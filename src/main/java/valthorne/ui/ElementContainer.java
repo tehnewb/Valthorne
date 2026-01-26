@@ -73,17 +73,17 @@ public abstract class ElementContainer extends Element {
     }
 
     /**
-     * Searches for and returns the top-most {@code Element} located at the specified coordinates (x, y)
-     * within this container. The method traverses through the child elements in reverse order, checking
-     * for visibility, enabled state, and whether the specified coordinates are within the bounds of
-     * each element.
+     * Recursively searches for an {@link Element} at a given position (x, y) within
+     * the container and its child elements. The method includes an optional
+     * 'click' flag to determine if click-through elements should be considered.
      *
-     * @param x the x-coordinate to check.
-     * @param y the y-coordinate to check.
-     * @return the top-most {@code Element} at the specified coordinates, or {@code null} if no element
-     * exists at that position.
+     * @param x     the x-coordinate to search for an element.
+     * @param y     the y-coordinate to search for an element.
+     * @param click if true, elements with the click-through property are ignored.
+     * @return the {@link Element} located at the specified position, or
+     * {@code null} if no element exists at that position.
      */
-    public Element findElementAt(float x, float y) {
+    public Element findElementAt(float x, float y, boolean click) {
         for (int i = size - 1; i >= 0; i--) {
             Element child = elements[i];
 
@@ -91,16 +91,26 @@ public abstract class ElementContainer extends Element {
                 continue;
 
             if (child instanceof ElementContainer container) {
-                Element hit = container.findElementAt(x, y);
-                if (hit != null)
+                Element hit = container.findElementAt(x, y, click);
+                if (hit != null) {
+                    if (click && hit.isClickThrough())
+                        continue;
                     return hit;
+                }
             }
 
-            if (child.inside(x, y))
+            if (child.inside(x, y)) {
+                if (click && child.isClickThrough())
+                    continue;
+
                 return child;
+            }
         }
 
-        return inside(x, y) ? this : null;
+        if (inside(x, y) && !isClickThrough())
+            return this;
+
+        return null;
     }
 
     @Override
@@ -120,6 +130,16 @@ public abstract class ElementContainer extends Element {
             if (element == null || element.isHidden())
                 continue;
             element.draw();
+        }
+    }
+
+    @Override
+    public void layout() {
+        super.layout();
+        for (Element element : elements) {
+            if (element == null || element.isHidden())
+                continue;
+            element.layout();
         }
     }
 

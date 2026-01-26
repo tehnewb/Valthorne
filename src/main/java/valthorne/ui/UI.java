@@ -11,6 +11,9 @@ import valthorne.event.listeners.WindowResizeListener;
 import valthorne.math.Vector2f;
 import valthorne.viewport.Viewport;
 
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+
 /**
  * The UI class represents the root container for a user interface, managing its child elements,
  * handling user input events (keyboard, mouse, scroll), and maintaining focus, hover, and press states.
@@ -47,13 +50,13 @@ public class UI extends ElementContainer {
     }
 
     @Override
-    public Element findElementAt(float x, float y) {
-        if (viewport == null) return super.findElementAt(x - this.getX(), y - this.getY());
+    public Element findElementAt(float x, float y, boolean click) {
+        if (viewport == null) return super.findElementAt(x - this.getX(), y - this.getY(), click);
 
         Vector2f world = viewport.screenToWorld(x, y);
         if (world == null) return null;
 
-        return super.findElementAt(world.getX(), world.getY());
+        return super.findElementAt(world.getX(), world.getY(), click);
     }
 
     @Override
@@ -67,12 +70,12 @@ public class UI extends ElementContainer {
 
     @Override
     protected void onAdd(Element element) {
-
+        element.layout();
     }
 
     @Override
     protected void onRemove(Element element) {
-
+        element.layout();
     }
 
     /**
@@ -85,12 +88,15 @@ public class UI extends ElementContainer {
      */
     public void setViewport(Viewport viewport) {
         this.viewport = viewport;
-        this.x = viewport.getX();
-        this.y = viewport.getY();
-        this.width = viewport.getWidth();
-        this.height = viewport.getHeight();
     }
 
+    /**
+     * Retrieves the current viewport of the user interface.
+     * The viewport defines the visible area of the UI and influences rendering and interaction
+     * within this area.
+     *
+     * @return the currently active {@code Viewport} instance, or null if no viewport is set.
+     */
     public Viewport getViewport() {
         return viewport;
     }
@@ -105,13 +111,16 @@ public class UI extends ElementContainer {
      *             Can be null to clear the focus. Must be focusable for the focus to be applied.
      */
     public void setFocusTo(Element next) {
-        if (focused == next) return;
+        if (focused == next)
+            return;
 
-        if (focused != null) focused.setFocused(false);
+        if (focused != null)
+            focused.setFocused(false);
 
         focused = (next != null && next.isFocusable()) ? next : null;
 
-        if (focused != null) focused.setFocused(true);
+        if (focused != null)
+            focused.setFocused(true);
     }
 
     /**
@@ -196,10 +205,11 @@ public class UI extends ElementContainer {
 
         @Override
         public void mousePressed(MousePressEvent event) {
-            Element target = findElementAt(event.getX(), event.getY());
+            Element target = findElementAt(event.getX(), event.getY(), true);
 
-            if (target != null) {
-                if (target.isFocusable()) setFocusTo(target);
+            if (target != null && !target.isClickThrough()) {
+                if (target.isFocusable())
+                    setFocusTo(target);
 
                 pressed = target;
                 pressed.setPressed(true);
@@ -225,7 +235,7 @@ public class UI extends ElementContainer {
 
         @Override
         public void mouseMoved(MouseMoveEvent event) {
-            Element target = findElementAt(event.getX(), event.getY());
+            Element target = findElementAt(event.getX(), event.getY(), true);
 
             if (target != hovered && hovered != null) {
                 hovered.setHovered(false);
@@ -252,7 +262,7 @@ public class UI extends ElementContainer {
 
         @Override
         public void mouseScrolled(MouseScrollEvent event) {
-            Element target = findElementAt(Mouse.getX(), Mouse.getY());
+            Element target = findElementAt(Mouse.getX(), Mouse.getY(), false);
             if (target == null) return;
 
             target.onMouseScroll(event);
@@ -275,22 +285,24 @@ public class UI extends ElementContainer {
 
         @Override
         public void windowResized(WindowResizeEvent event) {
-            propagateResize(UI.this, event);
-        }
+            new BiConsumer<Element, WindowResizeEvent>() {
+                @Override
+                public void accept(Element element, WindowResizeEvent e) {
+                    if (element == null)
+                        return;
 
-        private void propagateResize(Element element, WindowResizeEvent event) {
-            if (element == null) return;
+                    element.onWindowResize(e);
+                    element.layout();
 
-            element.onWindowResize(event);
-
-            if (element instanceof ElementContainer container) {
-                for (int i = 0; i < container.size; i++) {
-                    Element child = container.elements[i];
-                    if (child != null) {
-                        propagateResize(child, event);
+                    if (element instanceof ElementContainer container) {
+                        for (int i = 0; i < container.size; i++) {
+                            Element child = container.elements[i];
+                            if (child != null)
+                                this.accept(child, e);
+                        }
                     }
                 }
-            }
+            }.accept(UI.this, event);
         }
     }
 }

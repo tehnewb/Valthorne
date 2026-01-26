@@ -3,7 +3,7 @@ package valthorne.ui;
 import valthorne.math.Vector2f;
 
 /**
- * Defines horizontal and vertical alignment combinations used to position
+ * Defines horizontalAlignment and verticalAlignment alignment combinations used to position
  * elements relative to their container or another element.
  *
  * @author Albert Beaupre
@@ -11,55 +11,72 @@ import valthorne.math.Vector2f;
  */
 public enum Alignment {
 
-    CENTER_CENTER(Horizontal.CENTER, Vertical.CENTER),
+    /**
+     * Represents an alignment configuration where both horizontal and vertical alignments
+     * are centered. Specifically, the horizontal alignment is set to {@code HorizontalAlignment.CENTER}
+     * and the vertical alignment is set to {@code VerticalAlignment.CENTER}.
+     * <p>
+     * This alignment is commonly used to position elements in the exact center
+     * of a container or a specific area.
+     */
+    CENTER_CENTER(HorizontalAlignment.CENTER, VerticalAlignment.CENTER),
 
-    TOP_LEFT(Horizontal.LEFT, Vertical.TOP),
-    TOP_CENTER(Horizontal.CENTER, Vertical.TOP),
-    TOP_RIGHT(Horizontal.RIGHT, Vertical.TOP),
+    /**
+     * Represents an alignment configuration where horizontal alignment is set to {@code HorizontalAlignment.LEFT}
+     * and vertical alignment is set to {@code VerticalAlignment.TOP}.
+     * <p>
+     * This alignment is typically used to position elements at the top-left corner of a container or another element.
+     */
+    TOP_LEFT(HorizontalAlignment.LEFT, VerticalAlignment.TOP),
+    TOP_CENTER(HorizontalAlignment.CENTER, VerticalAlignment.TOP),
+    TOP_RIGHT(HorizontalAlignment.RIGHT, VerticalAlignment.TOP),
 
-    CENTER_LEFT(Horizontal.LEFT, Vertical.CENTER),
-    CENTER_RIGHT(Horizontal.RIGHT, Vertical.CENTER),
+    /**
+     * Represents an alignment configuration where horizontal alignment is set to {@code HorizontalAlignment.LEFT}
+     * and vertical alignment is set to {@code VerticalAlignment.CENTER}.
+     * <p>
+     * This alignment is typically used to position elements along the center of a container vertically,
+     * while aligning them to the left horizontally.
+     */
+    CENTER_LEFT(HorizontalAlignment.LEFT, VerticalAlignment.CENTER),
+    CENTER_RIGHT(HorizontalAlignment.RIGHT, VerticalAlignment.CENTER),
 
-    BOTTOM_LEFT(Horizontal.LEFT, Vertical.BOTTOM),
-    BOTTOM_CENTER(Horizontal.CENTER, Vertical.BOTTOM),
-    BOTTOM_RIGHT(Horizontal.RIGHT, Vertical.BOTTOM);
+    /**
+     * Represents an alignment configuration where the horizontal alignment is set to the leftmost position
+     * and the vertical alignment is set to the bottommost position.
+     * <p>
+     * This combination is useful when aligning elements towards the bottom-left corner
+     * relative to a specified reference.
+     */
+    BOTTOM_LEFT(HorizontalAlignment.LEFT, VerticalAlignment.BOTTOM),
+    BOTTOM_CENTER(HorizontalAlignment.CENTER, VerticalAlignment.BOTTOM),
+    BOTTOM_RIGHT(HorizontalAlignment.RIGHT, VerticalAlignment.BOTTOM);
 
-    public enum Horizontal {
-        LEFT,
-        CENTER,
-        RIGHT
+
+    private final HorizontalAlignment horizontalAlignment;
+    private final VerticalAlignment verticalAlignment;
+
+    Alignment(HorizontalAlignment horizontalAlignment, VerticalAlignment verticalAlignment) {
+        this.horizontalAlignment = horizontalAlignment;
+        this.verticalAlignment = verticalAlignment;
     }
 
-    public enum Vertical {
-        TOP,
-        CENTER,
-        BOTTOM
+    public HorizontalAlignment getHorizontal() {
+        return horizontalAlignment;
     }
 
-    private final Horizontal horizontal;
-    private final Vertical vertical;
-
-    Alignment(Horizontal horizontal, Vertical vertical) {
-        this.horizontal = horizontal;
-        this.vertical = vertical;
-    }
-
-    public Horizontal getHorizontal() {
-        return horizontal;
-    }
-
-    public Vertical getVertical() {
-        return vertical;
+    public VerticalAlignment getVertical() {
+        return verticalAlignment;
     }
 
     public static Vector2f align(Dimensional source, Sizeable target, Alignment alignment) {
-        float x = switch (alignment.horizontal) {
+        float x = switch (alignment.horizontalAlignment) {
             case LEFT -> source.getX();
             case RIGHT -> source.getX() + source.getWidth() - target.getWidth();
             case CENTER -> source.getX() + (source.getWidth() - target.getWidth()) * 0.5f;
         };
 
-        float y = switch (alignment.vertical) {
+        float y = switch (alignment.verticalAlignment) {
             case TOP -> source.getY() + source.getHeight() - target.getHeight();
             case BOTTOM -> source.getY();
             case CENTER -> source.getY() + (source.getHeight() - target.getHeight()) * 0.5f;

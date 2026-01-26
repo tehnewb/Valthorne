@@ -43,6 +43,7 @@ public class TextField extends Element {
     private boolean cursorActive = true;
     private float cursorBlinkTime;
     private float cursorBlinkInterval = 0.5f;
+    private float maxCaretHeight; // pixels, tweakable
 
     private float textOffsetX = 0f;
     private float padding = 10f;
@@ -64,6 +65,7 @@ public class TextField extends Element {
         this.font.setText(placeHolder);
         this.current = style.getBackground();
         this.setFocusable(true);
+        this.maxCaretHeight = font.getHeight() * 2;
     }
 
     @Override
@@ -94,15 +96,12 @@ public class TextField extends Element {
         float sx = x + padding - scissorFudge * 0.5f;
         float sw = (width - padding * 2) + scissorFudge;
 
-        glEnable(GL_SCISSOR_TEST);
-        viewport.applyScissor(sx, y, sw, height);
+        viewport.applyScissor(sx, y, sw, height, () -> {
+            if (isFocused() && hasSelection()) drawSelection();
 
-        if (isFocused() && hasSelection()) drawSelection();
-
-        font.draw();
-        drawCaret();
-
-        glDisable(GL_SCISSOR_TEST);
+            font.draw();
+            drawCaret();
+        });
     }
 
     private void drawSelection() {
@@ -112,8 +111,10 @@ public class TextField extends Element {
         float x1 = font.getX() + getTextWidthUpTo(a);
         float x2 = font.getX() + getTextWidthUpTo(b);
 
-        float top = y + caretPadY;
-        float bottom = y + height - caretPadY;
+        float caretHeight = getCaretHeight();
+        float centerY = y + height * 0.5f;
+        float top = centerY - caretHeight * 0.5f;
+        float bottom = centerY + caretHeight * 0.5f;
 
         glDisable(GL_TEXTURE_2D);
         glColor4f(1f, 1f, 1f, 0.35f);
@@ -132,8 +133,11 @@ public class TextField extends Element {
         if (!cursorActive || !isFocused()) return;
 
         float cx = font.getX() + getCursorX();
-        float top = y + caretPadY;
-        float bottom = y + height - caretPadY;
+        float caretHeight = getCaretHeight();
+
+        float centerY = y + height * 0.5f;
+        float top = centerY - caretHeight * 0.5f;
+        float bottom = centerY + caretHeight * 0.5f;
 
         glDisable(GL_TEXTURE_2D);
         glColor4f(1f, 1f, 1f, 1f);
@@ -471,7 +475,6 @@ public class TextField extends Element {
 
         this.text = value;
 
-        // Clamp cursor & selection
         cursorIndex = MathUtils.clamp(cursorIndex, 0, text.length());
         selectionStart = cursorIndex;
         selectionEnd = cursorIndex;
@@ -483,4 +486,10 @@ public class TextField extends Element {
     public String getText() {
         return text;
     }
+
+    private float getCaretHeight() {
+        float availHeight = height - caretPadY * 2;
+        return Math.min(maxCaretHeight, availHeight);
+    }
+
 }

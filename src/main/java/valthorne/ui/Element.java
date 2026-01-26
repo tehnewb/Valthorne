@@ -1,5 +1,6 @@
 package valthorne.ui;
 
+import valthorne.Window;
 import valthorne.event.events.*;
 
 /**
@@ -42,15 +43,16 @@ public abstract class Element implements Dimensional {
     private static final byte FOCUSED = 1 << 3;   // Flag indicating if element has keyboard focus
     private static final byte PRESSED = 1 << 4;   // Flag indicating if element is being clicked
     private static final byte FOCUSABLE = 1 << 5; // Flag indicating if element can receive focus
+    private static final byte CLICK_THROUGH = 1 << 6; // Flag indicating if element can receive focus
 
     private Element parent;     // Reference to parent element in hierarchy
     private int index = -1;     // Index of element within its parent container
     private byte flags;         // Bit flags storing element state
 
+    private Layout layout;
+
     protected float x, y;  // The position of the element in 2D space
     protected float width, height;  // The dimensions (width and height) of the element
-
-    private Layout layout;
 
     private UI ui;
 
@@ -180,6 +182,47 @@ public abstract class Element implements Dimensional {
         return x >= this.x && x <= this.x + width && y >= this.y && y <= this.y + height;
     }
 
+    /**
+     * Arranges the layout of the current object based on its parent or window dimensions.
+     * This method calculates and sets the position and size of the object using
+     * layout properties, such as x, y, width, and height.
+     * <p>
+     * If the object has a parent, the calculations take into account the parent's
+     * position and dimensions. Otherwise, the calculations use the window's dimensions.
+     * <p>
+     * The positioning and sizing are resolved through the layout's type and number
+     * properties to determine the final resolved position and size values.
+     * <p>
+     * This method ensures that the object is correctly positioned and sized within
+     * the boundaries of its parent or the window.
+     */
+    public void layout() {
+        if (layout == null) return;
+
+        boolean hasParent = parent != null;
+
+        float ox = hasParent ? parent.x : 0;
+        float oy = hasParent ? parent.y : 0;
+        float ow = hasParent ? parent.width : Window.getWidth();
+        float oh = hasParent ? parent.height : Window.getHeight();
+
+        if (layout.getX().type() == ValueType.AUTO) ox = this.x;
+        if (layout.getY().type() == ValueType.AUTO) oy = this.y;
+        if (layout.getWidth().type() == ValueType.AUTO) ow = this.width;
+        if (layout.getHeight().type() == ValueType.AUTO) oh = this.height;
+
+        float padL = layout.getLeftPadding().type().resolve(layout.getLeftPadding().number(), 0, ow, 0);
+        float padR = layout.getRightPadding().type().resolve(layout.getRightPadding().number(), 0, ow, 0);
+        float padT = layout.getTopPadding().type().resolve(layout.getTopPadding().number(), 0, oh, 0);
+        float padB = layout.getBottomPadding().type().resolve(layout.getBottomPadding().number(), 0, oh, 0);
+        float x = layout.getX().type().resolve(layout.getX().number(), ox, ow, ox);
+        float y = layout.getY().type().resolve(layout.getY().number(), oy, oh, oy);
+        float width = layout.getWidth().type().resolve(layout.getWidth().number(), 0, ow, ow) + padL + padR;
+        float height = layout.getHeight().type().resolve(layout.getHeight().number(), 0, oh, oh) + padT + padB;
+
+        setPosition(x, y);
+        setSize(width, height);
+    }
 
     /**
      * Sets the index of this element.
@@ -304,6 +347,26 @@ public abstract class Element implements Dimensional {
     }
 
     /**
+     * Determines whether the click-through behavior is enabled based on the current flags.
+     *
+     * @return true if the click-through behavior is enabled, false otherwise.
+     */
+    public boolean isClickThrough() {
+        return (flags & CLICK_THROUGH) != 0;
+    }
+
+    /**
+     * Sets the click-through behavior for the component.
+     * Enables or disables whether the component allows click-through interactions.
+     *
+     * @param value true to enable click-through behavior, false to disable it
+     */
+    public void setClickThrough(boolean value) {
+        if (value) flags |= CLICK_THROUGH;
+        else flags &= ~CLICK_THROUGH;
+    }
+
+    /**
      * Determines whether this element is currently in the "hovered" state.
      * The "hovered" state typically indicates that the mouse cursor is over the element.
      *
@@ -366,10 +429,10 @@ public abstract class Element implements Dimensional {
     }
 
     /**
-     * Sets the size of the object by specifying the width and height.
+     * Sets the size of the object based on the provided width and height values.
      *
-     * @param width  the width of the object
-     * @param height the height of the object
+     * @param width  the width value, which can be provided in pixels, percentage, or as a special value (AUTO or FILL)
+     * @param height the height value, which can be provided in pixels, percentage, or as a special value (AUTO or FILL)
      */
     public void setSize(float width, float height) {
         this.width = width;
@@ -406,6 +469,24 @@ public abstract class Element implements Dimensional {
     }
 
     /**
+     * Retrieves the current layout object.
+     *
+     * @return the Layout object representing the current layout configuration
+     */
+    public Layout getLayout() {
+        return layout;
+    }
+
+    /**
+     * Sets the layout for the current object.
+     *
+     * @param layout the Layout object to be set
+     */
+    public void setLayout(Layout layout) {
+        this.layout = layout;
+    }
+
+    /**
      * Sets the UI for this element and propagates the UI to child elements
      * if the object is an instance of ElementContainer.
      *
@@ -431,25 +512,5 @@ public abstract class Element implements Dimensional {
      */
     public UI getUI() {
         return ui;
-    }
-
-    /**
-     * Retrieves the current layout.
-     *
-     * @return the current Layout object
-     */
-    public Layout getLayout() {
-        if (layout == null)
-            layout = new Layout();
-        return layout;
-    }
-
-    /**
-     * Sets the layout to be used.
-     *
-     * @param layout the layout object to be set for this component
-     */
-    public void setLayout(Layout layout) {
-        this.layout = layout;
     }
 }

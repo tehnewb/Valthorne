@@ -202,7 +202,7 @@ public abstract class Viewport {
      *     <li>Save current OpenGL viewport</li>
      *     <li>Push projection and model-view matrices</li>
      *     <li>Apply this viewport's projection</li>
-     *     <li>Run the provided renderer</li>
+     *     <li>Run the provided action</li>
      *     <li>Restore all matrices</li>
      *     <li>Restore previous viewport</li>
      * </ol>
@@ -210,9 +210,9 @@ public abstract class Viewport {
      * <p>This allows multiple viewports (UI, game world, minimaps, etc.)
      * to exist in the same frame without interfering with each other.</p>
      *
-     * @param renderer a function containing draw calls to execute inside this viewport
+     * @param action a function containing draw calls to execute inside this viewport
      */
-    public void render(Runnable renderer) {
+    public void render(Runnable action) {
         glGetIntegerv(GL_VIEWPORT, oldViewport);
 
         glMatrixMode(GL_PROJECTION);
@@ -221,11 +221,10 @@ public abstract class Viewport {
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
 
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(x, y, width, height);
-        apply();
-        renderer.run();
-        glDisable(GL_SCISSOR_TEST);
+        applyScissor(0, 0, worldWidth, worldHeight, () -> {
+            apply();
+            action.run();
+        });
 
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
@@ -277,7 +276,7 @@ public abstract class Viewport {
      * @param ww world-space width
      * @param wh world-space height
      */
-    public void applyScissor(float wx, float wy, float ww, float wh) {
+    public void applyScissor(float wx, float wy, float ww, float wh, Runnable action) {
         float nx = wx / worldWidth;
         float ny = wy / worldHeight;
         float nw = ww / worldWidth;
@@ -304,7 +303,10 @@ public abstract class Viewport {
         if (sw <= 0 || sh <= 0)
             return;
 
+        glEnable(GL_SCISSOR_TEST);
         glScissor(sx, sy, sw, sh);
+        action.run();
+        glDisable(GL_SCISSOR_TEST);
     }
 
     /**

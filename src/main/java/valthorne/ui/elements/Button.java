@@ -69,9 +69,11 @@ public class Button extends Element {
         if (current == null)
             return;
 
-        current.draw(this.x, this.y, this.width, this.height);
+        this.getUI().getViewport().applyScissor(this.x, this.y, this.width, this.height, () -> {
+            current.draw(this.x, this.y, this.width, this.height);
 
-        font.draw();
+            font.draw();
+        });
     }
 
     @Override
@@ -114,18 +116,22 @@ public class Button extends Element {
     public void setPosition(float x, float y) {
         super.setPosition(x, y);
 
-        Vector2f alignment = Alignment.align(this, font, textAlignment);
+        Vector2f fontPosition = Alignment.align(this, font, textAlignment);
 
-        font.setPosition(alignment.getX(), alignment.getY());
+        font.setPosition(fontPosition.getX(), fontPosition.getY());
     }
 
     @Override
     public void setSize(float width, float height) {
         super.setSize(width, height);
 
-        Vector2f alignment = Alignment.align(this, font, textAlignment);
+        Vector2f fontPosition = Alignment.align(this, font, textAlignment);
 
-        font.setPosition(alignment.getX(), alignment.getY());
+        font.setPosition(fontPosition.getX(), fontPosition.getY());
+    }
+
+    public Font getFont() {
+        return font;
     }
 
     public Button setText(String text) {

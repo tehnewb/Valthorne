@@ -89,3 +89,5 @@ $RECYCLE.BIN/
 lwjgl/
 proto/
 /assets/
+/private/
+gradle.properties
