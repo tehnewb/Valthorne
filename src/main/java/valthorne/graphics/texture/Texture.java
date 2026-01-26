@@ -136,12 +136,12 @@ public class Texture {
     private boolean flippedY;
 
     /**
-     * Horizontal scaling factor applied during vertex generation.
+     * HorizontalAlignment scaling factor applied during vertex generation.
      */
     private float scaleX = 1f;
 
     /**
-     * Vertical scaling factor applied during vertex generation.
+     * VerticalAlignment scaling factor applied during vertex generation.
      */
     private float scaleY = 1f;
 
@@ -284,7 +284,7 @@ public class Texture {
      *
      * <p>This operation mirrors the texture along the X-axis (top ↔ bottom).
      * Like {@link #flipX()}, this affects only UV coordinates and leaves the
-     * geometry, origin, and rotation untouched. Vertical flipping is useful
+     * geometry, origin, and rotation untouched. VerticalAlignment flipping is useful
      * for texture formats loaded upside-down, sprite animations, or user-driven
      * visual transformations.</p>
      *
@@ -301,7 +301,7 @@ public class Texture {
     /**
      * Enables or disables horizontal flipping of the texture's UV coordinates.
      *
-     * <p>Horizontal flipping swaps the left and right UV values, causing the
+     * <p>HorizontalAlignment flipping swaps the left and right UV values, causing the
      * texture to mirror along the Y-axis (left ↔ right). This is purely a UV
      * transformation and does not affect the vertex positions or rotation.</p>
      *
@@ -322,7 +322,7 @@ public class Texture {
     /**
      * Enables or disables vertical flipping of the texture's UV coordinates.
      *
-     * <p>Vertical flipping swaps the top and bottom UV values, causing the
+     * <p>VerticalAlignment flipping swaps the top and bottom UV values, causing the
      * texture to mirror along the X-axis (top ↔ bottom). Like horizontal flipping,
      * this affects only UV mapping and leaves geometry unchanged.</p>
      *

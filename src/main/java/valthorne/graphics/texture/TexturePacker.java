@@ -21,13 +21,6 @@ import java.util.List;
 public class TexturePacker {
 
     /**
-     * Internal structure describing a single copy operation from a source texture
-     * into the final atlas buffer.
-     */
-    private record RegionRequest(TextureData src, int sx, int sy, int sw, int sh, int dx, int dy) {
-    }
-
-    /**
      * List of all pending region copy requests.
      */
     private final List<RegionRequest> regions = new ArrayList<>();
@@ -88,11 +81,12 @@ public class TexturePacker {
             result.put((byte) 0); // B
             result.put((byte) 0); // A
         }
-        result.flip(); // position=0, limit=capacity
+        result.flip();
 
         // Copy each region into atlas
         for (RegionRequest r : regions) {
             blitRegion(r, result);
+            System.out.println(r);
         }
 
         // Atlas is ready in CPU memory
@@ -133,11 +127,19 @@ public class TexturePacker {
                 // Destination atlas also bottom-up
                 int dstIndex = ((finalHeight - 1 - dstY) * finalWidth + dstX) * 4;
 
+                System.out.println("Dest Index: " + dstIndex + " Src Index: " + srcIndex);
                 destAtlas.put(dstIndex, srcPixels.get(srcIndex));
                 destAtlas.put(dstIndex + 1, srcPixels.get(srcIndex + 1));
                 destAtlas.put(dstIndex + 2, srcPixels.get(srcIndex + 2));
                 destAtlas.put(dstIndex + 3, srcPixels.get(srcIndex + 3));
             }
         }
+    }
+
+    /**
+     * Internal structure describing a single copy operation from a source texture
+     * into the final atlas buffer.
+     */
+    private record RegionRequest(TextureData src, int sx, int sy, int sw, int sh, int dx, int dy) {
     }
 }

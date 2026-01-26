@@ -226,8 +226,7 @@ public final class Assets {
                     .supplyAsync(() -> {
                         AssetLoader loader = loaders.get(parameters.getClass());
                         if (loader == null)
-                            throw new IllegalStateException("No loader registered for "
-                                    + parameters.getClass().getName());
+                            throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
 
                         return loader.load(parameters);
                     }, service)

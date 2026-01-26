@@ -16,8 +16,7 @@ import java.nio.file.Paths;
  * @param bitsPerSample The number of bits used to represent each sample (e.g., 16, 24).
  * @param pcm16         An array of PCM audio samples decoded as signed 16-bit values.
  */
-public record SoundData(ByteBuffer data, float duration, int channels, int sampleRate, int bitsPerSample,
-                        short[] pcm16) {
+public record SoundData(ByteBuffer data, float duration, int channels, int sampleRate, int bitsPerSample, short[] pcm16) {
 
     /**
      * Loads a sound file into a {@code SoundData} object from the provided byte array.

@@ -1,15 +1,7 @@
 package valthorne.ui;
 
-public enum Anchor {
-    TOP_LEFT,
-    TOP_CENTER,
-    TOP_RIGHT,
+public class Anchor {
 
-    CENTER_LEFT,
-    CENTER,
-    CENTER_RIGHT,
+    private Dimensional anchoringTo;
 
-    BOTTOM_LEFT,
-    BOTTOM_CENTER,
-    BOTTOM_RIGHT
 }

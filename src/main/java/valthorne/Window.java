@@ -1,10 +1,10 @@
 package valthorne;
 
-import valthorne.event.events.WindowResizeEvent;
-import valthorne.event.listeners.WindowResizeListener;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
+import valthorne.event.events.WindowResizeEvent;
+import valthorne.event.listeners.WindowResizeListener;
 
 import java.nio.IntBuffer;
 
@@ -67,10 +67,12 @@ public final class Window {
         glfwSwapInterval(swapInterval.getInterval());
         GL.createCapabilities();
 
-        // Set up all window callbacks
         fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
         });
         sizeCallback = glfwSetWindowSizeCallback(address, (win, newW, newH) -> {
+            if (newW <= 0 || newH <= 0)
+                return; // it keeps making the width and height to 0 when minimizing
+
             short oldWidth = Window.width;
             short oldHeight = Window.height;
             Window.width = (short) newW;
