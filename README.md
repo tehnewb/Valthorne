@@ -33,3 +33,34 @@ Valthorne is a lightweight 2D game library that wraps LWJGL to remove boilerplat
 
 ### Bottom line
 Valthorne excels at rapidly standing up polished 2D applications with a skinnable UI and minimal LWJGL boilerplate. If you want to prototype or ship a 2D tool/game with custom-styled controls, simple layout, and a clean app loop without wrestling with raw GLFW/OpenGL setup, this project does it perfectly.
+## Getting Started
+
+Add Valthorne to your build as a dependency.
+
+### Gradle (Groovy)
+```groovy
+dependencies {
+    implementation 'io.github.tehnewb:Valthorne:1.0.0'
+}
+```
+
+### Gradle (Kotlin DSL)
+```kotlin
+dependencies {
+    implementation("io.github.tehnewb:Valthorne:1.0.0")
+}
+```
+
+### Maven
+```xml
+<dependency>
+    <groupId>io.github.tehnewb</groupId>
+    <artifactId>Valthorne</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+Notes:
+- Valthorne wraps LWJGL. If you run on desktop, ensure LWJGL natives for your OS are available at runtime. If your project doesn’t already include them, add the appropriate LWJGL classifier dependencies (e.g., `natives-windows`, `natives-linux`, `natives-macos`).
+- Requires a recent JDK (the library is built with Java 23 toolchain).
+- A project builder will be done in the future so all of this can be generated for you

@@ -91,3 +91,5 @@ proto/
 /assets/
 /private/
 gradle.properties
+sonatype-token.png
+signing-data.png
