@@ -2,34 +2,18 @@ package valthorne.graphics.font;
 
 import valthorne.asset.AssetParameters;
 
-public class FontParameters implements AssetParameters {
-
-    private final String name;
-    private final int fontSize;
-    private final int firstCharacterIndex;
-    private final int characterCount;
-
-    public FontParameters(String name, int fontSize, int firstCharacterIndex, int characterCount) {
-        this.name = name;
-        this.fontSize = fontSize;
-        this.firstCharacterIndex = firstCharacterIndex;
-        this.characterCount = characterCount;
-    }
+/**
+ * Represents the parameters required for defining font attributes in a system.
+ * This record encapsulates essential font-related properties such as the font's name,
+ * size, and the range of characters it covers.
+ * <p>
+ * This implementation also provides a mechanism to retrieve a unique key for the font,
+ * which can be used to identify and manage the font configuration in a system.
+ */
+public record FontParameters(String name, int fontSize, int firstCharacterIndex, int characterCount) implements AssetParameters {
 
     public FontParameters(String name, int fontSize) {
         this(name, fontSize, 30, 254);
-    }
-
-    public int getFirstCharacterIndex() {
-        return firstCharacterIndex;
-    }
-
-    public int getCharacterCount() {
-        return characterCount;
-    }
-
-    public int getFontSize() {
-        return fontSize;
     }
 
     @Override

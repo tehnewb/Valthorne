@@ -43,7 +43,7 @@ public abstract class Element implements Dimensional {
     private static final byte FOCUSED = 1 << 3;   // Flag indicating if element has keyboard focus
     private static final byte PRESSED = 1 << 4;   // Flag indicating if element is being clicked
     private static final byte FOCUSABLE = 1 << 5; // Flag indicating if element can receive focus
-    private static final byte CLICK_THROUGH = 1 << 6; // Flag indicating if element can receive focus
+    private static final byte CLICK_THROUGH = 1 << 6; // Flag indicating if element can be clicked through
 
     private Element parent;     // Reference to parent element in hierarchy
     private int index = -1;     // Index of element within its parent container

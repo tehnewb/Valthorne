@@ -1,7 +1,7 @@
 package valthorne.ui;
 
 public enum HorizontalAlignment {
-        LEFT,
-        CENTER,
-        RIGHT
-    }
+    LEFT,
+    CENTER,
+    RIGHT
+}

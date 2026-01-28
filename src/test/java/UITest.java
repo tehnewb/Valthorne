@@ -53,7 +53,7 @@ public class UITest implements Application {
         TextureData checkboxCheckmark = TextureData.load("./assets/ui/checkbox-checkmark.png");
         TextureData checkboxHovered = TextureData.load("./assets/ui/checkbox-hovered.png");
 
-        FontData font = FontData.load("./assets/ui/font.otf", 26, 0, 254);
+        FontData font = FontData.load("./assets/ui/font.ttf", 19, 0, 254);
 
         ButtonStyle buttonStyle = ButtonStyle.of()
                 .background(new NinePatchDrawable(new NinePatchTexture(buttonNormal, 6, 6, 6, 6)))
@@ -75,7 +75,7 @@ public class UITest implements Application {
         TextField password = new TextField("Password", textFieldStyle, e -> {});
         password.setMasking(true);
 
-        Button button = new Button("Login", buttonStyle);
+        Button button = new Button("Loginsadasfffffffffffffffffffffffffffffffffffffffffffasdfasdfasdfasdf", buttonStyle);
         Checkbox checkbox = new Checkbox(checkboxStyle);
         checkbox.setSize(16, 16);
 
@@ -91,6 +91,12 @@ public class UITest implements Application {
                 .setX(Value.percentage(0.25f + 0.25f / 2f))
                 .setY(Value.percentage(0.4f)));
 
+        button.setLayout(new Layout()
+                .setHeight(Value.pixels(40f))
+                .setWidth(Value.percentage(0.5f))
+                .setX(Value.percentage(0.5f - 0.5f / 2f))
+                .setY(Value.percentage(0.8f)));
+
         button.setAction(b -> {
             System.out.println("Username/Password: " + username.getText() + "/" + password.getText());
             System.out.println("Remember me? " + checkbox.isChecked());
@@ -98,6 +104,8 @@ public class UITest implements Application {
 
         ui.addElement(username);
         ui.addElement(password);
+        ui.addElement(button);
+        ui.addElement(checkbox);
 
         Window.addWindowResizeListener(event -> {
             viewport.update(event.getNewWidth(), event.getNewHeight());

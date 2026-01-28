@@ -97,6 +97,24 @@ public class JGL {
     }
 
     /**
+     * Unregisters an {@code EventListener} for a specific type of {@code Event}.
+     * The provided {@code listener} will no longer handle events of the specified {@code eventType}.
+     * Throws a {@code NullPointerException} if either the {@code eventType} or {@code listener} is null.
+     *
+     * @param <T>       the type of {@code Event} the listener was handling
+     * @param eventType the class object representing the type of event to be unregistered
+     * @param listener  the {@code EventListener} to be unregistered from handling the specified event type
+     * @throws NullPointerException if {@code eventType} or {@code listener} is null
+     */
+    public static <T extends Event> void unsubscribe(Class<T> eventType, EventListener<T> listener) {
+        if (eventType == null)
+            throw new NullPointerException("A null event type cannot be unregistered for event listeners.");
+        if (listener == null)
+            throw new NullPointerException("A null EventListener cannot be unregistered for " + eventType.getSimpleName() + " events.");
+        events.unregister(eventType, listener);
+    }
+
+    /**
      * Publishes the specified {@code Event} to the event bus, allowing all
      * registered listeners for the event's type to handle it. If the event
      * is null, a {@code NullPointerException} is thrown.

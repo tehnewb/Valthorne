@@ -1,10 +1,10 @@
 package valthorne;
 
+import org.lwjgl.glfw.GLFWKeyCallback;
 import valthorne.event.events.KeyEvent;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.KeyReleaseEvent;
 import valthorne.event.listeners.KeyListener;
-import org.lwjgl.glfw.GLFWKeyCallback;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -115,6 +115,20 @@ public final class Keyboard {
         if (listener == null)
             throw new NullPointerException("A null KeyListener cannot be added");
         JGL.subscribe(KeyEvent.class, listener);
+    }
+
+    /**
+     * Removes a previously registered {@code KeyListener} from receiving keyboard
+     * event notifications. The listener will no longer receive key press and key
+     * release events after removal.
+     *
+     * @param listener the {@code KeyListener} to be removed; must not be {@code null}
+     * @throws NullPointerException if the provided {@code listener} is {@code null}
+     */
+    public static void removeKeyListener(KeyListener listener) {
+        if (listener == null)
+            throw new NullPointerException("A null KeyListener cannot be removed");
+        JGL.unsubscribe(KeyEvent.class, listener);
     }
 
     /**
