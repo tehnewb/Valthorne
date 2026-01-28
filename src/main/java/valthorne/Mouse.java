@@ -1,11 +1,11 @@
 package valthorne;
 
-import valthorne.event.events.*;
-import valthorne.event.listeners.MouseListener;
-import valthorne.event.listeners.MouseScrollListener;
 import org.lwjgl.glfw.GLFWCursorPosCallback;
 import org.lwjgl.glfw.GLFWMouseButtonCallback;
 import org.lwjgl.glfw.GLFWScrollCallback;
+import valthorne.event.events.*;
+import valthorne.event.listeners.MouseListener;
+import valthorne.event.listeners.MouseScrollListener;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -172,6 +172,21 @@ public final class Mouse {
         if (listener == null)
             throw new NullPointerException("A null MouseListener cannot be added");
         JGL.subscribe(MouseEvent.class, listener);
+    }
+
+    /**
+     * Removes a {@code MouseListener} from the system to stop handling mouse-related events.
+     * The listener will no longer receive notifications for various mouse events, including
+     * movement, button presses/releases, and dragging.
+     *
+     * @param listener the {@code MouseListener} to be removed.
+     *                 Must not be {@code null}.
+     * @throws NullPointerException if the provided listener is {@code null}.
+     */
+    public static void removeMouseListener(MouseListener listener) {
+        if (listener == null)
+            throw new NullPointerException("A null MouseListener cannot be removed");
+        JGL.unsubscribe(MouseEvent.class, listener);
     }
 
     /**

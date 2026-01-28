@@ -6,7 +6,7 @@ public class FontLoader implements AssetLoader<FontParameters, FontData> {
 
     @Override
     public FontData load(FontParameters parameters) {
-        return FontData.load(parameters.key(), parameters.getFontSize(), parameters.getFirstCharacterIndex(), parameters.getCharacterCount());
+        return FontData.load(parameters.key(), parameters.fontSize(), parameters.firstCharacterIndex(), parameters.characterCount());
     }
 
 }

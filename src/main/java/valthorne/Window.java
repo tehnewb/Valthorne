@@ -136,6 +136,18 @@ public final class Window {
     }
 
     /**
+     * Removes a window resize event listener.
+     *
+     * @param listener The listener to remove
+     * @throws NullPointerException if the listener is null
+     */
+    public static void removeWindowResizeListener(WindowResizeListener listener) {
+        if (listener == null)
+            throw new NullPointerException("A null WindowResizeListener cannot be removed");
+        JGL.unsubscribe(WindowResizeEvent.class, listener);
+    }
+
+    /**
      * @return true if window should close, false otherwise
      */
     static boolean shouldClose() {
