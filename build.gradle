@@ -12,7 +12,28 @@ repositories {
 }
 
 def lwjglVersion = "3.3.4"
-def lwjglNatives = "natives-windows"
+def os = org.gradle.internal.os.OperatingSystem.current()
+def arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT)
+def lwjglNatives
+
+if (os.isWindows()) {
+    lwjglNatives = "natives-windows"
+} else if (os.isMacOsX()) {
+    // LWJGL uses "natives-macos" (intel) and "natives-macos-arm64" (Apple Silicon)
+    lwjglNatives = arch.contains("aarch64") || arch.contains("arm64") ? "natives-macos-arm64" : "natives-macos"
+} else { // Linux / Unix
+    // Common LWJGL classifiers:
+    // - natives-linux (x64)
+    // - natives-linux-arm64 (aarch64/arm64)
+    // - natives-linux-arm32 (armv7/arm)
+    if (arch.contains("aarch64") || arch.contains("arm64")) {
+        lwjglNatives = "natives-linux-arm64"
+    } else if (arch.contains("arm")) {
+        lwjglNatives = "natives-linux-arm32"
+    } else {
+        lwjglNatives = "natives-linux"
+    }
+}
 
 dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
@@ -36,7 +57,7 @@ dependencies {
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(23) }
     withSourcesJar()
-    withJavadocJar() // keep the standard javadoc jar
+    withJavadocJar()
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -50,11 +71,6 @@ tasks.withType(Javadoc).configureEach {
     failOnError = false
 }
 
-/**
- * The Vanniktech plugin often creates an extra "plainJavadocJar" which conflicts
- * with java.withJavadocJar() (both publish classifier "javadoc").
- * We disable the extra one to avoid: multiple artifacts with identical extension/classifier.
- */
 tasks.matching { it.name == "plainJavadocJar" }.configureEach {
     enabled = false
 }
