@@ -60,3 +60,22 @@ Notes:
 - Valthorne wraps LWJGL. If you run on desktop, ensure LWJGL natives for your OS are available at runtime. If your project doesn’t already include them, add the appropriate LWJGL classifier dependencies (e.g., `natives-windows`, `natives-linux`, `natives-macos`).
 - Requires a recent JDK (the library is built with Java 23 toolchain).
 - A project builder will be done in the future so all of this can be generated for you
+
+### What I'm currently working on
+- UI system
+    - Easy to construct UI system possibly based on chaining
+    - System similar to CSS when designing the layout
+    - I'm thinking about creating a shader for painting based on CSS attributes
+       - I have prototyped this system probably 5 times already and have failed miserably because I'm picky how I want it, so for now we're just dealing with a skin system how libGDX does it.
+    - Element transitions and effects
+
+### What I plan on doing
+- Shaders
+- Lighting
+- Tilemaps
+- Basic effects like tint/alpha, additive/muliply blend, particles
+- Animation system based on sprite sheets or a collection of sprites
+- State machine system that switches based on conditions
+- Scenes
+- Physics & collision system
+- Controller support
