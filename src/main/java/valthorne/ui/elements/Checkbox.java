@@ -61,12 +61,7 @@ public class Checkbox extends Element {
             current = style.getHovered();
         else current = style.getBackground();
 
-        checked = !checked;
-
-        if (action == null)
-            return;
-        if (checked)
-            action.perform(this);
+        setChecked(!checked);
     }
 
     public Checkbox setStyle(CheckboxStyle style) {
@@ -119,6 +114,8 @@ public class Checkbox extends Element {
 
     public Checkbox setChecked(boolean checked) {
         this.checked = checked;
+        if (action != null)
+            action.perform(this);
         return this;
     }
 }

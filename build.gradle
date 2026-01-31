@@ -19,13 +19,8 @@ def lwjglNatives
 if (os.isWindows()) {
     lwjglNatives = "natives-windows"
 } else if (os.isMacOsX()) {
-    // LWJGL uses "natives-macos" (intel) and "natives-macos-arm64" (Apple Silicon)
     lwjglNatives = arch.contains("aarch64") || arch.contains("arm64") ? "natives-macos-arm64" : "natives-macos"
-} else { // Linux / Unix
-    // Common LWJGL classifiers:
-    // - natives-linux (x64)
-    // - natives-linux-arm64 (aarch64/arm64)
-    // - natives-linux-arm32 (armv7/arm)
+} else {
     if (arch.contains("aarch64") || arch.contains("arm64")) {
         lwjglNatives = "natives-linux-arm64"
     } else if (arch.contains("arm")) {
@@ -79,7 +74,7 @@ mavenPublishing {
     coordinates(group.toString(), project.name.toString(), version.toString())
     pom {
         name = "Valthorne"
-        description = "2d game library"
+        description = "2D game library"
         inceptionYear = "2025"
         url = "https://github.com/tehnewb/Valthorne"
 

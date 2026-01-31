@@ -56,9 +56,9 @@ public class UIOrthographicCamera2D extends Camera2D {
         float w = worldWidth / zoom;
         float h = worldHeight / zoom;
 
-        float left   = center.getX();
-        float right  = center.getX() + w;
-        float top    = center.getY();
+        float left = center.getX();
+        float right = center.getX() + w;
+        float top = center.getY();
         float bottom = center.getY() + h;
 
         // Build a top-left aligned orthographic projection for UI rendering

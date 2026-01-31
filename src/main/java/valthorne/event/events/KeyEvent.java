@@ -39,15 +39,6 @@ public class KeyEvent extends Event {
     }
 
     /**
-     * Sets the key code for this event.
-     *
-     * @param key the key code to set, which will be stored as a {@code short} value
-     */
-    public void setKey(int key) {
-        this.key = (short) key;
-    }
-
-    /**
      * Sets the modifier flags for this event. Modifier flags indicate which
      * modifier keys (e.g., shift, control, alt, super) were active during the event.
      *
@@ -67,6 +58,15 @@ public class KeyEvent extends Event {
      */
     public short getKey() {
         return key;
+    }
+
+    /**
+     * Sets the key code for this event.
+     *
+     * @param key the key code to set, which will be stored as a {@code short} value
+     */
+    public void setKey(int key) {
+        this.key = (short) key;
     }
 
     /**

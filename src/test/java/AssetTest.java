@@ -17,6 +17,10 @@ public class AssetTest implements Application {
     private Font font;
     private SoundPlayer player;
 
+    public static void main(String[] args) {
+        JGL.init(new AssetTest(), "Asset Test", 1280, 720);
+    }
+
     @Override
     public void init() {
         try {
@@ -64,9 +68,5 @@ public class AssetTest implements Application {
     @Override
     public void dispose() {
         Assets.shutdown();
-    }
-
-    public static void main(String[] args) {
-        JGL.init(new AssetTest(), "Asset Test", 1280, 720);
     }
 }

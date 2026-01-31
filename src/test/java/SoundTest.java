@@ -13,6 +13,10 @@ public class SoundTest implements Application {
 
     private SoundPlayer active;  // <-- currently selected sound
 
+    public static void main(String[] args) {
+        JGL.init(new SoundTest(), "SoundPlayer Multi-Sound Test", 1280, 720);
+    }
+
     @Override
     public void init() {
         sound1 = Audio.load("src/test/resources/test-sound-4.mp3");
@@ -166,9 +170,5 @@ public class SoundTest implements Application {
         if (sound1 != null) sound1.dispose();
         if (sound2 != null) sound2.dispose();
         if (sound3 != null) sound3.dispose();
-    }
-
-    public static void main(String[] args) {
-        JGL.init(new SoundTest(), "SoundPlayer Multi-Sound Test", 1280, 720);
     }
 }

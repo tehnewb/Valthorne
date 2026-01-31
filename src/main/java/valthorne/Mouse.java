@@ -35,6 +35,38 @@ import static org.lwjgl.glfw.GLFW.*;
 public final class Mouse {
 
     /**
+     * Left mouse button (button index 0).
+     */
+    public static final int LEFT = 0;
+    /**
+     * Right mouse button (button index 1).
+     */
+    public static final int RIGHT = 1;
+    /**
+     * Middle mouse button (button index 2), usually the scroll wheel click.
+     */
+    public static final int MIDDLE = 2;
+    /**
+     * Extra mouse button #3 (typically side/back button).
+     */
+    public static final int BUTTON_3 = 3;
+    /**
+     * Extra mouse button #4 (typically side/forward button).
+     */
+    public static final int BUTTON_4 = 4;
+    /**
+     * Extra mouse button #5.
+     */
+    public static final int BUTTON_5 = 5;
+    /**
+     * Extra mouse button #6.
+     */
+    public static final int BUTTON_6 = 6;
+    /**
+     * Extra mouse button #7.
+     */
+    public static final int BUTTON_7 = 7;
+    /**
      * Pre-allocated mouse event instances for reuse.
      */
     private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0);
@@ -42,47 +74,39 @@ public final class Mouse {
     private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0);
     private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0);
     private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0);
-
     /**
      * GLFW callback for handling mouse movement. This callback updates cursor
      * coordinates and publishes a {@link MouseMoveEvent} whenever the user moves
      * the mouse cursor.
      */
     private static GLFWCursorPosCallback cursorPosCallback;
-
     /**
      * GLFW callback for handling mouse button interactions. This callback receives
      * button press and release actions and publishes {@link MousePressEvent} or
      * {@link MouseReleaseEvent} as appropriate.
      */
     private static GLFWMouseButtonCallback mouseButtonCallback;
-
     /**
      * GLFW callback for handling scroll wheel input. Publishes {@link MouseScrollEvent}
      * whenever vertical or horizontal scrolling occurs.
      */
     private static GLFWScrollCallback scrollCallback;
-
     /**
      * The current X position of the mouse cursor relative to the window.
      */
     private static short x;
-
     /**
      * The current Y position of the mouse cursor relative to the window.
      */
     private static short y;
-
     /**
      * Bitmask of mouse button states, where each bit corresponds to a mouse button.
      */
     private static byte buttonState;
-
     /**
      * Bitmask representing the current state of modifier keys (Shift, Control, Alt, Super).
      */
     private static byte modifierState;
-
     /**
      * Represents the horizontal scroll offset of the mouse wheel.
      */
@@ -308,44 +332,4 @@ public final class Mouse {
     public boolean isSuperDown() {
         return (modifierState & GLFW_MOD_SUPER) != 0;
     }
-
-    /**
-     * Left mouse button (button index 0).
-     */
-    public static final int LEFT = 0;
-
-    /**
-     * Right mouse button (button index 1).
-     */
-    public static final int RIGHT = 1;
-
-    /**
-     * Middle mouse button (button index 2), usually the scroll wheel click.
-     */
-    public static final int MIDDLE = 2;
-
-    /**
-     * Extra mouse button #3 (typically side/back button).
-     */
-    public static final int BUTTON_3 = 3;
-
-    /**
-     * Extra mouse button #4 (typically side/forward button).
-     */
-    public static final int BUTTON_4 = 4;
-
-    /**
-     * Extra mouse button #5.
-     */
-    public static final int BUTTON_5 = 5;
-
-    /**
-     * Extra mouse button #6.
-     */
-    public static final int BUTTON_6 = 6;
-
-    /**
-     * Extra mouse button #7.
-     */
-    public static final int BUTTON_7 = 7;
 }

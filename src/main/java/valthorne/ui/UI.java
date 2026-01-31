@@ -12,35 +12,29 @@ import valthorne.math.Vector2f;
 import valthorne.viewport.Viewport;
 
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /**
- * The UI class represents the root container for a user interface, managing its child elements,
- * handling user input events (keyboard, mouse, scroll), and maintaining focus, hover, and press states.
- * This class extends the ElementContainer to provide support for hierarchical UI elements.
+ * Represents the main user interface (UI) container for managing and rendering hierarchical
+ * UI elements. Provides support for focusing elements, handling mouse and keyboard events,
+ * and rendering with optional viewport integration. This class serves as the root container
+ * for all UI elements and ensures proper event propagation and element state management.
  * <p>
- * The UI serves as the central component of the system, handling user interaction and delegating
- * input events to the appropriate child elements based on their states and positions.
- *
- * @author Albert Beaupre
- * @since December 22nd, 2025
+ * The {@code UI} class integrates with the application's input and window systems to
+ * interact with user input and respond to window resizing events. It provides methods
+ * to control focus, handle input events, and manage the viewport for rendering.
+ * <p>
+ * Inherits from {@code ElementContainer}, enabling it to hold child elements and manage their layout.
  */
 public class UI extends ElementContainer {
 
     private Element focused; // The currently focused UI element
     private Element pressed; // The UI element that is currently being pressed
     private Element hovered; // The UI element that the mouse is currently hovering over
-
     private Viewport viewport;
 
     /**
-     * Constructor for the UI class.
-     * Initializes the user interface by adding event listeners for keyboard actions,
-     * mouse clicks, and mouse scroll events.
-     * It associates the following listeners:
-     * - Key events handled by UIKeyListener.
-     * - Mouse click events handled by UIMouseListener.
-     * - Mouse scroll events handled by UIScrollListener.
+     * Constructs a new UI instance and initializes input listeners for handling user interactions.
+     * It sets up listeners for keyboard input, mouse clicks, mouse scroll actions, and window resizing events.
      */
     public UI() {
         Keyboard.addKeyListener(new UIKeyListener());
@@ -79,64 +73,23 @@ public class UI extends ElementContainer {
     }
 
     /**
-     * Sets the viewport for the user interface. The viewport defines the visible
-     * area of the user interface and impacts the rendering and interaction of elements
-     * within the UI. Assigning a new viewport replaces the currently active one.
+     * Assigns focus to the specified element if it is focusable, visible, and not disabled.
+     * If the given element is null or does not meet these criteria, no element is focused.
+     * Removes focus from the previously focused element, if any.
      *
-     * @param viewport the {@code Viewport} instance to set as the current viewport.
-     *                 It cannot be null to avoid rendering issues.
-     */
-    public void setViewport(Viewport viewport) {
-        this.viewport = viewport;
-    }
-
-    /**
-     * Retrieves the current viewport of the user interface.
-     * The viewport defines the visible area of the UI and influences rendering and interaction
-     * within this area.
-     *
-     * @return the currently active {@code Viewport} instance, or null if no viewport is set.
-     */
-    public Viewport getViewport() {
-        return viewport;
-    }
-
-    /**
-     * Updates the currently focused element in the user interface.
-     * Removes focus from the previously focused element, if any,
-     * and assigns focus to the provided element if it is focusable.
-     * If the provided element is null or not focusable, no element will be focused.
-     *
-     * @param next the element to set as the currently focused element.
-     *             Can be null to clear the focus. Must be focusable for the focus to be applied.
+     * @param next the element to set focus to; may be null
      */
     public void setFocusTo(Element next) {
-        if (focused == next)
-            return;
+        if (focused == next) return;
 
-        if (focused != null)
-            focused.setFocused(false);
+        if (focused != null) focused.setFocused(false);
 
-        focused = (next != null && next.isFocusable()) ? next : null;
+        focused = (next != null && next.isFocusable() && !next.isHidden() && !next.isDisabled()) ? next : null;
 
-        if (focused != null)
-            focused.setFocused(true);
+        if (focused != null) focused.setFocused(true);
     }
 
-    /**
-     * Retrieves the currently focused element in the user interface.
-     *
-     * @return the currently focused {@link Element}, or null if no element is focused.
-     */
-    public Element getFocused() {
-        return focused;
-    }
-
-    /**
-     * Retrieves the parent element of this element.
-     *
-     * @return the parent element, or null if this element has no parent.
-     */
+    @Override
     public Element getParent() {
         return this;
     }
@@ -147,25 +100,150 @@ public class UI extends ElementContainer {
     }
 
     /**
-     * The UIKeyListener class is a private implementation of the KeyListener interface
-     * within the context of the UI class. It provides specific handling behavior for
-     * key events (key press and key release) associated with the currently focused
-     * element in the user interface.
+     * Focuses the next focusable element in UI tree order (depth-first).
+     * If nothing is focused, focuses the first focusable element.
+     */
+    public void focusNext() {
+        Element next = findNextFocusable(focused);
+        setFocusTo(next);
+    }
+
+    /**
+     * Finds the next focusable element after {@code from} in depth-first order.
+     * Wraps around to the first focusable element if needed.
+     */
+    private Element findNextFocusable(Element from) {
+        if (from == null) return findFirstFocusable(this);
+
+        Element[] found = new Element[]{null};
+        boolean[] seenFrom = new boolean[]{false};
+
+        new BiConsumer<Element, Void>() {
+            @Override
+            public void accept(Element element, Void ignored) {
+                if (element == null || found[0] != null) return;
+
+                // Once we've seen "from", the next focusable becomes our answer.
+                if (seenFrom[0]) {
+                    if (isElementFocusableNow(element)) {
+                        found[0] = element;
+                        return;
+                    }
+                }
+
+                if (element == from) {
+                    seenFrom[0] = true;
+                }
+
+                if (element instanceof ElementContainer container) {
+                    for (int i = 0; i < container.size; i++) {
+                        Element child = container.elements[i];
+                        if (child != null) this.accept(child, null);
+                        if (found[0] != null) return;
+                    }
+                }
+            }
+        }.accept(this, null);
+
+        if (found[0] == null) return findFirstFocusable(this);
+
+        return found[0];
+    }
+
+    /**
+     * Finds and returns the first focusable element within the specified root element.
+     * The method traverses the UI tree in depth-first order and identifies the first element
+     * that can currently accept focus.
+     *
+     * @param root the root element to start searching for a focusable element; must not be null
+     * @return the first focusable element found within the root element, or null if no focusable element exists
+     */
+    private Element findFirstFocusable(Element root) {
+        Element[] found = new Element[]{null};
+
+        new BiConsumer<Element, Void>() {
+            @Override
+            public void accept(Element element, Void ignored) {
+                if (element == null || found[0] != null) return;
+
+                if (isElementFocusableNow(element)) {
+                    found[0] = element;
+                    return;
+                }
+
+                if (element instanceof ElementContainer container) {
+                    for (int i = 0; i < container.size; i++) {
+                        Element child = container.elements[i];
+                        if (child != null) this.accept(child, null);
+                        if (found[0] != null) return;
+                    }
+                }
+            }
+        }.accept(root, null);
+
+        return found[0];
+    }
+
+    /**
+     * Checks if the provided element is currently focusable.
+     * An element is considered focusable if it is not null, is focusable, is not hidden,
+     * and is not disabled.
+     *
+     * @param e the element to check for focusability; may be null
+     * @return true if the element is currently focusable, false otherwise
+     */
+    private boolean isElementFocusableNow(Element e) {
+        return e != null && e.isFocusable() && !e.isHidden() && !e.isDisabled();
+    }
+
+    /**
+     * Retrieves the current viewport associated with this UI instance.
+     * The viewport defines the rendering area and is used to manage
+     * the visible portion of the UI.
+     *
+     * @return the current {@link Viewport} of this UI instance
+     */
+    public Viewport getViewport() {
+        return viewport;
+    }
+
+    /**
+     * Sets the viewport for this UI instance. The viewport defines the rendering area
+     * and is used to manage the visible portion of the UI.
+     *
+     * @param viewport the {@link Viewport} to be assigned to this UI instance; must not be null
+     */
+    public void setViewport(Viewport viewport) {
+        this.viewport = viewport;
+    }
+
+    /**
+     * Retrieves the element that is currently focused within the UI.
+     * If no element is focused, this method returns null.
+     *
+     * @return the currently focused element, or null if no element is focused
+     */
+    public Element getFocused() {
+        return focused;
+    }
+
+    /**
+     * The {@code UIKeyListener} class is an internal implementation of the {@code KeyListener}
+     * interface for handling keyboard events within the {@code UI} class. It manages user interactions
+     * with the keyboard by responding to key press and key release events.
      * <p>
-     * This listener ensures that only the focused element receives key event notifications.
-     * When a key press or release event is triggered, the event is forwarded to the
-     * corresponding methods of the focused element if one exists.
-     * <p>
-     * Methods:
-     * - keyPressed(KeyPressEvent event): Handles and forwards the key press event to the
-     * focused element's onKeyPress method.
-     * - keyReleased(KeyReleaseEvent event): Handles and forwards the key release event
-     * to the focused element's onKeyRelease method.
+     * This class primarily handles focus traversal using the {@code Tab} key and delegates
+     * specific key-related behavior to the currently focused UI element, if one exists.
      */
     private class UIKeyListener implements KeyListener {
 
         @Override
         public void keyPressed(KeyPressEvent event) {
+            if (event.getKey() == Keyboard.TAB) {
+                focusNext();
+                return;
+            }
+
             if (focused != null) focused.onKeyPress(event);
         }
 
@@ -176,30 +254,28 @@ public class UI extends ElementContainer {
     }
 
     /**
-     * The UIMouseListener class is a private inner class responsible for handling mouse events
-     * and providing interactivity to elements in the user interface. It implements the MouseListener
-     * interface to process mouse press, release, drag, and move events.
+     * The {@code UIMouseListener} class implements the {@code MouseListener} interface and is
+     * responsible for handling mouse-related interactions within the {@code UI} context. It
+     * processes mouse events such as press, release, drag, and move, and performs actions on
+     * the corresponding {@code Element} instances within the UI.
      * <p>
-     * This class offers the following main functionalities:
-     * - Maintains and manages the state of the pressed and hovered elements when interacting
-     * with the user interface.
-     * - Updates the focus state of UI elements based on mouse interactions.
-     * - Triggers element-specific behavior during mouse events such as mouse presses, releases,
-     * drags, and moves by invoking corresponding handlers on the affected elements.
+     * This class facilitates user interaction by determining the appropriate {@code Element}
+     * based on event coordinates and invoking relevant behaviors like focusing, pressing,
+     * hovering, and handling custom event logic.
      * <p>
-     * Behavior of the implemented methods:
-     * - mousePressed: Handles behavior when a mouse button is pressed. It sets focus to the
-     * element at the mouse position, updates its pressed state, and calls its onMousePress method.
-     * - mouseReleased: Handles behavior when a mouse button is released. It resets the pressed
-     * element's pressed state and invokes its onMouseRelease method.
-     * - mouseDragged: Handles behavior when the mouse is dragged. Passes the drag event to the pressed
-     * element's onMouseDrag handler if the element is pressed.
-     * - mouseMoved: Handles behavior when the mouse moves. Updates the hovered state of UI elements,
-     * invoking the onMouseMove method for both the previously hovered and newly hovered elements.
+     * Mouse Events:
      * <p>
-     * This class interacts with the UI class to update focus and with the Element class to
-     * manage press, hover, and state changes, ensuring consistent behavior and interactivity
-     * of UI elements during mouse interactions.
+     * 1. {@code mousePressed(MousePressEvent event)}: Handles mouse press events by locating the
+     * target element and initiating focus and pressed state logic.
+     * <p>
+     * 2. {@code mouseReleased(MouseReleaseEvent event)}: Handles mouse release events and resets
+     * the pressed state.
+     * <p>
+     * 3. {@code mouseDragged(MouseDragEvent event)}: Handles mouse drag events and forwards the
+     * event to the pressed element.
+     * <p>
+     * 4. {@code mouseMoved(MouseMoveEvent event)}: Handles mouse move events by updating the
+     * hovered state and invoking hover-related behavior on the target element.
      */
     private class UIMouseListener implements MouseListener {
 
@@ -208,8 +284,7 @@ public class UI extends ElementContainer {
             Element target = findElementAt(event.getX(), event.getY(), true);
 
             if (target != null && !target.isClickThrough()) {
-                if (target.isFocusable())
-                    setFocusTo(target);
+                if (target.isFocusable()) setFocusTo(target);
 
                 pressed = target;
                 pressed.setPressed(true);
@@ -250,13 +325,16 @@ public class UI extends ElementContainer {
     }
 
     /**
-     * The UIScrollListener class is a private implementation of the MouseScrollListener interface
-     * that listens for mouse scroll events and delegates handling them to the appropriate UI element.
-     * It is responsible for identifying the element located at the mouse pointer's current position
-     * and invoking the onMouseScroll method for that element.
+     * The {@code UIScrollListener} class is a private implementation of the {@code MouseScrollListener} interface
+     * designed for handling mouse scroll events within the UI system. It listens for scroll events and delegates
+     * the handling to the appropriate target UI element.
      * <p>
-     * This listener is typically used within the UI class to handle user interactions involving
-     * mouse scroll actions, such as scrolling through elements or triggering scroll-related behaviors.
+     * This implementation is responsible for locating the UI element at the position of the mouse cursor when a
+     * scroll action occurs and invoking the element's {@code onMouseScroll} method to handle the event.
+     * If no element is found at the mouse's location, the event is ignored.
+     * <p>
+     * It provides an essential mechanism for enabling mouse scroll interactions across the UI, ensuring that
+     * specific elements can respond to user inputs like scrolling with a mouse wheel.
      */
     private class UIScrollListener implements MouseScrollListener {
 
@@ -270,16 +348,16 @@ public class UI extends ElementContainer {
     }
 
     /**
-     * The UIWindowListener class implements the {@link WindowResizeListener} interface
-     * and is responsible for handling window resize events and propagating the resize
-     * information throughout the user interface hierarchy starting from the root {@code UI} element.
+     * The UIWindowListener class is a private inner class of the UI class that handles
+     * window resize events. It implements the WindowResizeListener interface to
+     * process WindowResizeEvent instances when the window size changes.
      * <p>
-     * It listens for the {@code WindowResizeEvent} and recursively notifies all relevant
-     * child elements about the resize via the {@code propagateResize} method.
+     * This class propagates the resize events to the UI and its child elements
+     * for re-layout and processing. It ensures the proper cascading of the resize
+     * logic across all nested Element and ElementContainer instances within the UI tree.
      * <p>
-     * This class helps ensure that the UI updates consistently in response to changes
-     * in the window's size, allowing each element and its descendants to handle the
-     * event appropriately.
+     * Upon receiving a WindowResizeEvent, the listener updates the UI and recursively
+     * invokes resize behavior for each element within any nested containers.
      */
     private class UIWindowListener implements WindowResizeListener {
 
@@ -288,8 +366,7 @@ public class UI extends ElementContainer {
             new BiConsumer<Element, WindowResizeEvent>() {
                 @Override
                 public void accept(Element element, WindowResizeEvent e) {
-                    if (element == null)
-                        return;
+                    if (element == null) return;
 
                     element.onWindowResize(e);
                     element.layout();
@@ -297,8 +374,7 @@ public class UI extends ElementContainer {
                     if (element instanceof ElementContainer container) {
                         for (int i = 0; i < container.size; i++) {
                             Element child = container.elements[i];
-                            if (child != null)
-                                this.accept(child, e);
+                            if (child != null) this.accept(child, e);
                         }
                     }
                 }

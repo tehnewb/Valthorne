@@ -1,5 +1,6 @@
 import valthorne.Application;
 import valthorne.JGL;
+import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.Font;
 import valthorne.graphics.font.FontData;
@@ -12,6 +13,10 @@ public class FontTest implements Application {
 
     private Font font;
 
+    public static void main(String[] args) {
+        JGL.init(new FontTest(), "Font Test", 1280, 720);
+    }
+
     @Override
     public void init() {
         try {
@@ -20,6 +25,7 @@ public class FontTest implements Application {
             throw new RuntimeException(e);
         }
         font.setColor(Color.BLUE);
+        font.setPosition(10, Window.getHeight() - 100);
         font.setText("""
                 
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi tristique semper vulputate. Nam in pretium sem, sed feugiat sem. Quisque pellentesque sodales ante, nec posuere nisi lacinia ac. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Phasellus viverra dui tortor, vel posuere metus consectetur cursus. Nam risus quam, placerat a diam ac, faucibus fermentum arcu. Mauris scelerisque lobortis blandit.
@@ -46,9 +52,5 @@ public class FontTest implements Application {
     @Override
     public void dispose() {
         font.dispose();
-    }
-
-    public static void main(String[] args) {
-        JGL.init(new FontTest(), "Font Test", 1280, 720);
     }
 }

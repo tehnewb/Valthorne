@@ -61,14 +61,6 @@ public enum Alignment {
         this.verticalAlignment = verticalAlignment;
     }
 
-    public HorizontalAlignment getHorizontal() {
-        return horizontalAlignment;
-    }
-
-    public VerticalAlignment getVertical() {
-        return verticalAlignment;
-    }
-
     public static Vector2f align(Dimensional source, Sizeable target, Alignment alignment) {
         float x = switch (alignment.horizontalAlignment) {
             case LEFT -> source.getX();
@@ -83,5 +75,13 @@ public enum Alignment {
         };
 
         return new Vector2f(x, y);
+    }
+
+    public HorizontalAlignment getHorizontal() {
+        return horizontalAlignment;
+    }
+
+    public VerticalAlignment getVertical() {
+        return verticalAlignment;
     }
 }

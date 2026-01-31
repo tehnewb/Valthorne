@@ -43,34 +43,6 @@ public class MouseEvent extends Event {
     }
 
     /**
-     * Sets the mouse button associated with this event.
-     *
-     * @param button the mouse button to set, represented as an integer.
-     *               This value will be stored internally as a byte.
-     */
-    public void setButton(int button) {
-        this.button = (byte) button;
-    }
-
-    /**
-     * Updates the x-coordinate of this mouse event.
-     *
-     * @param x the new x-coordinate to be set, represented as a {@code short} value
-     */
-    public void setX(short x) {
-        this.x = x;
-    }
-
-    /**
-     * Updates the y-coordinate of this mouse event.
-     *
-     * @param y the new y-coordinate to be set, represented as a {@code short} value
-     */
-    public void setY(short y) {
-        this.y = y;
-    }
-
-    /**
      * Sets the modifier flags for this mouse event. Modifier flags indicate which
      * modifier keys (e.g., Shift, Control, Alt, Super) were active during the event.
      *
@@ -91,12 +63,30 @@ public class MouseEvent extends Event {
     }
 
     /**
+     * Updates the x-coordinate of this mouse event.
+     *
+     * @param x the new x-coordinate to be set, represented as a {@code short} value
+     */
+    public void setX(short x) {
+        this.x = x;
+    }
+
+    /**
      * Retrieves the y-coordinate of the mouse cursor during the event.
      *
      * @return the y-coordinate value as an integer
      */
     public int getY() {
         return y;
+    }
+
+    /**
+     * Updates the y-coordinate of this mouse event.
+     *
+     * @param y the new y-coordinate to be set, represented as a {@code short} value
+     */
+    public void setY(short y) {
+        this.y = y;
     }
 
     /**
@@ -108,6 +98,16 @@ public class MouseEvent extends Event {
      */
     public int getButton() {
         return button;
+    }
+
+    /**
+     * Sets the mouse button associated with this event.
+     *
+     * @param button the mouse button to set, represented as an integer.
+     *               This value will be stored internally as a byte.
+     */
+    public void setButton(int button) {
+        this.button = (byte) button;
     }
 
     /**

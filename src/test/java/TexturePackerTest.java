@@ -22,6 +22,10 @@ public class TexturePackerTest implements Application {
     private OrthographicCamera2D camera2D;
     private Font font;
 
+    public static void main(String[] args) {
+        JGL.init(new TexturePackerTest(), "Texture Packer Test", 1280, 720);
+    }
+
     @Override
     public void init() {
         try {
@@ -35,12 +39,7 @@ public class TexturePackerTest implements Application {
         this.camera2D.setCenter(Window.getWidth() / 2f, Window.getHeight() / 2f);
         this.viewport.setCamera(camera2D);
 
-        // Enable the legacy client states your Texture.draw() uses
-
-        // ----- Load source texture -----
         TextureData sheet = TextureData.load("./src/test/resources/cat-test.png");
-
-        // ----- Build atlas 256x256 -----
         TexturePacker packer = new TexturePacker(128, 128);
 
         // Extract 3 patches
@@ -84,9 +83,5 @@ public class TexturePackerTest implements Application {
     @Override
     public void dispose() {
         if (atlasTexture != null) atlasTexture.dispose();
-    }
-
-    public static void main(String[] args) {
-        JGL.init(new TexturePackerTest(), "Texture Packer Test", 1280, 720);
     }
 }

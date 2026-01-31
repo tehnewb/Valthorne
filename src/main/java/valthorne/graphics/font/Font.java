@@ -2,505 +2,329 @@ package valthorne.graphics.font;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
-import valthorne.graphics.texture.TextureData;
-import valthorne.graphics.texture.TextureFilter;
 import valthorne.ui.Dimensional;
-import org.lwjgl.stb.STBTTPackedchar;
-
-import java.nio.ByteBuffer;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 
 /**
- * Represents a font and its associated rendering capabilities,
- * utilizing OpenGL for managing texture data and rendering text
- * onto the GPU.
+ * The Font class represents a renderable font, enabling textual content
+ * to be drawn using predefined font metrics and glyph data from a
+ * FontData instance. The class also provides scaling, positioning, and
+ * color customization options for the rendered text.
  * <p>
- * The Font class provides methods for rendering text via a
- * pre-generated glyph atlas and supports efficient text bitmap
- * updates and OpenGL texture uploads.
+ * This class relies on a Texture for rendering glyphs and requires
+ * a non-null FontData to define the font metrics and glyph metadata.
  *
  * @author Albert Beaupre
  * @since December 6th, 2025
  */
 public class Font implements Dimensional {
 
-    /**
-     * A single transparent pixel used to form a minimal 1×1 fallback texture
-     * when text is empty.
-     */
-    private static final ByteBuffer ONE_PIXEL = ByteBuffer.allocateDirect(1).put(0, (byte) 0);
-    private static final int INITIAL_BUFFER_CAPACITY = 256;
+    private final Texture texture;
+    private final FontData data;
 
-    private final FontData data;                      // Font metrics and glyph atlas data
-    private final Texture texture;                    // OpenGL texture for rendering
-    private final float[] bounds = new float[4];      // Text bounding box coordinates [minX,minY,width,height]
-    private ByteBuffer pixelBuffer = ByteBuffer.allocateDirect(INITIAL_BUFFER_CAPACITY); // CPU-side pixel buffer for text bitmap
-    private int bufferCapacity = INITIAL_BUFFER_CAPACITY;  // Current size of pixel buffer in bytes
-    private String text = "";                         // Current text content
-    private float width;                              // Rendered text width in pixels
-    private float height;                             // Rendered text height in pixels
+    private float scaleX = 1f;
+    private float scaleY = 1f;
+    private String text;
+    private float x;
+    private float y;
+
+    private float width, height;
 
     /**
-     * Constructs a Font instance using the provided font data.
-     * <p>
-     * Populates a texture with the glyph atlas from the font data and prepares it
-     * for rendering text. Initializes GPU resources and configures texture
-     * parameters.
+     * Constructs a new {@code Font} object using the specified {@code FontData}.
      *
-     * @param data the {@link FontData} containing font metrics, glyph atlas,
-     *             and layout information used to initialize this Font.
+     * @param data the {@code FontData} containing font metrics and texture information;
+     *             must not be {@code null}
+     * @throws NullPointerException if {@code data} is {@code null}
      */
     public Font(FontData data) {
+        if (data == null)
+            throw new NullPointerException("FontData cannot be null");
         this.data = data;
-
-        int texID = glGenTextures();
-        glBindTexture(GL_TEXTURE_2D, texID);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, data.atlasSize(), data.atlasSize(), 0, GL_ALPHA, GL_UNSIGNED_BYTE, data.bitmap());
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        this.texture = new Texture(createEmptyTextureData());
-        this.texture.setFlipY(true);
-        this.texture.setFilter(TextureFilter.NEAREST);
-        this.setText(text);
+        this.texture = new Texture(data.textureData());
+        this.texture.setScale(1f, -1f);
     }
 
     /**
-     * Creates a 1×1 GL_ALPHA texture used as the initial texture before any real
-     * text is rendered.
-     *
-     * @return newly created {@link TextureData}
+     * Renders text using the defined font data and texture settings.
+     * <p>
+     * This method draws each character in the current {@code text} string
+     * at the specified position ({@code x}, {@code y}), applying the corresponding
+     * glyph metadata from the {@code FontData} instance. Characters are rendered
+     * sequentially, starting from the given position, and advancing horizontally
+     * or vertically depending on newline ('\n') and tab ('\t') characters.
+     * If a glyph for a character is missing, it skips the character or applies
+     * a default spacing.
+     * <p>
+     * Behavior:
+     * - Handles newline ('\n') by moving to a new line based on line height.
+     * - Handles tab ('\t') by adding four times the advance width of a space glyph.
+     * - For each character, retrieves associated glyph data to determine position,
+     * size, offsets, and texture region to render.
+     * - If the glyph for a character is not found, a default spacing is added based
+     * on the font's line height.
+     * - Skips rendering for glyphs with a width or height of zero.
      */
-    private TextureData createEmptyTextureData() {
-        int textureID = glGenTextures();
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    public void draw() {
+        if (text == null || text.isEmpty()) return;
 
-        ONE_PIXEL.position(0);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 1, 1, 0, GL_ALPHA, GL_UNSIGNED_BYTE, ONE_PIXEL);
+        float penX = x;
+        float baselineY = y;
 
-        return new TextureData(ONE_PIXEL, (short) 1, (short) 1);
-    }
+        float lineAdvance = data.lineHeight() * scaleY;
 
-    /**
-     * Updates the rendered text. This triggers complete regeneration of the bitmap:
-     * <ul>
-     *     <li>Measure bounds</li>
-     *     <li>Resize buffer if needed</li>
-     *     <li>Clear pixel buffer</li>
-     *     <li>Rasterize glyphs and composite into buffer</li>
-     *     <li>Upload result to OpenGL</li>
-     * </ul>
-     *
-     * @param text the new string content
-     */
-    public void setText(String text) {
-        if (text == null) text = "";
-        if (this.text.equals(text)) return;
-
-        this.text = text;
-
-        // If empty, upload a 1x1 texture
-        if (text.isEmpty()) {
-            upload1x1Texture();
-            width = height = 0;
-            return;
-        }
-
-        // Compute bounds in the same coordinate system we use to rasterize
-        computeBounds(text);
-        float minX = bounds[0], minY = bounds[1];
-        float w = bounds[2], h = bounds[3];
-
-        int texW = Math.max(1, (int) Math.ceil(w));
-        int texH = Math.max(1, (int) Math.ceil(h));
-
-        this.width = w;
-        this.height = h;
-
-        int requiredPixels = texW * texH;
-        ensureBufferCapacity(requiredPixels);
-        clearBuffer(requiredPixels);
-
-        renderTextToBuffer(text, minX, minY, texW, texH);
-        uploadTexture(texW, texH);
-    }
-
-    /**
-     * Retrieves the current text content of this Font instance.
-     *
-     * @return the current text content as a String
-     */
-    public String getText() {
-        return text;
-    }
-
-    /**
-     * Ensures the pixel buffer is large enough to store the rendered bitmap.
-     * Grows exponentially up to 4MB increments.
-     *
-     * @param required required number of bytes
-     */
-    private void ensureBufferCapacity(int required) {
-        if (required <= bufferCapacity) return;
-
-        // Grow ONCE to the required size
-        ByteBuffer newBuffer = ByteBuffer.allocateDirect(required);
-        bufferCapacity = required;
-
-        // Replace old buffer
-        pixelBuffer = newBuffer;
-    }
-
-
-    /**
-     * Fills the pixel buffer with fully transparent bytes.
-     *
-     * @param size number of bytes to clear
-     */
-    private void clearBuffer(int size) {
-        pixelBuffer.position(0);
-        pixelBuffer.limit(size);
-        while (pixelBuffer.hasRemaining()) pixelBuffer.put((byte) 0);
-        pixelBuffer.position(0);
-    }
-
-    /**
-     * Rasterizes the text into the CPU-side pixel buffer.
-     *
-     * <p>For each glyph:</p>
-     * <ol>
-     *     <li>Fetch glyph alpha mask from font atlas</li>
-     *     <li>Compute glyph placement using STB metrics (xoff/yoff/yoff2)</li>
-     *     <li>Copy non-zero alpha pixels into buffer</li>
-     * </ol>
-     *
-     * @param text content to rasterize
-     * @param minX left text bound offset
-     * @param minY top text bound offset
-     * @param texW output texture width
-     * @param texH output texture height
-     */
-    private void renderTextToBuffer(String text, float minX, float minY, int texW, int texH) {
-        byte[] atlas = data.atlasPixels();
-        int atlasW = data.atlasSize();
-
-        // Offsets that move the min bounds to (0,0)
-        float offsetX = -minX;
-        float offsetY = -minY;
-
-        float penX = 0f;
-        float penY = 0f; // baseline for first line in our local space
-
-        int first = data.firstChar();
-        int count = data.numChars();
-
-        for (int i = 0, n = text.length(); i < n; i++) {
+        for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
 
             if (c == '\n') {
-                penX = 0;
-                penY += data.lineHeight();
+                penX = x;
+                baselineY -= lineAdvance;
                 continue;
             }
 
-            int idx = c - first;
-            if ((idx | (count - 1 - idx)) < 0) continue;
+            if (c == '\t') {
+                Glyph space = data.glyph(' ');
+                float adv = (space != null ? space.xAdvance() : data.lineHeight() * 0.25f);
+                penX += (adv * 4f) * scaleX;
+                continue;
+            }
 
-            STBTTPackedchar ch = data.charData()[idx];
-            int gw = ch.x1() - ch.x0();
-            int gh = ch.y1() - ch.y0();
+            Glyph g = data.glyph(c);
+            if (g == null) {
+                penX += (data.lineHeight() * 0.25f) * scaleX;
+                continue;
+            }
 
-            // Skip empty glyphs
+            int gw = g.width();
+            int gh = g.height();
+
             if (gw <= 0 || gh <= 0) {
-                penX += ch.xadvance();
+                penX += g.xAdvance() * scaleX;
                 continue;
             }
 
-            // Compute glyph placement in output buffer (same formulas as stbtt_GetPackedQuad)
-            float gx0 = penX + ch.xoff() + offsetX;
-            float gy0 = penY + ch.yoff() + offsetY;
+            float left = g.x0();
+            float top = g.y0();
+            float right = g.x1();
+            float bottom = g.y1();
 
-            int dx0 = (int) Math.floor(gx0 + 0.5f);
-            int dy0 = (int) Math.floor(gy0 + 0.5f);
+            texture.setRegion(left, top, right, bottom);
 
-            // Off-screen skip optimization
-            if (dx0 >= texW || dy0 >= texH || dx0 + gw <= 0 || dy0 + gh <= 0) {
-                penX += ch.xadvance();
-                continue;
-            }
+            float drawX = penX + (g.xOffset() * scaleX);
+            float drawY = baselineY - g.yOffset() * scaleY;
 
-            // Compute atlas and buffer subregion boundaries
-            int sx0 = ch.x0();
-            int sy0 = ch.y0();
-            int x0 = Math.max(0, -dx0);
-            int y0 = Math.max(0, -dy0);
-            int x1 = Math.min(gw, texW - dx0);
-            int y1 = Math.min(gh, texH - dy0);
+            texture.setSize(gw * scaleX, gh * scaleY);
+            texture.setPosition(drawX, drawY);
+            texture.draw();
 
-            // Copy alpha values
-            for (int y = y0; y < y1; y++) {
-                int srcBase = (sy0 + y) * atlasW + sx0;
-                int dstBase = (dy0 + y) * texW + dx0;
-                for (int x = x0; x < x1; x++) {
-                    byte alpha = atlas[srcBase + x];
-                    if (alpha != 0) {
-                        pixelBuffer.put(dstBase + x, alpha);
-                    }
-                }
-            }
-
-            penX += ch.xadvance();
+            penX += g.xAdvance() * scaleX;
         }
     }
 
     /**
-     * Uploads the rendered bitmap to the GPU. Uses {@code glTexSubImage2D} when possible
-     * to avoid reallocating GPU memory.
+     * Retrieves the width of the font, which represents the predefined maximum
+     * width available for rendering text using this font instance.
      *
-     * @param w texture width
-     * @param h texture height
-     */
-    private void uploadTexture(int w, int h) {
-        glBindTexture(GL_TEXTURE_2D, texture.getID());
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        pixelBuffer.position(0).limit(w * h);
-
-        TextureData data = texture.getData();
-        if (data.width() == w && data.height() == h) {
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_ALPHA, GL_UNSIGNED_BYTE, pixelBuffer);
-        } else {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, w, h, 0, GL_ALPHA, GL_UNSIGNED_BYTE, pixelBuffer);
-            texture.setSize(w, h);
-        }
-    }
-
-    /**
-     * Uploads a single transparent pixel to reset the texture when the text is empty.
-     */
-    private void upload1x1Texture() {
-        glBindTexture(GL_TEXTURE_2D, texture.getID());
-        ONE_PIXEL.position(0);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 1, 1, 0, GL_ALPHA, GL_UNSIGNED_BYTE, ONE_PIXEL);
-        texture.setSize(1, 1);
-    }
-
-    /**
-     * Draws the rendered text using the underlying {@link Texture}.
-     */
-    public void draw() {
-        texture.draw();
-    }
-
-    /**
-     * Sets the screen position of the rendered text.
-     */
-    public void setPosition(float x, float y) {
-        texture.setPosition(x, y);
-    }
-
-    /**
-     * Retrieves the current screen-space X position of the rendered text.
-     *
-     * @return the X coordinate of the rendered text in screen-space.
-     */
-    public float getX() {
-        return texture.getX();
-    }
-
-    /**
-     * Retrieves the current screen-space Y position of the rendered text.
-     *
-     * @return the Y coordinate of the rendered text in screen-space.
-     */
-    public float getY() {
-        return texture.getY();
-    }
-
-    /**
-     * Applies a color tint to the rendered text.
-     */
-    public void setColor(Color color) {
-        texture.setColor(color);
-    }
-
-    /**
-     * @return rendered text width in pixels
+     * @return the width of the font as a float
      */
     public float getWidth() {
         return width;
     }
 
     /**
-     * @return rendered text height in pixels
+     * Calculates the maximum width of the given text string when rendered using the font's glyph data.
+     * The width is determined based on the horizontal advances of each character in the string,
+     * accounting for newline ('\n') and tab ('\t') characters. Newline resets the current line's width,
+     * and tab adds a spacing equivalent to four times the advance width of a space character.
+     *
+     * @param text the text string for which the width is to be calculated; if null or empty, the method returns 0
+     * @return the maximum width of the text string as a float, considering the font's scale and glyph data
+     */
+    public float getWidth(String text) {
+        if (text == null || text.isEmpty()) return 0f;
+
+        float penX = 0f;
+        float maxX = 0f;
+
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (c == '\n') {
+                if (penX > maxX) maxX = penX;
+                penX = 0f;
+                continue;
+            }
+
+            if (c == '\t') {
+                Glyph space = data.glyph(' ');
+                float adv = (space != null ? space.xAdvance() : data.lineHeight() * 0.25f);
+                penX += (adv * 4f) * scaleX;
+                continue;
+            }
+
+            Glyph g = data.glyph(c);
+            if (g == null) {
+                penX += (data.lineHeight() * 0.25f) * scaleX;
+                continue;
+            }
+
+            penX += g.xAdvance() * scaleX;
+        }
+
+        if (penX > maxX) maxX = penX;
+        return maxX;
+    }
+
+    /**
+     * Retrieves the height of the font, which represents the predefined maximum
+     * height available for rendering text using this font instance.
+     *
+     * @return the height of the font as a float
      */
     public float getHeight() {
         return height;
     }
 
     /**
-     * Frees GPU resources and clears the pixel buffer.
-     * After calling this, the instance must no longer be used.
+     * Calculates the height required to render the specified text string, based on
+     * the font's ascent and vertical scale. The method multiplies the font's ascent
+     * with the number of lines in the text and applies the vertical scale factor.
+     * If the text is null or empty, the method returns 0.
+     *
+     * @param text the input text string for which the height is to be calculated;
+     *             if null or empty, the method returns 0
+     * @return the calculated height of the text as a float
+     */
+    public float getHeight(String text) {
+        if (text == null || text.isEmpty()) return 0f;
+
+        return data.ascent() * text.lines().count() * scaleY;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    /**
+     * Sets the text to be rendered by the font and calculates its dimensions (width and height)
+     * based on the font's glyph data and scale. The width is calculated as the maximum
+     * horizontal advance of all lines in the text, while the height is based on the number of lines
+     * and the font's ascent and vertical scale. The new text string updates the rendering logic,
+     * and dimensions are updated accordingly.
+     *
+     * @param text the new text to be used for rendering; can be null or empty. If null, the
+     *             text is treated as empty, and the dimensions are set to zero.
+     */
+    public void setText(String text) {
+        this.text = text;
+        this.width = getWidth(text);
+        this.height = getHeight(text);
+    }
+
+    /**
+     * Sets the position of the font to the specified coordinates.
+     *
+     * @param x the x-coordinate of the position
+     * @param y the y-coordinate of the position
+     */
+    public void setPosition(float x, float y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    /**
+     * Sets the scale factors for rendering fonts. The scale factors determine the horizontal
+     * and vertical scaling applied to the font's dimensions when rendered. These values are
+     * applied globally, affecting all text rendered using this font instance.
+     *
+     * @param sx the horizontal scaling factor
+     * @param sy the vertical scaling factor
+     */
+    public void setScale(float sx, float sy) {
+        this.scaleX = sx;
+        this.scaleY = sy;
+    }
+
+    /**
+     * Retrieves the horizontal scaling factor of the font. The scale factor is used to
+     * determine how the width of the font is adjusted during rendering.
+     *
+     * @return the horizontal scale factor as a float
+     */
+    public float getScaleX() {return scaleX;}
+
+    /**
+     * Retrieves the vertical scaling factor of the font. The scale factor determines
+     * how the height of the font is adjusted during rendering.
+     *
+     * @return the vertical scale factor as a float
+     */
+    public float getScaleY() {return scaleY;}
+
+    /**
+     * Retrieves the x-coordinate of the font's position. The x-coordinate determines
+     * the horizontal placement of the font for rendering.
+     *
+     * @return the x-coordinate as a float
+     */
+    public float getX() {return x;}
+
+    /**
+     * Sets the x-coordinate of the font's position.
+     *
+     * @param x the new x-coordinate value
+     */
+    public void setX(float x) {this.x = x;}
+
+    /**
+     * Retrieves the y-coordinate of the font's position. The y-coordinate determines
+     * the vertical placement of the font for rendering.
+     *
+     * @return the y-coordinate as a float
+     */
+    public float getY() {return y;}
+
+    /**
+     * Sets the y-coordinate of the font's position.
+     *
+     * @param y the new y-coordinate value
+     */
+    public void setY(float y) {this.y = y;}
+
+    /**
+     * Retrieves the color associated with the font's texture, which determines
+     * how the font will be rendered in terms of its appearance or visual style.
+     *
+     * @return the {@code Color} object used for rendering the font
+     */
+    public Color getColor() {
+        return this.texture.getColor();
+    }
+
+    /**
+     * Sets the color used to render the font. This color is applied to the font's texture,
+     * modifying its appearance based on the specified color values (e.g., red, green, blue, alpha).
+     *
+     * @param color the {@code Color} object defining the desired rendering color;
+     *              must not be {@code null}
+     * @throws NullPointerException if {@code color} is {@code null}
+     */
+    public void setColor(Color color) {
+        this.texture.setColor(color);
+    }
+
+    /**
+     * Releases resources associated with this font instance.
+     * <p>
+     * This method disposes of the texture used by the font, ensuring that the
+     * associated GPU resources are properly released. After calling this method,
+     * the font's texture becomes unusable, and any attempts to render text using
+     * this font may result in undefined behavior or errors.
+     * <p>
+     * It is essential to call this method when the font is no longer needed to
+     * avoid memory leaks or excessive GPU resource usage.
      */
     public void dispose() {
+        text = null;
         texture.dispose();
-        pixelBuffer = null;
-        bufferCapacity = 0;
-    }
-
-    /**
-     * Computes tight bounds of the given text (including multiple lines)
-     * in the same coordinate system used by {@link #renderTextToBuffer}.
-     */
-    private void computeBounds(String text) {
-        float minX = Float.MAX_VALUE;
-        float minY = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE;
-        float maxY = -Float.MAX_VALUE;
-
-        float penX = 0f;
-        float penY = 0f; // baseline for first line
-        float lineH = data.lineHeight();
-
-        int first = data.firstChar();
-        int count = data.numChars();
-
-        for (int i = 0, n = text.length(); i < n; i++) {
-            char c = text.charAt(i);
-
-            if (c == '\n') {
-                penX = 0f;
-                penY += lineH;
-                continue;
-            }
-
-            int idx = c - first;
-            if ((idx | (count - 1 - idx)) < 0) continue;
-
-            STBTTPackedchar g = data.charData()[idx];
-
-            float x0 = penX + g.xoff();
-            float y0 = penY + g.yoff();
-            float x1 = penX + g.xoff2();
-            float y1 = penY + g.yoff2();
-
-            if (x0 <= minX) minX = x0;
-            if (y0 <= minY) minY = y0;
-            if (x1 >= maxX) maxX = x1;
-            if (y1 >= maxY) maxY = y1;
-
-            penX += g.xadvance();
-        }
-
-        if (maxX < minX || maxY < minY) {
-            bounds[0] = 0;
-            bounds[1] = 0;
-            bounds[2] = 0;
-            bounds[3] = 0;
-            return;
-        }
-
-        bounds[0] = minX;
-        bounds[1] = minY;
-        bounds[2] = maxX - minX;
-        bounds[3] = maxY - minY;
-    }
-
-    /**
-     * Computes the width of the given text using the same rules as computeBounds.
-     *
-     * @param text the text to measure
-     * @return width in pixels
-     */
-    public float computeWidth(String text) {
-        if (text == null || text.isEmpty()) return 0f;
-
-        float minX = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE;
-
-        float penX = 0f;
-
-        int first = data.firstChar();
-        int count = data.numChars();
-
-        for (int i = 0, n = text.length(); i < n; i++) {
-            char c = text.charAt(i);
-
-            if (c == '\n') {
-                penX = 0f;
-                continue;
-            }
-
-            int idx = c - first;
-            if ((idx | (count - 1 - idx)) < 0) continue;
-
-            STBTTPackedchar g = data.charData()[idx];
-
-            float x0 = penX + g.xoff();
-            float x1 = penX + g.xoff2();
-
-            if (x0 < minX) minX = x0;
-            if (x1 > maxX) maxX = x1;
-
-            penX += g.xadvance();
-        }
-
-        if (maxX < minX) return 0f;
-        return maxX - minX;
-    }
-
-    /**
-     * Computes the height of the given text using the same rules as computeBounds.
-     *
-     * @param text the text to measure
-     * @return height in pixels
-     */
-    public float computeHeight(String text) {
-        if (text == null || text.isEmpty()) return 0f;
-
-        float minY = Float.MAX_VALUE;
-        float maxY = -Float.MAX_VALUE;
-
-        float penY = 0f;
-
-        int first = data.firstChar();
-        int count = data.numChars();
-
-        for (int i = 0, n = text.length(); i < n; i++) {
-            char c = text.charAt(i);
-
-            if (c == '\n') {
-                penY += data.lineHeight();
-                continue;
-            }
-
-            int idx = c - first;
-            if ((idx | (count - 1 - idx)) < 0) continue;
-
-            STBTTPackedchar g = data.charData()[idx];
-
-            float y0 = penY + g.yoff();
-            float y1 = penY + g.yoff2();
-
-            if (y0 < minY) minY = y0;
-            if (y1 > maxY) maxY = y1;
-        }
-
-        if (maxY < minY) return 0f;
-        return maxY - minY;
-    }
-
-    /**
-     * Retrieves the font data associated with this Font instance.
-     *
-     * @return the FontData containing font metrics, glyph atlas, and layout information.
-     */
-    public FontData getData() {
-        return data;
     }
 }

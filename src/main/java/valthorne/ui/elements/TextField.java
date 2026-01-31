@@ -351,16 +351,16 @@ public class TextField extends Element {
         updateScroll();
     }
 
-    private void setClipboard(String s) {
-        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(s), null);
-    }
-
     private String getClipboard() {
         try {
             return (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private void setClipboard(String s) {
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(s), null);
     }
 
     private void resetCursorBlink() {
@@ -374,7 +374,7 @@ public class TextField extends Element {
 
     private float getTextWidthUpTo(int index) {
         if (index <= 0) return 0;
-        return font.computeWidth(getDisplayText().substring(0, index));
+        return font.getWidth(getDisplayText().substring(0, index));
     }
 
     private String getDisplayText() {
@@ -387,7 +387,7 @@ public class TextField extends Element {
 
         String d = getDisplayText();
         for (int i = 1; i <= d.length(); i++)
-            if (font.computeWidth(d.substring(0, i)) >= local) return i;
+            if (font.getWidth(d.substring(0, i)) >= local) return i;
         return d.length();
     }
 
@@ -409,11 +409,36 @@ public class TextField extends Element {
 
     private void updateScroll() {
         float avail = width - padding * 2;
+
+        if (avail <= 0) {
+            textOffsetX = 0f;
+            updateFontPosition();
+            return;
+        }
+
+        float textWidth = font.getWidth(getDisplayText());
         float cx = getCursorX();
 
-        if (cx + textOffsetX > avail) textOffsetX = avail - cx;
-        if (cx + textOffsetX < 0) textOffsetX = -cx;
+        if (textWidth <= avail) {
+            textOffsetX = 0f;
+            updateFontPosition();
+            return;
+        }
 
+        float minOffset = avail - textWidth; // negative
+        float maxOffset = 0f;
+
+        textOffsetX = MathUtils.clamp(textOffsetX, minOffset, maxOffset);
+
+        float caretX = cx + textOffsetX;
+
+        if (caretX > avail) {
+            textOffsetX = avail - cx; // shift left so caret hits right edge
+        } else if (caretX < 0f) {
+            textOffsetX = -cx;        // shift right so caret hits left edge
+        }
+
+        textOffsetX = MathUtils.clamp(textOffsetX, minOffset, maxOffset);
         updateFontPosition();
     }
 
@@ -445,6 +470,10 @@ public class TextField extends Element {
         updateScroll();
     }
 
+    public boolean isMasking() {
+        return masking;
+    }
+
     public void setMasking(boolean masking) {
         if (this.masking == masking) return;
 
@@ -454,8 +483,8 @@ public class TextField extends Element {
         updateScroll();
     }
 
-    public boolean isMasking() {
-        return masking;
+    public char getMaskCharacter() {
+        return maskCharacter;
     }
 
     public void setMaskCharacter(char maskCharacter) {
@@ -466,8 +495,8 @@ public class TextField extends Element {
         }
     }
 
-    public char getMaskCharacter() {
-        return maskCharacter;
+    public String getText() {
+        return text;
     }
 
     public void setText(String value) {
@@ -481,10 +510,6 @@ public class TextField extends Element {
 
         updateFontText();
         updateScroll();
-    }
-
-    public String getText() {
-        return text;
     }
 
     private float getCaretHeight() {

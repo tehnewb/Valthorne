@@ -139,42 +139,6 @@ public class SoundPlayer {
     }
 
     /**
-     * Sets the volume level for audio playback of this {@code SoundPlayer} instance.
-     * The volume is clamped between 0.0 (silent) and 1.0 (maximum volume).
-     * This method adjusts the gain parameter of the underlying OpenAL audio source.
-     *
-     * @param v the desired volume level, where 0.0 is completely silent
-     *          and 1.0 is the maximum allowed volume.
-     */
-    public void setVolume(float v) {
-        alSourcef(source, AL_GAIN, Math.max(0f, Math.min(1f, v)));
-    }
-
-    /**
-     * Sets the pitch level for audio playback of this {@code SoundPlayer} instance.
-     * The pitch value is clamped between 0.1 (lowest pitch) and 8.0 (highest pitch).
-     * This method adjusts the pitch parameter of the underlying OpenAL audio source.
-     *
-     * @param p the desired pitch level, where 1.0 represents the normal pitch,
-     *          values less than 1.0 decrease the pitch (lower frequency),
-     *          and values greater than 1.0 increase the pitch (higher frequency).
-     */
-    public void setPitch(float p) {
-        alSourcef(source, AL_PITCH, Math.max(0.1f, Math.min(8f, p)));
-    }
-
-    /**
-     * Sets whether the audio playback should loop continuously.
-     * When looping is enabled, the sound will restart automatically
-     * from the beginning once it reaches the end.
-     *
-     * @param looping {@code true} to enable looping, {@code false} to disable it.
-     */
-    public void setLooping(boolean looping) {
-        alSourcei(source, AL_LOOPING, looping ? AL_TRUE : AL_FALSE);
-    }
-
-    /**
      * Retrieves the duration of the audio associated with this {@code SoundPlayer} instance.
      * The duration is measured in seconds and represents the total playback time of the audio.
      *
@@ -196,6 +160,19 @@ public class SoundPlayer {
     }
 
     /**
+     * Sets the current playback position for the audio associated with this {@code SoundPlayer} instance.
+     * The position is clamped between the start (0 seconds) and the maximum duration of the audio.
+     * If the specified value exceeds the duration or is negative, it will be adjusted accordingly.
+     *
+     * @param sec the desired playback position in seconds.
+     *            Values less than 0 will be clamped to 0,
+     *            and values greater than the duration will be clamped to the duration.
+     */
+    public void setCurrentTime(float sec) {
+        alSourcef(source, AL_SEC_OFFSET, Math.max(0, Math.min(sec, data.duration())));
+    }
+
+    /**
      * Retrieves the current volume level of the audio source.
      * The returned value represents the gain of the underlying
      * OpenAL audio source, where 0.0 is completely silent and
@@ -205,6 +182,18 @@ public class SoundPlayer {
      */
     public float getVolume() {
         return alGetSourcef(source, AL_GAIN);
+    }
+
+    /**
+     * Sets the volume level for audio playback of this {@code SoundPlayer} instance.
+     * The volume is clamped between 0.0 (silent) and 1.0 (maximum volume).
+     * This method adjusts the gain parameter of the underlying OpenAL audio source.
+     *
+     * @param v the desired volume level, where 0.0 is completely silent
+     *          and 1.0 is the maximum allowed volume.
+     */
+    public void setVolume(float v) {
+        alSourcef(source, AL_GAIN, Math.max(0f, Math.min(1f, v)));
     }
 
     /**
@@ -220,6 +209,19 @@ public class SoundPlayer {
     }
 
     /**
+     * Sets the pitch level for audio playback of this {@code SoundPlayer} instance.
+     * The pitch value is clamped between 0.1 (lowest pitch) and 8.0 (highest pitch).
+     * This method adjusts the pitch parameter of the underlying OpenAL audio source.
+     *
+     * @param p the desired pitch level, where 1.0 represents the normal pitch,
+     *          values less than 1.0 decrease the pitch (lower frequency),
+     *          and values greater than 1.0 increase the pitch (higher frequency).
+     */
+    public void setPitch(float p) {
+        alSourcef(source, AL_PITCH, Math.max(0.1f, Math.min(8f, p)));
+    }
+
+    /**
      * Checks whether the audio playback is currently set to loop.
      * This method queries the underlying OpenAL audio source to determine
      * if the looping state is enabled.
@@ -231,16 +233,14 @@ public class SoundPlayer {
     }
 
     /**
-     * Sets the current playback position for the audio associated with this {@code SoundPlayer} instance.
-     * The position is clamped between the start (0 seconds) and the maximum duration of the audio.
-     * If the specified value exceeds the duration or is negative, it will be adjusted accordingly.
+     * Sets whether the audio playback should loop continuously.
+     * When looping is enabled, the sound will restart automatically
+     * from the beginning once it reaches the end.
      *
-     * @param sec the desired playback position in seconds.
-     *            Values less than 0 will be clamped to 0,
-     *            and values greater than the duration will be clamped to the duration.
+     * @param looping {@code true} to enable looping, {@code false} to disable it.
      */
-    public void setCurrentTime(float sec) {
-        alSourcef(source, AL_SEC_OFFSET, Math.max(0, Math.min(sec, data.duration())));
+    public void setLooping(boolean looping) {
+        alSourcei(source, AL_LOOPING, looping ? AL_TRUE : AL_FALSE);
     }
 
     /**

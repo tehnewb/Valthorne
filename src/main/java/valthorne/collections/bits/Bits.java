@@ -108,9 +108,9 @@ public class Bits {
      * Sets or clears the bit at the specified index based on the given boolean value.
      *
      * @param index The index of the bit to modify.
-     * @param set If true, sets the bit at the specified index to 1. If false, clears the bit at the specified index, setting it to 0.
+     * @param set   If true, sets the bit at the specified index to 1. If false, clears the bit at the specified index, setting it to 0.
      */
-    public void set(int index, boolean set){
+    public void set(int index, boolean set) {
         if (set) set(index);
         else clear(index);
     }

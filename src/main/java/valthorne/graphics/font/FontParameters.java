@@ -12,6 +12,13 @@ import valthorne.asset.AssetParameters;
  */
 public record FontParameters(String name, int fontSize, int firstCharacterIndex, int characterCount) implements AssetParameters {
 
+    /**
+     * Constructs a FontParameters object with specified name and font size,
+     * defaulting the first character index to 30 and the character count to 254.
+     *
+     * @param name     the name of the font
+     * @param fontSize the size of the font
+     */
     public FontParameters(String name, int fontSize) {
         this(name, fontSize, 30, 254);
     }

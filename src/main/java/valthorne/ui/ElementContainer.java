@@ -136,10 +136,17 @@ public abstract class ElementContainer extends Element {
     @Override
     public void layout() {
         super.layout();
-        for (Element element : elements) {
+
+        for (int i = 0; i < size; i++) {
+            Element element = elements[i];
             if (element == null || element.isHidden())
                 continue;
+
             element.layout();
+
+            if (element instanceof ElementContainer container) {
+                container.layout();
+            }
         }
     }
 
