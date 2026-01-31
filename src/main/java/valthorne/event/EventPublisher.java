@@ -41,6 +41,27 @@ public class EventPublisher {
     private final ConcurrentHashMap<Class<? extends Event>, TreeSet<EventListener>> listeners = new ConcurrentHashMap<>();
 
     /**
+     * Extracts the priority of an {@code EventListener} for a specific {@code Event} type, based
+     * on the presence of the {@code @EventPriority} annotation on the listener's {@code handle} method.
+     * If the annotation is not present, a default priority of {@code 0} is returned.
+     *
+     * @param listener the {@code EventListener} whose priority is being extracted; must not be null
+     * @param clazz    the event class the listener is associated with; must not be null
+     * @return the priority level as defined by the {@code @EventPriority} annotation, or {@code 0} if the annotation is absent
+     */
+    private static int extractPriority(EventListener listener, Class<? extends Event> clazz) {
+        for (Method method : listener.getClass().getMethods()) {
+            if (!method.getName().equals("handle")) continue;
+            Class<?>[] params = method.getParameterTypes();
+            if (params.length == 1 && clazz.isAssignableFrom(params[0])) {
+                EventPriority annotation = method.getAnnotation(EventPriority.class);
+                return annotation != null ? annotation.priority() : 0;
+            }
+        }
+        return 0;
+    }
+
+    /**
      * Determines whether an event type has any registered listeners.
      *
      * @param clazz the event class to check for registration; must not be null
@@ -120,7 +141,6 @@ public class EventPublisher {
         }
     }
 
-
     /**
      * Creates a {@code TreeSet} for storing listeners, ordered by priority (highest first).
      * Ties in priority are resolved by listener identity to ensure uniqueness.
@@ -135,27 +155,6 @@ public class EventPublisher {
                 return Integer.compare(System.identityHashCode(listener2), System.identityHashCode(listener1));
             return compare;
         });
-    }
-
-    /**
-     * Extracts the priority of an {@code EventListener} for a specific {@code Event} type, based
-     * on the presence of the {@code @EventPriority} annotation on the listener's {@code handle} method.
-     * If the annotation is not present, a default priority of {@code 0} is returned.
-     *
-     * @param listener the {@code EventListener} whose priority is being extracted; must not be null
-     * @param clazz    the event class the listener is associated with; must not be null
-     * @return the priority level as defined by the {@code @EventPriority} annotation, or {@code 0} if the annotation is absent
-     */
-    private static int extractPriority(EventListener listener, Class<? extends Event> clazz) {
-        for (Method method : listener.getClass().getMethods()) {
-            if (!method.getName().equals("handle")) continue;
-            Class<?>[] params = method.getParameterTypes();
-            if (params.length == 1 && clazz.isAssignableFrom(params[0])) {
-                EventPriority annotation = method.getAnnotation(EventPriority.class);
-                return annotation != null ? annotation.priority() : 0;
-            }
-        }
-        return 0;
     }
 
 }

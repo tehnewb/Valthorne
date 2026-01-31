@@ -28,7 +28,7 @@ import valthorne.math.Vector2f;
  *     <li>{@link #getProjection()} returns the active projection matrix used in rendering.</li>
  *     <li>Zoom values below {@code 0.001f} are automatically clamped.</li>
  * </ul>
- *
+ * <p>
  * This class is intended for extension—use {@link Camera2D} as the base for
  * custom camera types tailored to specific rendering strategies.
  *
@@ -42,18 +42,16 @@ public abstract class Camera2D {
      * performed relative to this point.
      */
     protected final Vector2f center = new Vector2f(0, 0);
-
-    /**
-     * Current zoom level of the camera. Higher values zoom in; lower values zoom out.
-     * Cannot be set below {@code 0.001f}.
-     */
-    protected float zoom = 1f;
-
     /**
      * The projection matrix used by the camera. Concrete implementations rebuild
      * this matrix when camera settings or world dimensions change.
      */
     protected final Matrix4f projection = new Matrix4f();
+    /**
+     * Current zoom level of the camera. Higher values zoom in; lower values zoom out.
+     * Cannot be set below {@code 0.001f}.
+     */
+    protected float zoom = 1f;
 
     /**
      * Returns the current center of the camera.

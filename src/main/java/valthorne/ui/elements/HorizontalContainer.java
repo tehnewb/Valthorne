@@ -6,7 +6,7 @@ import valthorne.ui.ElementContainer;
 public class HorizontalContainer extends ElementContainer {
 
     public HorizontalContainer() {
-        
+
     }
 
     @Override

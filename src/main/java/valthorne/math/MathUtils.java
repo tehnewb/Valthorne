@@ -12,26 +12,23 @@ import java.util.Random;
  */
 public final class MathUtils {
 
-    private MathUtils() {
-        throw new AssertionError("No MathUtils instances allowed.");
-    }
-
-    private static final Random RANDOM = new Random();
-
     /**
      * TAU constant (2π).
      */
     public static final double TAU = Math.PI * 2.0;
-
     /**
      * Degrees to radians multiplier.
      */
     public static final double DEG_TO_RAD = Math.PI / 180.0;
-
     /**
      * Radians to degrees multiplier.
      */
     public static final double RAD_TO_DEG = 180.0 / Math.PI;
+    private static final Random RANDOM = new Random();
+
+    private MathUtils() {
+        throw new AssertionError("No MathUtils instances allowed.");
+    }
 
     /**
      * Clamps an int into a range.

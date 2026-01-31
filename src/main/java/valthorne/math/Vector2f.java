@@ -46,24 +46,6 @@ public class Vector2f {
     }
 
     /**
-     * Sets the x-coordinate of this vector.
-     *
-     * @param x The new x-coordinate
-     */
-    public void setX(float x) {
-        this.x = x;
-    }
-
-    /**
-     * Sets the y-coordinate of this vector.
-     *
-     * @param y The new y-coordinate
-     */
-    public void setY(float y) {
-        this.y = y;
-    }
-
-    /**
      * Returns the x-coordinate of this vector.
      *
      * @return The x-coordinate of this vector.
@@ -73,12 +55,30 @@ public class Vector2f {
     }
 
     /**
+     * Sets the x-coordinate of this vector.
+     *
+     * @param x The new x-coordinate
+     */
+    public void setX(float x) {
+        this.x = x;
+    }
+
+    /**
      * Returns the y-coordinate of this vector.
      *
      * @return The y-coordinate of this vector.
      */
     public float getY() {
         return y;
+    }
+
+    /**
+     * Sets the y-coordinate of this vector.
+     *
+     * @param y The new y-coordinate
+     */
+    public void setY(float y) {
+        this.y = y;
     }
 
     /**

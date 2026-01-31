@@ -32,6 +32,7 @@ public final class Layout {
      */
     private Value x = Default, y = Default;
     private Value width = Default, height = Default;
+    private Value leftMargin = Default, rightMargin = Default, topMargin = Default, bottomMargin = Default;
 
     /**
      * Gets the bottom padding value of this layout.
@@ -204,6 +205,118 @@ public final class Layout {
      */
     public Layout setHeight(Value height) {
         this.height = height;
+        return this;
+    }
+
+    /**
+     * Sets the margins of this layout for the left, top, right, and bottom sides.
+     *
+     * @param left   the margin value for the left side
+     * @param top    the margin value for the top side
+     * @param right  the margin value for the right side
+     * @param bottom the margin value for the bottom side
+     * @return this Layout instance for method chaining
+     */
+    public Layout setMargins(Value left, Value top, Value right, Value bottom) {
+        this.leftMargin = left;
+        this.topMargin = top;
+        this.rightMargin = right;
+        this.bottomMargin = bottom;
+        return this;
+    }
+
+    /**
+     * Sets uniform margins for all sides of the layout (left, top, right, and bottom)
+     * using the specified margin value.
+     *
+     * @param margin the margin value to apply uniformly to all sides
+     * @return this Layout instance for method chaining
+     */
+    public Layout setMargins(Value margin) {
+        this.leftMargin = margin;
+        this.topMargin = margin;
+        this.rightMargin = margin;
+        this.bottomMargin = margin;
+        return this;
+    }
+
+    /**
+     * Retrieves the left margin value of this layout.
+     *
+     * @return the current left margin as a {@link Value}
+     */
+    public Value getLeftMargin() {
+        return leftMargin;
+    }
+
+    /**
+     * Sets the left margin of this layout to the specified value.
+     *
+     * @param leftMargin the new left margin value as a {@link Value}
+     * @return this Layout instance for method chaining
+     */
+    public Layout setLeftMargin(Value leftMargin) {
+        this.leftMargin = leftMargin;
+        return this;
+    }
+
+    /**
+     * Retrieves the top margin value of this layout.
+     *
+     * @return the current top margin as a {@link Value}
+     */
+    public Value getTopMargin() {
+        return topMargin;
+    }
+
+    /**
+     * Sets the top margin of this layout to the specified value.
+     *
+     * @param topMargin the new top margin value as a {@link Value}
+     * @return this Layout instance for method chaining
+     */
+    public Layout setTopMargin(Value topMargin) {
+        this.topMargin = topMargin;
+        return this;
+    }
+
+    /**
+     * Retrieves the right margin value of this layout.
+     *
+     * @return the current right margin as a {@link Value}
+     */
+    public Value getRightMargin() {
+        return rightMargin;
+    }
+
+    /**
+     * Sets the right margin of this layout to the specified value.
+     *
+     * @param rightMargin the new right margin value as a {@link Value}
+     * @return this Layout instance for method chaining
+     */
+    public Layout setRightMargin(Value rightMargin) {
+        this.rightMargin = rightMargin;
+        return this;
+    }
+
+    /**
+     * Retrieves the bottom margin value of this layout.
+     *
+     * @return the current bottom margin as a {@link Value}
+     */
+    public Value getBottomMargin() {
+        return bottomMargin;
+    }
+
+    /**
+     * Sets the bottom margin of this layout to the specified value.
+     *
+     * @param bottomMargin the new bottom margin value as a {@link Value}
+     * @return this Layout instance for method chaining
+     */
+    public Layout setBottomMargin(Value bottomMargin) {
+        this.bottomMargin = bottomMargin;
         return this;
     }
 }

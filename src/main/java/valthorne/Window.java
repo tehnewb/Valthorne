@@ -235,6 +235,13 @@ public final class Window {
     }
 
     /**
+     * @return Current SwapInterval
+     */
+    public static SwapInterval getSwapInterval() {
+        return swapInterval;
+    }
+
+    /**
      * Sets the swap interval (VSync).
      *
      * @param type The swap interval type
@@ -243,13 +250,6 @@ public final class Window {
         if (type == null) return;
         swapInterval = type;
         glfwSwapInterval(type.getInterval());
-    }
-
-    /**
-     * @return Current SwapInterval
-     */
-    public static SwapInterval getSwapInterval() {
-        return swapInterval;
     }
 
     /**

@@ -24,6 +24,12 @@ package valthorne.graphics.texture;
  */
 public class NinePatchTexture extends Texture {
 
+    // Reusable temp arrays (NO per-frame allocation)
+    private final float[] tmpOut = new float[2];
+    // Slice data reused every frame
+    private final float[][] slicePos = new float[9][2];
+    private final float[][] sliceSize = new float[9][2];
+    private final int[][] srcRegions = new int[9][4];
     /**
      * Pixel border sizes in the source texture.
      */
@@ -31,14 +37,6 @@ public class NinePatchTexture extends Texture {
     private int right;
     private int top;
     private int bottom;
-
-    // Reusable temp arrays (NO per-frame allocation)
-    private final float[] tmpOut = new float[2];
-
-    // Slice data reused every frame
-    private final float[][] slicePos = new float[9][2];
-    private final float[][] sliceSize = new float[9][2];
-    private final int[][] srcRegions = new int[9][4];
 
     /**
      * Creates a NinePatchTexture from an image path and border sizes.
@@ -114,58 +112,103 @@ public class NinePatchTexture extends Texture {
         float y1 = baseY + top;
         float y2 = baseY + top + stretchH;
 
-        slicePos[0][0] = baseX; slicePos[0][1] = baseY;
-        slicePos[1][0] = x1;    slicePos[1][1] = baseY;
-        slicePos[2][0] = x2;    slicePos[2][1] = baseY;
+        slicePos[0][0] = baseX;
+        slicePos[0][1] = baseY;
+        slicePos[1][0] = x1;
+        slicePos[1][1] = baseY;
+        slicePos[2][0] = x2;
+        slicePos[2][1] = baseY;
 
-        slicePos[3][0] = baseX; slicePos[3][1] = y1;
-        slicePos[4][0] = x1;    slicePos[4][1] = y1;
-        slicePos[5][0] = x2;    slicePos[5][1] = y1;
+        slicePos[3][0] = baseX;
+        slicePos[3][1] = y1;
+        slicePos[4][0] = x1;
+        slicePos[4][1] = y1;
+        slicePos[5][0] = x2;
+        slicePos[5][1] = y1;
 
-        slicePos[6][0] = baseX; slicePos[6][1] = y2;
-        slicePos[7][0] = x1;    slicePos[7][1] = y2;
-        slicePos[8][0] = x2;    slicePos[8][1] = y2;
+        slicePos[6][0] = baseX;
+        slicePos[6][1] = y2;
+        slicePos[7][0] = x1;
+        slicePos[7][1] = y2;
+        slicePos[8][0] = x2;
+        slicePos[8][1] = y2;
 
-        sliceSize[0][0] = left;      sliceSize[0][1] = top;
-        sliceSize[1][0] = stretchW;  sliceSize[1][1] = top;
-        sliceSize[2][0] = right;     sliceSize[2][1] = top;
+        sliceSize[0][0] = left;
+        sliceSize[0][1] = top;
+        sliceSize[1][0] = stretchW;
+        sliceSize[1][1] = top;
+        sliceSize[2][0] = right;
+        sliceSize[2][1] = top;
 
-        sliceSize[3][0] = left;      sliceSize[3][1] = stretchH;
-        sliceSize[4][0] = stretchW;  sliceSize[4][1] = stretchH;
-        sliceSize[5][0] = right;     sliceSize[5][1] = stretchH;
+        sliceSize[3][0] = left;
+        sliceSize[3][1] = stretchH;
+        sliceSize[4][0] = stretchW;
+        sliceSize[4][1] = stretchH;
+        sliceSize[5][0] = right;
+        sliceSize[5][1] = stretchH;
 
-        sliceSize[6][0] = left;      sliceSize[6][1] = bottom;
-        sliceSize[7][0] = stretchW;  sliceSize[7][1] = bottom;
-        sliceSize[8][0] = right;     sliceSize[8][1] = bottom;
+        sliceSize[6][0] = left;
+        sliceSize[6][1] = bottom;
+        sliceSize[7][0] = stretchW;
+        sliceSize[7][1] = bottom;
+        sliceSize[8][0] = right;
+        sliceSize[8][1] = bottom;
 
         int[] r;
 
         r = srcRegions[0];
-        r[0] = 0; r[1] = 0; r[2] = left; r[3] = top;
+        r[0] = 0;
+        r[1] = 0;
+        r[2] = left;
+        r[3] = top;
 
         r = srcRegions[1];
-        r[0] = left; r[1] = 0; r[2] = srcW - right; r[3] = top;
+        r[0] = left;
+        r[1] = 0;
+        r[2] = srcW - right;
+        r[3] = top;
 
         r = srcRegions[2];
-        r[0] = srcW - right; r[1] = 0; r[2] = srcW; r[3] = top;
+        r[0] = srcW - right;
+        r[1] = 0;
+        r[2] = srcW;
+        r[3] = top;
 
         r = srcRegions[3];
-        r[0] = 0; r[1] = top; r[2] = left; r[3] = srcH - bottom;
+        r[0] = 0;
+        r[1] = top;
+        r[2] = left;
+        r[3] = srcH - bottom;
 
         r = srcRegions[4];
-        r[0] = left; r[1] = top; r[2] = srcW - right; r[3] = srcH - bottom;
+        r[0] = left;
+        r[1] = top;
+        r[2] = srcW - right;
+        r[3] = srcH - bottom;
 
         r = srcRegions[5];
-        r[0] = srcW - right; r[1] = top; r[2] = srcW; r[3] = srcH - bottom;
+        r[0] = srcW - right;
+        r[1] = top;
+        r[2] = srcW;
+        r[3] = srcH - bottom;
 
         r = srcRegions[6];
-        r[0] = 0; r[1] = srcH - bottom; r[2] = left; r[3] = srcH;
+        r[0] = 0;
+        r[1] = srcH - bottom;
+        r[2] = left;
+        r[3] = srcH;
 
         r = srcRegions[7];
-        r[0] = left; r[1] = srcH - bottom; r[2] = srcW - right; r[3] = srcH;
+        r[0] = left;
+        r[1] = srcH - bottom;
+        r[2] = srcW - right;
+        r[3] = srcH;
 
         r = srcRegions[8];
-        r[0] = srcW - right; r[1] = srcH - bottom; r[2] = srcW; r[3] = srcH;
+        r[0] = srcW - right;
+        r[1] = srcH - bottom;
+        r[2] = srcW;
+        r[3] = srcH;
 
         for (int i = 0; i < 9; i++) {
 
@@ -198,39 +241,21 @@ public class NinePatchTexture extends Texture {
     }
 
     /**
-     * Retrieves the size of the right border in pixels.
-     *
-     * @return the right border size in pixels
-     */
-    public int getRight() {
-        return right;
-    }
-
-    /**
-     * Retrieves the size of the top border in pixels.
-     *
-     * @return the top border size in pixels
-     */
-    public int getTop() {
-        return top;
-    }
-
-    /**
-     * Retrieves the size of the bottom border in pixels.
-     *
-     * @return the bottom border size in pixels
-     */
-    public int getBottom() {
-        return bottom;
-    }
-
-    /**
      * Sets the size of the left border in pixels.
      *
      * @param left the left border size in pixels to be set
      */
     public void setLeft(int left) {
         this.left = left;
+    }
+
+    /**
+     * Retrieves the size of the right border in pixels.
+     *
+     * @return the right border size in pixels
+     */
+    public int getRight() {
+        return right;
     }
 
     /**
@@ -243,12 +268,30 @@ public class NinePatchTexture extends Texture {
     }
 
     /**
+     * Retrieves the size of the top border in pixels.
+     *
+     * @return the top border size in pixels
+     */
+    public int getTop() {
+        return top;
+    }
+
+    /**
      * Sets the size of the top border in pixels.
      *
      * @param top the top border size in pixels to be set
      */
     public void setTop(int top) {
         this.top = top;
+    }
+
+    /**
+     * Retrieves the size of the bottom border in pixels.
+     *
+     * @return the bottom border size in pixels
+     */
+    public int getBottom() {
+        return bottom;
     }
 
     /**

@@ -13,6 +13,10 @@ public class TextureTest implements Application {
 
     private float time = 0f;
 
+    public static void main(String[] args) {
+        JGL.init(new TextureTest(), "Texture Feature Test", 1280, 720);
+    }
+
     @Override
     public void init() {
         int width = Window.getWidth();
@@ -83,9 +87,5 @@ public class TextureTest implements Application {
     @Override
     public void dispose() {
 
-    }
-
-    public static void main(String[] args) {
-        JGL.init(new TextureTest(), "Texture Feature Test", 1280, 720);
     }
 }

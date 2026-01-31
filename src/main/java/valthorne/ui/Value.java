@@ -56,4 +56,26 @@ public record Value(ValueType type, float number) {
         return new Value(ValueType.PIXELS, number);
     }
 
+    /**
+     * Resolves the final value based on the type of the value, its numeric value,
+     * and contextual parameters such as origin, size, and fallback.
+     *
+     * @param origin   the origin offset (e.g., x or y coordinate) to calculate the value against
+     * @param size     the reference size (e.g., width or height) to determine proportional or relative values
+     * @param fallback the fallback value to use if the resolution cannot be determined from the type or number
+     * @return the resolved float value based on the inputs and the value's type
+     */
+    public float resolve(float origin, float size, float fallback) {
+        return type.resolve(number, origin, size, fallback);
+    }
+
+    /**
+     * Checks if the {@link ValueType} of this instance matches the specified type.
+     *
+     * @param type the {@link ValueType} to compare against
+     * @return true if the type of this instance matches the specified {@link ValueType}, false otherwise
+     */
+    public boolean is(ValueType type) {
+        return this.type == type;
+    }
 }

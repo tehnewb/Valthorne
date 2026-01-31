@@ -1,8 +1,8 @@
 package valthorne.graphics.texture;
 
+import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
 import valthorne.math.Vector2f;
-import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
 
@@ -63,18 +63,15 @@ public class Texture {
      * Rotation and translation pivot around this point.
      */
     private final Vector2f origin = new Vector2f(0f, 0f);
-
-    /**
-     * Current filtering mode used for this texture.
-     */
-    private TextureFilter filter = TextureFilter.NEAREST;
-
     /**
      * Represents the unique identifier for a texture resource
      * used in rendering or graphical operations.
      */
     private final int textureID;
-
+    /**
+     * Current filtering mode used for this texture.
+     */
+    private TextureFilter filter = TextureFilter.NEAREST;
     /**
      * Width of the rendered quad in world units.
      */
@@ -397,19 +394,19 @@ public class Texture {
     }
 
     /**
-     * @return current height of the rendered quad
-     */
-    public float getHeight() {
-        return height;
-    }
-
-    /**
      * Sets the quad width, recalculates vertices, and updates world coordinates.
      */
     public void setWidth(float w) {
         this.width = w;
         updateLocalVertices();
         updateVertexBuffer();
+    }
+
+    /**
+     * @return current height of the rendered quad
+     */
+    public float getHeight() {
+        return height;
     }
 
     /**
@@ -464,6 +461,13 @@ public class Texture {
     }
 
     /**
+     * @return current rotation angle in degrees
+     */
+    public float getRotation() {
+        return rotation;
+    }
+
+    /**
      * Sets the rotation around the origin point.
      *
      * <p>The rotation is stored in degrees but converted to radians for calculation.
@@ -477,13 +481,6 @@ public class Texture {
         sinRot = (float) Math.sin(rad);
         cosRot = (float) Math.cos(rad);
         updateVertexBuffer();
-    }
-
-    /**
-     * @return current rotation angle in degrees
-     */
-    public float getRotation() {
-        return rotation;
     }
 
     /**
@@ -606,6 +603,24 @@ public class Texture {
         glVertexPointer(2, GL_FLOAT, 0, vertexBuffer);
         glTexCoordPointer(2, GL_FLOAT, 0, uvBuffer);
         glDrawArrays(GL_QUADS, 0, 4);
+    }
+
+    /**
+     * Retrieves the vertex buffer containing the vertex data.
+     *
+     * @return a FloatBuffer representing the vertex data.
+     */
+    public FloatBuffer getVertexBuffer() {
+        return vertexBuffer;
+    }
+
+    /**
+     * Retrieves the buffer containing UV coordinate data.
+     *
+     * @return A FloatBuffer holding the UV coordinates.
+     */
+    public FloatBuffer getUVBuffer() {
+        return uvBuffer;
     }
 
     /**

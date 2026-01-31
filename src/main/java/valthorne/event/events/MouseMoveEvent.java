@@ -31,6 +31,13 @@ public class MouseMoveEvent extends MouseEvent {
     }
 
     /**
+     * @return the ending x-coordinate of the mouse cursor as an integer
+     */
+    public int getToX() {
+        return toX;
+    }
+
+    /**
      * Sets the ending x-coordinate of the mouse cursor for this mouse movement event.
      *
      * @param toX the new x-coordinate to set, represented as a {@code short}.
@@ -40,26 +47,18 @@ public class MouseMoveEvent extends MouseEvent {
     }
 
     /**
+     * @return the ending y-coordinate of the mouse cursor as an integer
+     */
+    public int getToY() {
+        return toY;
+    }
+
+    /**
      * Sets the ending y-coordinate of the mouse cursor for this mouse movement event.
      *
      * @param toY the new y-coordinate to set, represented as a {@code short}.
      */
     public void setToY(short toY) {
         this.toY = toY;
-    }
-
-
-    /**
-     * @return the ending x-coordinate of the mouse cursor as an integer
-     */
-    public int getToX() {
-        return toX;
-    }
-
-    /**
-     * @return the ending y-coordinate of the mouse cursor as an integer
-     */
-    public int getToY() {
-        return toY;
     }
 }

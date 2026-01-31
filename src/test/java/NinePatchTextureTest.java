@@ -13,6 +13,10 @@ public class NinePatchTextureTest implements Application {
 
     private float time = 0f;
 
+    public static void main(String[] args) {
+        JGL.init(new NinePatchTextureTest(), "NinePatch Texture Test", 1280, 720);
+    }
+
     @Override
     public void init() {
         int width = Window.getWidth();
@@ -65,9 +69,5 @@ public class NinePatchTextureTest implements Application {
         if (panel != null) {
             panel.dispose();
         }
-    }
-
-    public static void main(String[] args) {
-        JGL.init(new NinePatchTextureTest(), "NinePatch Texture Test", 1280, 720);
     }
 }

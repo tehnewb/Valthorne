@@ -14,9 +14,7 @@ import valthorne.graphics.Drawable;
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
-public class TextureRegionDrawable implements Drawable {
-
-    private final TextureRegion region;
+public record TextureRegionDrawable(TextureRegion region) implements Drawable {
 
     /**
      * Creates a new {@code TextureRegionDrawable} that wraps the specified
@@ -26,8 +24,7 @@ public class TextureRegionDrawable implements Drawable {
      * @param region the {@code TextureRegion} to be wrapped and rendered by this
      *               drawable; must not be null
      */
-    public TextureRegionDrawable(TextureRegion region) {
-        this.region = region;
+    public TextureRegionDrawable {
     }
 
     @Override
@@ -53,7 +50,8 @@ public class TextureRegionDrawable implements Drawable {
      *
      * @return the {@code TextureRegion} associated with this drawable
      */
-    public TextureRegion getRegion() {
+    @Override
+    public TextureRegion region() {
         return region;
     }
 }

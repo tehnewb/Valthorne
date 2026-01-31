@@ -12,17 +12,14 @@ import valthorne.graphics.Drawable;
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
-public class TextureDrawable implements Drawable {
-
-    private final Texture texture;
+public record TextureDrawable(Texture texture) implements Drawable {
 
     /**
      * Constructs a new {@code TextureDrawable} with the specified texture.
      *
      * @param texture the texture to be rendered by this drawable
      */
-    public TextureDrawable(Texture texture) {
-        this.texture = texture;
+    public TextureDrawable {
     }
 
     @Override
@@ -47,7 +44,8 @@ public class TextureDrawable implements Drawable {
      *
      * @return the texture used for rendering
      */
-    public Texture getTexture() {
+    @Override
+    public Texture texture() {
         return texture;
     }
 

@@ -82,52 +82,44 @@ import static org.lwjgl.opengl.GL11.*;
 public abstract class Viewport {
 
     /**
-     * X position of this viewport in screen pixels.
-     */
-    protected int x;
-
-    /**
-     * Y position of this viewport in screen pixels.
-     */
-    protected int y;
-
-    /**
-     * Width of this viewport in screen pixels.
-     */
-    protected int width;
-
-    /**
-     * Height of this viewport in screen pixels.
-     */
-    protected int height;
-
-    /**
-     * The logical world width visible inside this viewport.
-     */
-    protected float worldWidth;
-
-    /**
-     * The logical world height visible inside this viewport.
-     */
-    protected float worldHeight;
-
-    /**
      * The fallback projection matrix used when no camera is assigned.
      * Subclasses may populate this matrix in {@link #update(int, int)}.
      */
     protected final Matrix4f projectionMatrix = new Matrix4f();
-
-    /**
-     * Optional camera used to compute a projection transform for rendering.
-     * If {@code null}, {@link #projectionMatrix} is used instead.
-     */
-    protected Camera2D camera;
-
     /**
      * A buffer storing the previous OpenGL viewport values so they can be restored
      * after {@link #render(Runnable)}.
      */
     private final int[] oldViewport = new int[4];
+    /**
+     * X position of this viewport in screen pixels.
+     */
+    protected int x;
+    /**
+     * Y position of this viewport in screen pixels.
+     */
+    protected int y;
+    /**
+     * Width of this viewport in screen pixels.
+     */
+    protected int width;
+    /**
+     * Height of this viewport in screen pixels.
+     */
+    protected int height;
+    /**
+     * The logical world width visible inside this viewport.
+     */
+    protected float worldWidth;
+    /**
+     * The logical world height visible inside this viewport.
+     */
+    protected float worldHeight;
+    /**
+     * Optional camera used to compute a projection transform for rendering.
+     * If {@code null}, {@link #projectionMatrix} is used instead.
+     */
+    protected Camera2D camera;
 
     /**
      * Creates a viewport using the specified logical world size.
@@ -138,16 +130,6 @@ public abstract class Viewport {
     public Viewport(float worldWidth, float worldHeight) {
         this.worldWidth = worldWidth;
         this.worldHeight = worldHeight;
-    }
-
-    /**
-     * Assigns a camera to this viewport. When applied, the camera will be used
-     * to compute the projection matrix instead of the internal fallback matrix.
-     *
-     * @param camera the camera to use for rendering (may be null)
-     */
-    public void setCamera(Camera2D camera) {
-        this.camera = camera;
     }
 
     /**
@@ -234,7 +216,6 @@ public abstract class Viewport {
 
         glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
     }
-
 
     /**
      * Converts screen coordinates to world coordinates based on the viewport's
@@ -343,24 +324,6 @@ public abstract class Viewport {
     }
 
     /**
-     * Sets the x-coordinate of the screen position for this viewport.
-     *
-     * @param x the x-coordinate of the screen position
-     */
-    public void setX(int x) {
-        this.x = x;
-    }
-
-    /**
-     * Sets the y-coordinate of the screen position for this viewport.
-     *
-     * @param y the y-coordinate of the screen position
-     */
-    public void setY(int y) {
-        this.y = y;
-    }
-
-    /**
      * Retrieves the x-coordinate of the screen position for this viewport.
      *
      * @return the x-coordinate of the screen position
@@ -370,12 +333,30 @@ public abstract class Viewport {
     }
 
     /**
+     * Sets the x-coordinate of the screen position for this viewport.
+     *
+     * @param x the x-coordinate of the screen position
+     */
+    public void setX(int x) {
+        this.x = x;
+    }
+
+    /**
      * Retrieves the y-coordinate of the screen position for this viewport.
      *
      * @return the y-coordinate of the screen position
      */
     public int getY() {
         return y;
+    }
+
+    /**
+     * Sets the y-coordinate of the screen position for this viewport.
+     *
+     * @param y the y-coordinate of the screen position
+     */
+    public void setY(int y) {
+        this.y = y;
     }
 
     /**
@@ -415,5 +396,15 @@ public abstract class Viewport {
      */
     public Camera2D getCamera() {
         return camera;
+    }
+
+    /**
+     * Assigns a camera to this viewport. When applied, the camera will be used
+     * to compute the projection matrix instead of the internal fallback matrix.
+     *
+     * @param camera the camera to use for rendering (may be null)
+     */
+    public void setCamera(Camera2D camera) {
+        this.camera = camera;
     }
 }

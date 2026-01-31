@@ -44,16 +44,12 @@ public abstract class Element implements Dimensional {
     private static final byte PRESSED = 1 << 4;   // Flag indicating if element is being clicked
     private static final byte FOCUSABLE = 1 << 5; // Flag indicating if element can receive focus
     private static final byte CLICK_THROUGH = 1 << 6; // Flag indicating if element can be clicked through
-
+    protected float x, y;  // The position of the element in 2D space
+    protected float width, height;  // The dimensions (width and height) of the element
     private Element parent;     // Reference to parent element in hierarchy
     private int index = -1;     // Index of element within its parent container
     private byte flags;         // Bit flags storing element state
-
     private Layout layout;
-
-    protected float x, y;  // The position of the element in 2D space
-    protected float width, height;  // The dimensions (width and height) of the element
-
     private UI ui;
 
     /**
@@ -206,31 +202,23 @@ public abstract class Element implements Dimensional {
         float ow = hasParent ? parent.width : Window.getWidth();
         float oh = hasParent ? parent.height : Window.getHeight();
 
-        if (layout.getX().type() == ValueType.AUTO) ox = this.x;
-        if (layout.getY().type() == ValueType.AUTO) oy = this.y;
-        if (layout.getWidth().type() == ValueType.AUTO) ow = this.width;
-        if (layout.getHeight().type() == ValueType.AUTO) oh = this.height;
+        if (layout.getX().is(ValueType.AUTO)) ox = this.x;
+        if (layout.getY().is(ValueType.AUTO)) oy = this.y;
+        if (layout.getWidth().is(ValueType.AUTO)) ow = this.width;
+        if (layout.getHeight().is(ValueType.AUTO)) oh = this.height;
 
-        float padL = layout.getLeftPadding().type().resolve(layout.getLeftPadding().number(), 0, ow, 0);
-        float padR = layout.getRightPadding().type().resolve(layout.getRightPadding().number(), 0, ow, 0);
-        float padT = layout.getTopPadding().type().resolve(layout.getTopPadding().number(), 0, oh, 0);
-        float padB = layout.getBottomPadding().type().resolve(layout.getBottomPadding().number(), 0, oh, 0);
-        float x = layout.getX().type().resolve(layout.getX().number(), ox, ow, ox);
-        float y = layout.getY().type().resolve(layout.getY().number(), oy, oh, oy);
-        float width = layout.getWidth().type().resolve(layout.getWidth().number(), 0, ow, ow) + padL + padR;
+        float padL = layout.getLeftPadding().resolve(0, ow, 0);
+        float padR = layout.getRightPadding().resolve(0, ow, 0);
+        float padT = layout.getTopPadding().resolve(0, oh, 0);
+        float padB = layout.getBottomPadding().resolve(0, oh, 0);
+        float x = layout.getX().resolve(ox, ow, ox);
+        float y = layout.getY().resolve(oy, oh, oy);
+        float width = layout.getWidth().resolve(0, ow, ow) + padL + padR;
         float height = layout.getHeight().type().resolve(layout.getHeight().number(), 0, oh, oh) + padT + padB;
+
 
         setPosition(x, y);
         setSize(width, height);
-    }
-
-    /**
-     * Sets the index of this element.
-     *
-     * @param index the index to assign to this element
-     */
-    protected void setIndex(int index) {
-        this.index = index;
     }
 
     /**
@@ -243,14 +231,12 @@ public abstract class Element implements Dimensional {
     }
 
     /**
-     * Sets the parent element for this element.
-     * This method assigns the specified parent element to the current element,
-     * establishing a hierarchical relationship.
+     * Sets the index of this element.
      *
-     * @param parent the parent element to set for this element
+     * @param index the index to assign to this element
      */
-    public void setParent(Element parent) {
-        this.parent = parent;
+    protected void setIndex(int index) {
+        this.index = index;
     }
 
     /**
@@ -260,6 +246,17 @@ public abstract class Element implements Dimensional {
      */
     public Element getParent() {
         return parent;
+    }
+
+    /**
+     * Sets the parent element for this element.
+     * This method assigns the specified parent element to the current element,
+     * establishing a hierarchical relationship.
+     *
+     * @param parent the parent element to set for this element
+     */
+    public void setParent(Element parent) {
+        this.parent = parent;
     }
 
     /**
@@ -487,6 +484,15 @@ public abstract class Element implements Dimensional {
     }
 
     /**
+     * Retrieves the UI instance associated with this component or context.
+     *
+     * @return the UI instance
+     */
+    public UI getUI() {
+        return ui;
+    }
+
+    /**
      * Sets the UI for this element and propagates the UI to child elements
      * if the object is an instance of ElementContainer.
      *
@@ -503,14 +509,5 @@ public abstract class Element implements Dimensional {
                 }
             }
         }
-    }
-
-    /**
-     * Retrieves the UI instance associated with this component or context.
-     *
-     * @return the UI instance
-     */
-    public UI getUI() {
-        return ui;
     }
 }
