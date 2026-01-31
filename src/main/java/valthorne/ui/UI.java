@@ -284,7 +284,11 @@ public class UI extends ElementContainer {
             Element target = findElementAt(event.getX(), event.getY(), true);
 
             if (target != null && !target.isClickThrough()) {
-                if (target.isFocusable()) setFocusTo(target);
+                if (target.isFocusable()) {
+                    setFocusTo(target);
+                } else {
+                    setFocusTo(null);
+                }
 
                 pressed = target;
                 pressed.setPressed(true);
