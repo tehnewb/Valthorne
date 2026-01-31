@@ -1,6 +1,6 @@
-package valthorne.ui.flex;
+package valthorne.ui.enums;
 
-public enum JustifyContent {
+public enum AlignContent {
     START,
     CENTER,
     END,

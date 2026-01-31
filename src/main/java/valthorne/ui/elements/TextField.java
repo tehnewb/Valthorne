@@ -36,6 +36,12 @@ public class TextField extends Element {
 
     private int cursorIndex = 0;
 
+    /**
+     * Maximum number of characters allowed in this field.
+     * A value <= 0 means "no limit".
+     */
+    private int characterLimit;
+
     private int selectionStart = 0;
     private int selectionEnd = 0;
     private boolean selecting;
@@ -221,7 +227,6 @@ public class TextField extends Element {
         updateScroll();
     }
 
-
     @Override
     public void onMouseDrag(MouseDragEvent event) {
         if (!selecting) return;
@@ -236,16 +241,38 @@ public class TextField extends Element {
         updateScroll();
     }
 
-
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
         selecting = false;
+    }
+
+    private boolean hasCharacterLimit() {
+        return characterLimit > 0;
+    }
+
+    private int remainingCapacity() {
+        if (!hasCharacterLimit()) return Integer.MAX_VALUE;
+        return Math.max(0, characterLimit - text.length());
+    }
+
+    private String clampToLimit(String s) {
+        if (s == null) return null;
+        if (!hasCharacterLimit()) return s;
+
+        int cap = remainingCapacity();
+        if (cap <= 0) return "";
+        if (s.length() <= cap) return s;
+
+        return s.substring(0, cap);
     }
 
     private void insertChar(char c) {
         if (c == 0 || c == '\n' || c == '\r') return;
 
         if (hasSelection()) deleteSelection();
+
+        // Enforce character limit.
+        if (hasCharacterLimit() && text.length() >= characterLimit) return;
 
         text = text.substring(0, cursorIndex) + c + text.substring(cursorIndex);
         cursorIndex++;
@@ -340,9 +367,17 @@ public class TextField extends Element {
 
     private void pasteClipboard() {
         String s = getClipboard();
-        if (s == null) return;
+        if (s == null || s.isEmpty()) return;
 
         if (hasSelection()) deleteSelection();
+
+        // Enforce character limit.
+        s = clampToLimit(s);
+        if (s.isEmpty()) {
+            updateFontText();
+            updateScroll();
+            return;
+        }
 
         text = text.substring(0, cursorIndex) + s + text.substring(cursorIndex);
         cursorIndex += s.length();
@@ -502,6 +537,11 @@ public class TextField extends Element {
     public void setText(String value) {
         if (value == null) value = "";
 
+        // Enforce character limit.
+        if (hasCharacterLimit() && value.length() > characterLimit) {
+            value = value.substring(0, characterLimit);
+        }
+
         this.text = value;
 
         cursorIndex = MathUtils.clamp(cursorIndex, 0, text.length());
@@ -510,6 +550,35 @@ public class TextField extends Element {
 
         updateFontText();
         updateScroll();
+    }
+
+    /**
+     * Sets the max character limit for this TextField.
+     * A value <= 0 means "no limit".
+     *
+     * @param limit the maximum number of characters allowed, or <= 0 for unlimited
+     */
+    public void setCharacterLimit(int limit) {
+        this.characterLimit = limit;
+
+        // If current text exceeds the new limit, clamp it.
+        if (hasCharacterLimit() && text.length() > characterLimit) {
+            text = text.substring(0, characterLimit);
+
+            cursorIndex = MathUtils.clamp(cursorIndex, 0, text.length());
+            selectionStart = cursorIndex;
+            selectionEnd = cursorIndex;
+
+            updateFontText();
+            updateScroll();
+        }
+    }
+
+    /**
+     * @return the configured character limit, or <= 0 if unlimited
+     */
+    public int getCharacterLimit() {
+        return characterLimit;
     }
 
     private float getCaretHeight() {

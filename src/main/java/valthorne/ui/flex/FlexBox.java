@@ -1,6 +1,8 @@
 package valthorne.ui.flex;
 
 import valthorne.ui.*;
+import valthorne.ui.enums.AlignItems;
+import valthorne.ui.enums.JustifyContent;
 
 /**
  * A simple FlexBox-style container that positions children in a row or column with gap + wrap.
@@ -166,6 +168,7 @@ public class FlexBox extends ElementContainer {
             float y = switch (alignItems) {
                 case START -> innerY + (innerH - ch);          // top
                 case CENTER -> innerY + (innerH - ch) * 0.5f; // middle
+                case STRETCH -> 0.0F;
                 case END -> innerY;                           // bottom
             };
 
@@ -205,6 +208,7 @@ public class FlexBox extends ElementContainer {
             float y = switch (alignItems) {
                 case START -> penYTop - ch;                         // top within row
                 case CENTER -> rowBottom + (lineH - ch) * 0.5f;      // centered in row
+                case STRETCH -> 0.0F;
                 case END -> rowBottom;                               // bottom within row
             };
 
@@ -302,6 +306,7 @@ public class FlexBox extends ElementContainer {
             float x = switch (alignItems) {
                 case START -> innerX;                        // left
                 case CENTER -> innerX + (innerW - cw) * 0.5f; // centered
+                case STRETCH -> 0.0F;
                 case END -> innerX + (innerW - cw);           // right
             };
 
@@ -337,6 +342,7 @@ public class FlexBox extends ElementContainer {
             float x = switch (alignItems) {
                 case START -> cx;
                 case CENTER -> cx + (colW - cw) * 0.5f; // best-effort within current colW
+                case STRETCH -> 0.0F;
                 case END -> cx + (colW - cw);
             };
 
