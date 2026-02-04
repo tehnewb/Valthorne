@@ -1,13 +1,16 @@
 package valthorne;
 
 import org.lwjgl.glfw.GLFWCursorPosCallback;
+import org.lwjgl.glfw.GLFWImage;
 import org.lwjgl.glfw.GLFWMouseButtonCallback;
 import org.lwjgl.glfw.GLFWScrollCallback;
 import valthorne.event.events.*;
 import valthorne.event.listeners.MouseListener;
 import valthorne.event.listeners.MouseScrollListener;
+import valthorne.graphics.texture.TextureData;
 
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.glfw.GLFWImage.malloc;
 
 /**
  * The {@code Mouse} class provides static utilities for handling mouse input within
@@ -38,34 +41,88 @@ public final class Mouse {
      * Left mouse button (button index 0).
      */
     public static final int LEFT = 0;
+
     /**
      * Right mouse button (button index 1).
      */
     public static final int RIGHT = 1;
+
     /**
      * Middle mouse button (button index 2), usually the scroll wheel click.
      */
     public static final int MIDDLE = 2;
+
     /**
      * Extra mouse button #3 (typically side/back button).
      */
     public static final int BUTTON_3 = 3;
+
     /**
      * Extra mouse button #4 (typically side/forward button).
      */
     public static final int BUTTON_4 = 4;
+
     /**
      * Extra mouse button #5.
      */
     public static final int BUTTON_5 = 5;
+
     /**
      * Extra mouse button #6.
      */
     public static final int BUTTON_6 = 6;
+
     /**
      * Extra mouse button #7.
      */
     public static final int BUTTON_7 = 7;
+
+    /**
+     * Cursor mode: normal cursor behavior (visible and not captured).
+     */
+    public static final int CURSOR_NORMAL = GLFW_CURSOR_NORMAL;
+
+    /**
+     * Cursor mode: cursor is hidden when over the window.
+     */
+    public static final int CURSOR_HIDDEN = GLFW_CURSOR_HIDDEN;
+
+    /**
+     * Cursor mode: cursor is disabled and captured (useful for FPS camera).
+     */
+    public static final int CURSOR_DISABLED = GLFW_CURSOR_DISABLED;
+
+
+    /**
+     * Standard arrow cursor shape for general use.
+     */
+    public static final int CURSOR_ARROW = GLFW_ARROW_CURSOR;
+
+    /**
+     * I-beam cursor shape typically used for text editing.
+     */
+    public static final int CURSOR_IBEAM = GLFW_IBEAM_CURSOR;
+
+    /**
+     * Crosshair cursor shape for precise selection.
+     */
+    public static final int CURSOR_CROSSHAIR = GLFW_CROSSHAIR_CURSOR;
+
+    /**
+     * Hand cursor shape indicating clickable elements.
+     */
+    public static final int CURSOR_HAND = GLFW_HAND_CURSOR;
+
+    /**
+     * Horizontal resize cursor shape for width adjustment.
+     */
+    public static final int CURSOR_HRESIZE = GLFW_HRESIZE_CURSOR;
+
+    /**
+     * Vertical resize cursor shape for height adjustment.
+     */
+    public static final int CURSOR_VRESIZE = GLFW_VRESIZE_CURSOR;
+    
     /**
      * Pre-allocated mouse event instances for reuse.
      */
@@ -114,6 +171,11 @@ public final class Mouse {
     private static byte scrollY;
 
     /**
+     * Tracks the current cursor type being used in the system.
+     */
+    private static long currentCursor = 0;
+
+    /**
      * Private constructor prevents instantiation. This class is purely static.
      */
     private Mouse() {
@@ -135,8 +197,7 @@ public final class Mouse {
 
             MouseMoveEvent event = moveEvent;
 
-            if (buttonState > 0)
-                event = dragEvent;
+            if (buttonState > 0) event = dragEvent;
 
             event.setX(fromX);
             event.setY(fromY);
@@ -184,6 +245,106 @@ public final class Mouse {
     }
 
     /**
+     * Sets the mouse cursor to a standard system cursor.
+     *
+     * @param shape One of the CURSOR_* constants
+     */
+    public static void setCursor(int shape) {
+        long win = Window.getAddress();
+        if (win == 0) return;
+
+        if (currentCursor != 0)
+            glfwDestroyCursor(currentCursor);
+
+        currentCursor = glfwCreateStandardCursor(shape);
+        glfwSetCursor(win, currentCursor);
+    }
+
+    /**
+     * Sets a custom cursor for the current window using the provided texture data and hotspot.
+     *
+     *
+     * @param data The texture data used to create the custom cursor. Must not be {@code null},
+     *             and its buffer must not be {@code null}.
+     * @param hotX The x-coordinate of the cursor's hotspot in pixels, relative to the top-left of the image.
+     *             The value will be clamped to the image's bounds.
+     * @param hotY The y-coordinate of the cursor's hotspot in pixels, relative to the top-left of the image.
+     *             The value will be clamped to the image's bounds.
+     * @throws NullPointerException  If the provided {@code data} is null.
+     * @throws IllegalStateException If {@code data.buffer()} is null.
+     * @throws RuntimeException      If cursor creation fails due to a problem with the provided texture data.
+     */
+    public static void setCursor(TextureData data, int hotX, int hotY) {
+        long win = Window.getAddress();
+        if (win == 0) return;
+        if (data == null) throw new NullPointerException("data");
+        if (data.buffer() == null) throw new IllegalStateException("TextureData.buffer() is null");
+
+        if (currentCursor != 0) {
+            glfwDestroyCursor(currentCursor);
+            currentCursor = 0;
+        }
+
+        GLFWImage img = malloc();
+        img.width(data.width());
+        img.height(data.height());
+        img.pixels(data.buffer());
+
+        hotY = data.height() - hotY - 1; // I'm making the y coordinate how my system is
+
+        if (hotX < 0) hotX = 0;
+        if (hotY < 0) hotY = 0;
+        if (hotX >= data.width()) hotX = data.width() - 1;
+        if (hotY >= data.height()) hotY = data.height() - 1;
+
+        currentCursor = glfwCreateCursor(img, hotX, hotY);
+        img.free();
+
+        if (currentCursor == 0)
+            throw new RuntimeException("Failed to create GLFW cursor from TextureData");
+
+        glfwSetCursor(win, currentCursor);
+    }
+
+    /**
+     * Sets the cursor mode for the current window.
+     *
+     * <p>Valid values are:</p>
+     * <ul>
+     *     <li>{@link #CURSOR_NORMAL}</li>
+     *     <li>{@link #CURSOR_HIDDEN}</li>
+     *     <li>{@link #CURSOR_DISABLED}</li>
+     * </ul>
+     *
+     * @param mode the GLFW cursor mode constant
+     */
+    public static void setCursorMode(int mode) {
+        long win = Window.getAddress();
+        if (win == 0) return;
+
+        if (mode != GLFW_CURSOR_NORMAL && mode != GLFW_CURSOR_HIDDEN && mode != GLFW_CURSOR_DISABLED)
+            throw new IllegalArgumentException("Invalid cursor mode: " + mode);
+
+        glfwSetInputMode(win, GLFW_CURSOR, mode);
+    }
+
+    /**
+     * Sets the cursor position in window coordinates.
+     *
+     * <p>This sets GLFW's internal cursor position, which will trigger the cursor
+     * position callback (if installed). Coordinates are in GLFW window space
+     * (origin at top-left).</p>
+     *
+     * @param x the X position in window coordinates
+     * @param y the Y position in window coordinates
+     */
+    public static void setCursorPosition(double x, double y) {
+        long win = Window.getAddress();
+        if (win == 0) return;
+        glfwSetCursorPos(win, x, y);
+    }
+
+    /**
      * Adds a {@code MouseListener} to the system to handle mouse-related events.
      * The listener will be subscribed to receive notifications for various mouse events,
      * including movement, button presses/releases, and dragging.
@@ -193,8 +354,7 @@ public final class Mouse {
      * @throws NullPointerException if the provided listener is {@code null}
      */
     public static void addMouseListener(MouseListener listener) {
-        if (listener == null)
-            throw new NullPointerException("A null MouseListener cannot be added");
+        if (listener == null) throw new NullPointerException("A null MouseListener cannot be added");
         JGL.subscribe(MouseEvent.class, listener);
     }
 
@@ -208,8 +368,7 @@ public final class Mouse {
      * @throws NullPointerException if the provided listener is {@code null}.
      */
     public static void removeMouseListener(MouseListener listener) {
-        if (listener == null)
-            throw new NullPointerException("A null MouseListener cannot be removed");
+        if (listener == null) throw new NullPointerException("A null MouseListener cannot be removed");
         JGL.unsubscribe(MouseEvent.class, listener);
     }
 
@@ -222,8 +381,7 @@ public final class Mouse {
      * @throws NullPointerException if the provided listener is {@code null}
      */
     public static void addScrollListener(MouseScrollListener listener) {
-        if (listener == null)
-            throw new NullPointerException("A null MouseScrollListener cannot be added");
+        if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be added");
         JGL.subscribe(MouseScrollEvent.class, listener);
     }
 
@@ -235,6 +393,10 @@ public final class Mouse {
         if (cursorPosCallback != null) cursorPosCallback.free();
         if (mouseButtonCallback != null) mouseButtonCallback.free();
         if (scrollCallback != null) scrollCallback.free();
+        if (currentCursor != 0) {
+            glfwDestroyCursor(currentCursor);
+            currentCursor = 0;
+        }
     }
 
     /**

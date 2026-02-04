@@ -41,20 +41,46 @@ public record TextureData(ByteBuffer buffer, short width, short height) {
     private static final IntBuffer h = BufferUtils.createIntBuffer(1);
     private static final IntBuffer comp = BufferUtils.createIntBuffer(1);
 
+
     /**
-     * Loads a texture from a file path. This is a convenience wrapper around
-     * {@link #load(byte[])} which retrieves the raw file bytes first.
+     * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
      *
-     * @param path file system path to an image
-     * @return a fully constructed {@link TextureData} instance
-     * @throws RuntimeException if file reading fails or image decoding fails
+     * @param path the file path to the texture image (e.g., PNG, JPEG)
+     * @return a new {@link TextureData} instance containing the GPU texture ID and pixel size
+     * @throws RuntimeException if an I/O error occurs or if the image decoding fails
      */
     public static TextureData load(String path) {
         try {
-            return load(Files.readAllBytes(Path.of(path)));
+            return load(Files.readAllBytes(Path.of(path)), true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Loads a texture from the specified file path and optionally flips it vertically before decoding.
+     *
+     * @param path           the file path to the texture image (e.g., PNG, JPEG)
+     * @param flipVertically whether to flip the image vertically during decoding
+     * @return a new {@code TextureData} instance containing the decoded image data
+     * @throws RuntimeException if an I/O error occurs while reading the file
+     */
+    public static TextureData load(String path, boolean flipVertically) {
+        try {
+            return load(Files.readAllBytes(Path.of(path)), flipVertically);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Loads a texture from raw image bytes and decodes it.
+     *
+     * @param data the raw image bytes (e.g., PNG, JPEG)
+     * @return a new {@code TextureData} instance containing the decoded image data
+     */
+    public static TextureData load(byte[] data) {
+        return load(data, true);
     }
 
     /**
@@ -73,11 +99,11 @@ public record TextureData(ByteBuffer buffer, short width, short height) {
      * @return a new {@link TextureData} containing the GPU texture ID and pixel size
      * @throws RuntimeException if STBImage fails to decode the image
      */
-    public static TextureData load(byte[] data) {
+    public static TextureData load(byte[] data, boolean flipVertically) {
         ByteBuffer dataBuffer = BufferUtils.createByteBuffer(data.length);
         dataBuffer.put(data).flip();
 
-        STBImage.stbi_set_flip_vertically_on_load(true);
+        STBImage.stbi_set_flip_vertically_on_load(flipVertically);
 
         ByteBuffer image = STBImage.stbi_load_from_memory(dataBuffer, w, h, comp, 4);
 

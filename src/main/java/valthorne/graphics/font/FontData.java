@@ -23,12 +23,13 @@ import static org.lwjgl.stb.STBTruetype.*;
  *   <li>ascent/descent/lineHeight are stored in <b>pixels</b> at the requested font size.</li>
  *   <li>stb's {@code descent} is typically negative (below baseline).</li>
  *   <li>{@code baseline} is equivalent to {@code ascent} in pixels (baseline-to-top).</li>
+ *   <li>Includes an STB font handle + backing buffer so we can query <b>kerning</b>.</li>
  * </ul>
  *
  * @author Albert Beaupre
- * @since December 6th, 2025
+ * @since February 2nd, 2026
  */
-public record FontData(TextureData textureData, int fontSize, char startChar, char endChar, int atlasWidth, int atlasHeight, float ascent, float descent, float scale, float baseline, float lineHeight, Glyph[] glyphs) {
+public record FontData(TextureData textureData, int fontSize, char startChar, char endChar, int atlasWidth, int atlasHeight, float ascent, float descent, float scale, float baseline, float lineHeight, Glyph[] glyphs, STBTTFontinfo stbInfo, ByteBuffer stbFontBuffer) {
 
     private static final IntBuffer ASC_BUF = BufferUtils.createIntBuffer(1);
     private static final IntBuffer DESC_BUF = BufferUtils.createIntBuffer(1);
@@ -49,11 +50,11 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
         if (fontSize <= 0) throw new IllegalArgumentException("fontSize must be > 0");
         if (numChars <= 0) throw new IllegalArgumentException("numChars must be > 0");
 
-        STBTTFontinfo info = STBTTFontinfo.create();
-
+        // IMPORTANT: keep this buffer alive for kerning queries later.
         ByteBuffer fontBuffer = BufferUtils.createByteBuffer(fontBytes.length);
         fontBuffer.put(fontBytes).flip();
 
+        STBTTFontinfo info = STBTTFontinfo.create();
         if (!stbtt_InitFont(info, fontBuffer)) throw new RuntimeException("Failed to init STB font");
 
         stbtt_GetFontVMetrics(info, ASC_BUF, DESC_BUF, GAP_BUF);
@@ -107,7 +108,7 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
 
         char endChar = (char) (startChar + numChars - 1);
 
-        return new FontData(textureData, fontSize, (char) startChar, endChar, atlasSize, atlasSize, ascentPx, descentPx, scale, ascentPx, lineHeightPx, glyphArray);
+        return new FontData(textureData, fontSize, (char) startChar, endChar, atlasSize, atlasSize, ascentPx, descentPx, scale, ascentPx, lineHeightPx, glyphArray, info, fontBuffer);
     }
 
     /**
@@ -137,6 +138,25 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
         int idx = c - startChar;
         if (idx < 0 || idx >= glyphs.length) return null;
         return glyphs[idx];
+    }
+
+    /**
+     * Kerning advance in pixels (already scaled to the baked font size).
+     *
+     * <p>
+     * This value should be added to your pen position before placing the second glyph.
+     * Returns 0 if kerning data isn't available.
+     *
+     * @param left  previous character
+     * @param right current character
+     * @return kerning advance in pixels at baked size
+     */
+    public float getKerningAdvance(char left, char right) {
+        if (left == 0 || right == 0) return 0f;
+        if (stbInfo == null || stbFontBuffer == null) return 0f;
+
+        int adv = stbtt_GetCodepointKernAdvance(stbInfo, left, right);
+        return adv * scale;
     }
 
     /**

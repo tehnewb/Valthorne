@@ -1,5 +1,9 @@
 package valthorne.ui;
 
+import valthorne.graphics.DrawFunction;
+import valthorne.math.geometry.Rectangle;
+import valthorne.viewport.Viewport;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -15,6 +19,7 @@ import java.util.Collections;
  */
 public abstract class ElementContainer extends Element {
 
+    private final DrawFunction draw = this::drawElements;
     protected Element[] elements = new Element[8]; // Array to store child elements with initial capacity of 8
     protected int size; // Current number of elements in the container
 
@@ -27,9 +32,8 @@ public abstract class ElementContainer extends Element {
      * @param element the element to be added to this container. Must not be null.
      */
     public void addElement(Element element) {
-        if (size == elements.length) {
+        if (size == elements.length)
             elements = Arrays.copyOf(elements, elements.length * 2);
-        }
 
         element.setParent(this);
         element.setUI(this.getUI());
@@ -79,11 +83,11 @@ public abstract class ElementContainer extends Element {
      *
      * @param x     the x-coordinate to search for an element.
      * @param y     the y-coordinate to search for an element.
-     * @param click if true, elements with the click-through property are ignored.
+     * @param flags the flags required in an element to be found.
      * @return the {@link Element} located at the specified position, or
      * {@code null} if no element exists at that position.
      */
-    public Element findElementAt(float x, float y, boolean click) {
+    public Element findElementAt(float x, float y, byte flags) {
         for (int i = size - 1; i >= 0; i--) {
             Element child = elements[i];
 
@@ -91,23 +95,17 @@ public abstract class ElementContainer extends Element {
                 continue;
 
             if (child instanceof ElementContainer container) {
-                Element hit = container.findElementAt(x, y, click);
-                if (hit != null) {
-                    if (click && hit.isClickThrough())
-                        continue;
+                Element hit = container.findElementAt(x, y, flags);
+                if (hit != null && (hit.getFlags() & flags) == flags) {
                     return hit;
                 }
             }
 
-            if (child.inside(x, y)) {
-                if (click && child.isClickThrough())
-                    continue;
-
+            if (child.inside(x, y) && (child.getFlags() & flags) == flags)
                 return child;
-            }
         }
 
-        if (inside(x, y) && !isClickThrough())
+        if (inside(x, y) && (getFlags() & flags) == flags)
             return this;
 
         return null;
@@ -125,11 +123,28 @@ public abstract class ElementContainer extends Element {
 
     @Override
     public void draw() {
+        Viewport viewport = getUI().getViewport();
+        if (this.getClipBounds() != null) {
+            Rectangle clip = this.getClipBounds();
+            viewport.applyScissor(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight(), draw);
+        } else {
+            drawElements();
+        }
+    }
+
+    private void drawElements() {
+        Viewport viewport = getUI().getViewport();
         for (int i = 0; i < size; i++) {
             Element element = elements[i];
             if (element == null || element.isHidden())
                 continue;
-            element.draw();
+
+            if (element.getClipBounds() != null) {
+                Rectangle clip = element.getClipBounds();
+                viewport.applyScissor(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight(), element);
+            } else {
+                element.draw();
+            }
         }
     }
 

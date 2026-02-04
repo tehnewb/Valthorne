@@ -1,80 +1,17 @@
 package valthorne.viewport;
 
 import valthorne.camera.Camera2D;
+import valthorne.graphics.DrawFunction;
 import valthorne.math.Matrix4f;
 import valthorne.math.Vector2f;
 
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * The {@code Viewport} class defines a rendering region inside the OpenGL window.
- * A viewport maps a portion of the screen to a logical coordinate system
- * defined by a world width and height. It also provides projection-management
- * and scoped rendering behavior.
- *
- * <p>This class is abstract—different viewport types may compute layout
- * differently (letterboxing, stretching, pixel-perfect scaling, UI-only regions, etc.).
- * Subclasses implement {@link #update(int, int)} to determine how the viewport's
- * screen-area and world-area relate.</p>
- *
- * <h2>Primary Responsibilities</h2>
- * <ul>
- *     <li>Define a region of the screen where rendering occurs.</li>
- *     <li>Apply world-to-screen projection transforms using either:
- *         <ul>
- *             <li>a user-supplied {@link Camera2D}, or</li>
- *             <li>a built-in {@link Matrix4f} projection matrix.</li>
- *         </ul>
- *     </li>
- *     <li>Preserve and restore OpenGL state during isolated rendering passes.</li>
- *     <li>Allow rendering tasks to be safely executed via {@link #render(Runnable)}.</li>
- * </ul>
- *
- * <h2>Coordinate Definitions</h2>
- * <ul>
- *     <li>{@code x, y} — position of the viewport on the screen</li>
- *     <li>{@code width, height} — the pixel dimensions of the viewport</li>
- *     <li>{@code worldWidth, worldHeight} — logical world units visible inside the viewport</li>
- * </ul>
- *
- * <h2>How Projection Works</h2>
- * <p>If a {@link Camera2D} is assigned:
- * <ul>
- *     <li>Its {@code rebuild()} method is called.</li>
- *     <li>The camera produces a projection matrix.</li>
- *     <li>The matrix is loaded into the OpenGL projection stack.</li>
- * </ul>
- * <p>
- * If no camera is set:
- * <ul>
- *     <li>The internal {@link #projectionMatrix} is used instead.</li>
- * </ul>
- * </p>
- *
- * <h2>Render Isolation</h2>
- * <p>{@link #render(Runnable)} encapsulates drawing code with:
- * <ul>
- *     <li>Viewport push/pop</li>
- *     <li>Projection matrix push/pop</li>
- *     <li>ModelView matrix push/pop</li>
- * </ul>
- * ensuring the viewport does not affect rendering outside its scope.</p>
- *
- * <h2>Subclass Requirements</h2>
- * <p>A subclass <strong>must</strong> compute:</p>
- * <ul>
- *     <li>{@code screenX}</li>
- *     <li>{@code screenY}</li>
- *     <li>{@code screenWidth}</li>
- *     <li>{@code screenHeight}</li>
- * </ul>
- * based on some strategy, such as:
- * <ul>
- *     <li>Scaling while preserving aspect ratio</li>
- *     <li>Stretching</li>
- *     <li>Letterboxing / pillarboxing</li>
- *     <li>Aligning UI viewports</li>
- * </ul>
+ * Represents a viewport in a 2D rendering context, handling projection, view transformations,
+ * and OpenGL state management. The {@code Viewport} class provides functionality for managing
+ * screen-to-world coordinate mappings, OpenGL scissor operations, and projection matrix updates.
+ * Subclasses are required to define their own viewport resizing logic and projection setups.
  *
  * @author Albert Beaupre
  * @since December 1st, 2025
@@ -86,40 +23,62 @@ public abstract class Viewport {
      * Subclasses may populate this matrix in {@link #update(int, int)}.
      */
     protected final Matrix4f projectionMatrix = new Matrix4f();
+
     /**
-     * A buffer storing the previous OpenGL viewport values so they can be restored
-     * after {@link #render(Runnable)}.
+     * Stores the previous OpenGL viewport configuration as an array of four integers.
+     * This includes the x and y position, width, and height of the last OpenGL viewport.
      */
     private final int[] oldViewport = new int[4];
+
+    /**
+     * Stores the previous OpenGL scissor rectangle's coordinates and dimensions.
+     * Used to restore the scissor state after applying transformations or nested
+     * scissor rectangles.
+     */
+    private final int[] previousScissor = new int[4];
+
     /**
      * X position of this viewport in screen pixels.
      */
     protected int x;
+
     /**
      * Y position of this viewport in screen pixels.
      */
     protected int y;
+
     /**
      * Width of this viewport in screen pixels.
      */
     protected int width;
+
     /**
      * Height of this viewport in screen pixels.
      */
     protected int height;
+
     /**
      * The logical world width visible inside this viewport.
      */
     protected float worldWidth;
+
     /**
      * The logical world height visible inside this viewport.
      */
     protected float worldHeight;
+
     /**
      * Optional camera used to compute a projection transform for rendering.
      * If {@code null}, {@link #projectionMatrix} is used instead.
      */
     protected Camera2D camera;
+
+    /**
+     * A vector used internally to store temporary calculations or transformations
+     * related to the viewport. This vector is managed internally by the {@code Viewport}
+     * and is not directly exposed or modifiable by external code.
+     */
+    private final Vector2f screenToWorldCoordinates = new Vector2f();
 
     /**
      * Creates a viewport using the specified logical world size.
@@ -146,15 +105,18 @@ public abstract class Viewport {
     public abstract void update(int screenWidth, int screenHeight);
 
     /**
-     * Applies this viewport's transform to OpenGL. This includes:
-     * <ul>
-     *     <li>Setting the OpenGL viewport rectangle</li>
-     *     <li>Loading the projection matrix (via camera or internal)</li>
-     *     <li>Resetting the model-view matrix</li>
-     * </ul>
-     *
-     * <p>Called automatically inside {@link #render(Runnable)}, but may also be
-     * invoked manually for custom rendering flows.</p>
+     * Applies the current viewport configuration to the OpenGL state.
+     * <p>
+     * The method adjusts the OpenGL viewport to match the viewport's screen position
+     * and size, sets the projection matrix based on the assigned camera or fallback
+     * projection matrix, and resets the model-view matrix.
+     * <p>
+     * - The OpenGL viewport is configured to the dimensions defined by {@code x},
+     * {@code y}, {@code width}, and {@code height}.
+     * - If a camera is set, its projection matrix is rebuilt using the logical world
+     * size and applied; otherwise, the default projection matrix is used.
+     * - The OpenGL projection matrix is updated to align with the selected matrix.
+     * - The OpenGL model-view matrix is reset to the identity matrix.
      */
     public void apply() {
         glViewport(x, y, width, height);
@@ -176,25 +138,12 @@ public abstract class Viewport {
     }
 
     /**
-     * Executes a rendering task inside this viewport. All OpenGL state affected
-     * by the viewport or projection is safely restored once rendering completes.
+     * Renders a drawing operation inside the viewport's projection and model-view matrix scope.
+     * This method ensures that the OpenGL state is preserved before and restored after rendering.
      *
-     * <p>This method performs the following steps:</p>
-     * <ol>
-     *     <li>Save current OpenGL viewport</li>
-     *     <li>Push projection and model-view matrices</li>
-     *     <li>Apply this viewport's projection</li>
-     *     <li>Run the provided action</li>
-     *     <li>Restore all matrices</li>
-     *     <li>Restore previous viewport</li>
-     * </ol>
-     *
-     * <p>This allows multiple viewports (UI, game world, minimaps, etc.)
-     * to exist in the same frame without interfering with each other.</p>
-     *
-     * @param action a function containing draw calls to execute inside this viewport
+     * @param function a {@link DrawFunction} representing the drawing operation to be rendered
      */
-    public void render(Runnable action) {
+    public void render(DrawFunction function) {
         glGetIntegerv(GL_VIEWPORT, oldViewport);
 
         glMatrixMode(GL_PROJECTION);
@@ -203,10 +152,8 @@ public abstract class Viewport {
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
 
-        applyScissor(0, 0, worldWidth, worldHeight, () -> {
-            apply();
-            action.run();
-        });
+        apply();
+        function.draw();
 
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
@@ -227,8 +174,7 @@ public abstract class Viewport {
      * or {@code null} if the screen coordinates lie outside the viewport
      */
     public Vector2f screenToWorld(float screenX, float screenY) {
-        if (screenX < x || screenY < y || screenX > x + width || screenY > y + height)
-            return null;
+        if (screenX < x || screenY < y || screenX > x + width || screenY > y + height) return null;
 
         float vx = screenX - x;
         float vy = screenY - y;
@@ -244,20 +190,29 @@ public abstract class Viewport {
             wy = (wy - halfH) / camera.getZoom() + camera.getCenter().getY();
         }
 
-        return new Vector2f(wx, wy);
+        return screenToWorldCoordinates.set(wx, wy);
     }
 
     /**
-     * Applies an OpenGL scissor rectangle using world coordinates.
-     * The rectangle is converted into framebuffer (screen) space
-     * so it works correctly with all viewport types.
+     * Applies a scissor operation to restrict rendering within a specified region
+     * of the viewport. This operation ensures that any draw calls are limited to
+     * the defined rectangular area. The scissor rectangle is defined in terms of
+     * the viewport's logical world coordinates.
      *
-     * @param wx world-space x
-     * @param wy world-space y
-     * @param ww world-space width
-     * @param wh world-space height
+     * @param wx       the x-coordinate of the lower-left corner of the scissor
+     *                 rectangle in world coordinates
+     * @param wy       the y-coordinate of the lower-left corner of the scissor
+     *                 rectangle in world coordinates
+     * @param ww       the width of the scissor rectangle in world coordinates
+     * @param wh       the height of the scissor rectangle in world coordinates
+     * @param function a {@code DrawFunction} representing the drawing operation
+     *                 to execute within the scissor region
+     * @throws NullPointerException if the {@code function} parameter is null
      */
-    public void applyScissor(float wx, float wy, float ww, float wh, Runnable action) {
+    public void applyScissor(float wx, float wy, float ww, float wh, DrawFunction function) {
+        if (function == null)
+            throw new NullPointerException("Scissor function cannot be null");
+
         float nx = wx / worldWidth;
         float ny = wy / worldHeight;
         float nw = ww / worldWidth;
@@ -276,18 +231,55 @@ public abstract class Viewport {
             sh -= (y - sy);
             sy = y;
         }
-        if (sx + sw > x + width)
-            sw = x + width - sx;
-        if (sy + sh > y + height)
-            sh = y + height - sy;
+        if (sx + sw > x + width) sw = (x + width) - sx;
+        if (sy + sh > y + height) sh = (y + height) - sy;
 
-        if (sw <= 0 || sh <= 0)
-            return;
+        if (sw <= 0 || sh <= 0) return;
+
+        boolean wasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+
+        glGetIntegerv(GL_SCISSOR_BOX, previousScissor);
+        int prevX = previousScissor[0];
+        int prevY = previousScissor[1];
+        int prevW = previousScissor[2];
+        int prevH = previousScissor[3];
+
+        int fx = sx;
+        int fy = sy;
+        int fw = sw;
+        int fh = sh;
+
+        if (wasEnabled) {
+            int prevRight = prevX + prevW;
+            int prevTop = prevY + prevH;
+
+            int newRight = sx + sw;
+            int newTop = sy + sh;
+
+            int ix0 = Math.max(prevX, sx);
+            int iy0 = Math.max(prevY, sy);
+            int ix1 = Math.min(prevRight, newRight);
+            int iy1 = Math.min(prevTop, newTop);
+
+            fw = ix1 - ix0;
+            fh = iy1 - iy0;
+            fx = ix0;
+            fy = iy0;
+
+            if (fw <= 0 || fh <= 0) return;
+        }
 
         glEnable(GL_SCISSOR_TEST);
-        glScissor(sx, sy, sw, sh);
-        action.run();
-        glDisable(GL_SCISSOR_TEST);
+        glScissor(fx, fy, fw, fh);
+
+        try {
+            function.draw();
+        } finally {
+            if (wasEnabled)
+                glScissor(prevX, prevY, prevW, prevH);
+            if (!wasEnabled)
+                glDisable(GL_SCISSOR_TEST);
+        }
     }
 
     /**

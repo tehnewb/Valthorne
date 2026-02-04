@@ -1,13 +1,40 @@
 package valthorne.ui;
 
+
 /**
- * Represents a layout configuration that defines padding, position, and size properties for an element.
+ * A class that manages layout properties for UI elements, providing control over positioning,
+ * dimensions, padding, and margins. Each layout property is represented by a {@link Value} object
+ * that defines how the property should be calculated or constrained.
  * <p>
- * The Layout class allows customization of padding for all sides (left, right, top, bottom),
- * as well as position (x, y) and dimensions (width, height). Each property is represented by a {@link Value}.
- * Default values are applied when properties are not explicitly specified.
+ * Key features:
+ * <ul>
+ *   <li>Position control (x, y coordinates)</li>
+ *   <li>Dimension management (width, height)</li>
+ *   <li>Padding on all sides (left, right, top, bottom)</li>
+ *   <li>Margin control on all sides (left, right, top, bottom)</li>
+ * </ul>
  * <p>
- * This class is designed to use a fluent API style, enabling method chaining for property configuration.
+ * All properties use a {@link Value} system that supports different types of measurements:
+ * <ul>
+ *   <li>Auto - Automatically determined based on content</li>
+ *   <li>Pixels - Fixed pixel values</li>
+ *   <li>Percentage - Relative to parent container</li>
+ *   <li>Fill - Fills available space</li>
+ * </ul>
+ * <p>
+ * Layout properties are constrained values, meaning once set, the element they are bound to
+ * will maintain these values during layout calculations. The layout system ensures that
+ * elements respect their assigned constraints while maintaining proper positioning and
+ * sizing within their parent containers.
+ * <p>
+ * Example usage:
+ * <pre>
+ * Layout layout = new Layout();
+ * layout.setWidth(Value.pixels(100))
+ *       .setHeight(Value.percentage(50))
+ *       .setPadding(Value.pixels(10))
+ *       .setMargins(Value.auto());
+ * </pre>
  *
  * @author Albert Beaupre
  * @since December 25th, 2025

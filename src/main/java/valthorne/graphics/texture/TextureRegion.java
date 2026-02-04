@@ -1,53 +1,94 @@
 package valthorne.graphics.texture;
 
 /**
- * Represents a rectangular sub-region of a {@link Texture} object, allowing
- * for specific portions of the texture to be defined, manipulated, and drawn.
- * A {@code TextureRegion} can define both the region of the texture to use
- * and the size and position of its rendered output.
+ * Represents a rectangular sub-region of a {@link Texture}, allowing you to draw only a portion of an
+ * atlas/spritesheet while also controlling the output position and size.
+ *
+ * <p>This class stores two separate concepts:</p>
+ * <ul>
+ *     <li><b>Region (source rectangle)</b>: {@link #regionX}, {@link #regionY}, {@link #regionWidth}, {@link #regionHeight}
+ *     define the pixel rectangle inside the backing {@link Texture}.</li>
+ *     <li><b>Output (destination rectangle)</b>: {@link #x}, {@link #y}, {@link #width}, {@link #height}
+ *     define where and how large the region is drawn in world space.</li>
+ * </ul>
+ *
+ * <p>When {@link #draw()} is called, the region and output settings are pushed into the backing {@link Texture}
+ * via {@code setRegion()}, {@code setSize()}, and {@code setPosition()}, then the texture is rendered.</p>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * Texture atlas = new Texture("assets/sprites/ui_atlas.png");
+ *
+ * // Use a 16x16 icon starting at (32, 48) inside the atlas.
+ * TextureRegion icon = new TextureRegion(atlas, 32, 48, 16, 16);
+ * icon.setPosition(100, 200);
+ * icon.setSize(64, 64); // scale up the icon on-screen
+ *
+ * // In your render loop:
+ * icon.draw();
+ * }</pre>
+ *
+ * <p><b>Note:</b> Because {@link #draw()} mutates the backing {@link Texture}'s region/size/position, multiple
+ * {@code TextureRegion}s that share the same {@link Texture} should not be drawn concurrently without reapplying
+ * their settings each time (which {@link #draw()} does). If you interleave draws of regions sharing one texture,
+ * the last draw call wins for that texture's state.</p>
  *
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
 public class TextureRegion {
 
-    private final Texture texture; // The backing texture for this region
-    private float regionX, regionY; // The x,y coordinates of the region within the texture
-    private float regionWidth, regionHeight; // The width and height dimensions of the region
-    private float x, y;
-    private float width, height; // The rendered output dimensions
+    private final Texture texture;          // The backing texture that this region references and draws from.
+    private float regionX, regionY;         // Source-region top-left coordinates inside the texture (pixels).
+    private float regionWidth, regionHeight; // Source-region size inside the texture (pixels).
+    private float x, y;                     // Destination position in world space where the region is drawn.
+    private float width, height;            // Destination size in world space for the rendered region.
 
     /**
-     * Creates a region that spans the entire texture.
+     * Creates a {@code TextureRegion} that spans the entire backing texture.
+     *
+     * <p>The created region uses:</p>
+     * <ul>
+     *     <li>Region: (0,0) to (texture width, texture height)</li>
+     *     <li>Output: defaults to the region size unless changed via {@link #setSize(float, float)}</li>
+     * </ul>
      *
      * @param texture the backing texture
+     * @throws NullPointerException if {@code texture} is null
      */
     public TextureRegion(Texture texture) {
         this(texture, 0, 0, (int) texture.getWidth(), (int) texture.getHeight());
     }
 
     /**
-     * Constructs a {@code TextureRegion} that represents a specific sub-region
-     * of the provided {@code Texture} object, based on the specified parameters.
+     * Creates a {@code TextureRegion} that references a specific sub-rectangle of a backing {@link Texture}.
+     *
+     * <p>This constructor sets the source region only. Output position and size can be configured independently
+     * via {@link #setPosition(float, float)} and {@link #setSize(float, float)}.</p>
      *
      * @param texture      the backing texture from which the region is defined
-     * @param regionX      the x-coordinate in pixels of the starting point of the region
-     * @param regionY      the y-coordinate in pixels of the starting point of the region
-     * @param regionWidth  the width in pixels of the defined region
-     * @param regionHeight the height in pixels of the defined region
+     * @param regionX      source x-coordinate in pixels inside the texture
+     * @param regionY      source y-coordinate in pixels inside the texture
+     * @param regionWidth  source width in pixels inside the texture
+     * @param regionHeight source height in pixels inside the texture
+     * @throws NullPointerException if {@code texture} is null
      */
     public TextureRegion(Texture texture, float regionX, float regionY, float regionWidth, float regionHeight) {
+        if (texture == null) throw new NullPointerException("Texture cannot be null");
         this.texture = texture;
         this.setRegion(regionX, regionY, regionWidth, regionHeight);
     }
 
     /**
-     * Sets the specific region of the texture to be used or drawn by this {@code TextureRegion}.
+     * Updates the source rectangle inside the backing texture.
      *
-     * @param regionX      the x-coordinate in pixels of the starting point of the region
-     * @param regionY      the y-coordinate in pixels of the starting point of the region
-     * @param regionWidth  the width in pixels of the defined region
-     * @param regionHeight the height in pixels of the defined region
+     * <p>This does not automatically change the output size. If you want the output size to match the new region,
+     * call {@link #setSize(float, float)} as well.</p>
+     *
+     * @param regionX      source x-coordinate in pixels inside the texture
+     * @param regionY      source y-coordinate in pixels inside the texture
+     * @param regionWidth  source width in pixels inside the texture
+     * @param regionHeight source height in pixels inside the texture
      */
     public void setRegion(float regionX, float regionY, float regionWidth, float regionHeight) {
         this.regionX = regionX;
@@ -57,18 +98,19 @@ public class TextureRegion {
     }
 
     /**
-     * Draws the configured region of the texture to the screen.
-     * <p>
-     * This method performs the following actions:
-     * 1. Configures the texture to represent the region specified by the region coordinates and dimensions.
-     * 2. Sets the size of the texture to the specified width and height.
-     * 3. Renders the textured quad to the screen.
-     * <p>
-     * The texture region is defined by {@code regionX}, {@code regionY}, {@code regionWidth}, and {@code regionHeight},
-     * while the output size is determined by {@code width} and {@code height}.
-     * <p>
-     * Internally, it updates the texture region and size using {@code texture.setRegion} and {@code texture.setSize},
-     * then uses {@code texture.draw} to render the texture.
+     * Draws this region using the backing {@link Texture}.
+     *
+     * <p>This method:</p>
+     * <ol>
+     *     <li>Configures the backing texture to sample from this region via {@link Texture#setRegion(float, float, float, float)}.</li>
+     *     <li>Sets the backing texture's quad size via {@link Texture#setSize(float, float)}.</li>
+     *     <li>Sets the backing texture's position via {@link Texture#setPosition(float, float)}.</li>
+     *     <li>Issues the draw call via {@link Texture#draw()}.</li>
+     * </ol>
+     *
+     * <p><b>Important:</b> This mutates the backing {@link Texture}'s state. If multiple regions share the same
+     * texture, make sure you call {@link #draw()} for each region (which re-applies state) and avoid relying on
+     * the texture retaining prior region values between unrelated draws.</p>
      */
     public void draw() {
         texture.setRegion(regionX, regionY, regionWidth, regionHeight);
@@ -78,10 +120,12 @@ public class TextureRegion {
     }
 
     /**
-     * Sets the width and height dimensions of this {@code TextureRegion}.
+     * Sets the destination size (rendered output dimensions) for this region.
      *
-     * @param width  the width to set for this {@code TextureRegion}
-     * @param height the height to set for this {@code TextureRegion}
+     * <p>This does not change the source region size. It only controls how large the region is drawn.</p>
+     *
+     * @param width  output width in world units
+     * @param height output height in world units
      */
     public void setSize(float width, float height) {
         this.width = width;
@@ -89,10 +133,12 @@ public class TextureRegion {
     }
 
     /**
-     * Sets the position of this {@code TextureRegion} by specifying its x and y coordinates.
+     * Sets the destination position (rendered output position) for this region.
      *
-     * @param x the x-coordinate to set for this {@code TextureRegion}
-     * @param y the y-coordinate to set for this {@code TextureRegion}
+     * <p>This does not change the source region position inside the texture.</p>
+     *
+     * @param x destination x in world space
+     * @param y destination y in world space
      */
     public void setPosition(float x, float y) {
         this.x = x;
@@ -100,63 +146,63 @@ public class TextureRegion {
     }
 
     /**
-     * Retrieves the width of this {@code TextureRegion}.
+     * Returns the configured output width.
      *
-     * @return the width of the texture region in pixels.
+     * @return output width in world units
      */
     public float getWidth() {
         return width;
     }
 
     /**
-     * Retrieves the height of this {@code TextureRegion}.
+     * Returns the configured output height.
      *
-     * @return the height of the texture region in pixels.
+     * @return output height in world units
      */
     public float getHeight() {
         return height;
     }
 
     /**
-     * Retrieves the x-coordinate of this {@code TextureRegion}.
+     * Returns the configured output x position.
      *
-     * @return the x-coordinate of the texture region in pixels.
+     * @return destination x in world space
      */
     public float getX() {
         return x;
     }
 
     /**
-     * Retrieves the y-coordinate of this {@code TextureRegion}.
+     * Returns the configured output y position.
      *
-     * @return the y-coordinate of the texture region in pixels.
+     * @return destination y in world space
      */
     public float getY() {
         return y;
     }
 
     /**
-     * Retrieves the x-coordinate in pixels of the starting point of the texture region.
+     * Returns the source-region X coordinate (in pixels) inside the backing texture.
      *
-     * @return the x-coordinate of the texture region in pixels.
+     * @return source x in pixels
      */
     public float getRegionX() {
         return regionX;
     }
 
     /**
-     * Retrieves the y-coordinate in pixels of the starting point of the texture region.
+     * Returns the source-region Y coordinate (in pixels) inside the backing texture.
      *
-     * @return the y-coordinate of the texture region in pixels.
+     * @return source y in pixels
      */
     public float getRegionY() {
         return regionY;
     }
 
     /**
-     * Retrieves the backing {@code Texture} object associated with this {@code TextureRegion}.
+     * Returns the backing texture used by this region.
      *
-     * @return the {@code Texture} object that this {@code TextureRegion} is using.
+     * @return backing {@link Texture}
      */
     public Texture getTexture() {
         return texture;
