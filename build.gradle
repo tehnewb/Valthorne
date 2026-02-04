@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.tehnewb"
-version = "1.0.0"
+version = "1.0.1"
 description = "A 2D game development library"
 
 repositories {

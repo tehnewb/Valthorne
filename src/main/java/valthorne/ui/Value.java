@@ -17,13 +17,13 @@ package valthorne.ui;
 public record Value(ValueType type, float number) {
 
     /**
-     * Creates a new {@link Value} instance of type {@link ValueType#FILL} with a numeric value of 0.
+     * Creates a new {@link Value} instance of type {@link ValueType#FILL} with a numeric value of 1.
      * This represents a value that is used to fill the available space.
      *
      * @return a {@link Value} instance representing the FILL behavior
      */
     public static Value fill() {
-        return new Value(ValueType.FILL, 0);
+        return new Value(ValueType.FILL, 1);
     }
 
     /**

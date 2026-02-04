@@ -541,7 +541,7 @@ public class Color {
      *
      * @return The normalized alpha value
      */
-    public float getA() {
+    public float a() {
         return getAlpha() / 255.0f;
     }
 
@@ -551,7 +551,7 @@ public class Color {
      *
      * @return The normalized red value
      */
-    public float getR() {
+    public float r() {
         return getRed() / 255.0f;
     }
 
@@ -561,7 +561,7 @@ public class Color {
      *
      * @return The normalized green value
      */
-    public float getG() {
+    public float g() {
         return getGreen() / 255.0f;
     }
 
@@ -571,7 +571,7 @@ public class Color {
      *
      * @return The normalized blue value
      */
-    public float getB() {
+    public float b() {
         return getBlue() / 255.0f;
     }
 

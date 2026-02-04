@@ -40,6 +40,9 @@ public final class Window {
     private static long address;
     private static short x, y;
     private static short width, height;
+    private static boolean fullscreen = false;
+    private static boolean borderless = false;
+    private static boolean resizable = true;
 
     /**
      * Initializes the GLFW window with the specified parameters.
@@ -53,15 +56,14 @@ public final class Window {
         Window.height = (short) height;
 
         glfwDefaultWindowHints();
-        glfwWindowHint(GLFW_SAMPLES, 4);
+        glfwWindowHint(GLFW_SAMPLES, 16);
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 
         address = glfwCreateWindow(width, height, title, NULL, NULL);
 
-        if (address == NULL)
-            throw new RuntimeException("Failed to create the GLFW window");
+        if (address == NULL) throw new RuntimeException("Failed to create the GLFW window");
 
         glfwMakeContextCurrent(address);
         glfwSwapInterval(swapInterval.getInterval());
@@ -70,8 +72,7 @@ public final class Window {
         fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
         });
         sizeCallback = glfwSetWindowSizeCallback(address, (win, newW, newH) -> {
-            if (newW <= 0 || newH <= 0)
-                return; // it keeps making the width and height to 0 when minimizing
+            if (newW <= 0 || newH <= 0) return; // it keeps making the width and height to 0 when minimizing
 
             short oldWidth = Window.width;
             short oldHeight = Window.height;
@@ -88,14 +89,10 @@ public final class Window {
             Window.x = (short) newX;
             Window.y = (short) newY;
         });
-        focusCallback = glfwSetWindowFocusCallback(address, (win, focused) -> {
-        });
-        iconifyCallback = glfwSetWindowIconifyCallback(address, (win, iconified) -> {
-        });
-        maximizeCallback = glfwSetWindowMaximizeCallback(address, (win, maximized) -> {
-        });
-        scaleCallback = glfwSetWindowContentScaleCallback(address, (win, xs, ys) -> {
-        });
+        focusCallback = glfwSetWindowFocusCallback(address, (win, focused) -> {});
+        iconifyCallback = glfwSetWindowIconifyCallback(address, (win, iconified) -> {});
+        maximizeCallback = glfwSetWindowMaximizeCallback(address, (win, maximized) -> {});
+        scaleCallback = glfwSetWindowContentScaleCallback(address, (win, xs, ys) -> {});
         closeCallback = glfwSetWindowCloseCallback(address, (win) -> glfwSetWindowShouldClose(win, true));
 
         // Center window on screen
@@ -130,8 +127,7 @@ public final class Window {
      * @throws NullPointerException if listener is null
      */
     public static void addWindowResizeListener(WindowResizeListener listener) {
-        if (listener == null)
-            throw new NullPointerException("A null WindowResizeListener cannot be added");
+        if (listener == null) throw new NullPointerException("A null WindowResizeListener cannot be added");
         JGL.subscribe(WindowResizeEvent.class, listener);
     }
 
@@ -142,8 +138,7 @@ public final class Window {
      * @throws NullPointerException if the listener is null
      */
     public static void removeWindowResizeListener(WindowResizeListener listener) {
-        if (listener == null)
-            throw new NullPointerException("A null WindowResizeListener cannot be removed");
+        if (listener == null) throw new NullPointerException("A null WindowResizeListener cannot be removed");
         JGL.unsubscribe(WindowResizeEvent.class, listener);
     }
 
@@ -164,6 +159,36 @@ public final class Window {
     }
 
     /**
+     * Sets whether the window is resizable.
+     * <p>
+     * This affects the window immediately after creation.
+     * GLFW allows changing this at runtime via window attributes.
+     *
+     * @param resizable true to allow resizing, false to lock the window size
+     */
+    public static void setResizable(boolean resizable) {
+        if (address == NULL)
+            return;
+        Window.resizable = resizable;
+        glfwSetWindowAttrib(address, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
+    }
+
+    /**
+     * Sets whether the window is borderless (undecorated).
+     * <p>
+     * A borderless window has no title bar or borders.
+     * This can be changed at runtime.
+     *
+     * @param borderless true for borderless, false for normal window decorations
+     */
+    public static void setBorderless(boolean borderless) {
+        if (address == NULL)
+            return;
+        Window.borderless = borderless;
+        glfwSetWindowAttrib(address, GLFW_DECORATED, borderless ? GLFW_FALSE : GLFW_TRUE);
+    }
+
+    /**
      * Sets the window fullscreen state.
      *
      * @param fullscreen true for fullscreen, false for windowed
@@ -172,8 +197,9 @@ public final class Window {
         if (address == NULL) return;
 
         GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        if (vid == null)
-            throw new RuntimeException("Failed to get video mode");
+        if (vid == null) throw new RuntimeException("Failed to get video mode");
+
+        Window.fullscreen = fullscreen;
 
         if (fullscreen) {
             glfwSetWindowMonitor(address, glfwGetPrimaryMonitor(), 0, 0, vid.width(), vid.height(), vid.refreshRate());
@@ -250,6 +276,75 @@ public final class Window {
         if (type == null) return;
         swapInterval = type;
         glfwSwapInterval(type.getInterval());
+    }
+
+    public static boolean isFullscreen() {
+        return fullscreen;
+    }
+
+    public static boolean isBorderless() {
+        return borderless;
+    }
+
+    public static boolean isResizable() {
+        return resizable;
+    }
+
+    public static void toggleFullscreen() {
+        setFullscreen(!fullscreen);
+        fullscreen = !fullscreen;
+    }
+
+    public static void minimize() {
+        if (address == NULL) return;
+        glfwIconifyWindow(address);
+    }
+
+    public static void maximize() {
+        if (address == NULL) return;
+        glfwMaximizeWindow(address);
+    }
+
+    public static void restore() {
+        if (address == NULL) return;
+        glfwRestoreWindow(address);
+    }
+
+    public static void focus() {
+        if (address == NULL) return;
+        glfwFocusWindow(address);
+    }
+
+    public static void requestClose() {
+        if (address == NULL) return;
+        glfwSetWindowShouldClose(address, true);
+    }
+
+    public static void setAlwaysOnTop(boolean value) {
+        if (address == NULL) return;
+        glfwSetWindowAttrib(address, GLFW_FLOATING, value ? GLFW_TRUE : GLFW_FALSE);
+    }
+
+    public static void setOpacity(float opacity) {
+        if (address == NULL) return;
+        opacity = Math.max(0f, Math.min(1f, opacity));
+        glfwSetWindowOpacity(address, opacity);
+    }
+
+    public static void center() {
+        if (address == NULL) return;
+
+        GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        if (vid == null) return;
+
+        int cx = (vid.width() - getWidth()) / 2;
+        int cy = (vid.height() - getHeight()) / 2;
+        glfwSetWindowPos(address, cx, cy);
+    }
+
+    public static void setSizeLimits(int minW, int minH, int maxW, int maxH) {
+        if (address == NULL) return;
+        glfwSetWindowSizeLimits(address, minW, minH, maxW, maxH);
     }
 
     /**

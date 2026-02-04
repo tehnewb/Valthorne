@@ -142,6 +142,19 @@ public class ByteBits {
     }
 
     /**
+     * Checks if any bits in this instance match the corresponding bits
+     * in the given byte.
+     *
+     * @param bits The byte to compare against. Each bit in this byte is checked
+     *              for a match with the corresponding bit in this instance.
+     * @return true if any corresponding bits between this instance and the
+     *         provided byte are both set (1), false otherwise.
+     */
+    public boolean anyMatch(byte bits) {
+        return (this.bits & bits) != 0;
+    }
+
+    /**
      * Gets the value of the bits stored in the byte.
      *
      * @return The byte containing the bits.

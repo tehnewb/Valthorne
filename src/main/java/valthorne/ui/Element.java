@@ -2,6 +2,8 @@ package valthorne.ui;
 
 import valthorne.Window;
 import valthorne.event.events.*;
+import valthorne.graphics.DrawFunction;
+import valthorne.math.geometry.Rectangle;
 
 /**
  * Abstract base class representing a user interface element in a graphical user interface system.
@@ -35,22 +37,27 @@ import valthorne.event.events.*;
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
-public abstract class Element implements Dimensional {
+public abstract class Element implements Dimensional, DrawFunction {
 
-    private static final byte HIDDEN = 1;      // Flag indicating if element is not visible
-    private static final byte DISABLED = 1 << 1; // Flag indicating if element is non-interactive
-    private static final byte HOVERED = 1 << 2;  // Flag indicating if mouse is over element
-    private static final byte FOCUSED = 1 << 3;   // Flag indicating if element has keyboard focus
-    private static final byte PRESSED = 1 << 4;   // Flag indicating if element is being clicked
-    private static final byte FOCUSABLE = 1 << 5; // Flag indicating if element can receive focus
-    private static final byte CLICK_THROUGH = 1 << 6; // Flag indicating if element can be clicked through
+    public static final byte HIDDEN = 1;      // Flag indicating if element is not visible
+    public static final byte DISABLED = 1 << 1; // Flag indicating if element is non-interactive
+    public static final byte HOVERED = 1 << 2;  // Flag indicating if mouse is over element
+    public static final byte FOCUSED = 1 << 3;   // Flag indicating if element has keyboard focus
+    public static final byte PRESSED = 1 << 4;   // Flag indicating if element is being clicked
+    public static final byte FOCUSABLE = 1 << 5; // Flag indicating if element can receive focus
+    public static final byte CLICKABLE = 1 << 6; // Flag indicating if element can be clicked through
+    public static final byte SCROLLABLE = (byte) (1 << 7); // Flag indicating if element is scrollable
+
+    private float localX, localY;
     protected float x, y;  // The position of the element in 2D space
     protected float width, height;  // The dimensions (width and height) of the element
     private Element parent;     // Reference to parent element in hierarchy
     private int index = -1;     // Index of element within its parent container
-    private byte flags;         // Bit flags storing element state
+    private byte flags = CLICKABLE;         // Bit flags storing element state
     private Layout layout;
     private UI ui;
+
+    private Rectangle clipBounds;
 
     /**
      * Updates the state of the element. This method is called to perform
@@ -179,47 +186,54 @@ public abstract class Element implements Dimensional {
     }
 
     /**
-     * Arranges the layout of the current object based on its parent or window dimensions.
-     * This method calculates and sets the position and size of the object using
-     * layout properties, such as x, y, width, and height.
+     * Updates the layout of the current object based on its layout properties and parent configuration.
+     * This method calculates and resolves the position, size, and padding of the object considering
+     * the parent's dimensions and window size if no parent is present.
      * <p>
-     * If the object has a parent, the calculations take into account the parent's
-     * position and dimensions. Otherwise, the calculations use the window's dimensions.
+     * Behavior:
+     * - If no layout is defined, this method immediately exits.
+     * - If a parent is present, its position and dimensions are used as a reference for calculations.
+     * - If a parent is not present, the window's dimensions are used as the reference.
+     * - Resolves padding values for left, right, top, and bottom based on the layout and parent/window size.
+     * - Determines the resolved position (`x`, `y`) and size (`width`, `height`) of the object:
+     * - If a layout value is set to "AUTO," fallback values such as `localX`, `localY`, `width`, or `height` are used.
+     * - Otherwise, the layout's specified values are resolved using the parent/window dimensions or position.
+     * - Adjusts the object's position and size by applying the calculated padding values.
      * <p>
-     * The positioning and sizing are resolved through the layout's type and number
-     * properties to determine the final resolved position and size values.
-     * <p>
-     * This method ensures that the object is correctly positioned and sized within
-     * the boundaries of its parent or the window.
+     * The resulting position and size determined during this method's execution are applied to
+     * the object using its `setPosition` and `setSize` methods.
      */
     public void layout() {
-        if (layout == null) return;
-
         boolean hasParent = parent != null;
 
-        float ox = hasParent ? parent.x : 0;
-        float oy = hasParent ? parent.y : 0;
-        float ow = hasParent ? parent.width : Window.getWidth();
-        float oh = hasParent ? parent.height : Window.getHeight();
+        if (layout == null) {
+            if (hasParent) {
+                setPosition(parent.x + localX, parent.y + localY);
+                setSize(width, height);
+                return;
+            }
+            return;
+        }
 
-        if (layout.getX().is(ValueType.AUTO)) ox = this.x;
-        if (layout.getY().is(ValueType.AUTO)) oy = this.y;
-        if (layout.getWidth().is(ValueType.AUTO)) ow = this.width;
-        if (layout.getHeight().is(ValueType.AUTO)) oh = this.height;
+        float px = hasParent ? parent.x : 0f;
+        float py = hasParent ? parent.y : 0f;
+        float pw = hasParent ? parent.width : Window.getWidth();
+        float ph = hasParent ? parent.height : Window.getHeight();
 
-        float padL = layout.getLeftPadding().resolve(0, ow, 0);
-        float padR = layout.getRightPadding().resolve(0, ow, 0);
-        float padT = layout.getTopPadding().resolve(0, oh, 0);
-        float padB = layout.getBottomPadding().resolve(0, oh, 0);
-        float x = layout.getX().resolve(ox, ow, ox);
-        float y = layout.getY().resolve(oy, oh, oy);
-        float width = layout.getWidth().resolve(0, ow, ow) + padL + padR;
-        float height = layout.getHeight().type().resolve(layout.getHeight().number(), 0, oh, oh) + padT + padB;
+        float padL = layout.getLeftPadding().resolve(0, pw, 0);
+        float padR = layout.getRightPadding().resolve(0, pw, 0);
+        float padT = layout.getTopPadding().resolve(0, ph, 0);
+        float padB = layout.getBottomPadding().resolve(0, ph, 0);
 
+        float resolvedX = layout.getX().is(ValueType.AUTO) ? (px + this.localX) : layout.getX().resolve(px, pw, px);
+        float resolvedY = layout.getY().is(ValueType.AUTO) ? (py + this.localY) : layout.getY().resolve(py, ph, py);
+        float resolvedW = layout.getWidth().is(ValueType.AUTO) ? this.width : layout.getWidth().resolve(0, pw, pw);
+        float resolvedH = layout.getHeight().is(ValueType.AUTO) ? this.height : layout.getHeight().resolve(0, ph, ph);
 
-        setPosition(x, y);
-        setSize(width, height);
+        setPosition(resolvedX, resolvedY);
+        setSize(resolvedW + padL + padR, resolvedH + padT + padB);
     }
+
 
     /**
      * Retrieves the index of this element.
@@ -349,7 +363,7 @@ public abstract class Element implements Dimensional {
      * @return true if the click-through behavior is enabled, false otherwise.
      */
     public boolean isClickThrough() {
-        return (flags & CLICK_THROUGH) != 0;
+        return (flags & CLICKABLE) == 0;
     }
 
     /**
@@ -359,8 +373,8 @@ public abstract class Element implements Dimensional {
      * @param value true to enable click-through behavior, false to disable it
      */
     public void setClickThrough(boolean value) {
-        if (value) flags |= CLICK_THROUGH;
-        else flags &= ~CLICK_THROUGH;
+        if (value) flags &= ~CLICKABLE;
+        else flags |= CLICKABLE;
     }
 
     /**
@@ -408,6 +422,36 @@ public abstract class Element implements Dimensional {
     }
 
     /**
+     * Determines if the object is scrollable based on the internal flags.
+     *
+     * @return true if the object is scrollable; false otherwise.
+     */
+    public boolean isScrollable() {
+        return (flags & SCROLLABLE) != 0;
+    }
+
+    /**
+     * Sets the scrollable property of the object. If set to true, the object will
+     * allow scrolling functionality. If set to false, scrolling will be disabled.
+     *
+     * @param value a boolean indicating whether the object should be scrollable (true)
+     *              or not (false)
+     */
+    public void setScrollable(boolean value) {
+        if (value) flags |= SCROLLABLE;
+        else flags &= ~SCROLLABLE;
+    }
+
+    /**
+     * Retrieves the value of the flags.
+     *
+     * @return the byte value representing the flags.
+     */
+    public byte getFlags() {
+        return flags;
+    }
+
+    /**
      * Retrieves the width of the element.
      *
      * @return the width of the element.
@@ -437,6 +481,25 @@ public abstract class Element implements Dimensional {
     }
 
     /**
+     * Sets the clipping bounds for this object.
+     *
+     * @param clipBounds the rectangle representing the new clipping bounds to be set.
+     *                   If null, clipping is disabled.
+     */
+    public void setClipBounds(Rectangle clipBounds) {
+        this.clipBounds = clipBounds;
+    }
+
+    /**
+     * Retrieves the current clipping bounds.
+     *
+     * @return a {@code Rectangle} object representing the clipping bounds.
+     */
+    public Rectangle getClipBounds() {
+        return clipBounds;
+    }
+
+    /**
      * Sets the position of an object by specifying the x and y coordinates.
      *
      * @param x the x-coordinate of the position
@@ -445,6 +508,14 @@ public abstract class Element implements Dimensional {
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
+
+        if (parent != null) {
+            this.localX = x - parent.x;
+            this.localY = y - parent.y;
+        } else {
+            this.localX = x;
+            this.localY = y;
+        }
     }
 
     /**

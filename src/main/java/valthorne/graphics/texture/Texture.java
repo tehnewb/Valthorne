@@ -10,23 +10,54 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 
 /**
- * Represents a 2D textured quad rendered using legacy OpenGL (fixed-function pipeline).
+ * A 2D textured quad renderer built on the legacy OpenGL fixed-function pipeline.
  *
- * <p>This class manages a texture's transform (position, size, rotation, origin),
- * its UV region, and its vertex buffer. It pre-allocates vertex and UV buffers to avoid
- * repeated memory allocation and updates them incrementally whenever properties change.</p>
- *
- * <p>The rendering strategy uses {@code glVertexPointer}, {@code glTexCoordPointer},
- * and {@code glDrawArrays(GL_QUADS)}, which means this class is intended for
- * compatibility-style rendering or simple sprite systems without modern shaders.</p>
- *
- * <p>Key design goals:</p>
+ * <p>This class wraps an OpenGL texture object and provides sprite-like rendering features:</p>
  * <ul>
- *     <li>Zero allocations during draw calls</li>
- *     <li>Local-space vertex generation for fast rotation & translation</li>
- *     <li>Support for arbitrary texture subregions (sprite sheets)</li>
- *     <li>Manual origin control for intuitive rotation + scaling behavior</li>
+ *     <li><b>Transform</b>: position ({@link #x},{@link #y}), size ({@link #width},{@link #height}),
+ *         scale ({@link #scaleX},{@link #scaleY}), rotation ({@link #rotation}) around an origin ({@link #origin}).</li>
+ *     <li><b>Region rendering</b>: draw a sub-rectangle of the underlying image (sprite sheets) using UVs.</li>
+ *     <li><b>Low-allocation rendering</b>: pre-allocated {@link #vertexBuffer} and {@link #uvBuffer}, updated only when needed.</li>
+ *     <li><b>Mirroring</b>: horizontal/vertical UV flips via {@link #setFlipX(boolean)} and {@link #setFlipY(boolean)}.</li>
  * </ul>
+ *
+ * <h2>Rendering model</h2>
+ * <p>The quad is drawn using:</p>
+ * <ul>
+ *     <li>{@code glBindTexture(GL_TEXTURE_2D, textureID)}</li>
+ *     <li>{@code glVertexPointer(..., vertexBuffer)}</li>
+ *     <li>{@code glTexCoordPointer(..., uvBuffer)}</li>
+ *     <li>{@code glDrawArrays(GL_QUADS, 0, 4)}</li>
+ * </ul>
+ *
+ * <p>This means:</p>
+ * <ul>
+ *     <li>Your projection/view transforms must already be configured before calling {@link #draw()}.</li>
+ *     <li>Client states (vertex array / texcoord array / texture 2D) must be enabled by the caller (or elsewhere).</li>
+ * </ul>
+ *
+ * <h2>Vertex generation</h2>
+ * <p>Vertices are stored in two stages:</p>
+ * <ol>
+ *     <li>{@link #localVertices}: local-space quad corners relative to the origin (no rotation or translation).</li>
+ *     <li>{@link #vertexBuffer}: final world-space vertices after applying rotation and translation.</li>
+ * </ol>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * Texture tex = new Texture("assets/sprites/player.png");
+ * tex.setRegion(0, 0, 32, 32);          // draw first frame from a sprite sheet
+ * tex.setPosition(100, 200);
+ * tex.setSize(64, 64);
+ * tex.setRotationOriginCenter();
+ * tex.setRotation(15);
+ * tex.setColor(new Color(1f, 1f, 1f, 1f));
+ *
+ * // In your render loop:
+ * tex.draw();
+ *
+ * tex.dispose();
+ * }</pre>
  *
  * @author Albert Beaupre
  * @see TextureData
@@ -34,122 +65,34 @@ import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
  */
 public class Texture {
 
-    /**
-     * The OpenGL texture handle.
-     */
-    private final TextureData data;
+    private final TextureData data;                                     // Decoded image data used to upload pixels and resolve region UVs.
+    private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // World-space vertex positions (4 corners, x/y pairs).
+    private final FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);     // Normalized UV coordinates (4 corners, u/v pairs).
+    private final float[] localVertices = new float[8];                 // Local-space quad corners relative to the rotation origin.
+    private final Vector2f origin = new Vector2f(0f, 0f);               // Rotation/pivot point relative to the quad’s top-left.
+    private final int textureID;                                        // OpenGL texture object id returned by glGenTextures().
+    private TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.
+    private float width;                                                // Base quad width (before scaleX is applied).
+    private float height;                                               // Base quad height (before scaleY is applied).
+    private float x;                                                    // World-space X position for the quad (top-left reference).
+    private float y;                                                    // World-space Y position for the quad (top-left reference).
+    private float leftRegion;                                           // Normalized U coordinate for the left edge of the region.
+    private float topRegion;                                            // Normalized V coordinate for the top edge of the region.
+    private float rightRegion = 1f;                                     // Normalized U coordinate for the right edge of the region.
+    private float bottomRegion = 1f;                                    // Normalized V coordinate for the bottom edge of the region.
+    private float rotation;                                             // Rotation angle in degrees (clockwise by convention here).
+    private float sinRot, cosRot = 1f;                                  // Cached sine/cosine for the current rotation angle.
+    private boolean flippedX;                                           // Whether UVs are currently flipped horizontally (left/right swapped).
+    private boolean flippedY;                                           // Whether UVs are currently flipped vertically (top/bottom swapped).
+    private float scaleX = 1f;                                          // Horizontal scale factor applied during local vertex generation.
+    private float scaleY = 1f;                                          // Vertical scale factor applied during local vertex generation.
+    private Color color = Color.WHITE;                                  // Tint color multiplied in fixed-function pipeline via glColor4f().
+
 
     /**
-     * Vertex buffer storing 4 (x,y) pairs for the quad.
-     * Pre-allocated once for performance. Updated on position/size/rotation changes.
-     */
-    private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8);
-
-    /**
-     * UV coordinate buffer storing 4 (u,v) pairs.
-     * Updated only when the texture region is changed.
-     */
-    private final FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);
-
-    /**
-     * Local-space vertex positions for the quad before rotation/translation.
-     * Values represent offsets from the origin. Rotation and translation are applied
-     * in the {@link #updateVertexBuffer()} step.
-     */
-    private final float[] localVertices = new float[8];
-
-    /**
-     * The origin point relative to the texture's top-left corner.
-     * Rotation and translation pivot around this point.
-     */
-    private final Vector2f origin = new Vector2f(0f, 0f);
-    /**
-     * Represents the unique identifier for a texture resource
-     * used in rendering or graphical operations.
-     */
-    private final int textureID;
-    /**
-     * Current filtering mode used for this texture.
-     */
-    private TextureFilter filter = TextureFilter.NEAREST;
-    /**
-     * Width of the rendered quad in world units.
-     */
-    private float width;
-
-    /**
-     * Height of the rendered quad in world units.
-     */
-    private float height;
-
-    /**
-     * World-space X position of the quad.
-     */
-    private float x;
-
-    /**
-     * World-space Y position of the quad.
-     */
-    private float y;
-
-    /**
-     * UV region left coordinate.
-     */
-    private float leftRegion;
-
-    /**
-     * UV region top coordinate.
-     */
-    private float topRegion;
-
-    /**
-     * UV region right coordinate, defaults to 1.
-     */
-    private float rightRegion = 1f;
-
-    /**
-     * UV region bottom coordinate, defaults to 1.
-     */
-    private float bottomRegion = 1f;
-
-    /**
-     * Rotation angle in degrees.
-     */
-    private float rotation;
-
-    /**
-     * Cached sine and cosine of the rotation angle.
-     */
-    private float sinRot, cosRot = 1f;
-
-    /**
-     * Tracks whether the texture's UVs are currently flipped horizontally.
-     */
-    private boolean flippedX;
-
-    /**
-     * Tracks whether the texture's UVs are currently flipped vertically.
-     */
-    private boolean flippedY;
-
-    /**
-     * HorizontalAlignment scaling factor applied during vertex generation.
-     */
-    private float scaleX = 1f;
-
-    /**
-     * VerticalAlignment scaling factor applied during vertex generation.
-     */
-    private float scaleY = 1f;
-
-    /**
-     * Represents the color property used to define the visual appearance
-     * or aesthetic attributes of an object.
-     */
-    private Color color = Color.WHITE;
-
-    /**
-     * Loads a texture from a file path using {@link TextureData}.
+     * Loads a texture from an image file path using {@link TextureData}.
+     *
+     * <p>This constructor loads the image into a {@link TextureData} and then uploads it to the GPU.</p>
      *
      * @param path path to the image file
      */
@@ -158,7 +101,9 @@ public class Texture {
     }
 
     /**
-     * Loads a texture from raw image buffer.
+     * Loads a texture from an encoded image buffer (PNG/JPEG/etc.) using {@link TextureData}.
+     *
+     * <p>This constructor decodes the image data into a {@link TextureData} and uploads it to the GPU.</p>
      *
      * @param data PNG/JPEG/etc. byte array
      */
@@ -167,18 +112,33 @@ public class Texture {
     }
 
     /**
-     * Internal constructor used after {@link TextureData} creation.
-     * Initializes vertex buffer, UV buffers, and enables client states on first usage.
+     * Creates a texture from already-loaded {@link TextureData}.
      *
-     * @param data the texture buffer container
+     * <p>Upload steps performed:</p>
+     * <ol>
+     *     <li>Generate and bind the OpenGL texture object</li>
+     *     <li>Apply filter parameters (MIN/MAG)</li>
+     *     <li>Apply clamping to edges to reduce bleeding artifacts</li>
+     *     <li>Upload RGBA8 pixel data with {@code glTexImage2D}</li>
+     *     <li>Initialize quad state: default size = image size, full region, buffers updated</li>
+     * </ol>
+     *
+     * <p>Side effects:</p>
+     * <ul>
+     *     <li>Leaves this texture bound to {@code GL_TEXTURE_2D} after construction.</li>
+     * </ul>
+     *
+     * @param data the decoded image container
+     * @throws NullPointerException if {@code data} is null
      */
     public Texture(TextureData data) {
+        if (data == null) throw new NullPointerException("TextureData cannot be null");
+
         // Generate an OpenGL texture object.
         this.textureID = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, textureID);
 
         // Configure texture filtering for minification and magnification.
-        // Linear filtering gives smoother results for scaled textures.
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.magFilter);
 
@@ -192,21 +152,22 @@ public class Texture {
         this.data = data;
         this.width = data.width();
         this.height = data.height();
+
         updateLocalVertices();
         updateUVBuffer();
         updateVertexBuffer();
     }
 
     /**
-     * Sets the texture filtering mode used when OpenGL scales the texture.
+     * Sets the texture filtering mode used when OpenGL samples/scales this texture.
      *
-     * <p>This updates both the MIN and MAG filters. The texture must be bound
-     * before applying filter parameters, so this method binds the texture,
-     * updates the filtering mode, and leaves the texture bound.</p>
+     * <p>This updates both MIN and MAG filters. The texture is bound before updating GL state.</p>
      *
      * @param filter the filtering mode to apply
+     * @throws NullPointerException if {@code filter} is null
      */
     public void setFilter(TextureFilter filter) {
+        if (filter == null) throw new NullPointerException("TextureFilter cannot be null");
         this.filter = filter;
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
@@ -214,21 +175,25 @@ public class Texture {
     }
 
     /**
-     * Sets the scale factors applied to the texture quad.
+     * Sets the scale factors applied to the quad during vertex generation.
      *
-     * <p>This modifies the size of the rendered quad without changing the
-     * texture's width or height values. Both scaling factors are applied during
-     * the vertex update step.</p>
+     * <p>Important behavior:</p>
+     * <ul>
+     *     <li>This scales the rendered quad without changing the stored base {@link #width}/{@link #height}.</li>
+     *     <li>The origin is adjusted proportionally so the pivot remains visually consistent under scaling.</li>
+     * </ul>
+     *
+     * <p>After updating scale, this recalculates local vertices and rebuilds the final vertex buffer.</p>
      *
      * @param sx horizontal scale factor
      * @param sy vertical scale factor
      */
     public void setScale(float sx, float sy) {
-        // Adjust origin proportionally to new scale
+        // Adjust origin proportionally to new scale.
         float oldScaleX = this.scaleX;
         float oldScaleY = this.scaleY;
 
-        // Prevent divide-by-zero and invalid first-scale
+        // Prevent divide-by-zero and invalid first-scale.
         if (oldScaleX != 0) origin.setX(origin.getX() * (sx / oldScaleX));
         if (oldScaleY != 0) origin.setY(origin.getY() * (sy / oldScaleY));
 
@@ -240,34 +205,24 @@ public class Texture {
     }
 
     /**
-     * Retrieves the horizontal scaling factor applied to the texture.
-     *
-     * @return the current horizontal scale factor (scaleX) of the texture
+     * @return the current horizontal scale factor applied to this quad
      */
     public float getScaleX() {
         return scaleX;
     }
 
     /**
-     * Retrieves the vertical scaling factor applied to the texture.
-     *
-     * @return the current vertical scale factor (scaleY) of the texture
+     * @return the current vertical scale factor applied to this quad
      */
     public float getScaleY() {
         return scaleY;
     }
 
     /**
-     * Flips the texture horizontally by swapping the left and right UV coordinates.
+     * Flips the texture mapping horizontally by swapping the left and right UV values.
      *
-     * <p>This operation mirrors the texture along the Y-axis (left ↔ right).
-     * Only the UV mapping is altered—no vertex positions or orientation values
-     * are modified. This makes the method extremely fast and suitable for
-     * sprite mirroring, character direction changes, and flipping texture regions
-     * defined via {@link #setRegion(float, float, float, float)}.</p>
-     *
-     * <p>After swapping the UV values, {@link #updateUVBuffer()} is called
-     * to commit the new UV layout to the GPU client-side buffer.</p>
+     * <p>This is a raw UV swap. It does not update {@link #flippedX}; prefer {@link #setFlipX(boolean)}
+     * if you want stateful flipping.</p>
      */
     public void flipX() {
         float temp = leftRegion;
@@ -277,16 +232,10 @@ public class Texture {
     }
 
     /**
-     * Flips the texture vertically by swapping the top and bottom UV coordinates.
+     * Flips the texture mapping vertically by swapping the top and bottom UV values.
      *
-     * <p>This operation mirrors the texture along the X-axis (top ↔ bottom).
-     * Like {@link #flipX()}, this affects only UV coordinates and leaves the
-     * geometry, origin, and rotation untouched. VerticalAlignment flipping is useful
-     * for texture formats loaded upside-down, sprite animations, or user-driven
-     * visual transformations.</p>
-     *
-     * <p>After the UV swap, {@link #updateUVBuffer()} is invoked to refresh the
-     * UV coordinate buffer used during rendering.</p>
+     * <p>This is a raw UV swap. It does not update {@link #flippedY}; prefer {@link #setFlipY(boolean)}
+     * if you want stateful flipping.</p>
      */
     public void flipY() {
         float temp = topRegion;
@@ -296,62 +245,43 @@ public class Texture {
     }
 
     /**
-     * Enables or disables horizontal flipping of the texture's UV coordinates.
+     * Enables or disables horizontal UV flipping.
      *
-     * <p>HorizontalAlignment flipping swaps the left and right UV values, causing the
-     * texture to mirror along the Y-axis (left ↔ right). This is purely a UV
-     * transformation and does not affect the vertex positions or rotation.</p>
+     * <p>This method swaps UVs only when the requested state differs from the current {@link #flippedX} state,
+     * preventing repeated swaps.</p>
      *
-     * <p>The operation is performed only when the desired flip state differs from
-     * the current {@link #flippedX} state, ensuring that UV values are not
-     * repeatedly swapped.</p>
-     *
-     * @param flip {@code true} to flip the texture horizontally,
-     *             {@code false} to restore the original UV orientation
+     * @param flip true to flip horizontally, false to restore original orientation
      */
     public void setFlipX(boolean flip) {
         if (flip != flippedX) {
-            flipX();           // Performs the actual UV swap
-            flippedX = flip;   // Update state tracking
+            flipX();
+            flippedX = flip;
         }
     }
 
     /**
-     * Enables or disables vertical flipping of the texture's UV coordinates.
+     * Enables or disables vertical UV flipping.
      *
-     * <p>VerticalAlignment flipping swaps the top and bottom UV values, causing the
-     * texture to mirror along the X-axis (top ↔ bottom). Like horizontal flipping,
-     * this affects only UV mapping and leaves geometry unchanged.</p>
+     * <p>This method swaps UVs only when the requested state differs from the current {@link #flippedY} state,
+     * preventing repeated swaps.</p>
      *
-     * <p>The operation is applied only if the requested flip state differs from
-     * the current {@link #flippedY} value, preventing repeated and unnecessary
-     * UV swaps.</p>
-     *
-     * @param flip {@code true} to flip the texture vertically,
-     *             {@code false} to restore the original UV orientation
+     * @param flip true to flip vertically, false to restore original orientation
      */
     public void setFlipY(boolean flip) {
         if (flip != flippedY) {
-            flipY();           // Performs the UV swap
-            flippedY = flip;   // Update state tracking
+            flipY();
+            flippedY = flip;
         }
     }
 
     /**
-     * Sets both the horizontal and vertical flip states of the texture in a single call.
+     * Sets horizontal and vertical flip states in one call.
      *
-     * <p>This is a convenience method that forwards the specified flip states to
-     * {@link #setFlipX(boolean)} and {@link #setFlipY(boolean)}. It allows the caller
-     * to efficiently configure both flip directions without needing to invoke each
-     * method individually.</p>
+     * <p>This delegates to {@link #setFlipX(boolean)} and {@link #setFlipY(boolean)} so UV updates
+     * occur only when needed.</p>
      *
-     * <p>Internally, the method relies on the existing flip-tracking fields
-     * ({@code flippedX} and {@code flippedY}) to ensure that UV coordinates
-     * are only modified when the desired state differs from the current one.
-     * As a result, this method performs zero unnecessary UV buffer updates.</p>
-     *
-     * @param flipX whether the texture should be flipped horizontally
-     * @param flipY whether the texture should be flipped vertically
+     * @param flipX true to flip horizontally
+     * @param flipY true to flip vertically
      */
     public void setFlip(boolean flipX, boolean flipY) {
         setFlipX(flipX);
@@ -359,14 +289,15 @@ public class Texture {
     }
 
     /**
-     * Sets the world-space position of the texture.
+     * Sets the world-space position of the quad.
+     *
+     * <p>If the position is unchanged, this method exits early to avoid unnecessary buffer writes.</p>
      *
      * @param x world X coordinate
      * @param y world Y coordinate
      */
     public void setPosition(float x, float y) {
-        if (this.x == x && this.y == y)
-            return;
+        if (this.x == x && this.y == y) return;
         this.x = x;
         this.y = y;
         updateVertexBuffer();
@@ -387,14 +318,16 @@ public class Texture {
     }
 
     /**
-     * @return current width of the rendered quad
+     * @return current base width of the quad (before scale)
      */
     public float getWidth() {
         return width;
     }
 
     /**
-     * Sets the quad width, recalculates vertices, and updates world coordinates.
+     * Sets the quad width (base, before scaling), then rebuilds local and final vertices.
+     *
+     * @param w new width
      */
     public void setWidth(float w) {
         this.width = w;
@@ -403,14 +336,16 @@ public class Texture {
     }
 
     /**
-     * @return current height of the rendered quad
+     * @return current base height of the quad (before scale)
      */
     public float getHeight() {
         return height;
     }
 
     /**
-     * Sets the quad height, recalculates vertices, and updates world coordinates.
+     * Sets the quad height (base, before scaling), then rebuilds local and final vertices.
+     *
+     * @param h new height
      */
     public void setHeight(float h) {
         this.height = h;
@@ -419,7 +354,10 @@ public class Texture {
     }
 
     /**
-     * Sets both width and height simultaneously.
+     * Sets both width and height (base, before scaling), then rebuilds local and final vertices.
+     *
+     * @param w new width
+     * @param h new height
      */
     public void setSize(float w, float h) {
         this.width = w;
@@ -429,13 +367,20 @@ public class Texture {
     }
 
     /**
-     * Defines a sub-rectangle of the texture to draw.
-     * Useful for sprite sheets or animation frames.
+     * Defines a sub-rectangle of the texture to render, expressed in pixel coordinates.
      *
-     * @param left   u-coordinate of the left side
-     * @param top    v-coordinate of the top side
-     * @param right  u-coordinate of the right side
-     * @param bottom v-coordinate of the bottom side
+     * <p>This converts pixel coordinates into normalized UVs (0..1) using the underlying image size.</p>
+     *
+     * <p>Important:</p>
+     * <ul>
+     *     <li>This method does not modify {@link #flippedX}/{@link #flippedY} state.</li>
+     *     <li>If you call this after flipping, the region values are replaced and you may want to reapply flips.</li>
+     * </ul>
+     *
+     * @param left   left edge in pixels
+     * @param top    top edge in pixels
+     * @param right  right edge in pixels
+     * @param bottom bottom edge in pixels
      */
     public void setRegion(float left, float top, float right, float bottom) {
         this.leftRegion = left / data.width();
@@ -446,8 +391,17 @@ public class Texture {
     }
 
     /**
-     * Updates the UV buffer with the current region.
-     * Order: top-left → top-right → bottom-right → bottom-left.
+     * Updates the UV buffer with the current normalized region values.
+     *
+     * <p>Corner order:</p>
+     * <ol>
+     *     <li>Top-left</li>
+     *     <li>Top-right</li>
+     *     <li>Bottom-right</li>
+     *     <li>Bottom-left</li>
+     * </ol>
+     *
+     * <p>This ordering must match the vertex ordering in {@link #updateLocalVertices()} and {@link #updateVertexBuffer()}.</p>
      */
     private void updateUVBuffer() {
         uvBuffer.put(0, leftRegion);
@@ -468,10 +422,14 @@ public class Texture {
     }
 
     /**
-     * Sets the rotation around the origin point.
+     * Sets rotation (in degrees) around {@link #origin} and rebuilds the final vertex buffer.
      *
-     * <p>The rotation is stored in degrees but converted to radians for calculation.
-     * Sine and cosine are cached to avoid repeated trigonometric calls.</p>
+     * <p>Implementation details:</p>
+     * <ul>
+     *     <li>Degrees are converted to radians.</li>
+     *     <li>Radians are negated ({@code -degrees}) to match your clockwise rotation convention.</li>
+     *     <li>Sine and cosine are cached into {@link #sinRot} and {@link #cosRot}.</li>
+     * </ul>
      *
      * @param degrees clockwise rotation angle
      */
@@ -484,10 +442,12 @@ public class Texture {
     }
 
     /**
-     * Sets the origin/pivot used for rotation and positioning.
+     * Sets the rotation origin/pivot relative to the quad.
      *
-     * @param ox origin X relative to texture
-     * @param oy origin Y relative to texture
+     * <p>After changing the origin, local and final vertices are rebuilt.</p>
+     *
+     * @param ox origin X relative to the quad's top-left
+     * @param oy origin Y relative to the quad's top-left
      */
     public void setRotationOrigin(float ox, float oy) {
         this.origin.set(ox, oy);
@@ -496,12 +456,10 @@ public class Texture {
     }
 
     /**
-     * Sets the rotation origin of the object to its geometric center.
-     * <p>
-     * The method calculates the center point of the object based on its current
-     * width, height, and scale factors. It then updates the origin to this center point.
-     * After setting the rotation origin, this method ensures that the local vertices
-     * and the vertex buffer of the object are updated appropriately.
+     * Sets the rotation origin to the geometric center of the quad (after scaling).
+     *
+     * <p>This uses {@code width * scaleX / 2} and {@code height * scaleY / 2} to ensure the pivot is centered
+     * in rendered space rather than base-size space.</p>
      */
     public void setRotationOriginCenter() {
         origin.set(width * scaleX / 2f, height * scaleY / 2f);
@@ -510,40 +468,55 @@ public class Texture {
     }
 
     /**
-     * @return current origin vector
+     * @return the current rotation origin vector (mutable)
      */
     public Vector2f getRotationOrigin() {
         return origin;
     }
 
     /**
-     * @return the {@link TextureData} instance containing the raw image buffer
+     * Returns the decoded image data backing this texture.
+     *
+     * @return texture data container
      */
     public TextureData getData() {
         return data;
     }
 
     /**
-     * @return the color of the object
+     * @return current tint color used for rendering
      */
     public Color getColor() {
         return color;
     }
 
     /**
-     * Sets the color of the object.
+     * Sets the tint color used for rendering.
      *
-     * @param color the Color object to set
+     * <p>The color is applied via {@code glColor4f} inside {@link #draw()} and therefore multiplies the sampled
+     * texture color.</p>
+     *
+     * @param color new color
+     * @throws NullPointerException if {@code color} is null
      */
     public void setColor(Color color) {
+        if (color == null) throw new NullPointerException("Color cannot be null");
         this.color = color;
     }
 
     /**
-     * Computes the local-space vertex positions relative to the origin.
+     * Computes local-space quad corners relative to {@link #origin}.
      *
-     * <p>No rotation or world offset is applied here. Values represent
-     * the raw quad positions prior to transformation.</p>
+     * <p>This method applies scaling to {@link #width} and {@link #height} to build the local rectangle,
+     * but does not apply rotation or world translation.</p>
+     *
+     * <p>Corner order is consistent with {@link #updateUVBuffer()}:</p>
+     * <ol>
+     *     <li>Top-left</li>
+     *     <li>Top-right</li>
+     *     <li>Bottom-right</li>
+     *     <li>Bottom-left</li>
+     * </ol>
      */
     private void updateLocalVertices() {
         float ox = origin.getX();
@@ -566,7 +539,16 @@ public class Texture {
     }
 
     /**
-     * Rebuilds the final vertex buffer by applying rotation and world translation.
+     * Rebuilds the final world-space {@link #vertexBuffer} by applying rotation and translation.
+     *
+     * <p>Computation:</p>
+     * <ul>
+     *     <li>Translate to pivot space: {@code px = x + origin.x}, {@code py = y + origin.y}</li>
+     *     <li>Rotate each local corner using cached {@link #cosRot}/{@link #sinRot}</li>
+     *     <li>Translate rotated corners into world space and write them into {@link #vertexBuffer}</li>
+     * </ul>
+     *
+     * <p>This method performs no allocations and writes the buffer using absolute puts.</p>
      */
     private void updateVertexBuffer() {
         float px = x + origin.getX();
@@ -585,20 +567,20 @@ public class Texture {
     }
 
     /**
-     * Renders the textured quad.
+     * Renders the textured quad with the current transform, UV region, and color.
      *
-     * <p>This call performs the following:</p>
+     * <p>Preconditions (caller responsibility):</p>
      * <ul>
-     *     <li>Binds the texture</li>
-     *     <li>Assigns vertex and UV buffer pointers</li>
-     *     <li>Draws a quad via {@code glDrawArrays}</li>
+     *     <li>{@code glEnable(GL_TEXTURE_2D)} is enabled</li>
+     *     <li>{@code glEnableClientState(GL_VERTEX_ARRAY)} is enabled</li>
+     *     <li>{@code glEnableClientState(GL_TEXTURE_COORD_ARRAY)} is enabled</li>
+     *     <li>Projection/model-view matrices are already configured</li>
      * </ul>
      *
-     * <p>No matrix manipulation is done here; your projection/view matrix
-     * must already be active.</p>
+     * <p>This method does not modify matrices or GL client state beyond binding the texture and issuing the draw.</p>
      */
     public void draw() {
-        glColor4f(color.getR(), color.getG(), color.getB(), color.getA());
+        glColor4f(color.r(), color.g(), color.b(), color.a());
         glBindTexture(GL_TEXTURE_2D, textureID);
         glVertexPointer(2, GL_FLOAT, 0, vertexBuffer);
         glTexCoordPointer(2, GL_FLOAT, 0, uvBuffer);
@@ -606,40 +588,41 @@ public class Texture {
     }
 
     /**
-     * Retrieves the vertex buffer containing the vertex data.
+     * Exposes the internal vertex buffer used for rendering.
      *
-     * @return a FloatBuffer representing the vertex data.
+     * <p>This is primarily useful for debugging or for batching systems that want to read the computed vertices.
+     * The buffer contents are updated by {@link #updateVertexBuffer()}.</p>
+     *
+     * @return the world-space vertex buffer (length 8 floats)
      */
     public FloatBuffer getVertexBuffer() {
         return vertexBuffer;
     }
 
     /**
-     * Retrieves the buffer containing UV coordinate data.
+     * Exposes the internal UV buffer used for rendering.
      *
-     * @return A FloatBuffer holding the UV coordinates.
+     * <p>The buffer contents are updated by {@link #updateUVBuffer()}.</p>
+     *
+     * @return the UV buffer (length 8 floats)
      */
     public FloatBuffer getUVBuffer() {
         return uvBuffer;
     }
 
     /**
-     * Releases resources associated with the texture.
-     * <p>
-     * This method disposes of the underlying OpenGL texture by delegating
-     * the cleanup to the {@link TextureData} instance. After calling this method,
-     * the texture becomes unusable, and any attempts to render it will likely result
-     * in errors or undefined behavior. It is crucial to call this method
-     * when the texture is no longer needed to free GPU memory.
+     * Deletes the underlying OpenGL texture object.
+     *
+     * <p>After calling this method, {@link #textureID} is no longer valid and this instance should not be used.</p>
      */
     public void dispose() {
         glDeleteTextures(textureID);
     }
 
     /**
-     * Retrieves the unique identifier for the texture.
+     * Returns the OpenGL texture handle for this instance.
      *
-     * @return the texture ID as an integer
+     * @return OpenGL texture id
      */
     public int getID() {
         return textureID;
