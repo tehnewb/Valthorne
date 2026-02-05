@@ -1,7 +1,6 @@
 package valthorne.graphics.texture;
 
-import static org.lwjgl.opengl.GL11.GL_LINEAR;
-import static org.lwjgl.opengl.GL11.GL_NEAREST;
+import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Represents the filtering mode applied to an OpenGL texture.
@@ -37,7 +36,34 @@ public enum TextureFilter {
      * <p>Interpolates between adjacent pixels, producing a smoother image.
      * Best for modern graphics, high-res textures, and UI widgets.</p>
      */
-    LINEAR(GL_LINEAR, GL_LINEAR);
+    LINEAR(GL_LINEAR, GL_LINEAR),
+
+    /**
+     * Nearest filtering with mipmaps.
+     *
+     * <p>Uses nearest neighbor sampling and nearest mipmap level.
+     * Reduces aliasing at distance while keeping a pixel-art look.</p>
+     */
+    NEAREST_MIPMAP_NEAREST(GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST),
+
+    /**
+     * Nearest filtering with linear mipmap blending.
+     *
+     * <p>Sharp pixels with smoother transitions between mip levels.</p>
+     */
+    NEAREST_MIPMAP_LINEAR(GL_NEAREST_MIPMAP_LINEAR, GL_NEAREST),
+
+    /**
+     * Linear filtering with nearest mipmap selection.
+     */
+    LINEAR_MIPMAP_NEAREST(GL_LINEAR_MIPMAP_NEAREST, GL_LINEAR),
+
+    /**
+     * Linear filtering with linear mipmap blending.
+     *
+     * <p>The highest quality standard OpenGL filtering.</p>
+     */
+    LINEAR_MIPMAP_LINEAR(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
     /**
      * Minification filter parameter.
@@ -53,4 +79,22 @@ public enum TextureFilter {
         this.minFilter = minFilter;
         this.magFilter = magFilter;
     }
+
+    /**
+     * @return true if this filter requires mipmaps
+     */
+    public boolean usesMipmaps() {
+        return minFilter == GL_NEAREST_MIPMAP_NEAREST
+                || minFilter == GL_NEAREST_MIPMAP_LINEAR
+                || minFilter == GL_LINEAR_MIPMAP_NEAREST
+                || minFilter == GL_LINEAR_MIPMAP_LINEAR;
+    }
+
+    /**
+     * @return true if this filter is pixel-perfect
+     */
+    public boolean isPixelPerfect() {
+        return magFilter == GL_NEAREST;
+    }
+
 }

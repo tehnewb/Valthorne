@@ -1,80 +1,76 @@
 package valthorne.ui;
 
-
 /**
- * A class that manages layout properties for UI elements, providing control over positioning,
- * dimensions, padding, and margins. Each layout property is represented by a {@link Value} object
- * that defines how the property should be calculated or constrained.
- * <p>
- * Key features:
+ * Stores CSS-like layout constraints for a UI {@link Element}.
+ *
+ * <p>This class is a simple, chainable data container. It does not perform layout itself.
+ * Your layout engine (ex: {@link Element#layout()} and container layouts like Grid/FlexBox)
+ * reads these values and resolves them against parent sizes, content sizes, and other rules.</p>
+ *
+ * <h2>What this controls</h2>
  * <ul>
- *   <li>Position control (x, y coordinates)</li>
- *   <li>Dimension management (width, height)</li>
- *   <li>Padding on all sides (left, right, top, bottom)</li>
- *   <li>Margin control on all sides (left, right, top, bottom)</li>
+ *   <li><b>Position</b>: {@link #x}, {@link #y} (optional constraints)</li>
+ *   <li><b>Size</b>: {@link #width}, {@link #height} (pixels/percent/auto/fill)</li>
+ *   <li><b>Self alignment</b>: optional override for how this element aligns in a parent container</li>
  * </ul>
- * <p>
- * All properties use a {@link Value} system that supports different types of measurements:
+ *
+ * <h2>Value system</h2>
+ * <p>All properties are represented by {@link Value}, which can express:</p>
  * <ul>
- *   <li>Auto - Automatically determined based on content</li>
- *   <li>Pixels - Fixed pixel values</li>
- *   <li>Percentage - Relative to parent container</li>
- *   <li>Fill - Fills available space</li>
+ *   <li><b>AUTO</b>: resolved by content or parent rules</li>
+ *   <li><b>PIXELS</b>: fixed size</li>
+ *   <li><b>PERCENTAGE</b>: relative to parent container size</li>
+ *   <li><b>FILL</b>: consume remaining space (container-dependent behavior)</li>
  * </ul>
- * <p>
- * Layout properties are constrained values, meaning once set, the element they are bound to
- * will maintain these values during layout calculations. The layout system ensures that
- * elements respect their assigned constraints while maintaining proper positioning and
- * sizing within their parent containers.
- * <p>
- * Example usage:
- * <pre>
- * Layout layout = new Layout();
- * layout.setWidth(Value.pixels(100))
- *       .setHeight(Value.percentage(50))
- *       .setPadding(Value.pixels(10))
- *       .setMargins(Value.auto());
- * </pre>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * Layout layout = new Layout()
+ *         .setWidth(Value.pixels(160))
+ *         .setHeight(Value.percentage(50))
+ *         .setPadding(Value.pixels(10));
+ *
+ * Element button = new Button("Play");
+ * button.setLayout(layout);
+ * }</pre>
  *
  * @author Albert Beaupre
  * @since December 25th, 2025
  */
 public final class Layout {
 
-    /**
-     * The default value used for all layout properties if isn't explicitly set
-     */
-    private static final Value Default = Value.auto();
+    private static final Value DEFAULT = Value.auto(); // Default Value assigned to properties that are not explicitly configured.
+    private Value leftPadding = DEFAULT;               // Left padding inside the element (space between content and left edge).
+    private Value rightPadding = DEFAULT;              // Right padding inside the element (space between content and right edge).
+    private Value topPadding = DEFAULT;                // Top padding inside the element (space between content and top edge).
+    private Value bottomPadding = DEFAULT;             // Bottom padding inside the element (space between content and bottom edge).
+    private Value x = DEFAULT;                         // Optional X-position constraint (layout engine may ignore depending on container).
+    private Value y = DEFAULT;                         // Optional Y-position constraint (layout engine may ignore depending on container).
+    private Value width = DEFAULT;                     // Width constraint for the element (AUTO/PIXELS/PERCENT/FILL).
+    private Value height = DEFAULT;                    // Height constraint for the element (AUTO/PIXELS/PERCENT/FILL).
 
     /**
-     * Padding values for all four sides of the element
-     */
-    private Value leftPadding = Default;
-    private Value rightPadding = Default;
-    private Value topPadding = Default;
-    private Value bottomPadding = Default;
-
-    /**
-     * Position coordinates and dimension values
-     */
-    private Value x = Default, y = Default;
-    private Value width = Default, height = Default;
-    private Value leftMargin = Default, rightMargin = Default, topMargin = Default, bottomMargin = Default;
-
-    /**
-     * Gets the bottom padding value of this layout.
+     * Returns the bottom padding value.
      *
-     * @return the current bottom padding as a {@link Value}
+     * <p>This value represents the internal spacing between the element's content
+     * and its bottom edge. Containers typically subtract padding from the available
+     * content rectangle before placing children or drawing text.</p>
+     *
+     * @return the bottom padding {@link Value} (never null unless you set it that way)
      */
     public Value getBottomPadding() {
         return bottomPadding;
     }
 
     /**
-     * Sets the bottom padding of this layout.
+     * Sets the bottom padding value.
      *
-     * @param bottomPadding the new bottom padding value
-     * @return this Layout instance for method chaining
+     * <p>This does not immediately change the element’s geometry. The layout engine
+     * reads this value during the element/container layout pass and resolves it
+     * against the element’s current size.</p>
+     *
+     * @param bottomPadding the new bottom padding {@link Value}
+     * @return this layout for chaining
      */
     public Layout setBottomPadding(Value bottomPadding) {
         this.bottomPadding = bottomPadding;
@@ -82,19 +78,25 @@ public final class Layout {
     }
 
     /**
-     * Gets the top padding value of this layout.
+     * Returns the top padding value.
      *
-     * @return the current top padding as a {@link Value}
+     * <p>This value represents the internal spacing between the element's content
+     * and its top edge.</p>
+     *
+     * @return the top padding {@link Value}
      */
     public Value getTopPadding() {
         return topPadding;
     }
 
     /**
-     * Sets the top padding of this layout.
+     * Sets the top padding value.
      *
-     * @param topPadding the new top padding value
-     * @return this Layout instance for method chaining
+     * <p>This does not immediately change the element’s geometry. The layout engine
+     * resolves this value during layout.</p>
+     *
+     * @param topPadding the new top padding {@link Value}
+     * @return this layout for chaining
      */
     public Layout setTopPadding(Value topPadding) {
         this.topPadding = topPadding;
@@ -102,19 +104,25 @@ public final class Layout {
     }
 
     /**
-     * Gets the right padding value of this layout.
+     * Returns the right padding value.
      *
-     * @return the current right padding as a {@link Value}
+     * <p>This value represents the internal spacing between the element's content
+     * and its right edge.</p>
+     *
+     * @return the right padding {@link Value}
      */
     public Value getRightPadding() {
         return rightPadding;
     }
 
     /**
-     * Sets the right padding of this layout.
+     * Sets the right padding value.
      *
-     * @param rightPadding the new right padding value
-     * @return this Layout instance for method chaining
+     * <p>This does not immediately change the element’s geometry. The layout engine
+     * resolves this value during layout.</p>
+     *
+     * @param rightPadding the new right padding {@link Value}
+     * @return this layout for chaining
      */
     public Layout setRightPadding(Value rightPadding) {
         this.rightPadding = rightPadding;
@@ -122,19 +130,25 @@ public final class Layout {
     }
 
     /**
-     * Gets the left padding value of this layout.
+     * Returns the left padding value.
      *
-     * @return the current left padding as a {@link Value}
+     * <p>This value represents the internal spacing between the element's content
+     * and its left edge.</p>
+     *
+     * @return the left padding {@link Value}
      */
     public Value getLeftPadding() {
         return leftPadding;
     }
 
     /**
-     * Sets the left padding of this layout.
+     * Sets the left padding value.
      *
-     * @param leftPadding the new left padding value
-     * @return this Layout instance for method chaining
+     * <p>This does not immediately change the element’s geometry. The layout engine
+     * resolves this value during layout.</p>
+     *
+     * @param leftPadding the new left padding {@link Value}
+     * @return this layout for chaining
      */
     public Layout setLeftPadding(Value leftPadding) {
         this.leftPadding = leftPadding;
@@ -142,10 +156,18 @@ public final class Layout {
     }
 
     /**
-     * Sets uniform padding for all sides of the layout simultaneously.
+     * Sets uniform padding for all four sides.
      *
-     * @param padding the padding value to apply to all sides
-     * @return this Layout instance for method chaining
+     * <p>This is equivalent to calling:</p>
+     * <pre>{@code
+     * setLeftPadding(p);
+     * setRightPadding(p);
+     * setTopPadding(p);
+     * setBottomPadding(p);
+     * }</pre>
+     *
+     * @param padding the padding {@link Value} to apply to every side
+     * @return this layout for chaining
      */
     public Layout setPadding(Value padding) {
         this.leftPadding = padding;
@@ -156,19 +178,24 @@ public final class Layout {
     }
 
     /**
-     * Gets the x-coordinate value of this layout.
+     * Returns the X-position constraint value.
      *
-     * @return the current x position as a {@link Value}
+     * <p>Whether this is used depends on the container/layout policy.
+     * Absolute-positioning containers may respect it; flow containers may ignore it.</p>
+     *
+     * @return x constraint {@link Value}
      */
     public Value getX() {
         return x;
     }
 
     /**
-     * Sets the x-coordinate of this layout.
+     * Sets the X-position constraint value.
      *
-     * @param x the new x position value
-     * @return this Layout instance for method chaining
+     * <p>This does not move anything immediately. A layout pass must read and apply it.</p>
+     *
+     * @param x the new x constraint {@link Value}
+     * @return this layout for chaining
      */
     public Layout setX(Value x) {
         this.x = x;
@@ -176,19 +203,23 @@ public final class Layout {
     }
 
     /**
-     * Gets the y-coordinate value of this layout.
+     * Returns the Y-position constraint value.
      *
-     * @return the current y position as a {@link Value}
+     * <p>Whether this is used depends on the container/layout policy.</p>
+     *
+     * @return y constraint {@link Value}
      */
     public Value getY() {
         return y;
     }
 
     /**
-     * Sets the y-coordinate of this layout.
+     * Sets the Y-position constraint value.
      *
-     * @param y the new y position value
-     * @return this Layout instance for method chaining
+     * <p>This does not move anything immediately. A layout pass must read and apply it.</p>
+     *
+     * @param y the new y constraint {@link Value}
+     * @return this layout for chaining
      */
     public Layout setY(Value y) {
         this.y = y;
@@ -196,19 +227,24 @@ public final class Layout {
     }
 
     /**
-     * Gets the width value of this layout.
+     * Returns the width constraint value.
      *
-     * @return the current width as a {@link Value}
+     * <p>{@link ValueType#AUTO} typically means "size to content" unless overridden by a container.
+     * {@link ValueType#FILL} typically means "take remaining space" (container-dependent).</p>
+     *
+     * @return width constraint {@link Value}
      */
     public Value getWidth() {
         return width;
     }
 
     /**
-     * Sets the width of this layout.
+     * Sets the width constraint value.
      *
-     * @param width the new width value
-     * @return this Layout instance for method chaining
+     * <p>This does not resize anything immediately. A layout pass must resolve and apply it.</p>
+     *
+     * @param width the new width constraint {@link Value}
+     * @return this layout for chaining
      */
     public Layout setWidth(Value width) {
         this.width = width;
@@ -216,134 +252,27 @@ public final class Layout {
     }
 
     /**
-     * Gets the height value of this layout.
+     * Returns the height constraint value.
      *
-     * @return the current height as a {@link Value}
+     * <p>{@link ValueType#AUTO} typically means "size to content" unless overridden by a container.
+     * {@link ValueType#FILL} typically means "take remaining space" (container-dependent).</p>
+     *
+     * @return height constraint {@link Value}
      */
     public Value getHeight() {
         return height;
     }
 
     /**
-     * Sets the height of this layout.
+     * Sets the height constraint value.
      *
-     * @param height the new height value
-     * @return this Layout instance for method chaining
+     * <p>This does not resize anything immediately. A layout pass must resolve and apply it.</p>
+     *
+     * @param height the new height constraint {@link Value}
+     * @return this layout for chaining
      */
     public Layout setHeight(Value height) {
         this.height = height;
-        return this;
-    }
-
-    /**
-     * Sets the margins of this layout for the left, top, right, and bottom sides.
-     *
-     * @param left   the margin value for the left side
-     * @param top    the margin value for the top side
-     * @param right  the margin value for the right side
-     * @param bottom the margin value for the bottom side
-     * @return this Layout instance for method chaining
-     */
-    public Layout setMargins(Value left, Value top, Value right, Value bottom) {
-        this.leftMargin = left;
-        this.topMargin = top;
-        this.rightMargin = right;
-        this.bottomMargin = bottom;
-        return this;
-    }
-
-    /**
-     * Sets uniform margins for all sides of the layout (left, top, right, and bottom)
-     * using the specified margin value.
-     *
-     * @param margin the margin value to apply uniformly to all sides
-     * @return this Layout instance for method chaining
-     */
-    public Layout setMargins(Value margin) {
-        this.leftMargin = margin;
-        this.topMargin = margin;
-        this.rightMargin = margin;
-        this.bottomMargin = margin;
-        return this;
-    }
-
-    /**
-     * Retrieves the left margin value of this layout.
-     *
-     * @return the current left margin as a {@link Value}
-     */
-    public Value getLeftMargin() {
-        return leftMargin;
-    }
-
-    /**
-     * Sets the left margin of this layout to the specified value.
-     *
-     * @param leftMargin the new left margin value as a {@link Value}
-     * @return this Layout instance for method chaining
-     */
-    public Layout setLeftMargin(Value leftMargin) {
-        this.leftMargin = leftMargin;
-        return this;
-    }
-
-    /**
-     * Retrieves the top margin value of this layout.
-     *
-     * @return the current top margin as a {@link Value}
-     */
-    public Value getTopMargin() {
-        return topMargin;
-    }
-
-    /**
-     * Sets the top margin of this layout to the specified value.
-     *
-     * @param topMargin the new top margin value as a {@link Value}
-     * @return this Layout instance for method chaining
-     */
-    public Layout setTopMargin(Value topMargin) {
-        this.topMargin = topMargin;
-        return this;
-    }
-
-    /**
-     * Retrieves the right margin value of this layout.
-     *
-     * @return the current right margin as a {@link Value}
-     */
-    public Value getRightMargin() {
-        return rightMargin;
-    }
-
-    /**
-     * Sets the right margin of this layout to the specified value.
-     *
-     * @param rightMargin the new right margin value as a {@link Value}
-     * @return this Layout instance for method chaining
-     */
-    public Layout setRightMargin(Value rightMargin) {
-        this.rightMargin = rightMargin;
-        return this;
-    }
-
-    /**
-     * Retrieves the bottom margin value of this layout.
-     *
-     * @return the current bottom margin as a {@link Value}
-     */
-    public Value getBottomMargin() {
-        return bottomMargin;
-    }
-
-    /**
-     * Sets the bottom margin of this layout to the specified value.
-     *
-     * @param bottomMargin the new bottom margin value as a {@link Value}
-     * @return this Layout instance for method chaining
-     */
-    public Layout setBottomMargin(Value bottomMargin) {
-        this.bottomMargin = bottomMargin;
         return this;
     }
 }

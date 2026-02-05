@@ -56,7 +56,7 @@ public final class Window {
         Window.height = (short) height;
 
         glfwDefaultWindowHints();
-        glfwWindowHint(GLFW_SAMPLES, 16);
+        glfwWindowHint(GLFW_SAMPLES, 4);
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);

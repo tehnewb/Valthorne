@@ -20,6 +20,7 @@ public class ScrollPanel extends ElementContainer {
     private final Map<Element, Float> baseY = new HashMap<>();
 
     private Rectangle clipBounds;
+    private boolean initialLayout = true;
 
     public ScrollPanel() {
         this.setFocusable(true);
@@ -52,6 +53,12 @@ public class ScrollPanel extends ElementContainer {
 
         clampScroll();
         applyScrollToChildren();
+
+        if (initialLayout) {
+            this.initialLayout = false;
+
+            setScrollY(maxScrollY);
+        }
     }
 
     /**
@@ -97,7 +104,9 @@ public class ScrollPanel extends ElementContainer {
     }
 
     @Override
-    protected void onAdd(Element element) {}
+    protected void onAdd(Element element) {
+
+    }
 
     @Override
     protected void onRemove(Element element) {

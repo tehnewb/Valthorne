@@ -182,6 +182,7 @@ public class Button extends Element {
             current.draw(this.x, this.y, this.width, this.height);
             font.draw();
         };
+        this.setSize(font.getWidth(), font.getHeight());
     }
 
     /**
@@ -472,5 +473,9 @@ public class Button extends Element {
         } else {
             current = style.getBackground();
         }
+    }
+
+    public String getText() {
+        return font.getText();
     }
 }

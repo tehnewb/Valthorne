@@ -8,6 +8,7 @@ import java.nio.FloatBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
+import static org.lwjgl.opengl.GL30.glGenerateMipmap;
 
 /**
  * A 2D textured quad renderer built on the legacy OpenGL fixed-function pipeline.
@@ -65,13 +66,13 @@ import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
  */
 public class Texture {
 
-    private final TextureData data;                                     // Decoded image data used to upload pixels and resolve region UVs.
-    private final FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // World-space vertex positions (4 corners, x/y pairs).
-    private final FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);     // Normalized UV coordinates (4 corners, u/v pairs).
-    private final float[] localVertices = new float[8];                 // Local-space quad corners relative to the rotation origin.
-    private final Vector2f origin = new Vector2f(0f, 0f);               // Rotation/pivot point relative to the quad’s top-left.
-    private final int textureID;                                        // OpenGL texture object id returned by glGenTextures().
-    private TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.
+    private TextureData data;                                     // Decoded image data used to upload pixels and resolve region UVs.
+    private FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // World-space vertex positions (4 corners, x/y pairs).
+    private FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);     // Normalized UV coordinates (4 corners, u/v pairs).
+    private float[] localVertices = new float[8];                 // Local-space quad corners relative to the rotation origin.
+    private Vector2f origin = new Vector2f(0f, 0f);                // OpenGL texture object id returned by glGenTextures().
+    private TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.          // Rotation/pivot point relative to the quad’s top-left.
+    private final int textureID;
     private float width;                                                // Base quad width (before scaleX is applied).
     private float height;                                               // Base quad height (before scaleY is applied).
     private float x;                                                    // World-space X position for the quad (top-left reference).
@@ -172,6 +173,10 @@ public class Texture {
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.magFilter);
+
+        if (filter.usesMipmaps())
+            glGenerateMipmap(GL_TEXTURE_2D);
+
     }
 
     /**
@@ -617,6 +622,13 @@ public class Texture {
      */
     public void dispose() {
         glDeleteTextures(textureID);
+        this.data = null;
+        this.vertexBuffer = null;
+        this.uvBuffer = null;
+        this.color = null;
+        this.origin = null;
+        this.localVertices = null;
+        this.filter = null;
     }
 
     /**

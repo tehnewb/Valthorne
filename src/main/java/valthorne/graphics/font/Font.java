@@ -49,6 +49,7 @@ import valthorne.ui.Dimensional;
  * float w = font.getWidth();
  * float h = font.getHeight();
  *
+ * // Don't forget to do this after you're done using the font
  * font.dispose();
  * }</pre>
  *
@@ -57,9 +58,9 @@ import valthorne.ui.Dimensional;
  */
 public class Font implements Dimensional {
 
-    private final Texture texture;                  // Underlying texture atlas used to draw glyph regions.
-    private final FontData data;                    // Glyph metrics/kerning and atlas metadata.
-    private final Glyph spaceGlyph;                 // Cached data.glyph(' ') to compute tab width efficiently.
+    private Texture texture;                  // Underlying texture atlas used to draw glyph regions.
+    private FontData data;                    // Glyph metrics/kerning and atlas metadata.
+    private Glyph spaceGlyph;                 // Cached data.glyph(' ') to compute tab width efficiently.
     private final float fallbackAdvance;            // Advance used when glyph is missing from FontData.
     private String text = "";                       // Current text content for rendering and measurement.
     private float scaleX = 1f;                      // Horizontal scale factor applied to glyph sizing/advance.
@@ -132,40 +133,31 @@ public class Font implements Dimensional {
         final float tabAdv = tabAdvanceBase * sx;
         final float fallbackAdv = fallbackAdvance * sx;
 
-        char prev = 0;
-
         for (int i = 0, n = s.length(); i < n; i++) {
             char c = s.charAt(i);
 
             if (c == '\n') {
                 penX = x;
                 baselineY -= lineAdvance;
-                prev = 0;
                 continue;
             }
 
             if (c == '\t') {
                 penX += tabAdv;
-                prev = 0;
                 continue;
             }
 
             Glyph g = data.glyph(c);
             if (g == null) {
                 penX += fallbackAdv;
-                prev = 0;
                 continue;
             }
-
-            if (prev != 0)
-                penX += data.getKerningAdvance(prev, c) * sx;
 
             int gw = g.width();
             int gh = g.height();
 
             if (gw <= 0 || gh <= 0) {
                 penX += g.xAdvance() * sx;
-                prev = c;
                 continue;
             }
 
@@ -179,7 +171,6 @@ public class Font implements Dimensional {
             texture.draw();
 
             penX += g.xAdvance() * sx;
-            prev = c;
         }
     }
 
@@ -340,42 +331,42 @@ public class Font implements Dimensional {
      *
      * @return x scale factor
      */
-    public float getScaleX() { return scaleX; }
+    public float getScaleX() {return scaleX;}
 
     /**
      * Returns the current vertical scale.
      *
      * @return y scale factor
      */
-    public float getScaleY() { return scaleY; }
+    public float getScaleY() {return scaleY;}
 
     /**
      * Returns the current pen origin X position.
      *
      * @return x coordinate
      */
-    public float getX() { return x; }
+    public float getX() {return x;}
 
     /**
      * Sets the pen origin X position.
      *
      * @param x new x coordinate
      */
-    public void setX(float x) { this.x = x; }
+    public void setX(float x) {this.x = x;}
 
     /**
      * Returns the current pen origin Y position.
      *
      * @return y coordinate
      */
-    public float getY() { return y; }
+    public float getY() {return y;}
 
     /**
      * Sets the pen origin Y position.
      *
      * @param y new y coordinate
      */
-    public void setY(float y) { this.y = y; }
+    public void setY(float y) {this.y = y;}
 
     /**
      * Returns the current font color used for rendering.
@@ -409,8 +400,11 @@ public class Font implements Dimensional {
      * </ul>
      */
     public void dispose() {
-        text = null;
-        texture.dispose();
+        this.data = null;
+        this.spaceGlyph = null;
+        this.text = null;
+        this.texture.dispose();
+        this.texture = null;
     }
 
     /**
