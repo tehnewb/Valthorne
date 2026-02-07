@@ -44,7 +44,7 @@ implementation 'io.github.tehnewb:Valthorne:1.0.0'
 
 ### Gradle (Kotlin DSL)
 ```kotlin
-implementation("io.github.tehnewb:Valthorne:1.0.0")
+implementation("io.github.tehnewb:Valthorne:1.0.1")
 ```
 
 ### Maven
@@ -52,7 +52,7 @@ implementation("io.github.tehnewb:Valthorne:1.0.0")
 <dependency>
     <groupId>io.github.tehnewb</groupId>
     <artifactId>Valthorne</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
