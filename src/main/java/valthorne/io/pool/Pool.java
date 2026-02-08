@@ -10,11 +10,11 @@ import java.util.function.Supplier;
  * Objects stored in this pool must implement the {@code Poolable} interface to support resetting their state
  * before being reused.
  *
- * @param <T> the type of objects managed by this pool, must extend {@code Poolable}
+ * @param <T> the type of objects managed by this pool
  * @author Albert Beaupre
  * @since December 9th, 2025
  */
-public class Pool<T extends Poolable> {
+public class Pool<T> {
 
     private final FastStack<T> pool;
     private final Supplier<T> factory;
@@ -52,7 +52,10 @@ public class Pool<T extends Poolable> {
      */
     public void free(T obj) {
         if (obj == null) return;
-        obj.reset();
+
+        if (obj instanceof Poolable poolable)
+            poolable.reset();
+
         if (pool.size() < maxSize)
             pool.push(obj);
     }

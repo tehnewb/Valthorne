@@ -2,11 +2,6 @@ package valthorne.math.geometry;
 
 import valthorne.math.Vector2f;
 
-import static org.lwjgl.opengl.GL11.GL_TRIANGLE_FAN;
-import static org.lwjgl.opengl.GL11.glBegin;
-import static org.lwjgl.opengl.GL11.glEnd;
-import static org.lwjgl.opengl.GL11.glVertex2f;
-
 /**
  * Represents a geometric area defined by a sequence of points that form its boundary.
  * Provides geometric operations such as point containment and area intersection.

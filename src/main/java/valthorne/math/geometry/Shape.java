@@ -65,6 +65,7 @@ public abstract class Shape implements Area {
     public void draw() {
         Vector2f[] pts = points();
 
+        glDisable(GL_TEXTURE_2D);
         glColor4f(color.r(), color.g(), color.b(), color.a());
         glBegin(GL_TRIANGLE_FAN);
 
@@ -81,6 +82,7 @@ public abstract class Shape implements Area {
         glVertex2f(pts[0].getX(), pts[0].getY());
 
         glEnd();
+        glEnable(GL_TEXTURE_2D);
 
         if (hasBorder()) {
             glColor4f(border.getColor().r(), border.getColor().g(), border.getColor().b(), border.getColor().a());

@@ -2,7 +2,9 @@ package valthorne.graphics.texture;
 
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
+import valthorne.io.pool.Poolable;
 import valthorne.math.Vector2f;
+import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
 
@@ -15,7 +17,7 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
  *
  * <p>This class wraps an OpenGL texture object and provides sprite-like rendering features:</p>
  * <ul>
- *     <li><b>Transform</b>: position ({@link #x},{@link #y}), size ({@link #width},{@link #height}),
+ *     <li><b>Transform</b>: position (x,y), size (width,height),
  *         scale ({@link #scaleX},{@link #scaleY}), rotation ({@link #rotation}) around an origin ({@link #origin}).</li>
  *     <li><b>Region rendering</b>: draw a sub-rectangle of the underlying image (sprite sheets) using UVs.</li>
  *     <li><b>Low-allocation rendering</b>: pre-allocated {@link #vertexBuffer} and {@link #uvBuffer}, updated only when needed.</li>
@@ -64,19 +66,16 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
  * @see TextureData
  * @since November 26th, 2025
  */
-public class Texture {
+public class Texture implements Poolable {
 
     private TextureData data;                                     // Decoded image data used to upload pixels and resolve region UVs.
     private FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // World-space vertex positions (4 corners, x/y pairs).
     private FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);     // Normalized UV coordinates (4 corners, u/v pairs).
     private float[] localVertices = new float[8];                 // Local-space quad corners relative to the rotation origin.
-    private Vector2f origin = new Vector2f(0f, 0f);                // OpenGL texture object id returned by glGenTextures().
-    private TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.          // Rotation/pivot point relative to the quad’s top-left.
+    private Vector2f origin = new Vector2f(0f, 0f);                // OpenGL texture object ID returned by glGenTextures().
     private final int textureID;
-    private float width;                                                // Base quad width (before scaleX is applied).
-    private float height;                                               // Base quad height (before scaleY is applied).
-    private float x;                                                    // World-space X position for the quad (top-left reference).
-    private float y;                                                    // World-space Y position for the quad (top-left reference).
+    private TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.          // Rotation/pivot point relative to the quad’s top-left.
+    private final Rectangle bounds;
     private float leftRegion;                                           // Normalized U coordinate for the left edge of the region.
     private float topRegion;                                            // Normalized V coordinate for the top edge of the region.
     private float rightRegion = 1f;                                     // Normalized U coordinate for the right edge of the region.
@@ -151,8 +150,9 @@ public class Texture {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, data.width(), data.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, data.buffer());
 
         this.data = data;
-        this.width = data.width();
-        this.height = data.height();
+        this.bounds = new Rectangle(0, 0, data.width(), data.height());
+        this.bounds.setWidth(data.width());
+        this.bounds.setHeight(data.height());
 
         updateLocalVertices();
         updateUVBuffer();
@@ -174,8 +174,7 @@ public class Texture {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.magFilter);
 
-        if (filter.usesMipmaps())
-            glGenerateMipmap(GL_TEXTURE_2D);
+        if (filter.usesMipmaps()) glGenerateMipmap(GL_TEXTURE_2D);
 
     }
 
@@ -184,7 +183,7 @@ public class Texture {
      *
      * <p>Important behavior:</p>
      * <ul>
-     *     <li>This scales the rendered quad without changing the stored base {@link #width}/{@link #height}.</li>
+     *     <li>This scales the rendered quad without changing the stored base width/height.</li>
      *     <li>The origin is adjusted proportionally so the pivot remains visually consistent under scaling.</li>
      * </ul>
      *
@@ -302,9 +301,9 @@ public class Texture {
      * @param y world Y coordinate
      */
     public void setPosition(float x, float y) {
-        if (this.x == x && this.y == y) return;
-        this.x = x;
-        this.y = y;
+        if (this.bounds.getX() == x && this.bounds.getY() == y) return;
+        this.bounds.setX(x);
+        this.bounds.setY(y);
         updateVertexBuffer();
     }
 
@@ -312,21 +311,21 @@ public class Texture {
      * @return current world-space X position
      */
     public float getX() {
-        return x;
+        return bounds.getX();
     }
 
     /**
      * @return current world-space Y position
      */
     public float getY() {
-        return y;
+        return bounds.getY();
     }
 
     /**
      * @return current base width of the quad (before scale)
      */
     public float getWidth() {
-        return width;
+        return bounds.getWidth();
     }
 
     /**
@@ -335,7 +334,8 @@ public class Texture {
      * @param w new width
      */
     public void setWidth(float w) {
-        this.width = w;
+        if (w == bounds.getWidth()) return;
+        this.bounds.setWidth(w);
         updateLocalVertices();
         updateVertexBuffer();
     }
@@ -344,7 +344,7 @@ public class Texture {
      * @return current base height of the quad (before scale)
      */
     public float getHeight() {
-        return height;
+        return bounds.getHeight();
     }
 
     /**
@@ -353,7 +353,8 @@ public class Texture {
      * @param h new height
      */
     public void setHeight(float h) {
-        this.height = h;
+        if (h == bounds.getHeight()) return;
+        this.bounds.setHeight(h);
         updateLocalVertices();
         updateVertexBuffer();
     }
@@ -365,8 +366,9 @@ public class Texture {
      * @param h new height
      */
     public void setSize(float w, float h) {
-        this.width = w;
-        this.height = h;
+        if (w == bounds.getWidth() && h == bounds.getHeight()) return;
+        setWidth(w);
+        setHeight(h);
         updateLocalVertices();
         updateVertexBuffer();
     }
@@ -467,7 +469,7 @@ public class Texture {
      * in rendered space rather than base-size space.</p>
      */
     public void setRotationOriginCenter() {
-        origin.set(width * scaleX / 2f, height * scaleY / 2f);
+        origin.set(bounds.getWidth() * scaleX / 2f, bounds.getHeight() * scaleY / 2f);
         updateLocalVertices();
         updateVertexBuffer();
     }
@@ -512,7 +514,7 @@ public class Texture {
     /**
      * Computes local-space quad corners relative to {@link #origin}.
      *
-     * <p>This method applies scaling to {@link #width} and {@link #height} to build the local rectangle,
+     * <p>This method applies scaling to width and height to build the local rectangle,
      * but does not apply rotation or world translation.</p>
      *
      * <p>Corner order is consistent with {@link #updateUVBuffer()}:</p>
@@ -527,8 +529,8 @@ public class Texture {
         float ox = origin.getX();
         float oy = origin.getY();
 
-        float scaledW = width * scaleX;
-        float scaledH = height * scaleY;
+        float scaledW = bounds.getWidth() * scaleX;
+        float scaledH = bounds.getHeight() * scaleY;
 
         localVertices[0] = -ox;
         localVertices[1] = -oy;
@@ -556,8 +558,8 @@ public class Texture {
      * <p>This method performs no allocations and writes the buffer using absolute puts.</p>
      */
     private void updateVertexBuffer() {
-        float px = x + origin.getX();
-        float py = y + origin.getY();
+        float px = bounds.getX() + origin.getX();
+        float py = bounds.getY() + origin.getY();
 
         for (int i = 0; i < 4; i++) {
             float lx = localVertices[i * 2];
@@ -616,9 +618,16 @@ public class Texture {
     }
 
     /**
-     * Deletes the underlying OpenGL texture object.
+     * Retrieves the bounding rectangle of the object.
      *
-     * <p>After calling this method, {@link #textureID} is no longer valid and this instance should not be used.</p>
+     * @return a Rectangle object representing the bounds of this object.
+     */
+    public Rectangle getBounds() {
+        return bounds;
+    }
+
+    /**
+     * Deletes the underlying OpenGL texture object.
      */
     public void dispose() {
         glDeleteTextures(textureID);
@@ -632,11 +641,26 @@ public class Texture {
     }
 
     /**
-     * Returns the OpenGL texture handle for this instance.
+     * Retrieves the unique identifier for the texture.
      *
-     * @return OpenGL texture id
+     * @return the texture ID as an integer
      */
-    public int getID() {
+    public int getTextureID() {
         return textureID;
+    }
+
+    @Override
+    public void reset() {
+        setSize(data.width(), data.height());
+        setScale(1, 1);
+        setRotationOriginCenter();
+        setColor(Color.WHITE);
+        setFilter(TextureFilter.LINEAR);
+        setFlip(false, false);
+        setRotation(0);
+        setPosition(0, 0);
+        updateVertexBuffer();
+        updateUVBuffer();
+        updateLocalVertices();
     }
 }

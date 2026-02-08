@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
+import valthorne.ui.Dimensional;
 
 import java.nio.IntBuffer;
 
@@ -367,5 +368,54 @@ public final class Window {
      */
     public static long getAddress() {
         return address;
+    }
+
+    /**
+     * A static instance of the {@link Dimensional} interface that provides access to the window's
+     * positional and dimensional properties. This particular implementation fetches the width
+     * and height dynamically from the {@link Window} class and provides default values of `0`
+     * for the X and Y coordinates.
+     *
+     * <ul>
+     * <li>{@code getX()} - Returns a constant value of `0`.</li>
+     * <li>{@code getY()} - Returns a constant value of `0`.</li>
+     * <li>{@code getWidth()} - Dynamically retrieves the current width of the {@link Window}
+     * using {@code Window.getWidth()}.</li>
+     * <li>{@code getHeight()} - Dynamically retrieves the current height of the {@link Window}
+     * using {@code Window.getHeight()}.</li>
+     * </ul>
+     * <p>
+     * This implementation is particularly useful for accessing or representing window dimensions
+     * and is synchronized with the runtime properties of the {@link Window} class.
+     */
+    private static final Dimensional dimensional = new Dimensional() {
+        @Override
+        public float getX() {
+            return 0;
+        }
+
+        @Override
+        public float getY() {
+            return 0;
+        }
+
+        @Override
+        public float getWidth() {
+            return Window.getWidth();
+        }
+
+        @Override
+        public float getHeight() {
+            return Window.getHeight();
+        }
+    };
+
+    /**
+     * Retrieves the current {@link Dimensional} instance associated with the window.
+     *
+     * @return the current Dimensional instance representing the size and location of the window
+     */
+    public static Dimensional getDimensional() {
+        return dimensional;
     }
 }

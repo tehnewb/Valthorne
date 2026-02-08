@@ -6,6 +6,8 @@ import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.KeyReleaseEvent;
 import valthorne.event.listeners.KeyListener;
 
+import java.util.BitSet;
+
 import static org.lwjgl.glfw.GLFW.*;
 
 /**
@@ -203,6 +205,8 @@ public final class Keyboard {
     public static final int MENU = 348;
     private static final KeyPressEvent pressEvent = new KeyPressEvent(0, 0);
     private static final KeyReleaseEvent releaseEvent = new KeyReleaseEvent(0, 0);
+    private static BitSet keyDown = new BitSet(GLFW_KEY_LAST + 1);
+
     /**
      * The GLFW key callback responsible for handling key press, release, and repeat
      * events. GLFW invokes this callback whenever a keyboard action occurs in the
@@ -213,16 +217,19 @@ public final class Keyboard {
      * {@link #dispose()} to avoid memory leaks.</p>
      */
     private static GLFWKeyCallback keyCallback;
+
     /**
      * Stores the most recently pressed key. If no key is pressed, this value becomes -1.
      * This value is updated whenever GLFW detects a key press or repeat event.
      */
     private static short currentKey;
+
     /**
      * Tracks the current state of modifier keys (Shift, Control, Alt, Super).
      * This is a bitwise mask composed of GLFW modifier constants.
      */
     private static byte modifierState;
+
     /**
      * Private constructor to prevent instantiation. This class is designed to be
      * accessed statically.
@@ -247,16 +254,19 @@ public final class Keyboard {
             if (key < 0 || key > GLFW_KEY_LAST)
                 return;
 
-            currentKey = (short) key;
-            modifierState = (byte) mods;
-
             KeyEvent event = null;
 
             switch (action) {
-                case GLFW_PRESS, GLFW_REPEAT -> event = pressEvent;
+                case GLFW_PRESS, GLFW_REPEAT -> {
+                    currentKey = (short) key;
+                    modifierState = (byte) mods;
+                    event = pressEvent;
+                    keyDown.set(key, true);
+                }
                 case GLFW_RELEASE -> {
                     event = releaseEvent;
                     currentKey = -1;
+                    keyDown.clear(key);
                 }
             }
 
@@ -315,7 +325,7 @@ public final class Keyboard {
      * @return {@code true} if the key is the current active key, otherwise {@code false}
      */
     public static boolean isKeyDown(int key) {
-        return key == currentKey;
+        return key >= 0 && key <= GLFW_KEY_LAST && keyDown.get(key);
     }
 
     /**
