@@ -98,22 +98,19 @@ public class TextureRegion {
     }
 
     /**
-     * Draws this region using the backing {@link Texture}.
-     *
-     * <p>This method:</p>
-     * <ol>
-     *     <li>Configures the backing texture to sample from this region via {@link Texture#setRegion(float, float, float, float)}.</li>
-     *     <li>Sets the backing texture's quad size via {@link Texture#setSize(float, float)}.</li>
-     *     <li>Sets the backing texture's position via {@link Texture#setPosition(float, float)}.</li>
-     *     <li>Issues the draw call via {@link Texture#draw()}.</li>
-     * </ol>
-     *
-     * <p><b>Important:</b> This mutates the backing {@link Texture}'s state. If multiple regions share the same
-     * texture, make sure you call {@link #draw()} for each region (which re-applies state) and avoid relying on
-     * the texture retaining prior region values between unrelated draws.</p>
+     * Configures and renders a texture region based on the specified parameters.
+     * <p>
+     * This method sets up a defined sub-region of the texture, adjusts its size and position
+     * in world space, and subsequently renders it. It achieves this by calling the respective
+     * methods in the texture object:
+     * <p>
+     * - {@code setRegion()} is used to define the texture subregion to render.
+     * - {@code setSize()} adjusts the dimensions (width and height) of the rendered output.
+     * - {@code setPosition()} positions the rendered output in world space.
+     * - {@code draw()} executes the rendering using the previously configured settings.
      */
     public void draw() {
-        texture.setRegion(regionX, regionY, regionWidth, regionHeight);
+        texture.setRegion(regionX, regionY, regionX + regionWidth, regionY + regionHeight);
         texture.setSize(width, height);
         texture.setPosition(x, y);
         texture.draw();
@@ -207,4 +204,50 @@ public class TextureRegion {
     public Texture getTexture() {
         return texture;
     }
+
+    /**
+     * Splits a texture into a 2D array of {@code TextureRegion} objects based on the specified number of rows and columns.
+     * Each region represents a sub-rectangle of the original texture.
+     *
+     * @param texture the texture to be split into regions
+     * @param rows    the number of rows to divide the texture into
+     * @param columns the number of columns to divide the texture into
+     * @return a 2D array of {@code TextureRegion} objects representing the divided regions of the texture
+     * @throws NullPointerException     if the texture is {@code null}
+     * @throws IllegalArgumentException if {@code rows} or {@code columns} is less than or equal to 0
+     * @throws IllegalStateException    if the texture has invalid dimensions
+     */
+    public static TextureRegion[][] split(Texture texture, int rows, int columns) {
+        if (texture == null) throw new NullPointerException("Texture cannot be null");
+        if (rows <= 0) throw new IllegalArgumentException("rows must be > 0");
+        if (columns <= 0) throw new IllegalArgumentException("columns must be > 0");
+
+        int texW = (int) texture.getWidth();
+        int texH = (int) texture.getHeight();
+
+        if (texW <= 0 || texH <= 0)
+            throw new IllegalStateException("Texture has invalid dimensions: " + texW + "x" + texH);
+
+        int cellW = texW / columns;
+        int cellH = texH / rows;
+
+        if (cellW <= 0 || cellH <= 0)
+            throw new IllegalArgumentException("rows/columns too large for texture size: " + texW + "x" + texH + " with " + rows + " rows and " + columns + " columns");
+
+        TextureRegion[][] regions = new TextureRegion[rows][columns];
+
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < columns; c++) {
+                float rx = c * cellW;
+                float ry = r * cellH;
+
+                TextureRegion region = new TextureRegion(texture, rx, ry, cellW, cellH);
+
+                region.setSize(cellW, cellH);
+                regions[r][c] = region;
+            }
+        }
+        return regions;
+    }
+
 }

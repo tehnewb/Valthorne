@@ -100,6 +100,10 @@ public class Font implements Dimensional {
         recalcTabBase();
     }
 
+    public Font(String path, int fontSize){
+        this(FontData.load(path, fontSize, 0, 254));
+    }
+
     /**
      * Renders the current {@link #text} using the font atlas and glyph metrics.
      *
