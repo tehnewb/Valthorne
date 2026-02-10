@@ -33,6 +33,17 @@ public class Pool<T> {
     }
 
     /**
+     * Initializes the pool by pre-creating and adding a specified number of objects to the pool.
+     *
+     * @param count the number of objects to initialize and add to the pool
+     */
+    public void initialize(int count) {
+        for (int i = 0; i < count; i++) {
+            pool.push(factory.get());
+        }
+    }
+
+    /**
      * Get an object from the pool or create a new one if empty.
      *
      * @return A pooled object.

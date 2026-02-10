@@ -477,7 +477,7 @@ public class Color {
     /**
      * The color value stored as RGBA integer (0xAARRGGBB)
      */
-    private final int rgba; // stored as 0xAARRGGBB
+    private int rgba; // stored as 0xAARRGGBB
 
     /**
      * Creates a new Color from an RGBA integer value.
@@ -498,6 +498,227 @@ public class Color {
      */
     public Color(float red, float green, float blue, float alpha) { // e.g. 0xFFFF0000 = opaque red
         this.rgba = (int) (alpha * 255) << 24 | (int) (red * 255) << 16 | (int) (green * 255) << 8 | (int) (blue * 255);
+    }
+
+    /**
+     * Sets the current color to the given color by copying its RGBA value.
+     *
+     * @param endColor The color from which to copy the RGBA value.
+     */
+    public void set(Color endColor) {
+        this.rgba = endColor.rgba;
+    }
+
+    /**
+     * Sets the color components of this object using the provided red, green, blue,
+     * and alpha values. Each component should be a normalized float value in the
+     * range [0.0, 1.0]. The specified values are internally converted to an
+     * integer-based RGBA representation.
+     *
+     * @param red   The red component as a normalized float in the range [0.0, 1.0].
+     * @param green The green component as a normalized float in the range [0.0, 1.0].
+     * @param blue  The blue component as a normalized float in the range [0.0, 1.0].
+     * @param alpha The alpha (transparency) component as a normalized float
+     *              in the range [0.0, 1.0].
+     */
+    public void set(float red, float green, float blue, float alpha) {
+        this.rgba = (int) (alpha * 255) << 24 | (int) (red * 255) << 16 | (int) (green * 255) << 8 | (int) (blue * 255);
+    }
+
+
+    /**
+     * Multiplies this color by another color (component-wise), storing the result in this instance.
+     *
+     * @param other other color
+     */
+    public void mul(Color other) {
+        if (other == null) throw new NullPointerException("other cannot be null");
+        set(r() * other.r(), g() * other.g(), b() * other.b(), a() * other.a());
+    }
+
+    /**
+     * Adds another color to this one (component-wise), clamped to [0..1], storing the result in this instance.
+     *
+     * @param other other color
+     */
+    public void add(Color other) {
+        if (other == null) throw new NullPointerException("other cannot be null");
+        set(clamp01(r() + other.r()), clamp01(g() + other.g()), clamp01(b() + other.b()), clamp01(a() + other.a()));
+    }
+
+    /**
+     * Linearly interpolates this color towards {@code target} by {@code t} and stores the result in this instance.
+     *
+     * @param target target color
+     * @param t      interpolation factor in [0..1]
+     */
+    public void lerp(Color target, float t) {
+        if (target == null) throw new NullPointerException("target cannot be null");
+        t = clamp01(t);
+        set(r() + (target.r() - r()) * t,
+                g() + (target.g() - g()) * t,
+                b() + (target.b() - b()) * t,
+                a() + (target.a() - a()) * t);
+    }
+
+    /**
+     * Sets this color to opaque (alpha = 1).
+     */
+    public void opaque() {
+        rgba = (rgba & 0x00FFFFFF) | 0xFF000000;
+    }
+
+    /**
+     * Sets this color to fully transparent (alpha = 0).
+     */
+    public void transparent() {
+        rgba = (rgba & 0x00FFFFFF);
+    }
+
+    /**
+     * @param alpha normalized alpha in [0..1]
+     * @return a new Color with the same RGB but a different alpha.
+     */
+    public Color withAlpha(float alpha) {
+        int aa = ((int) (clamp01(alpha) * 255) & 0xFF) << 24;
+        return new Color((rgba & 0x00FFFFFF) | aa);
+    }
+
+    /**
+     * Creates a new {@link Color} from packed components.
+     *
+     * @param r red 0..255
+     * @param g green 0..255
+     * @param b blue 0..255
+     * @param a alpha 0..255
+     * @return packed color
+     */
+    public static Color fromRGBA(int r, int g, int b, int a) {
+        int rr = clamp255(r);
+        int gg = clamp255(g);
+        int bb = clamp255(b);
+        int aa = clamp255(a);
+        return new Color((aa << 24) | (rr << 16) | (gg << 8) | bb);
+    }
+
+    /**
+     * Clamps a given float value to the range [0.0, 1.0].
+     * If the value is less than 0.0, it returns 0.0.
+     * If the value is greater than 1.0, it returns 1.0.
+     * Otherwise, it returns the value unchanged.
+     *
+     * @param v the value to be clamped
+     * @return the clamped value within the range [0.0, 1.0]
+     */
+    private static float clamp01(float v) {
+        if (v < 0f) return 0f;
+        return Math.min(v, 1f);
+    }
+
+    /**
+     * Clamps the given integer value to the range of 0 to 255.
+     *
+     * @param v the integer value to be clamped
+     * @return the clamped value, which will be between 0 and 255 inclusive
+     */
+    private static int clamp255(int v) {
+        if (v < 0) return 0;
+        return Math.min(v, 255);
+    }
+
+    /**
+     * Parses a hex string into a {@link Color}.
+     *
+     * <p>Accepted formats:</p>
+     * <ul>
+     *     <li>{@code "RRGGBB"} or {@code "#RRGGBB"} (alpha assumed 255)</li>
+     *     <li>{@code "AARRGGBB"} or {@code "#AARRGGBB"}</li>
+     * </ul>
+     *
+     * @param hex hex string
+     * @return parsed color
+     */
+    public static Color fromHex(String hex) {
+        if (hex == null) throw new NullPointerException("hex cannot be null");
+        String s = hex.startsWith("#") ? hex.substring(1) : hex;
+        if (s.length() != 6 && s.length() != 8) {
+            throw new IllegalArgumentException("Hex must be RRGGBB or AARRGGBB");
+        }
+        int value = (int) Long.parseLong(s, 16);
+        if (s.length() == 6) value |= 0xFF000000;
+        return new Color(value);
+    }
+
+    /**
+     * @return hex string in {@code #AARRGGBB} format.
+     */
+    public String toHex() {
+        return String.format("#%08X", rgba);
+    }
+
+    /**
+     * @return true if this color is fully opaque (alpha == 255).
+     */
+    public boolean isOpaque() {
+        return ((rgba >>> 24) & 0xFF) == 255;
+    }
+
+    /**
+     * @return true if this color is fully transparent (alpha == 0).
+     */
+    public boolean isTransparent() {
+        return ((rgba >>> 24) & 0xFF) == 0;
+    }
+
+    /**
+     * @return a copy of this color.
+     */
+    public Color copy() {
+        return new Color(rgba);
+    }
+
+    /**
+     * Sets the alpha (transparency) component of the color.
+     * The alpha value determines the transparency level, where 0.0 represents
+     * fully transparent and 1.0 represents fully opaque.
+     *
+     * @param a The alpha component as a normalized float value in the range [0.0, 1.0].
+     */
+    public void a(float a) {
+        this.rgba = (int) (a * 255) << 24 | (this.rgba & 0x00FFFFFF);
+    }
+
+    /**
+     * Sets the red component of the color.
+     * The red value is specified as a normalized float in the range [0.0, 1.0].
+     * This method updates the internal RGBA representation based on the provided value.
+     *
+     * @param r The red component as a normalized float value in the range [0.0, 1.0].
+     */
+    public void r(float r) {
+        this.rgba = (int) (r * 255) << 16 | (this.rgba & 0xFF00FFFF);
+    }
+
+    /**
+     * Sets the green component of the color.
+     * The green value is specified as a normalized float in the range [0.0, 1.0].
+     * This method updates the internal RGBA representation based on the provided value.
+     *
+     * @param g The green component as a normalized float value in the range [0.0, 1.0].
+     */
+    public void g(float g) {
+        this.rgba = (int) (g * 255) << 8 | (this.rgba & 0xFFFF00FF);
+    }
+
+    /**
+     * Sets the blue component of the color.
+     * The blue value is specified as a normalized float in the range [0.0, 1.0].
+     * This method updates the internal RGBA representation based on the provided value.
+     *
+     * @param b The blue component as a normalized float value in the range [0.0, 1.0].
+     */
+    public void b(float b) {
+        this.rgba = (int) (b * 255) | (this.rgba & 0xFFFFFF00);
     }
 
     /**
@@ -574,5 +795,4 @@ public class Color {
     public float b() {
         return getBlue() / 255.0f;
     }
-
 }
