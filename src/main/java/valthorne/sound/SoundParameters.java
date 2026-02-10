@@ -19,7 +19,18 @@ import valthorne.asset.AssetParameters;
  * @see SoundData
  * @see SoundLoader
  */
-public record SoundParameters(String name) implements AssetParameters {
+public record SoundParameters(String path, String name) implements AssetParameters {
+
+    /**
+     * Constructs a new SoundParameters instance using the provided path. The path serves
+     * as both the identifier and the name of the sound resource.
+     *
+     * @param path The file path or identifier of the sound resource. This value is used
+     *             as both the path and the name for the sound resource.
+     */
+    public SoundParameters(String path) {
+        this(path, path);
+    }
 
     @Override
     public String key() {
