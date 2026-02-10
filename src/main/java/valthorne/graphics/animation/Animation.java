@@ -27,7 +27,7 @@ import valthorne.math.MathUtils;
  * <h2>Example</h2>
  * <pre>{@code
  * Animation walk = new Animation(
- *         PlaybackMode.FORWARD,
+ *         PlaybackMode.BIDIRECTIONAL,
  *         new AnimationFrame(playerWalk0, 0.08f),
  *         new AnimationFrame(playerWalk1, 0.08f),
  *         new AnimationFrame(playerWalk2, 0.08f),
@@ -52,13 +52,13 @@ import valthorne.math.MathUtils;
  */
 public class Animation implements Drawable {
 
-    private static byte PAUSED = 0;                 // Bit index: whether the animation update is paused.
-    private static byte LOOPING = 1;                // Bit index: whether the animation loops when reaching an endpoint.
-    private static byte RETURNING = 2;              // Bit index: BIDIRECTIONAL-only flag indicating we are moving backward.
+    private static final byte PAUSED = 0;           // Bit index: whether the animation update is paused.
+    private static final byte LOOPING = 1;          // Bit index: whether the animation loops when reaching an endpoint.
+    private static final byte RETURNING = 2;        // Bit index: BIDIRECTIONAL-only flag indicating we are moving backward.
 
     private final ByteBits bits = new ByteBits();   // Packed boolean state flags (paused/looping/returning).
-    private PlaybackMode playbackMode;              // Current playback direction/behavior mode.
     private final AnimationFrame[] frames;          // Ordered array of frames that this animation plays.
+    private PlaybackMode playbackMode;              // Current playback direction/behavior mode.
     private short currentIndex;                     // Current frame index within {@link #frames}.
     private float elapsedTime;                      // Time accumulated on the current frame (seconds).
 
@@ -264,6 +264,24 @@ public class Animation implements Drawable {
      */
     public void setLooping(boolean looping) {
         this.bits.set(LOOPING, looping);
+    }
+
+    /**
+     * Checks if the animation is set to loop when it reaches the end of its sequence.
+     *
+     * @return true if the animation is set to loop, false otherwise
+     */
+    public boolean isLooping() {
+        return bits.get(LOOPING);
+    }
+
+    /**
+     * Checks if the animation is currently paused.
+     *
+     * @return true if the animation is paused, false otherwise
+     */
+    public boolean isPaused() {
+        return bits.get(PAUSED);
     }
 
     /**

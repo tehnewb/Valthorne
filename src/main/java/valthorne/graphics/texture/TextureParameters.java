@@ -12,7 +12,17 @@ import valthorne.asset.AssetParameters;
  *
  * @param name the unique name of the texture asset, serving as its identifier
  */
-public record TextureParameters(String name) implements AssetParameters {
+public record TextureParameters(String path, String name) implements AssetParameters {
+
+    /**
+     * Creates a new instance of TextureParameters with the given path.
+     * The texture name will also be set to the same value as the path.
+     *
+     * @param path the file path of the texture asset, which also serves as its name
+     */
+    public TextureParameters(String path) {
+        this(path, path);
+    }
 
     @Override
     public String key() {

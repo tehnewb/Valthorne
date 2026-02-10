@@ -91,7 +91,7 @@ public abstract class ElementContainer extends Element {
         for (int i = size - 1; i >= 0; i--) {
             Element child = elements[i];
 
-            if (child == null || child.isHidden() || child.isDisabled())
+            if (child == null || child.isHidden())
                 continue;
 
             if (child instanceof ElementContainer container) {

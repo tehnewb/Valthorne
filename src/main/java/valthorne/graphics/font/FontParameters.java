@@ -3,24 +3,26 @@ package valthorne.graphics.font;
 import valthorne.asset.AssetParameters;
 
 /**
- * Represents the parameters required for defining font attributes in a system.
- * This record encapsulates essential font-related properties such as the font's name,
- * size, and the range of characters it covers.
+ * FontParameters is a record that encapsulates configuration details related to a font asset.
+ * It includes properties such as the font's file path, name, size, and character range.
+ * This class implements the AssetParameters interface, allowing it to represent
+ * a configurable asset with a unique key.
  * <p>
- * This implementation also provides a mechanism to retrieve a unique key for the font,
- * which can be used to identify and manage the font configuration in a system.
+ * Instances of FontParameters are immutable and directly store the values provided
+ * during creation, ensuring lightweight and efficient handling of font asset configurations.
  */
-public record FontParameters(String name, int fontSize, int firstCharacterIndex, int characterCount) implements AssetParameters {
+public record FontParameters(String path, String name, int fontSize, int firstCharacterIndex, int characterCount) implements AssetParameters {
 
     /**
-     * Constructs a FontParameters object with specified name and font size,
-     * defaulting the first character index to 30 and the character count to 254.
+     * Creates an instance of FontParameters with a provided path and font size.
+     * The name of the font is set to match the path, and default values are used
+     * for the first character index and character count properties.
      *
-     * @param name     the name of the font
-     * @param fontSize the size of the font
+     * @param path     the file path or identifier for the font resource
+     * @param fontSize the size of the font to be applied
      */
-    public FontParameters(String name, int fontSize) {
-        this(name, fontSize, 30, 254);
+    public FontParameters(String path, int fontSize) {
+        this(path, path, fontSize, 30, 254);
     }
 
     @Override

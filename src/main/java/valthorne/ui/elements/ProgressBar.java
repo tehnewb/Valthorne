@@ -28,6 +28,7 @@ public class ProgressBar extends Element {
         this.font = new Font(style.getFontData());
         this.background = style.getBackground();
         this.foreground = style.getForeground();
+        this.font.setText("0.00%");
     }
 
     @Override

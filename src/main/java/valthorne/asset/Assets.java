@@ -230,7 +230,10 @@ public final class Assets {
 
                         return loader.load(parameters);
                     }, service)
-                    .whenComplete((_, _) -> completedCount.incrementAndGet());
+                    .whenComplete((_, ex) -> {
+                        if (ex != null) { ex.printStackTrace(); return; }
+                        completedCount.incrementAndGet();
+                    });
 
             cache.put(key, future);
             futures.add(future);
