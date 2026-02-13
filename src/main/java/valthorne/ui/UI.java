@@ -29,11 +29,16 @@ public class UI extends ElementContainer {
     private Element found;
     private boolean seenFrom;
 
+    private final UIKeyListener keyListener = new UIKeyListener();
+    private final UIMouseListener mouseListener = new UIMouseListener();
+    private final UIScrollListener scrollListener = new UIScrollListener();
+    private final UIWindowListener windowListener = new UIWindowListener();
+
     public UI() {
-        Keyboard.addKeyListener(new UIKeyListener());
-        Mouse.addMouseListener(new UIMouseListener());
-        Mouse.addScrollListener(new UIScrollListener());
-        Window.addWindowResizeListener(new UIWindowListener());
+        Keyboard.addKeyListener(keyListener);
+        Mouse.addMouseListener(mouseListener);
+        Mouse.addScrollListener(scrollListener);
+        Window.addWindowResizeListener(windowListener);
     }
 
     @Override
@@ -86,6 +91,21 @@ public class UI extends ElementContainer {
     @Override
     public UI getUI() {
         return this;
+    }
+
+    /**
+     * Disposes of resources and removes listeners associated with the UI.
+     * <p>
+     * This method unregisters key, mouse, scroll, and window resize listeners
+     * to ensure proper cleanup and avoid memory leaks or redundant event handling.
+     * It is typically used when the UI instance is no longer needed or
+     * is being destroyed.
+     */
+    public void dispose() {
+        Keyboard.removeKeyListener(keyListener);
+        Mouse.removeMouseListener(mouseListener);
+        Mouse.removeScrollListener(scrollListener);
+        Window.removeWindowResizeListener(windowListener);
     }
 
     public void focusNext() {

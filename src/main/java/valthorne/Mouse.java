@@ -122,7 +122,7 @@ public final class Mouse {
      * Vertical resize cursor shape for height adjustment.
      */
     public static final int CURSOR_VRESIZE = GLFW_VRESIZE_CURSOR;
-    
+
     /**
      * Pre-allocated mouse event instances for reuse.
      */
@@ -267,7 +267,6 @@ public final class Mouse {
     /**
      * Sets a custom cursor for the current window using the provided texture data and hotspot.
      *
-     *
      * @param data The texture data used to create the custom cursor. Must not be {@code null},
      *             and its buffer must not be {@code null}.
      * @param hotX The x-coordinate of the cursor's hotspot in pixels, relative to the top-left of the image.
@@ -387,6 +386,19 @@ public final class Mouse {
     public static void addScrollListener(MouseScrollListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be added");
         JGL.subscribe(MouseScrollEvent.class, listener);
+    }
+
+    /**
+     * Removes a {@code MouseScrollListener} from the system to stop handling mouse scroll events.
+     * The listener will no longer receive notifications for scroll actions detected by the mouse.
+     *
+     * @param listener the {@code MouseScrollListener} to be removed
+     *                 (must not be {@code null})
+     * @throws NullPointerException if the provided listener is {@code null}
+     */
+    public static void removeScrollListener(MouseScrollListener listener) {
+        if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be removed");
+        JGL.unsubscribe(MouseScrollEvent.class, listener);
     }
 
     /**
