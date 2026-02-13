@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.texture.Texture;
+
 /**
  * Soft glow around a sprite using alpha falloff sampling.
  *
@@ -62,7 +64,7 @@ public class GlowShader extends Shader {
                 v_uv = gl_MultiTexCoord0.st;
                 v_color = gl_Color;
             }
-            """; // GLSL vertex shader source (passes UVs + vertex color through).
+            """;
 
     private static final String FRAG_SRC = """
             #version 120
@@ -134,7 +136,7 @@ public class GlowShader extends Shader {
             
                 gl_FragColor = vec4(u_glowColor.rgb, u_glowColor.a * glow);
             }
-            """; // GLSL fragment shader source (alpha-neighborhood sampling glow).
+            """;
 
     /**
      * Creates a new {@code GlowShader} using the built-in GLSL sources.
@@ -146,25 +148,22 @@ public class GlowShader extends Shader {
     /**
      * Binds this shader and sets uniforms required to render a soft glow.
      *
-     * <p>Compute texel size like:</p>
-     * <pre>{@code
-     * texelX = 1f / textureWidth;
-     * texelY = 1f / textureHeight;
-     * }</pre>
-     *
-     * @param texelX    {@code 1 / textureWidth}
-     * @param texelY    {@code 1 / textureHeight}
+     * @param texture   the texture being drawn (used for width/height -> texel size)
      * @param radiusPx  glow radius in source texture pixels (>= 0)
-     * @param intensity glow strength multiplier (>= 0 is recommended)
+     * @param intensity glow strength multiplier (>= 0 recommended)
      * @param r         glow red
      * @param g         glow green
      * @param b         glow blue
      * @param a         glow alpha (final alpha is {@code a * computedGlow})
      */
-    public void apply(float texelX, float texelY, float radiusPx, float intensity, float r, float g, float b, float a) {
+    public void apply(Texture texture, float radiusPx, float intensity, float r, float g, float b, float a) {
         bind();
         setUniform1i("u_texture", 0);
+
+        float texelX = 1f / texture.getData().width();
+        float texelY = 1f / texture.getData().height();
         setUniform2f("u_texelSize", texelX, texelY);
+
         setUniform1f("u_radiusPx", radiusPx);
         setUniform1f("u_intensity", intensity);
         setUniform4f("u_glowColor", r, g, b, a);

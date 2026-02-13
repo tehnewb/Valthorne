@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.texture.Texture;
+
 /**
  * Draws a crisp outline around non-transparent pixels.
  *
@@ -36,12 +38,9 @@ package valthorne.graphics.shader;
  * <h2>Usage</h2>
  * <pre>{@code
  * OutlineShader outline = new OutlineShader();
+ * Texture texture = ...;
  *
- * // For a 256x256 texture:
- * float texelX = 1f / 256f;
- * float texelY = 1f / 256f;
- *
- * outline.apply(texelX, texelY, 1f, 0f, 0f, 0f, 1f); // 1px black outline
+ * outline.apply(texture, 1f, 0f, 0f, 0f, 1f); // 1px black outline
  * // draw your sprite(s)...
  * outline.unbind(); // optional
  * }</pre>
@@ -60,7 +59,7 @@ public class OutlineShader extends Shader {
                 v_uv = gl_MultiTexCoord0.st;
                 v_color = gl_Color;
             }
-            """; // GLSL vertex shader source (passes UVs + vertex color through).
+            """;
 
     private static final String FRAG_SRC = """
             #version 120
@@ -76,13 +75,13 @@ public class OutlineShader extends Shader {
                 vec4 center = texture2D(u_texture, v_uv);
                 float a = center.a;
             
-                // Draw sprite normally where opaque.
+                // Sprite pixels: draw normally.
                 if (a > 0.001) {
                     gl_FragColor = center * v_color;
                     return;
                 }
             
-                // If transparent, check nearby alpha to decide outline.
+                // True source-texel step.
                 vec2 o = u_texelSize * u_thicknessPx;
             
                 float n = 0.0;
@@ -97,42 +96,34 @@ public class OutlineShader extends Shader {
                 n = max(n, texture2D(u_texture, v_uv + vec2( o.x, -o.y)).a);
                 n = max(n, texture2D(u_texture, v_uv + vec2(-o.x, -o.y)).a);
             
-                if (n > 0.001) {
-                    gl_FragColor = u_outlineColor;
-                } else {
-                    gl_FragColor = vec4(0.0);
-                }
+                if (n > 0.001) gl_FragColor = u_outlineColor;
+                else gl_FragColor = vec4(0.0);
             }
-            """; // GLSL fragment shader source (neighbor alpha test for outline).
+            """;
 
-    /**
-     * Creates a new {@code OutlineShader} using the built-in GLSL sources.
-     */
     public OutlineShader() {
         super(VERT_SRC, FRAG_SRC);
     }
 
     /**
-     * Binds this shader and sets uniforms required to render an outline.
+     * Applies a source-pixel outline.
      *
-     * <p>{@code texelX/texelY} must match the underlying source texture dimensions:</p>
-     * <pre>{@code
-     * texelX = 1f / textureWidth;
-     * texelY = 1f / textureHeight;
-     * }</pre>
-     *
-     * @param texelX      {@code 1 / textureWidth}
-     * @param texelY      {@code 1 / textureHeight}
-     * @param thicknessPx outline thickness in source-texture pixels (typically 1..3)
+     * @param texture     the texture being drawn (used to get width/height)
+     * @param thicknessPx outline thickness in SOURCE texture pixels (1 = 1 texel)
      * @param r           outline red
      * @param g           outline green
      * @param b           outline blue
      * @param a           outline alpha
      */
-    public void apply(float texelX, float texelY, float thicknessPx, float r, float g, float b, float a) {
+    public void apply(Texture texture, float thicknessPx, float r, float g, float b, float a) {
         bind();
         setUniform1i("u_texture", 0);
+
+        // Compute texel size internally (no caller math).
+        float texelX = 1f / texture.getData().width();
+        float texelY = 1f / texture.getData().height();
         setUniform2f("u_texelSize", texelX, texelY);
+
         setUniform1f("u_thicknessPx", thicknessPx);
         setUniform4f("u_outlineColor", r, g, b, a);
     }
