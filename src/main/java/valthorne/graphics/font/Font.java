@@ -100,7 +100,7 @@ public class Font implements Dimensional {
         recalcTabBase();
     }
 
-    public Font(String path, int fontSize){
+    public Font(String path, int fontSize) {
         this(FontData.load(path, fontSize, 0, 254));
     }
 
@@ -500,5 +500,14 @@ public class Font implements Dimensional {
 
         if (lines == 1) this.height = firstLineHeightY;
         else this.height = firstLineHeightY + (lines - 1) * lineAdvanceY;
+    }
+
+    /**
+     * Retrieves the texture associated with the object.
+     *
+     * @return the texture object.
+     */
+    public Texture getTexture() {
+        return texture;
     }
 }

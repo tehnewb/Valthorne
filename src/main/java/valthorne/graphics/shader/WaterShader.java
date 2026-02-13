@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.texture.Texture;
+
 /**
  * Simple UV-distortion "water" shader (wobble / ripple) for 2D sprites.
  *
@@ -43,11 +45,9 @@ package valthorne.graphics.shader;
  * <h2>Usage</h2>
  * <pre>{@code
  * WaterShader water = new WaterShader();
+ * Texture waterTexture = ...;
  *
- * float texelX = 1f / textureWidth;
- * float texelY = 1f / textureHeight;
- *
- * water.apply(texelX, texelY, JGL.getTime(), 3f, 18f, 2.0f);
+ * water.apply(waterTexture, JGL.getTime(), 3f, 18f, 2.0f);
  * // draw sprite(s)...
  * water.unbind(); // optional
  * }</pre>
@@ -99,23 +99,20 @@ public class WaterShader extends Shader {
     /**
      * Binds this shader and sets uniforms for the animated water distortion.
      *
-     * <p>Texel size should be computed from the underlying texture dimensions:</p>
-     * <pre>{@code
-     * texelX = 1f / textureWidth;
-     * texelY = 1f / textureHeight;
-     * }</pre>
-     *
-     * @param texelX      {@code 1 / textureWidth}
-     * @param texelY      {@code 1 / textureHeight}
+     * @param texture     the texture being drawn (used to compute texel size)
      * @param timeSeconds time in seconds (e.g., {@code JGL.getTime()})
      * @param ampPx       distortion amplitude in pixels (>= 0 recommended)
      * @param freq        ripple frequency (typical range 6..30 depending on look)
      * @param speed       ripple speed multiplier (typical range 0..5)
      */
-    public void apply(float texelX, float texelY, float timeSeconds, float ampPx, float freq, float speed) {
+    public void apply(Texture texture, float timeSeconds, float ampPx, float freq, float speed) {
         bind();
         setUniform1i("u_texture", 0);
+
+        float texelX = 1f / texture.getData().width();
+        float texelY = 1f / texture.getData().height();
         setUniform2f("u_texelSize", texelX, texelY);
+
         setUniform1f("u_time", timeSeconds);
         setUniform1f("u_amp", ampPx);
         setUniform1f("u_freq", freq);
