@@ -1,10 +1,10 @@
 plugins {
-    id 'java'
+    id 'java-library'
     id 'com.vanniktech.maven.publish' version '0.36.0'
 }
 
 group = "io.github.tehnewb"
-version = "1.0.4"
+version = "1.0.5"
 description = "A 2D game development library"
 
 repositories {
@@ -31,13 +31,13 @@ if (os.isWindows()) {
 }
 
 dependencies {
-    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
 
-    implementation "org.lwjgl:lwjgl"
-    implementation "org.lwjgl:lwjgl-glfw"
-    implementation "org.lwjgl:lwjgl-opengl"
-    implementation "org.lwjgl:lwjgl-stb"
-    implementation "org.lwjgl:lwjgl-openal"
+    api "org.lwjgl:lwjgl"
+    api "org.lwjgl:lwjgl-glfw"
+    api "org.lwjgl:lwjgl-opengl"
+    api "org.lwjgl:lwjgl-stb"
+    api "org.lwjgl:lwjgl-openal"
 
     implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
@@ -48,6 +48,7 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
 }
+
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(23) }
