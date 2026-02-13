@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.tehnewb"
-version = "1.0.5"
+version = "0.9.0"
 description = "A 2D game development library"
 
 repositories {
@@ -58,6 +58,7 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
+    options.compilerArgs += ["-parameters"]
 }
 
 tasks.withType(Javadoc).configureEach {
