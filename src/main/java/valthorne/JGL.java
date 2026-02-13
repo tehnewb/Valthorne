@@ -129,6 +129,15 @@ public class JGL {
     }
 
     /**
+     * Retrieves the current time in seconds since the GLFW timer was initialized.
+     *
+     * @return The current time in seconds as a float.
+     */
+    public static float getTime() {
+        return (float) glfwGetTime();
+    }
+
+    /**
      * Retrieves the current frames per second (FPS) value, providing an
      * indication of the application's performance and rendering speed.
      *

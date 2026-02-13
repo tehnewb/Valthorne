@@ -37,8 +37,8 @@ public class Checkbox extends Element {
 
         current.draw(this.x, this.y, this.width, this.height);
         if (checked && style.getCheckmark() != null) {
-            float cw = this.width / 1.5f;
-            float ch = this.height / 1.5f;
+            float cw = this.width / 2f;
+            float ch = this.height / 2f;
             style.getCheckmark().draw(this.x + (this.width - cw) / 2, this.y + (this.height - ch) / 2, cw, ch);
         }
     }

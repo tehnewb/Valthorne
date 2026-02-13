@@ -4,6 +4,7 @@ import valthorne.Window;
 import valthorne.event.events.*;
 import valthorne.graphics.DrawFunction;
 import valthorne.math.geometry.Rectangle;
+import valthorne.ui.enums.Alignment;
 
 /**
  * Abstract base class representing a user interface element in a graphical user interface system.
@@ -39,6 +40,7 @@ import valthorne.math.geometry.Rectangle;
  */
 public abstract class Element implements Dimensional, DrawFunction {
 
+    private static final AlignmentTarget ALIGN_TARGET = new AlignmentTarget();
     public static final byte HIDDEN = 1;      // Flag indicating if element is not visible
     public static final byte DISABLED = 1 << 1; // Flag indicating if element is non-interactive
     public static final byte HOVERED = 1 << 2;  // Flag indicating if mouse is over element
@@ -58,6 +60,16 @@ public abstract class Element implements Dimensional, DrawFunction {
     private UI ui;
 
     private Rectangle clipBounds;
+
+    /**
+     * Handles the event or functionality triggered when this Element is added to an ElementContainer
+     */
+    public void onAdd() {}
+
+    /**
+     * Handles the event or functionality triggered when this Element is removed from an ElementContainer
+     */
+    public void onRemove() {}
 
     /**
      * Updates the state of the element. This method is called to perform
@@ -185,23 +197,39 @@ public abstract class Element implements Dimensional, DrawFunction {
         return x >= this.x && x <= this.x + width && y >= this.y && y <= this.y + height;
     }
 
+    // Reusable alignment target to avoid allocations during layout.
+    private static final class AlignmentTarget implements Sizeable {
+        float w, h;
+
+        void set(float w, float h) {
+            this.w = w;
+            this.h = h;
+        }
+
+        @Override
+        public float getWidth() {return w;}
+
+        @Override
+        public float getHeight() {return h;}
+    }
+
     /**
-     * Updates the layout of the current object based on its layout properties and parent configuration.
-     * This method calculates and resolves the position, size, and padding of the object considering
-     * the parent's dimensions and window size if no parent is present.
+     * Calculates and updates the position and size of the current component based on its layout rules,
+     * relative to its parent or to a default coordinate space if no parent is available.
      * <p>
-     * Behavior:
-     * - If no layout is defined, this method immediately exits.
-     * - If a parent is present, its position and dimensions are used as a reference for calculations.
-     * - If a parent is not present, the window's dimensions are used as the reference.
-     * - Resolves padding values for left, right, top, and bottom based on the layout and parent/window size.
-     * - Determines the resolved position (`x`, `y`) and size (`width`, `height`) of the object:
-     * - If a layout value is set to "AUTO," fallback values such as `localX`, `localY`, `width`, or `height` are used.
-     * - Otherwise, the layout's specified values are resolved using the parent/window dimensions or position.
-     * - Adjusts the object's position and size by applying the calculated padding values.
+     * This method first checks if the current object has a parent and, if no layout has been set,
+     * adjusts its position and size relative to the parent's dimensions. If a layout is defined,
+     * the method computes padding, alignment, and size constraints defined by the layout rules.
      * <p>
-     * The resulting position and size determined during this method's execution are applied to
-     * the object using its `setPosition` and `setSize` methods.
+     * Key behaviors:
+     * - Determines the position and size relative to a parent if it exists, otherwise adjusts for
+     * the global or default coordinate space.
+     * - Resolves padding, layout-specified dimensions, and alignment information.
+     * - Applies alignment rules horizontally and vertically if specified in the layout.
+     * - Updates the component's absolute position and dimensions after all layout calculations.
+     * <p>
+     * This method directly modifies the current component's position and size using
+     * {@code setPosition(float x, float y)} and {@code setSize(float width, float height)}.
      */
     public void layout() {
         boolean hasParent = parent != null;
@@ -210,7 +238,6 @@ public abstract class Element implements Dimensional, DrawFunction {
             if (hasParent) {
                 setPosition(parent.x + localX, parent.y + localY);
                 setSize(width, height);
-                return;
             }
             return;
         }
@@ -219,21 +246,43 @@ public abstract class Element implements Dimensional, DrawFunction {
         float py = hasParent ? parent.y : 0f;
         float pw = hasParent ? parent.width : Window.getWidth();
         float ph = hasParent ? parent.height : Window.getHeight();
-
         float padL = layout.getLeftPadding().resolve(0, pw, 0);
         float padR = layout.getRightPadding().resolve(0, pw, 0);
         float padT = layout.getTopPadding().resolve(0, ph, 0);
         float padB = layout.getBottomPadding().resolve(0, ph, 0);
+        float innerW = layout.getWidth().is(ValueType.AUTO) ? this.width : layout.getWidth().resolve(0, pw, pw);
+        float innerH = layout.getHeight().is(ValueType.AUTO) ? this.height : layout.getHeight().resolve(0, ph, ph);
+        float finalW = innerW + padL + padR;
+        float finalH = innerH + padT + padB;
 
-        float resolvedX = layout.getX().is(ValueType.AUTO) ? (px + this.localX) : layout.getX().resolve(px, pw, px);
-        float resolvedY = layout.getY().is(ValueType.AUTO) ? (py + this.localY) : layout.getY().resolve(py, ph, py);
-        float resolvedW = layout.getWidth().is(ValueType.AUTO) ? this.width : layout.getWidth().resolve(0, pw, pw);
-        float resolvedH = layout.getHeight().is(ValueType.AUTO) ? this.height : layout.getHeight().resolve(0, ph, ph);
+        ALIGN_TARGET.set(finalW, finalH);
+
+        Value vx = layout.getX();
+        Value vy = layout.getY();
+
+        Dimensional source = hasParent ? parent : this;
+        float resolvedX = px + this.localX;
+        float resolvedY = py + this.localY;
+
+        if (vx != null) {
+            if (vx.is(ValueType.ALIGNMENT)) {
+                resolvedX = Alignment.alignHorizontally(source, ALIGN_TARGET, vx.asAlignment());
+            } else if (!vx.is(ValueType.AUTO)) {
+                resolvedX = vx.resolve(px, pw, px);
+            }
+        }
+
+        if (vy != null) {
+            if (vy.is(ValueType.ALIGNMENT)) {
+                resolvedY = Alignment.alignVertically(source, ALIGN_TARGET, vy.asAlignment());
+            } else if (!vy.is(ValueType.AUTO)) {
+                resolvedY = vy.resolve(py, ph, py);
+            }
+        }
 
         setPosition(resolvedX, resolvedY);
-        setSize(resolvedW + padL + padR, resolvedH + padT + padB);
+        setSize(finalW, finalH);
     }
-
 
     /**
      * Retrieves the index of this element.

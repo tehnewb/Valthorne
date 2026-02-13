@@ -19,14 +19,17 @@ public interface Area {
     Vector2f[] points();
 
     /**
-     * Determines if a given 2D point lies within the boundary defined by this area.
-     * The method uses a ray-casting algorithm to test for point inclusion, with defensive
-     * null checks on the vertices to ensure robustness.
+     * Determines if the point specified by the coordinates (x, y) lies within
+     * the boundary defined by the area. This method uses the even-odd rule
+     * algorithm to check whether the point is inside the polygon formed by
+     * the area points.
      *
-     * @param point the 2D point to check for containment within the area
-     * @return true if the point lies within the area boundary; false otherwise
+     * @param x the x-coordinate of the point to check
+     * @param y the y-coordinate of the point to check
+     * @return true if the point (x, y) is inside the boundary of the area;
+     * false otherwise
      */
-    default boolean contains(Vector2f point) {
+    default boolean contains(float x, float y) {
         Vector2f[] pts = points();
         int count = (pts == null) ? 0 : pts.length;
 
@@ -40,7 +43,7 @@ public interface Area {
 
             if (pi == null || pj == null) continue;
 
-            boolean intersect = ((pi.getY() > point.getY()) != (pj.getY() > point.getY())) && (point.getX() < (pj.getX() - pi.getX()) * (point.getY() - pi.getY()) / (pj.getY() - pi.getY()) + pi.getX());
+            boolean intersect = ((pi.getY() > y) != (pj.getY() > y)) && (x < (pj.getX() - pi.getX()) * (y - pi.getY()) / (pj.getY() - pi.getY()) + pi.getX());
 
             if (intersect) inside = !inside;
         }
@@ -84,10 +87,10 @@ public interface Area {
         }
 
         Vector2f bAny = firstNonNull(b);
-        if (bAny != null && contains(bAny)) return true;
+        if (bAny != null && contains(bAny.getX(), bAny.getY())) return true;
 
         Vector2f aAny = firstNonNull(a);
-        return aAny != null && other.contains(aAny);
+        return aAny != null && other.contains(aAny.getX(), aAny.getY());
     }
 
     /**

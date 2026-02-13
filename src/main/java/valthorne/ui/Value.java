@@ -1,5 +1,7 @@
 package valthorne.ui;
 
+import valthorne.ui.enums.Alignment;
+
 /**
  * Represents a value with a specific type and associated numeric value.
  * <p>
@@ -77,5 +79,60 @@ public record Value(ValueType type, float number) {
      */
     public boolean is(ValueType type) {
         return this.type == type;
+    }
+
+    /**
+     * Creates a {@link Value} that encodes an {@link Alignment} (for X/Y positioning).
+     *
+     * <p>Note: This is resolved in {@link Element#layout()} because alignment requires
+     * knowing the target width/height.</p>
+     *
+     * @param alignment the alignment to encode
+     * @return alignment value
+     */
+    public static Value alignment(Alignment alignment) {
+        return new Value(ValueType.ALIGNMENT, alignment.ordinal());
+    }
+
+    /**
+     * Creates a new {@link Value} instance of type {@link ValueType#ALIGNMENT} with
+     * a numeric value corresponding to {@link Alignment#CENTER}.
+     *
+     * @return a {@link Value} instance representing the CENTER alignment behavior
+     */
+    public static Value center() {
+        return new Value(ValueType.ALIGNMENT, Alignment.CENTER.ordinal());
+    }
+
+    /**
+     * Creates a new {@link Value} instance of type {@link ValueType#ALIGNMENT} with
+     * a numeric value corresponding to {@link Alignment#START}.
+     *
+     * @return a {@link Value} instance representing the START alignment behavior
+     */
+    public static Value start() {
+        return new Value(ValueType.ALIGNMENT, Alignment.START.ordinal());
+    }
+
+    /**
+     * Creates a new {@link Value} instance of type {@link ValueType#ALIGNMENT} with
+     * a numeric value corresponding to {@link Alignment#END}.
+     *
+     * @return a {@link Value} instance representing the END alignment behavior
+     */
+    public static Value end() {
+        return new Value(ValueType.ALIGNMENT, Alignment.END.ordinal());
+    }
+
+    /**
+     * Decodes an {@link Alignment} from this value (only valid for ALIGNMENT type).
+     *
+     * @return decoded alignment (defaults to TOP_LEFT if out of range)
+     */
+    public Alignment asAlignment() {
+        int idx = (int) number;
+        Alignment[] values = Alignment.values();
+        if (idx < 0 || idx >= values.length) return Alignment.CENTER;
+        return values[idx];
     }
 }

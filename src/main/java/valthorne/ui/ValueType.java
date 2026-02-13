@@ -35,7 +35,6 @@ public enum ValueType {
     AUTO {
         @Override
         public float resolve(float number, float origin, float size, float fallback) {
-            // Auto needs to be resolved by the Element...
             return fallback;
         }
     },
@@ -44,6 +43,13 @@ public enum ValueType {
      * Fills available space.
      */
     FILL {
+        @Override
+        public float resolve(float number, float origin, float size, float fallback) {
+            return fallback;
+        }
+    },
+
+    ALIGNMENT {
         @Override
         public float resolve(float number, float origin, float size, float fallback) {
             return fallback;

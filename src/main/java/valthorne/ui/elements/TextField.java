@@ -11,6 +11,7 @@ import valthorne.graphics.font.Font;
 import valthorne.math.MathUtils;
 import valthorne.math.Vector2f;
 import valthorne.ui.*;
+import valthorne.ui.enums.Alignment;
 import valthorne.ui.styles.TextFieldStyle;
 import valthorne.viewport.Viewport;
 
@@ -893,9 +894,6 @@ public class TextField extends Element {
     /**
      * Updates the font position based on element alignment, padding, and current scroll offset.
      *
-     * <p>Uses {@link Alignment#align(Dimensional, Sizeable, Alignment)} with
-     * {@link Alignment#CENTER_LEFT} so the text remains vertically centered but left-anchored.</p>
-     *
      * <p>Position formula:</p>
      * <ul>
      *     <li>X = alignedX + padding + textOffsetX</li>
@@ -903,7 +901,7 @@ public class TextField extends Element {
      * </ul>
      */
     private void updateFontPosition() {
-        Vector2f align = Alignment.align(this, font, Alignment.CENTER_LEFT);
+        Vector2f align = Alignment.align(this, font, Alignment.CENTER, Alignment.START);
         font.setPosition(align.getX() + padding + textOffsetX, align.getY());
     }
 

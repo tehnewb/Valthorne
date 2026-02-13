@@ -40,6 +40,7 @@ public abstract class ElementContainer extends Element {
         element.setIndex(size);
         elements[size++] = element;
         onAdd(element);
+        element.onAdd();
     }
 
     /**
@@ -74,6 +75,7 @@ public abstract class ElementContainer extends Element {
         size--;
 
         onRemove(element);
+        element.onRemove();
     }
 
     /**
@@ -88,11 +90,24 @@ public abstract class ElementContainer extends Element {
      * {@code null} if no element exists at that position.
      */
     public Element findElementAt(float x, float y, byte flags) {
+        // 1) If we have clip bounds, do not allow hits outside of it.
+        Rectangle clip = this.getClipBounds();
+        if (clip != null && !clip.contains(x, y)) {
+            return null;
+        }
+
+        // 2) Search children from top-most to bottom-most.
         for (int i = size - 1; i >= 0; i--) {
             Element child = elements[i];
 
             if (child == null || child.isHidden())
                 continue;
+
+            // If the child has its own clip bounds, enforce it before descending/hit.
+            Rectangle childClip = child.getClipBounds();
+            if (childClip != null && !childClip.contains(x, y)) {
+                continue;
+            }
 
             if (child instanceof ElementContainer container) {
                 Element hit = container.findElementAt(x, y, flags);
@@ -105,6 +120,7 @@ public abstract class ElementContainer extends Element {
                 return child;
         }
 
+        // 3) Finally, consider the container itself (still clip-guarded above).
         if (inside(x, y) && (getFlags() & flags) == flags)
             return this;
 
