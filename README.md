@@ -69,12 +69,9 @@ Notes:
        - I have prototyped this system probably 5 times already and have failed miserably because I'm picky how I want it, so for now we're just dealing with a skin system how libGDX does it.
     - Element transitions and effects
 
-### What I plan on doing
-- Shaders
+### Systems remaining before I consider this complete
 - Lighting
 - Tilemaps
-- Basic effects like tint/alpha, additive/muliply blend, particles
-- Animation system based on sprite sheets or a collection of sprites
 - State machine system that switches based on conditions
 - Scenes
 - Physics & collision system
