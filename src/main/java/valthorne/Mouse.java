@@ -197,12 +197,16 @@ public final class Mouse {
 
             MouseMoveEvent event = moveEvent;
 
-            if (buttonState > 0) event = dragEvent;
-
-            event.setX(fromX);
-            event.setY(fromY);
-            event.setToX(x);
-            event.setY((short) (Window.getHeight() - y));
+            if (buttonState > 0) {
+                event = dragEvent;
+                event.setX(fromX);
+                event.setY(fromY);
+                event.setToX(x);
+                event.setToY((short) (Window.getHeight() - y));
+            } else {
+                event.setX(x);
+                event.setY((short) (Window.getHeight() - y));
+            }
             event.setButton(buttonState);
             event.setModifiers(modifierState);
 

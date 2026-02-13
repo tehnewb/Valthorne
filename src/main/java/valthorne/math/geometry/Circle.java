@@ -4,7 +4,7 @@ import valthorne.math.Vector2f;
 
 /**
  * Represents a geometric circle that extends the {@code Shape} class.
- * The circle is defined by its center coordinates, radius, and a number of segments
+ * The circle is defined by its bottom-left position, radius, and a number of segments
  * which control the resolution of its boundary representation.
  *
  * @author Albert Beaupre
@@ -12,21 +12,17 @@ import valthorne.math.Vector2f;
  */
 public class Circle extends Shape {
 
-    private float x;
-    private float y;
+    private Vector2f[] points;
+    private float x; // bottom-left x
+    private float y; // bottom-left y
     private float radius;
-
-    /**
-     * Number of points used to approximate the circle boundary.
-     * Higher values = smoother circle and more accurate overlaps/contains, but more cost.
-     */
     private int segments;
 
     /**
      * Creates a circle.
      *
-     * @param x        center x
-     * @param y        center y
+     * @param x        bottom-left x
+     * @param y        bottom-left y
      * @param radius   radius (must be >= 0)
      * @param segments number of perimeter points (minimum 3)
      */
@@ -35,15 +31,10 @@ public class Circle extends Shape {
         this.y = y;
         this.radius = Math.max(0f, radius);
         this.segments = Math.max(3, segments);
+        this.points = new Vector2f[segments];
+        this.updatePoints();
     }
 
-    /**
-     * Creates a circle with a default perimeter resolution.
-     *
-     * @param x      center x
-     * @param y      center y
-     * @param radius radius (must be >= 0)
-     */
     public Circle(float x, float y, float radius) {
         this(x, y, radius, 32);
     }
@@ -66,40 +57,50 @@ public class Circle extends Shape {
 
     public void setX(float x) {
         this.x = x;
+        this.updatePoints();
     }
 
     public void setY(float y) {
         this.y = y;
+        this.updatePoints();
     }
 
     public void setRadius(float radius) {
         this.radius = Math.max(0f, radius);
+        this.updatePoints();
     }
 
     public void setSegments(int segments) {
         this.segments = Math.max(3, segments);
+        this.updatePoints();
     }
 
     public Vector2f getCenter() {
-        return new Vector2f(x, y);
+        return new Vector2f(x + radius, y + radius);
     }
 
     public void move(Vector2f offset) {
         x += offset.getX();
         y += offset.getY();
+        this.updatePoints();
+    }
+
+    private void updatePoints() {
+        if (this.points.length != this.segments) this.points = new Vector2f[segments];
+
+        double step = (Math.PI * 2.0) / segments;
+
+        float centerX = x + radius;
+        float centerY = y + radius;
+
+        for (int i = 0; i < segments; i++) {
+            double a = i * step;
+            points[i] = new Vector2f((float) (centerX + Math.cos(a) * radius), (float) (centerY + Math.sin(a) * radius));
+        }
     }
 
     @Override
     public Vector2f[] points() {
-        Vector2f[] pts = new Vector2f[segments];
-
-        double step = (Math.PI * 2.0) / segments;
-
-        for (int i = 0; i < segments; i++) {
-            double a = i * step;
-            pts[i] = new Vector2f((float) (x + Math.cos(a) * radius), (float) (y + Math.sin(a) * radius));
-        }
-
-        return pts;
+        return points;
     }
 }

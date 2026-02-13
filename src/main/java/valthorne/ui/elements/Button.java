@@ -10,6 +10,7 @@ import valthorne.graphics.Drawable;
 import valthorne.graphics.font.Font;
 import valthorne.math.Vector2f;
 import valthorne.ui.*;
+import valthorne.ui.enums.Alignment;
 import valthorne.ui.styles.ButtonStyle;
 
 /**
@@ -37,10 +38,6 @@ import valthorne.ui.styles.ButtonStyle;
  *     <li>Key release restores background.</li>
  *     <li>Hover/focus/disabled updates swap the current drawable if the style provides those drawables.</li>
  * </ul>
- *
- * <h2>Text Alignment</h2>
- * <p>The text is positioned using {@link Alignment#align(Dimensional, Sizeable, Alignment)} based on
- * {@link #textAlignment}. The font position is recalculated whenever the button moves or resizes.</p>
  *
  * <h2>Example</h2>
  * <pre>{@code
@@ -80,7 +77,7 @@ public class Button extends Element {
      * @param text initial button label (null becomes an empty string via {@link #setText(String)})
      */
     public Button(String text) {
-        this(text, Alignment.CENTER_CENTER);
+        this(text, Alignment.CENTER);
     }
 
     /**
@@ -114,7 +111,7 @@ public class Button extends Element {
      * @param style style providing drawables and font data
      */
     public Button(String text, ButtonStyle style) {
-        this(text, Alignment.CENTER_CENTER, null, style);
+        this(text, Alignment.CENTER, null, style);
     }
 
     /**
@@ -124,7 +121,7 @@ public class Button extends Element {
      * @param action action invoked on activation (mouse release / Enter)
      */
     public Button(String text, UIAction<Button> action) {
-        this(text, Alignment.CENTER_CENTER, action, new ButtonStyle());
+        this(text, Alignment.CENTER, action, new ButtonStyle());
     }
 
     /**
@@ -146,7 +143,7 @@ public class Button extends Element {
      * @param style  style providing drawables and font data
      */
     public Button(String text, UIAction<Button> action, ButtonStyle style) {
-        this(text, Alignment.CENTER_CENTER, action, style);
+        this(text, Alignment.CENTER, action, style);
     }
 
     /**

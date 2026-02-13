@@ -2,7 +2,7 @@ package valthorne.ui.elements;
 
 import valthorne.graphics.font.Font;
 import valthorne.math.Vector2f;
-import valthorne.ui.Alignment;
+import valthorne.ui.enums.Alignment;
 import valthorne.ui.Element;
 import valthorne.ui.styles.LabelStyle;
 
@@ -16,7 +16,7 @@ public class Label extends Element {
     public Label(String text, LabelStyle style) {
         this.text = text;
         this.style = style;
-        this.textAlignment = Alignment.CENTER_CENTER;
+        this.textAlignment = Alignment.CENTER;
         this.font = new Font(style.getFontData());
         this.font.setText(text);
         this.setSize(font.getWidth(), font.getHeight());

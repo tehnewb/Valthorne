@@ -26,6 +26,8 @@ package valthorne.ui;
  * <h2>Example</h2>
  * <pre>{@code
  * Layout layout = new Layout()
+ *         .setX(Value.alignment(Alignment.CENTER)
+ *         .setY(Value.alignment(Alignment.CENTER)
  *         .setWidth(Value.pixels(160))
  *         .setHeight(Value.percentage(50))
  *         .setPadding(Value.pixels(10));
