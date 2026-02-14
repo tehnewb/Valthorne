@@ -73,12 +73,23 @@ public final class Window {
         fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
         });
         sizeCallback = glfwSetWindowSizeCallback(address, (win, newW, newH) -> {
-            if (newW <= 0 || newH <= 0) return; // it keeps making the width and height to 0 when minimizing
+            if (newW <= 0 || newH <= 0) return;
 
             short oldWidth = Window.width;
             short oldHeight = Window.height;
+
             Window.width = (short) newW;
             Window.height = (short) newH;
+
+            // Update GL viewport + projection to match new window size.
+            glViewport(0, 0, newW, newH);
+
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, newW, 0, newH, -1, 1);
+
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
 
             resizeEvent.setOldHeight(oldHeight);
             resizeEvent.setOldWidth(oldWidth);
@@ -86,6 +97,7 @@ public final class Window {
             resizeEvent.setNewWidth(Window.width);
             JGL.publish(resizeEvent);
         });
+
         posCallback = glfwSetWindowPosCallback(address, (win, newX, newY) -> {
             Window.x = (short) newX;
             Window.y = (short) newY;
