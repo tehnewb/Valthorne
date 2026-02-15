@@ -16,14 +16,32 @@ public final class MathUtils {
      * TAU constant (2π).
      */
     public static final double TAU = Math.PI * 2.0;
+
+    /**
+     * TAU constant (2π) as a float.
+     */
+    public static final float TAU_F = (float) (Math.PI * 2.0);
+
     /**
      * Degrees to radians multiplier.
      */
     public static final double DEG_TO_RAD = Math.PI / 180.0;
+
     /**
      * Radians to degrees multiplier.
      */
     public static final double RAD_TO_DEG = 180.0 / Math.PI;
+
+    /**
+     * Degrees to radians multiplier as a float.
+     */
+    public static final float DEG_TO_RAD_F = (float) (Math.PI / 180.0);
+
+    /**
+     * Radians to degrees multiplier as a float.
+     */
+    public static final float RAD_TO_DEG_F = (float) (180.0 / Math.PI);
+
     private static final Random RANDOM = new Random();
 
     private MathUtils() {
