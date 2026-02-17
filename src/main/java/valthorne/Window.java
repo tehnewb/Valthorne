@@ -61,6 +61,7 @@ public final class Window {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+        glfwWindowHint(GLFW_CONTEXT_NO_ERROR, GLFW_TRUE);
 
         address = glfwCreateWindow(width, height, title, NULL, NULL);
 
