@@ -49,8 +49,6 @@ public class JGL {
 
         application.init();
         while (!Window.shouldClose()) {
-            glClear(GL_COLOR_BUFFER_BIT);
-
             float now = (float) glfwGetTime();
             deltaTime = now - lastTime;
             lastTime = now;
