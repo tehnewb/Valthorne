@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.tehnewb"
-version = "0.9.0"
+version = "1.0.6"
 description = "A 2D game development library"
 
 repositories {
@@ -71,6 +71,7 @@ tasks.withType(Javadoc).configureEach {
 tasks.matching { it.name == "plainJavadocJar" }.configureEach {
     enabled = false
 }
+
 
 mavenPublishing {
     coordinates(group.toString(), project.name.toString(), version.toString())

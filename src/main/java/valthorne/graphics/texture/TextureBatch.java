@@ -26,6 +26,7 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * <ul>
  *     <li>Binds up to {@code maxTextureUnits} textures to texture units 0..N-1.</li>
  *     <li>Each sprite instance stores {@code i_tex} which selects which unit to sample from.</li>
+ *     <li>Each sprite instance stores {@code i_uvRect = (u0,v0,u1,v1)} to support sub-regions (atlases/fonts).</li>
  *     <li>Sprites are drawn in the order {@link #draw(Texture, float, float, float, float)} is called.</li>
  *     <li>The batch flushes when the instance buffer is full, or when a new texture is requested and no unit is free.</li>
  * </ul>
@@ -61,7 +62,7 @@ public final class TextureBatch {
     private static final int QUAD_FLOATS_PER_VERT = 4;                                           // localX, localY, u, v.
     private static final int BYTES_PER_FLOAT = 4;                                                // Bytes per float.
 
-    private static final int INST_FLOATS = 9;                                                    // Instance floats: x,y,w,h, r,g,b,a, texUnit.
+    private static final int INST_FLOATS = 13;                                                   // Instance floats: x,y,w,h, r,g,b,a, texUnit, u0,v0,u1,v1.
     private static final int INST_STRIDE_BYTES = INST_FLOATS * BYTES_PER_FLOAT;                  // Instance stride in bytes.
 
     private static final int ATTR_LOCAL = 0;                                                     // Attribute index: vec2 a_local.
@@ -69,6 +70,7 @@ public final class TextureBatch {
     private static final int ATTR_XYWH = 2;                                                      // Attribute index: vec4 i_xywh.
     private static final int ATTR_COL = 3;                                                       // Attribute index: vec4 i_col.
     private static final int ATTR_TEX = 4;                                                       // Attribute index: float i_tex.
+    private static final int ATTR_UVRECT = 5;                                                    // Attribute index: vec4 i_uvRect.
 
     private final FloatBuffer instanceBuffer;                                                    // CPU staging buffer for per-instance data.
     private final Color color = new Color(1f, 1f, 1f, 1f);                                       // Current batch tint color.
@@ -116,6 +118,7 @@ public final class TextureBatch {
         shader.bindAttribLocation(ATTR_XYWH, "i_xywh");
         shader.bindAttribLocation(ATTR_COL, "i_col");
         shader.bindAttribLocation(ATTR_TEX, "i_tex");
+        shader.bindAttribLocation(ATTR_UVRECT, "i_uvRect");
         shader.reload();
 
         FloatBuffer quad = BufferUtils.createFloatBuffer(QUAD_VERTS * QUAD_FLOATS_PER_VERT);
@@ -178,6 +181,9 @@ public final class TextureBatch {
         if (drawing) throw new IllegalStateException("Already drawing.");
         drawing = true;
 
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
         instanceCount = 0;
         instanceBuffer.clear();
 
@@ -212,6 +218,10 @@ public final class TextureBatch {
         glVertexAttribPointer(ATTR_TEX, 1, GL_FLOAT, false, INST_STRIDE_BYTES, 8L * BYTES_PER_FLOAT);
         glVertexAttribDivisor(ATTR_TEX, 1);
 
+        glEnableVertexAttribArray(ATTR_UVRECT);
+        glVertexAttribPointer(ATTR_UVRECT, 4, GL_FLOAT, false, INST_STRIDE_BYTES, 9L * BYTES_PER_FLOAT);
+        glVertexAttribDivisor(ATTR_UVRECT, 1);
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
@@ -225,7 +235,7 @@ public final class TextureBatch {
      * @param h   height
      */
     public void draw(Texture tex, float x, float y, float w, float h) {
-        draw(tex, x, y, w, h, null);
+        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, null);
     }
 
     /**
@@ -244,6 +254,46 @@ public final class TextureBatch {
      * @throws NullPointerException  if {@code tex} is null
      */
     public void draw(Texture tex, float x, float y, float w, float h, Color tint) {
+        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
+    }
+
+    /**
+     * Queues a sprite for drawing using a custom UV rectangle.
+     *
+     * @param tex texture to draw (must be non-null)
+     * @param x   world-space x
+     * @param y   world-space y
+     * @param w   width
+     * @param h   height
+     * @param u0  left u (0..1)
+     * @param v0  top v (0..1)
+     * @param u1  right u (0..1)
+     * @param v1  bottom v (0..1)
+     */
+    public void drawUV(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
+        drawUV(tex, x, y, w, h, u0, v0, u1, v1, null);
+    }
+
+    /**
+     * Queues a sprite for drawing using a custom UV rectangle and optional tint.
+     *
+     * <p>If the batch is full, this flushes first. If the texture cannot be assigned a unit because all
+     * units are occupied, this flushes and retries once.</p>
+     *
+     * @param tex  texture to draw (must be non-null)
+     * @param x    world-space x
+     * @param y    world-space y
+     * @param w    width
+     * @param h    height
+     * @param u0   left u (0..1)
+     * @param v0   top v (0..1)
+     * @param u1   right u (0..1)
+     * @param v1   bottom v (0..1)
+     * @param tint optional per-sprite tint (null uses current batch tint)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
+     */
+    public void drawUV(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, Color tint) {
         if (!drawing) throw new IllegalStateException("Call begin() before draw().");
         Objects.requireNonNull(tex, "tex");
 
@@ -267,9 +317,63 @@ public final class TextureBatch {
         instanceBuffer.put(x).put(y).put(w).put(h);
         instanceBuffer.put(r).put(g).put(b).put(a);
         instanceBuffer.put((float) texUnit);
+        instanceBuffer.put(u0).put(v0).put(u1).put(v1);
 
         instanceCount++;
     }
+
+    /**
+     * Queues a sub-region of a texture for drawing at the specified world-space coordinates with a custom size.
+     *
+     * @param tex          texture to draw (must be non-null)
+     * @param x            world-space x position
+     * @param y            world-space y position
+     * @param w            width of the texture region in world-space
+     * @param h            height of the texture region in world-space
+     * @param regionX      x offset of the region within the texture
+     * @param regionY      y offset of the region within the texture
+     * @param regionWidth  width of the region within the texture
+     * @param regionHeight height of the region within the texture
+     */
+    public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight) {
+        drawRegion(tex, x, y, w, h, regionX, regionY, regionWidth, regionHeight, null);
+    }
+
+    /**
+     * Queues a sub-region of a texture for drawing at the specified world-space coordinates with a custom size
+     * and optional tint color. The specified region in the texture is mapped to the provided width and height
+     * in world-space.
+     *
+     * @param tex          the texture to draw (must be non-null)
+     * @param x            world-space x position
+     * @param y            world-space y position
+     * @param w            width of the texture region in world-space
+     * @param h            height of the texture region in world-space
+     * @param regionX      x offset of the region within the texture
+     * @param regionY      y offset of the region within the texture
+     * @param regionWidth  width of the region within the texture
+     * @param regionHeight height of the region within the texture
+     * @param tint         optional per-sprite tint (null uses current batch tint)
+     */
+    public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, Color tint) {
+        Objects.requireNonNull(tex, "tex");
+
+        float texW = tex.getWidth();
+        float texH = tex.getHeight();
+
+        if (texW == 0f || texH == 0f) {
+            drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
+            return;
+        }
+
+        float u0 = regionX / texW;
+        float v0 = regionY / texH;
+        float u1 = (regionX + regionWidth) / texW;
+        float v1 = (regionY + regionHeight) / texH;
+
+        drawUV(tex, x, y, w, h, u0, v0, u1, v1, tint);
+    }
+
 
     /**
      * Ends a drawing session and flushes any remaining sprites.
@@ -284,12 +388,14 @@ public final class TextureBatch {
         glVertexAttribDivisor(ATTR_XYWH, 0);
         glVertexAttribDivisor(ATTR_COL, 0);
         glVertexAttribDivisor(ATTR_TEX, 0);
+        glVertexAttribDivisor(ATTR_UVRECT, 0);
 
         glDisableVertexAttribArray(ATTR_LOCAL);
         glDisableVertexAttribArray(ATTR_UV);
         glDisableVertexAttribArray(ATTR_XYWH);
         glDisableVertexAttribArray(ATTR_COL);
         glDisableVertexAttribArray(ATTR_TEX);
+        glDisableVertexAttribArray(ATTR_UVRECT);
 
         shader.unbind();
         drawing = false;
@@ -377,6 +483,7 @@ public final class TextureBatch {
             attribute vec4 i_xywh;
             attribute vec4 i_col;
             attribute float i_tex;
+            attribute vec4 i_uvRect;
             
             varying vec2 v_uv;
             varying vec4 v_col;
@@ -385,7 +492,7 @@ public final class TextureBatch {
             void main() {
                 vec2 world = i_xywh.xy + (a_local * i_xywh.zw);
                 gl_Position = gl_ModelViewProjectionMatrix * vec4(world.xy, 0.0, 1.0);
-                v_uv = a_uv;
+                v_uv = mix(i_uvRect.xy, i_uvRect.zw, a_uv);
                 v_col = i_col;
                 v_tex = i_tex;
             }
