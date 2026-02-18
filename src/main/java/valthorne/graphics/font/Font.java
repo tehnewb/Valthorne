@@ -2,90 +2,80 @@ package valthorne.graphics.font;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.Dimensional;
 
 /**
- * A lightweight bitmap-font text renderer built on {@link FontData} + a single {@link Texture} atlas.
- *
- * <p>This class is responsible for:</p>
- * <ul>
- *     <li>Storing the current text string ({@link #text}) and caching its measured width/height</li>
- *     <li>Rendering glyphs from a font atlas using glyph metrics from {@link FontData}</li>
- *     <li>Applying kerning via {@link FontData#getKerningAdvance(char, char)}</li>
- *     <li>Handling special characters:
- *         <ul>
- *             <li>{@code '\n'}: starts a new line</li>
- *             <li>{@code '\t'}: advances by a tab width (defaults to 4 spaces)</li>
- *         </ul>
- *     </li>
- *     <li>Supporting independent X/Y scaling</li>
- * </ul>
- *
- * <h2>Coordinate behavior</h2>
- * <p>This renderer treats {@link #x}/{@link #y} as the "pen origin" for the first line. Internally it computes
- * a baseline position using the font descent so glyph offsets land where you expect.</p>
- *
- * <p>Because the underlying {@link Texture} is scaled using {@code (1, -1)} in the constructor, the atlas is
- * drawn upside-down relative to the typical OpenGL UV origin, which matches your font atlas coordinates.</p>
- *
- * <h2>Caching</h2>
- * <p>{@link #setText(String)} updates cached width/height immediately via {@link #measureIntoCache(String)}.
- * {@link #getWidth()} and {@link #getHeight()} return these cached values.</p>
+ * Bitmap font renderer backed by {@link FontData} and a single atlas {@link Texture}.
  *
  * <h2>Example</h2>
  * <pre>{@code
- * FontData data = ...;                     // Loaded/constructed elsewhere (atlas + metrics)
- * Font font = new Font(data);
+ * Font font = new Font("assets/fonts/Inter-Regular.ttf", 32)
+ *         .setShadow(2f, -2f, new Color(0f, 0f, 0f, 0.75f))
+ *         .setOutline(1, new Color(0f, 0f, 0f, 1f));
  *
- * font.setText("Hello,\nValthorne!");
- * font.setPosition(40, 300);
- * font.setScale(1.0f, 1.0f);
- * font.setColor(new Color(1f, 1f, 1f, 1f));
+ * font.setText("Hello\nWorld!");
+ * font.setPosition(32, 64);
+ * font.setScale(1f, 1f);
  *
- * // Inside your render loop:
  * font.draw();
- *
- * // Measuring:
- * float w = font.getWidth();
- * float h = font.getHeight();
- *
- * // Don't forget to do this after you're done using the font
  * font.dispose();
  * }</pre>
+ *
+ * <h2>Behavior</h2>
+ * <ul>
+ *     <li>Draws glyphs from an atlas using metrics from {@link FontData}.</li>
+ *     <li>Supports {@code '\n'} newlines and {@code '\t'} tabs (4 spaces).</li>
+ *     <li>Supports independent X/Y scaling.</li>
+ *     <li>Supports drop shadow and geometric outline without shaders.</li>
+ * </ul>
+ *
+ * <h2>Coordinates</h2>
+ * <p>{@link #x}/{@link #y} represent the pen origin for the first line.</p>
+ * <p>The baseline is computed using the font descent.</p>
+ * <p>The atlas texture is scaled as {@code (1, -1)} to match atlas coordinate conventions.</p>
+ *
+ * <h2>Caching</h2>
+ * <p>{@link #setText(String)} updates cached {@link #width}/{@link #height} immediately.</p>
+ *
+ * <h2>Effects</h2>
+ * <p>Shadow is a single offset pass. Outline is a disk of offset passes per glyph.</p>
  *
  * @author Albert Beaupre
  * @since December 6th, 2025
  */
 public class Font implements Dimensional {
 
-    private Texture texture;                  // Underlying texture atlas used to draw glyph regions.
-    private FontData data;                    // Glyph metrics/kerning and atlas metadata.
-    private Glyph spaceGlyph;                 // Cached data.glyph(' ') to compute tab width efficiently.
-    private final float fallbackAdvance;            // Advance used when glyph is missing from FontData.
-    private String text = "";                       // Current text content for rendering and measurement.
-    private float scaleX = 1f;                      // Horizontal scale factor applied to glyph sizing/advance.
-    private float scaleY = 1f;                      // Vertical scale factor applied to glyph sizing/line spacing.
-    private float x;                                // X position (pen origin) for rendering the first line.
-    private float y;                                // Y position (pen origin) for rendering the first line.
-    private float width;                            // Cached measured max line width of {@link #text}.
-    private float height;                           // Cached measured total height of {@link #text}.
-    private float tabAdvanceBase;                   // Base (unscaled) tab advance, computed from space glyph.
-    private float lineAdvanceY;                     // Scaled vertical distance between baselines for new lines.
-    private float baselineDescentY;                 // Scaled descent used to place baseline relative to {@link #y}.
-    private float firstLineHeightY;                 // Scaled height of a single-line string (ascent - descent).
+    private Texture texture;                              // Atlas texture used to draw glyph regions.
+    private FontData data;                                // Glyph metrics, kerning, and atlas metadata.
+    private Glyph spaceGlyph;                             // Cached glyph(' ') for tab sizing.
+    private final float fallbackAdvance;                  // Advance used when a glyph is missing.
+    private String text = "";                             // Current text content.
+    private float scaleX = 1f;                            // Horizontal scale.
+    private float scaleY = 1f;                            // Vertical scale.
+    private float x;                                      // Pen origin x for the first line.
+    private float y;                                      // Pen origin y for the first line.
+    private float width;                                  // Cached max line width.
+    private float height;                                 // Cached total height.
+    private float tabAdvanceBase;                         // Unscaled tab advance (4 spaces).
+    private float lineAdvanceY;                           // Scaled distance between baselines.
+    private float baselineDescentY;                       // Scaled descent used to place baseline.
+    private float firstLineHeightY;                       // Scaled single-line height.
+    private final TextureBatch batch;                     // Batched renderer.
+
+    private boolean outlineEnabled;                       // True if outline is enabled.
+    private int outlinePx = 1;                            // Outline radius in pixels.
+    private Color outlineColor = new Color(0f, 0f, 0f, 1f); // Outline color.
+
+    private boolean shadowEnabled;                        // True if shadow is enabled.
+    private float shadowOffsetX = 2f;                     // Shadow x offset in pixels.
+    private float shadowOffsetY = -2f;                    // Shadow y offset in pixels.
+    private Color shadowColor = new Color(0f, 0f, 0f, 0.75f); // Shadow color.
 
     /**
-     * Creates a new {@link Font} instance backed by the given {@link FontData}.
+     * Creates a font backed by the given {@link FontData}.
      *
-     * <p>Initialization details:</p>
-     * <ul>
-     *     <li>Creates a {@link Texture} from {@link FontData#textureData()}</li>
-     *     <li>Applies {@code texture.setScale(1f, -1f)} so glyph atlas coordinates match your rendering orientation</li>
-     *     <li>Caches the space glyph (if present) to compute a consistent tab width</li>
-     *     <li>Computes fallback and scale-dependent cached metrics</li>
-     * </ul>
-     *
-     * @param data the font metadata containing glyph metrics, kerning, and texture information
+     * @param data font metrics and atlas data
      * @throws NullPointerException if {@code data} is null
      */
     public Font(FontData data) {
@@ -95,37 +85,158 @@ public class Font implements Dimensional {
         this.texture.setScale(1f, -1f);
         this.spaceGlyph = data.glyph(' ');
         this.fallbackAdvance = data.lineHeight() * 0.25f;
+        this.batch = new TextureBatch(4096);
 
         recalcScaleCaches();
         recalcTabBase();
+        measureIntoCache(this.text);
     }
 
+    /**
+     * Loads {@link FontData} from disk and creates a font.
+     *
+     * @param path     font file path
+     * @param fontSize baked pixel size
+     */
     public Font(String path, int fontSize) {
         this(FontData.load(path, fontSize, 0, 254));
     }
 
     /**
-     * Renders the current {@link #text} using the font atlas and glyph metrics.
+     * Enables outline rendering and configures outline parameters.
      *
-     * <p>Rendering rules:</p>
-     * <ul>
-     *     <li>If {@link #text} is null/empty, this is a no-op.</li>
-     *     <li>{@code '\n'} resets pen X to {@link #x} and moves baseline down by {@link #lineAdvanceY}.</li>
-     *     <li>{@code '\t'} advances pen X by a tab width (4 spaces by default).</li>
-     *     <li>Kerning is applied between adjacent glyphs via {@link FontData#getKerningAdvance(char, char)}.</li>
-     *     <li>Missing glyphs advance by {@link #fallbackAdvance} (scaled) and render nothing.</li>
-     *     <li>Zero-sized glyphs (width/height <= 0) do not render but still advance.</li>
-     * </ul>
+     * @param outlinePx outline radius in pixels (clamped to {@code >= 1})
+     * @param color     outline color (null keeps current)
+     * @return this for chaining
+     */
+    public Font setOutline(int outlinePx, Color color) {
+        this.outlineEnabled = true;
+        this.outlinePx = Math.max(1, outlinePx);
+        if (color != null) this.outlineColor = color;
+        return this;
+    }
+
+    /**
+     * Disables outline rendering.
+     */
+    public void disableOutline() {
+        this.outlineEnabled = false;
+    }
+
+    /**
+     * @return true if outline is enabled
+     */
+    public boolean isOutlineEnabled() {
+        return outlineEnabled;
+    }
+
+    /**
+     * @return outline radius in pixels
+     */
+    public int getOutlinePx() {
+        return outlinePx;
+    }
+
+    /**
+     * @return outline color reference
+     */
+    public Color getOutlineColor() {
+        return outlineColor;
+    }
+
+    /**
+     * Enables shadow rendering and configures shadow parameters.
      *
-     * <p>Positioning:</p>
-     * <ul>
-     *     <li>The baseline starts at {@code y - baselineDescentY} so descent is accounted for.</li>
-     *     <li>Per-glyph offsets ({@link Glyph#xOffset()}, {@link Glyph#yOffset()}) are applied with scaling.</li>
-     * </ul>
+     * @param offsetX shadow x offset in pixels
+     * @param offsetY shadow y offset in pixels
+     * @param color   shadow color (null keeps current)
+     * @return this for chaining
+     */
+    public Font setShadow(float offsetX, float offsetY, Color color) {
+        this.shadowEnabled = true;
+        this.shadowOffsetX = offsetX;
+        this.shadowOffsetY = offsetY;
+        if (color != null) this.shadowColor = color;
+        return this;
+    }
+
+    /**
+     * Disables shadow rendering.
+     */
+    public void disableShadow() {
+        this.shadowEnabled = false;
+    }
+
+    /**
+     * @return true if shadow is enabled
+     */
+    public boolean isShadowEnabled() {
+        return shadowEnabled;
+    }
+
+    /**
+     * @return shadow x offset in pixels
+     */
+    public float getShadowOffsetX() {
+        return shadowOffsetX;
+    }
+
+    /**
+     * @return shadow y offset in pixels
+     */
+    public float getShadowOffsetY() {
+        return shadowOffsetY;
+    }
+
+    /**
+     * @return shadow color reference
+     */
+    public Color getShadowColor() {
+        return shadowColor;
+    }
+
+    /**
+     * Draws the current {@link #text}.
+     *
+     * <p>Order: shadow (optional), outline (optional), fill (always).</p>
      */
     public void draw() {
         final String s = this.text;
         if (s == null || s.isEmpty()) return;
+
+        final float texW = texture.getWidth();
+        final float texH = texture.getHeight();
+        if (texW <= 0f || texH <= 0f) return;
+
+        final float invW = 1f / texW;
+        final float invH = 1f / texH;
+
+        batch.begin();
+
+        if (shadowEnabled && shadowColor != null && shadowColor.a() > 0f)
+            drawStringPass(s, invW, invH, shadowOffsetX, shadowOffsetY, shadowColor, false, 0);
+
+        if (outlineEnabled && outlinePx > 0 && outlineColor != null && outlineColor.a() > 0f)
+            drawStringPass(s, invW, invH, 0f, 0f, outlineColor, true, outlinePx);
+
+        drawStringPass(s, invW, invH, 0f, 0f, texture.getColor(), false, 0);
+
+        batch.end();
+    }
+
+    /**
+     * Draws one pass of text.
+     *
+     * @param s         text to draw
+     * @param invW      1/atlasWidth
+     * @param invH      1/atlasHeight
+     * @param passOffX  extra offset applied to all glyphs (x)
+     * @param passOffY  extra offset applied to all glyphs (y)
+     * @param tint      pass tint
+     * @param doOutline true to draw an outline disk per glyph
+     * @param outlineR  outline radius in pixels
+     */
+    private void drawStringPass(String s, float invW, float invH, float passOffX, float passOffY, Color tint, boolean doOutline, int outlineR) {
 
         final float sx = this.scaleX;
         final float sy = this.scaleY;
@@ -165,45 +276,86 @@ public class Font implements Dimensional {
                 continue;
             }
 
-            texture.setRegion(g.x0(), g.y0(), g.x1(), g.y1());
+            float baseX = penX + (g.xOffset() * sx) + passOffX;
+            float baseY = baselineY - (g.yOffset() * sy) + passOffY;
 
-            float drawX = penX + (g.xOffset() * sx);
-            float drawY = baselineY - (g.yOffset() * sy);
+            float w = gw * sx;
+            float h = -(gh * sy);
 
-            texture.setPosition(drawX, drawY);
-            texture.setSize(gw * sx, gh * sy);
-            texture.draw();
+            float u0 = g.x0() * invW;
+            float u1 = g.x1() * invW;
+            float v0 = g.y0() * invH;
+            float v1 = g.y1() * invH;
+
+            if (!doOutline) {
+                batch.drawUV(texture, baseX, baseY, w, h, u0, v0, u1, v1, tint);
+            } else {
+                final int r = Math.max(1, outlineR);
+                final int r2 = r * r;
+
+                // Reuse a single temp color per glyph to avoid allocating per offset.
+                final Color tc = new Color(tint.r(), tint.g(), tint.b(), tint.a());
+
+                for (int oy = -r; oy <= r; oy++) {
+                    for (int ox = -r; ox <= r; ox++) {
+                        if (ox == 0 && oy == 0) continue;
+
+                        int d2 = ox * ox + oy * oy;
+                        if (d2 > r2) continue;
+
+                        float aMul;
+                        if (r <= 1) {
+                            aMul = 1f;
+                        } else {
+                            float d = (float) Math.sqrt(d2);
+                            float t = d / (float) r;
+
+                            float featherBand = 1f / (float) r;
+                            aMul = 1f - smoothstep(1f - featherBand, 1f, t);
+
+                            if (t <= 1f - featherBand) aMul = 1f;
+                            if (aMul < 0.35f) aMul = 0.35f;
+                        }
+
+                        tc.a(tint.a() * aMul);
+
+                        batch.drawUV(texture, baseX + ox, baseY + oy, w, h, u0, v0, u1, v1, tc);
+                    }
+                }
+            }
 
             penX += g.xAdvance() * sx;
         }
     }
 
     /**
-     * Returns the cached width of the current {@link #text}.
+     * Smooth Hermite interpolation between 0 and 1.
      *
-     * <p>This is updated when calling {@link #setText(String)} or {@link #setScale(float, float)}.</p>
-     *
-     * @return cached width in pixels
+     * @param a low edge
+     * @param b high edge
+     * @param x sample value
+     * @return smoothed value in the range 0..1
      */
+    private static float smoothstep(float a, float b, float x) {
+        if (x <= a) return 0f;
+        if (x >= b) return 1f;
+        x = (x - a) / (b - a);
+        return x * x * (3f - 2f * x);
+    }
+
+    /**
+     * @return cached width of the current {@link #text}
+     */
+    @Override
     public float getWidth() {
         return width;
     }
 
     /**
-     * Measures the width (max line width) of an arbitrary string using the current font configuration.
+     * Measures width of a string without mutating {@link #text}.
      *
-     * <p>Measurement rules:</p>
-     * <ul>
-     *     <li>Returns 0 for null/empty input</li>
-     *     <li>Tracks max line width across newlines</li>
-     *     <li>Applies tab advancement</li>
-     *     <li>Uses glyph {@link Glyph#xAdvance()} and {@link #fallbackAdvance} for missing glyphs</li>
-     * </ul>
-     *
-     * <p>Note: This method does not apply kerning (mirrors your original behavior).</p>
-     *
-     * @param text the string to measure
-     * @return width in pixels
+     * @param text string to measure
+     * @return max line width
      */
     public float getWidth(String text) {
         if (text == null || text.isEmpty()) return 0f;
@@ -243,29 +395,18 @@ public class Font implements Dimensional {
     }
 
     /**
-     * Returns the cached height of the current {@link #text}.
-     *
-     * <p>This is updated when calling {@link #setText(String)} or {@link #setScale(float, float)}.</p>
-     *
-     * @return cached height in pixels
+     * @return cached height of the current {@link #text}
      */
+    @Override
     public float getHeight() {
         return height;
     }
 
     /**
-     * Measures the height of an arbitrary string using the current font configuration.
+     * Measures height of a string without mutating {@link #text}.
      *
-     * <p>Rules:</p>
-     * <ul>
-     *     <li>Returns 0 for null/empty input</li>
-     *     <li>Counts newline characters to determine line count</li>
-     *     <li>Returns {@link #firstLineHeightY} for a single line</li>
-     *     <li>For multiple lines: {@code firstLineHeightY + (lines - 1) * lineAdvanceY}</li>
-     * </ul>
-     *
-     * @param text the string to measure
-     * @return height in pixels
+     * @param text string to measure
+     * @return total height across lines
      */
     public float getHeight(String text) {
         if (text == null || text.isEmpty()) return 0f;
@@ -280,158 +421,139 @@ public class Font implements Dimensional {
     }
 
     /**
-     * Returns the currently assigned text string.
-     *
-     * @return current text (never null unless {@link #dispose()} has been called)
+     * @return current text (never null after construction)
      */
     public String getText() {
         return text;
     }
 
     /**
-     * Sets the text content rendered by this font and updates cached width/height.
+     * Sets text and updates cached width/height.
      *
-     * <p>Passing null results in an empty string.</p>
-     *
-     * @param text new text value (null becomes "")
+     * @param text new text (null becomes empty)
      */
-    public void setText(String text) {
+    public Font setText(String text) {
         this.text = (text == null ? "" : text);
         measureIntoCache(this.text);
+        return this;
     }
 
     /**
-     * Sets the pen origin position for rendering.
+     * Sets the pen origin used by {@link #draw()}.
      *
-     * <p>This does not re-measure text. It only affects where the text is drawn.</p>
-     *
-     * @param x new x position
-     * @param y new y position
+     * @param x pen origin x
+     * @param y pen origin y
      */
-    public void setPosition(float x, float y) {
+    public Font setPosition(float x, float y) {
         this.x = x;
         this.y = y;
+        return this;
     }
 
     /**
-     * Sets the horizontal and vertical scale factors for rendering and measurement.
+     * Sets X/Y scale and refreshes cached vertical metrics and measurement cache.
      *
-     * <p>This recomputes scale-dependent caches (line height, baseline offsets) and then re-measures
-     * the current {@link #text} into {@link #width}/{@link #height}.</p>
-     *
-     * @param sx horizontal scale factor
-     * @param sy vertical scale factor
+     * @param sx x scale
+     * @param sy y scale
      */
-    public void setScale(float sx, float sy) {
+    public Font setScale(float sx, float sy) {
         this.scaleX = sx;
         this.scaleY = sy;
 
         recalcScaleCaches();
         measureIntoCache(this.text);
+        return this;
     }
 
     /**
-     * Returns the current horizontal scale.
-     *
-     * @return x scale factor
+     * @return current x scale
      */
-    public float getScaleX() {return scaleX;}
+    public float getScaleX() {
+        return scaleX;
+    }
 
     /**
-     * Returns the current vertical scale.
-     *
-     * @return y scale factor
+     * @return current y scale
      */
-    public float getScaleY() {return scaleY;}
+    public float getScaleY() {
+        return scaleY;
+    }
 
     /**
-     * Returns the current pen origin X position.
-     *
-     * @return x coordinate
+     * @return pen origin x
      */
-    public float getX() {return x;}
+    public float getX() {
+        return x;
+    }
 
     /**
-     * Sets the pen origin X position.
+     * Sets pen origin x.
      *
-     * @param x new x coordinate
+     * @param x pen origin x
      */
-    public void setX(float x) {this.x = x;}
+    public void setX(float x) {
+        this.x = x;
+    }
 
     /**
-     * Returns the current pen origin Y position.
-     *
-     * @return y coordinate
+     * @return pen origin y
      */
-    public float getY() {return y;}
+    public float getY() {
+        return y;
+    }
 
     /**
-     * Sets the pen origin Y position.
+     * Sets pen origin y.
      *
-     * @param y new y coordinate
+     * @param y pen origin y
      */
-    public void setY(float y) {this.y = y;}
+    public void setY(float y) {
+        this.y = y;
+    }
 
     /**
-     * Returns the current font color used for rendering.
-     *
-     * <p>This color is stored on the underlying {@link Texture}.</p>
-     *
-     * @return current color
+     * @return fill color reference stored on the backing {@link Texture}
      */
     public Color getColor() {
         return this.texture.getColor();
     }
 
     /**
-     * Sets the font color used for rendering.
+     * Sets the fill color for the main pass.
      *
-     * <p>This forwards to {@link Texture#setColor(Color)}.</p>
-     *
-     * @param color new color (may be null depending on Texture implementation)
+     * @param color new fill color
      */
     public void setColor(Color color) {
         this.texture.setColor(color);
     }
 
     /**
-     * Disposes of GPU/native resources associated with this font.
+     * Disposes owned GPU resources.
      *
-     * <p>After calling this, the font should no longer be used. This method:</p>
-     * <ul>
-     *     <li>Nulls {@link #text} to help catch accidental reuse</li>
-     *     <li>Disposes the underlying {@link Texture}</li>
-     * </ul>
+     * <p>This disposes the atlas {@link Texture}.</p>
      */
     public void dispose() {
         this.data = null;
         this.spaceGlyph = null;
         this.text = null;
+
         this.texture.dispose();
         this.texture = null;
+
+        // batch.dispose();
     }
 
     /**
-     * Recalculates scale-dependent cached metrics derived from {@link FontData}.
-     *
-     * <p>Cached values:</p>
-     * <ul>
-     *     <li>{@link #lineAdvanceY}: baseline-to-baseline spacing</li>
-     *     <li>{@link #baselineDescentY}: descent offset used for baseline placement</li>
-     *     <li>{@link #firstLineHeightY}: ascent - descent (descent is typically negative)</li>
-     * </ul>
+     * Recomputes scaled vertical metrics derived from {@link FontData}.
      */
     private void recalcScaleCaches() {
         lineAdvanceY = data.lineHeight() * scaleY;
         baselineDescentY = data.descent() * scaleY;
-        firstLineHeightY = (data.ascent() - data.descent()) * scaleY; // descent negative
+        firstLineHeightY = (data.ascent() - data.descent()) * scaleY;
     }
 
     /**
-     * Recomputes the base tab width in "font units" (before X scaling is applied).
-     *
-     * <p>Tab width defaults to 4 spaces. If a space glyph is missing, this falls back to
-     * {@link #fallbackAdvance}.</p>
+     * Recomputes base tab width using four spaces.
      */
     private void recalcTabBase() {
         float adv = (spaceGlyph != null) ? spaceGlyph.xAdvance() : fallbackAdvance;
@@ -439,20 +561,9 @@ public class Font implements Dimensional {
     }
 
     /**
-     * Measures {@code s} using the current font configuration and updates {@link #width} and {@link #height}.
+     * Measures {@code s} into {@link #width} and {@link #height}.
      *
-     * <p>Rules:</p>
-     * <ul>
-     *     <li>Null/empty: width/height become 0</li>
-     *     <li>Width: maximum pen X across lines (split by '\n')</li>
-     *     <li>Height: first line height + (lines - 1) * lineAdvanceY</li>
-     *     <li>Tabs: advance by tab width (4 spaces)</li>
-     *     <li>Missing glyphs: advance by {@link #fallbackAdvance}</li>
-     * </ul>
-     *
-     * <p>Note: Like {@link #getWidth(String)}, this method does not apply kerning.</p>
-     *
-     * @param s the text to measure
+     * @param s text to measure
      */
     private void measureIntoCache(String s) {
         if (s == null || s.isEmpty()) {
@@ -467,7 +578,6 @@ public class Font implements Dimensional {
 
         float penX = 0f;
         float maxX = 0f;
-
         int lines = 1;
 
         for (int i = 0, n = s.length(); i < n; i++) {
@@ -497,15 +607,13 @@ public class Font implements Dimensional {
         if (penX > maxX) maxX = penX;
 
         this.width = maxX;
-
-        if (lines == 1) this.height = firstLineHeightY;
-        else this.height = firstLineHeightY + (lines - 1) * lineAdvanceY;
+        this.height = (lines == 1)
+                ? firstLineHeightY
+                : (firstLineHeightY + (lines - 1) * lineAdvanceY);
     }
 
     /**
-     * Retrieves the texture associated with the object.
-     *
-     * @return the texture object.
+     * @return backing atlas texture
      */
     public Texture getTexture() {
         return texture;
