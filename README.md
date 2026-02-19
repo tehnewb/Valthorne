@@ -38,12 +38,12 @@ Add Valthorne to your build as a dependency.
 
 ### Gradle (Groovy)
 ```groovy
-implementation 'io.github.tehnewb:Valthorne:1.0.7'
+implementation 'io.github.tehnewb:Valthorne:1.0.5'
 ```
 
 ### Gradle (Kotlin DSL)
 ```kotlin
-implementation("io.github.tehnewb:Valthorne:1.0.7")
+implementation("io.github.tehnewb:Valthorne:1.0.5")
 ```
 
 ### Maven
@@ -51,7 +51,7 @@ implementation("io.github.tehnewb:Valthorne:1.0.7")
 <dependency>
     <groupId>io.github.tehnewb</groupId>
     <artifactId>Valthorne</artifactId>
-    <version>1.0.7</version>
+    <version>1.0.5</version>
 </dependency>
 ```
 
@@ -79,25 +79,13 @@ Notes:
 
 ### Videos
 
-Here are some short demo videos showcasing various parts of Valthorne. (Embedded inline; uses HTML5 video.)
+Here are some short demo videos showcasing various parts of Valthorne:
 
-#### Particles Example
-<video src="videos/particlesexample.mp4" controls width="100%">
-  Your browser does not support the video tag.
-  <code>videos/particlesexample.mp4</code>
-  
-</video>
+- Particles Example — `videos/particlesexample.mp4`
+  - Direct link: [videos/particlesexample.mp4](videos/particlesexample.mp4)
 
-#### Shaders Example
-<video src="videos/shadersexample.mp4" controls width="100%">
-  Your browser does not support the video tag.
-  <code>videos/shadersexample.mp4</code>
-  
-</video>
+- Shaders Example — `videos/shadersexample.mp4`
+  - Direct link: [videos/shadersexample.mp4](videos/shadersexample.mp4)
 
-#### Water Bucket Game
-<video src="videos/waterbucketgame.mp4" controls width="100%">
-  Your browser does not support the video tag.
-  <code>videos/waterbucketgame.mp4</code>
-  
-</video>
+- Water Bucket Game — `videos/waterbucketgame.mp4`
+  - Direct link: [videos/waterbucketgame.mp4](videos/waterbucketgame.mp4)
