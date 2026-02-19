@@ -38,12 +38,12 @@ Add Valthorne to your build as a dependency.
 
 ### Gradle (Groovy)
 ```groovy
-implementation 'io.github.tehnewb:Valthorne:1.0.5'
+implementation 'io.github.tehnewb:Valthorne:1.0.7'
 ```
 
 ### Gradle (Kotlin DSL)
 ```kotlin
-implementation("io.github.tehnewb:Valthorne:1.0.5")
+implementation("io.github.tehnewb:Valthorne:1.0.7")
 ```
 
 ### Maven
@@ -51,7 +51,7 @@ implementation("io.github.tehnewb:Valthorne:1.0.5")
 <dependency>
     <groupId>io.github.tehnewb</groupId>
     <artifactId>Valthorne</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.7</version>
 </dependency>
 ```
 
@@ -79,13 +79,14 @@ Notes:
 
 ### Videos
 
-Here are some short demo videos showcasing various parts of Valthorne:
+Here are some short demo videos showcasing various parts of Valthorne. Each thumbnail links to the MP4 in the local `videos/` folder:
 
-- Particles Example — `videos/particlesexample.mp4`
-  - Direct link: [videos/particlesexample.mp4](videos/particlesexample.mp4)
+#### Particles Example
+[![Watch the demo](https://img.shields.io/badge/Watch%20the%20demo-Particles%20Example-red?logo=youtube&style=for-the-badge)](videos/particlesexample.mp4)
 
-- Shaders Example — `videos/shadersexample.mp4`
-  - Direct link: [videos/shadersexample.mp4](videos/shadersexample.mp4)
+#### Shaders Example
+[![Watch the demo](https://img.shields.io/badge/Watch%20the%20demo-Shaders%20Example-red?logo=youtube&style=for-the-badge)](videos/shadersexample.mp4)
 
-- Water Bucket Game — `videos/waterbucketgame.mp4`
-  - Direct link: [videos/waterbucketgame.mp4](videos/waterbucketgame.mp4)
+#### Water Bucket Game
+[![Watch the demo](https://img.shields.io/badge/Watch%20the%20demo-Water%20Bucket%20Game-red?logo=youtube&style=for-the-badge)](videos/waterbucketgame.mp4)
+
