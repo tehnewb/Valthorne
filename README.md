@@ -31,8 +31,7 @@ Valthorne is a lightweight 2D game library that wraps LWJGL to remove boilerplat
 - Useful support modules bundled in
     - Viewports/cameras for 2D (`viewport`, `camera`), audio helpers (`sound`), math/collections utilities to avoid external dependencies.
 
-### Bottom line
-Valthorne excels at rapidly standing up polished 2D applications with a skinnable UI and minimal LWJGL boilerplate. If you want to prototype or ship a 2D tool/game with custom-styled controls, simple layout, and a clean app loop without wrestling with raw GLFW/OpenGL setup, this project does it perfectly.
+
 ## Getting Started
 
 Add Valthorne to your build as a dependency.
@@ -76,3 +75,29 @@ Notes:
 - Scenes
 - Physics & collision system
 - Controller support
+
+
+### Videos
+
+Here are some short demo videos showcasing various parts of Valthorne. (Embedded inline; uses HTML5 video.)
+
+#### Particles Example
+<video src="videos/particlesexample.mp4" controls width="100%">
+  Your browser does not support the video tag.
+  <code>videos/particlesexample.mp4</code>
+  
+</video>
+
+#### Shaders Example
+<video src="videos/shadersexample.mp4" controls width="100%">
+  Your browser does not support the video tag.
+  <code>videos/shadersexample.mp4</code>
+  
+</video>
+
+#### Water Bucket Game
+<video src="videos/waterbucketgame.mp4" controls width="100%">
+  Your browser does not support the video tag.
+  <code>videos/waterbucketgame.mp4</code>
+  
+</video>
