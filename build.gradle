@@ -12,43 +12,46 @@ repositories {
 }
 
 def lwjglVersion = "3.3.4"
-def os = org.gradle.internal.os.OperatingSystem.current()
-def arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT)
-def lwjglNatives
 
-if (os.isWindows()) {
-    lwjglNatives = "natives-windows"
-} else if (os.isMacOsX()) {
-    lwjglNatives = arch.contains("aarch64") || arch.contains("arm64") ? "natives-macos-arm64" : "natives-macos"
-} else {
-    if (arch.contains("aarch64") || arch.contains("arm64")) {
-        lwjglNatives = "natives-linux-arm64"
-    } else if (arch.contains("arm")) {
-        lwjglNatives = "natives-linux-arm32"
-    } else {
-        lwjglNatives = "natives-linux"
-    }
-}
+// If you want more modules, add them to both lists below.
+def lwjglModules = [
+        "lwjgl",
+        "lwjgl-glfw",
+        "lwjgl-opengl",
+        "lwjgl-stb",
+        "lwjgl-openal",
+]
+
+// “All natives” set (common targets).
+def lwjglNativeClassifiers = [
+        "natives-windows",
+        "natives-windows-arm64",
+        "natives-macos",
+        "natives-macos-arm64",
+        "natives-linux",
+        "natives-linux-arm64",
+        "natives-linux-arm32",
+]
 
 dependencies {
     api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
 
-    api "org.lwjgl:lwjgl"
-    api "org.lwjgl:lwjgl-glfw"
-    api "org.lwjgl:lwjgl-opengl"
-    api "org.lwjgl:lwjgl-stb"
-    api "org.lwjgl:lwjgl-openal"
+    // API (what consumers compile against)
+    lwjglModules.each { m ->
+        api "org.lwjgl:${m}"
+    }
 
     implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
 
-    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
+    // Runtime natives for ALL supported OS/arch combos.
+    // These will be published so consumers get them transitively at runtime.
+    lwjglModules.each { m ->
+        lwjglNativeClassifiers.each { c ->
+            runtimeOnly "org.lwjgl:${m}::$c"
+        }
+    }
 }
-
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(23) }
