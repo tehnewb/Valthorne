@@ -250,4 +250,22 @@ public class TextureRegion {
         return regions;
     }
 
+    /**
+     * Returns the source-region width (in pixels) inside the backing texture.
+     *
+     * @return region width in pixels
+     */
+    public float getRegionWidth() {
+        return regionWidth;
+    }
+
+    /**
+     * Returns the source-region height (in pixels) inside the backing texture.
+     *
+     * @return region height in pixels
+     */
+    public float getRegionHeight() {
+        return regionHeight;
+    }
+
 }
