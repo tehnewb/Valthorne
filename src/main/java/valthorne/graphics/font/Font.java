@@ -402,6 +402,22 @@ public class Font implements Dimensional {
         return height;
     }
 
+    @Override
+    public void setSize(float width, float height) {
+        this.width = width;
+        this.height = height;
+    }
+
+    @Override
+    public void setWidth(float width) {
+        this.width = width;
+    }
+
+    @Override
+    public void setHeight(float height) {
+        this.height = height;
+    }
+
     /**
      * Measures height of a string without mutating {@link #text}.
      *
@@ -444,10 +460,9 @@ public class Font implements Dimensional {
      * @param x pen origin x
      * @param y pen origin y
      */
-    public Font setPosition(float x, float y) {
+    public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
-        return this;
     }
 
     /**
@@ -607,9 +622,7 @@ public class Font implements Dimensional {
         if (penX > maxX) maxX = penX;
 
         this.width = maxX;
-        this.height = (lines == 1)
-                ? firstLineHeightY
-                : (firstLineHeightY + (lines - 1) * lineAdvanceY);
+        this.height = (lines == 1) ? firstLineHeightY : (firstLineHeightY + (lines - 1) * lineAdvanceY);
     }
 
     /**

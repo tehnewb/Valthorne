@@ -211,6 +211,21 @@ public abstract class Element implements Dimensional, DrawFunction {
 
         @Override
         public float getHeight() {return h;}
+
+        @Override
+        public void setSize(float width, float height) {
+
+        }
+
+        @Override
+        public void setWidth(float width) {
+            this.w = width;
+        }
+
+        @Override
+        public void setHeight(float height) {
+            this.h = height;
+        }
     }
 
     /**
@@ -518,15 +533,30 @@ public abstract class Element implements Dimensional, DrawFunction {
         return height;
     }
 
-    /**
-     * Sets the size of the object based on the provided width and height values.
-     *
-     * @param width  the width value, which can be provided in pixels, percentage, or as a special value (AUTO or FILL)
-     * @param height the height value, which can be provided in pixels, percentage, or as a special value (AUTO or FILL)
-     */
+    @Override
+    public void setWidth(float width) {
+        this.width = width;
+    }
+
+    @Override
+    public void setHeight(float height) {
+        this.height = height;
+    }
+
+    @Override
     public void setSize(float width, float height) {
         this.width = width;
         this.height = height;
+    }
+
+    @Override
+    public void setX(float x) {
+        this.setPosition(x, y);
+    }
+
+    @Override
+    public void setY(float y) {
+        this.setPosition(x, y);
     }
 
     /**

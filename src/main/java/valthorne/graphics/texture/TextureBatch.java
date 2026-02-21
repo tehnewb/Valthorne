@@ -48,6 +48,12 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * batch.draw(playerTex, 100, 80, 64, 64);
  * batch.draw(uiTex,     10,  10, 32, 32, new Color(1f, 0.4f, 0.4f, 1f));
  *
+ * // Draw an atlas region (TextureRegion) at its own position/size:
+ * batch.drawRegion(iconRegion);
+ *
+ * // Draw an atlas region (TextureRegion) scaled:
+ * batch.drawRegion(iconRegion, 10, 10, 48, 48);
+ *
  * batch.end();
  *
  * batch.dispose();
@@ -83,12 +89,14 @@ public final class TextureBatch {
 
     private int instanceCount;                                                                   // Current number of queued instances.
     private boolean drawing;                                                                     // True between begin() and end().
-    private int boundCount;                                                                      // Number of currently bound texture units.
 
     /**
      * Creates a batch with {@code maxSprites} and auto-detects texture units (clamped to {@code <= 16}).
      *
+     * <p>This uses {@link #detectTextureUnitsClamped(int)} to choose a safe maximum for GLSL 120.</p>
+     *
      * @param maxSprites maximum sprites buffered before flushing
+     * @throws IllegalArgumentException if {@code maxSprites <= 0}
      */
     public TextureBatch(int maxSprites) {
         this(maxSprites, detectTextureUnitsClamped(16));
@@ -96,6 +104,13 @@ public final class TextureBatch {
 
     /**
      * Creates a batch.
+     *
+     * <p>This allocates:</p>
+     * <ul>
+     *     <li>A static quad VBO containing local quad coordinates + base UVs.</li>
+     *     <li>A dynamic instance VBO sized for {@code maxSprites} instances.</li>
+     *     <li>A CPU {@link FloatBuffer} staging area sized for {@code maxSprites} instances.</li>
+     * </ul>
      *
      * @param maxSprites      max sprites buffered before flushing
      * @param maxTextureUnits max simultaneously bound textures (2..16 recommended)
@@ -145,7 +160,10 @@ public final class TextureBatch {
     }
 
     /**
-     * Sets the batch tint color used when {@link #draw(Texture, float, float, float, float)} is called.
+     * Sets the default tint color applied to sprites drawn without a per-sprite tint.
+     *
+     * <p>When {@link #draw(Texture, float, float, float, float)} (and other overloads) are called with {@code tint=null},
+     * the current batch color is used.</p>
      *
      * @param tint tint color (must be non-null)
      * @throws NullPointerException if {@code tint} is null
@@ -156,7 +174,9 @@ public final class TextureBatch {
     }
 
     /**
-     * Sets the batch tint color used when {@link #draw(Texture, float, float, float, float)} is called.
+     * Sets the default tint color applied to sprites drawn without a per-sprite tint.
+     *
+     * <p>This writes into the internal {@link #color} instance and does not allocate.</p>
      *
      * @param r red   (0..1)
      * @param g green (0..1)
@@ -173,7 +193,13 @@ public final class TextureBatch {
     /**
      * Begins a drawing session.
      *
-     * <p>This binds the shader, uploads sampler uniforms for each unit, and sets up attribute pointers/divisors.</p>
+     * <p>This method:</p>
+     * <ul>
+     *     <li>Enables blending and sets {@code SRC_ALPHA, ONE_MINUS_SRC_ALPHA}.</li>
+     *     <li>Clears instance state and resets texture bindings.</li>
+     *     <li>Binds the shader and uploads sampler uniforms {@code u_tex0..u_texN}.</li>
+     *     <li>Binds VBOs and sets attribute pointers and instancing divisors.</li>
+     * </ul>
      *
      * @throws IllegalStateException if already drawing
      */
@@ -187,8 +213,8 @@ public final class TextureBatch {
         instanceCount = 0;
         instanceBuffer.clear();
 
-        for (int i = 0; i < maxTextureUnits; i++) textureIDs[i] = -1;
-        boundCount = 0;
+        for (int i = 0; i < maxTextureUnits; i++)
+            textureIDs[i] = -1;
 
         shader.bind();
 
@@ -226,13 +252,45 @@ public final class TextureBatch {
     }
 
     /**
+     * Draws a {@link Texture} using its own stored position and size.
+     *
+     * <p>This is a convenience overload that calls {@link #draw(Texture, Color)} with {@code color=null}.</p>
+     *
+     * @param tex texture to draw (must be non-null)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
+     */
+    public void draw(Texture tex) {
+        draw(tex, null);
+    }
+
+    /**
+     * Draws a {@link Texture} using its own stored position and size, with an optional tint override.
+     *
+     * <p>This overload assumes the full texture region (u/v = 0..1).</p>
+     *
+     * @param tex   texture to draw (must be non-null)
+     * @param tint  optional per-sprite tint (null uses current batch tint)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
+     */
+    public void draw(Texture tex, Color tint) {
+        Objects.requireNonNull(tex, "tex");
+        drawUV(tex, tex.getX(), tex.getY(), tex.getWidth(), tex.getHeight(), 0f, 0f, 1f, 1f, tint);
+    }
+
+    /**
      * Queues a sprite for drawing using the current batch tint color.
+     *
+     * <p>This draws the full texture (u/v = 0..1) with the provided destination rectangle.</p>
      *
      * @param tex texture to draw (must be non-null)
      * @param x   world-space x
      * @param y   world-space y
      * @param w   width
      * @param h   height
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
      */
     public void draw(Texture tex, float x, float y, float w, float h) {
         drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, null);
@@ -260,6 +318,8 @@ public final class TextureBatch {
     /**
      * Queues a sprite for drawing using a custom UV rectangle.
      *
+     * <p>This is useful for drawing sub-regions (atlases/fonts) without creating a {@link TextureRegion} object.</p>
+     *
      * @param tex texture to draw (must be non-null)
      * @param x   world-space x
      * @param y   world-space y
@@ -269,8 +329,10 @@ public final class TextureBatch {
      * @param v0  top v (0..1)
      * @param u1  right u (0..1)
      * @param v1  bottom v (0..1)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
      */
-    public void drawUV(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
+    public void draw(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
         drawUV(tex, x, y, w, h, u0, v0, u1, v1, null);
     }
 
@@ -323,37 +385,88 @@ public final class TextureBatch {
     }
 
     /**
-     * Queues a sub-region of a texture for drawing at the specified world-space coordinates with a custom size.
+     * Queues a sub-region of a texture for drawing using region coordinates in pixels.
+     *
+     * <p>This method converts pixel region coordinates into normalized UVs using the backing texture size.</p>
      *
      * @param tex          texture to draw (must be non-null)
      * @param x            world-space x position
      * @param y            world-space y position
-     * @param w            width of the texture region in world-space
-     * @param h            height of the texture region in world-space
-     * @param regionX      x offset of the region within the texture
-     * @param regionY      y offset of the region within the texture
-     * @param regionWidth  width of the region within the texture
-     * @param regionHeight height of the region within the texture
+     * @param w            destination width
+     * @param h            destination height
+     * @param regionX      x offset of the region within the texture (pixels)
+     * @param regionY      y offset of the region within the texture (pixels)
+     * @param regionWidth  width of the region within the texture (pixels)
+     * @param regionHeight height of the region within the texture (pixels)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
      */
     public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight) {
         drawRegion(tex, x, y, w, h, regionX, regionY, regionWidth, regionHeight, null);
     }
 
     /**
-     * Queues a sub-region of a texture for drawing at the specified world-space coordinates with a custom size
-     * and optional tint color. The specified region in the texture is mapped to the provided width and height
-     * in world-space.
+     * Queues a {@link TextureRegion} for drawing using the region's stored destination rectangle.
+     *
+     * <p>This uses the region's backing texture, region pixel rectangle, and the region's own x/y/width/height.</p>
+     *
+     * @param region region to draw (must be non-null)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code region} is null
+     */
+    public void drawRegion(TextureRegion region) {
+        Objects.requireNonNull(region, "region");
+        drawRegion(
+                region.getTexture(),
+                region.getX(), region.getY(),
+                region.getWidth(), region.getHeight(),
+                region.getRegionX(), region.getRegionY(),
+                region.getRegionWidth(), region.getRegionHeight(),
+                null
+        );
+    }
+
+    /**
+     * Queues a {@link TextureRegion} for drawing at a custom destination rectangle.
+     *
+     * <p>This keeps the same source region (pixel rectangle inside the atlas) but allows scaling/positioning.</p>
+     *
+     * @param region region to draw (must be non-null)
+     * @param x      world-space x position
+     * @param y      world-space y position
+     * @param w      destination width
+     * @param h      destination height
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code region} is null
+     */
+    public void drawRegion(TextureRegion region, float x, float y, float w, float h) {
+        Objects.requireNonNull(region, "region");
+        drawRegion(
+                region.getTexture(),
+                x, y, w, h,
+                region.getRegionX(), region.getRegionY(),
+                region.getRegionWidth(), region.getRegionHeight(),
+                null
+        );
+    }
+
+    /**
+     * Queues a sub-region of a texture for drawing with optional tint.
+     *
+     * <p>The specified region rectangle inside the texture is mapped to the given destination rectangle.</p>
      *
      * @param tex          the texture to draw (must be non-null)
      * @param x            world-space x position
      * @param y            world-space y position
-     * @param w            width of the texture region in world-space
-     * @param h            height of the texture region in world-space
-     * @param regionX      x offset of the region within the texture
-     * @param regionY      y offset of the region within the texture
-     * @param regionWidth  width of the region within the texture
-     * @param regionHeight height of the region within the texture
+     * @param w            destination width
+     * @param h            destination height
+     * @param regionX      x offset of the region within the texture (pixels)
+     * @param regionY      y offset of the region within the texture (pixels)
+     * @param regionWidth  width of the region within the texture (pixels)
+     * @param regionHeight height of the region within the texture (pixels)
      * @param tint         optional per-sprite tint (null uses current batch tint)
+     * @throws IllegalStateException if begin() has not been called
+     * @throws NullPointerException  if {@code tex} is null
      */
     public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, Color tint) {
         Objects.requireNonNull(tex, "tex");
@@ -374,9 +487,10 @@ public final class TextureBatch {
         drawUV(tex, x, y, w, h, u0, v0, u1, v1, tint);
     }
 
-
     /**
      * Ends a drawing session and flushes any remaining sprites.
+     *
+     * <p>This resets attribute divisors to 0, disables all enabled attribute arrays, and unbinds the shader.</p>
      *
      * @throws IllegalStateException if begin() has not been called
      */
@@ -404,7 +518,14 @@ public final class TextureBatch {
     /**
      * Flushes the current instance buffer and draws all queued sprites.
      *
-     * <p>This uploads {@link #instanceBuffer} to {@link #instanceVBO} and issues a single instanced draw call.</p>
+     * <p>This method:</p>
+     * <ul>
+     *     <li>Uploads {@link #instanceBuffer} into {@link #instanceVBO}.</li>
+     *     <li>Issues a single {@code glDrawArraysInstanced} call for all queued instances.</li>
+     *     <li>Clears the CPU buffer and resets {@link #instanceCount}.</li>
+     * </ul>
+     *
+     * <p>If no instances are queued, this method does nothing.</p>
      */
     public void flush() {
         if (instanceCount == 0) return;
@@ -423,7 +544,16 @@ public final class TextureBatch {
     }
 
     /**
-     * Disposes GPU resources owned by this batch (shader and VBOs).
+     * Disposes GPU resources owned by this batch.
+     *
+     * <p>This deletes:</p>
+     * <ul>
+     *     <li>The internal shader program</li>
+     *     <li>The quad VBO</li>
+     *     <li>The instance VBO</li>
+     * </ul>
+     *
+     * <p>Do not use the batch after calling this.</p>
      */
     public void dispose() {
         shader.dispose();
@@ -433,6 +563,13 @@ public final class TextureBatch {
 
     /**
      * Returns a texture unit already bound to {@code textureId}, or binds it to a free unit.
+     *
+     * <p>Binding rules:</p>
+     * <ul>
+     *     <li>If the texture is already bound, returns that unit index immediately.</li>
+     *     <li>If a free unit exists (textureIDs[i] == -1), binds and returns that index.</li>
+     *     <li>If no free unit exists, returns -1 (caller typically flushes and retries).</li>
+     * </ul>
      *
      * @param textureId OpenGL texture id
      * @return unit index, or -1 if no free units exist
@@ -445,7 +582,6 @@ public final class TextureBatch {
         for (int i = 0; i < maxTextureUnits; i++) {
             if (textureIDs[i] == -1) {
                 textureIDs[i] = textureId;
-                boundCount++;
 
                 glActiveTexture(GL_TEXTURE0 + i);
                 glBindTexture(GL_TEXTURE_2D, textureId);
@@ -460,8 +596,10 @@ public final class TextureBatch {
     /**
      * Detects {@code GL_MAX_TEXTURE_IMAGE_UNITS} and clamps it to {@code clampTo}.
      *
+     * <p>This is used to size the fragment shader sampler list.</p>
+     *
      * @param clampTo upper bound for returned units
-     * @return detected units (at least 2 recommended), clamped to {@code clampTo}
+     * @return detected units (falls back to 8 if query fails), clamped to {@code clampTo}
      */
     private static int detectTextureUnitsClamped(int clampTo) {
         int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
@@ -470,9 +608,10 @@ public final class TextureBatch {
     }
 
     /**
-     * Builds the GLSL 120 vertex shader source for instanced sprites.
+     * Vertex shader source (GLSL 120) for instanced sprites.
      *
-     * @return vertex shader source string
+     * <p>This transforms a unit quad into world-space using {@code i_xywh} and maps base UVs into a per-instance
+     * UV rectangle using {@code mix(i_uvRect.xy, i_uvRect.zw, a_uv)}.</p>
      */
     private static final String VERTEX_SHADER = """
             #version 120
@@ -500,6 +639,9 @@ public final class TextureBatch {
 
     /**
      * Builds a GLSL 120 fragment shader that selects among {@code units} samplers using an if/else chain.
+     *
+     * <p>GLSL 120 does not support sampler arrays, so we bind {@code u_tex0..u_texN} and select the sampler
+     * using comparisons against {@code v_tex}.</p>
      *
      * @param units number of texture units/samplers to support
      * @return fragment shader source string
