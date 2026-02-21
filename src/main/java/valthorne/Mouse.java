@@ -33,7 +33,7 @@ import static org.lwjgl.glfw.GLFWImage.malloc;
  * {@link #dispose()} during shutdown.</p>
  *
  * @author Albert Beaupre
- * @since February 16th, 2025
+ * @since October 17th, 2025
  */
 public final class Mouse {
 

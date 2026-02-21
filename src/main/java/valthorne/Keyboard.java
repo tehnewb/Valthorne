@@ -27,7 +27,7 @@ import static org.lwjgl.glfw.GLFW.*;
  * </ul>
  *
  * @author Albert Beaupre
- * @since February 16th, 2025
+ * @since October 17th, 2025
  */
 public final class Keyboard {
 
