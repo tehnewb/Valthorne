@@ -41,13 +41,9 @@ import valthorne.graphics.texture.Texture;
  * <pre>{@code
  * GlowShader glow = new GlowShader();
  *
- * // For a 256x256 sprite texture:
- * float texelX = 1f / 256f;
- * float texelY = 1f / 256f;
+ * Texture texture = ...;
  *
- * glow.apply(texelX, texelY, 6f, 1.25f, 1f, 0.8f, 0.2f, 1f); // warm glow
- * // draw your sprite(s)...
- * glow.unbind(); // optional
+ * glow.apply(texture, 6f, 1.25f, 1f, 0.8f, 0.2f, 1f); // warm glow
  * }</pre>
  *
  * @author Albert Beaupre
@@ -157,11 +153,29 @@ public class GlowShader extends Shader {
      * @param a         glow alpha (final alpha is {@code a * computedGlow})
      */
     public void apply(Texture texture, float radiusPx, float intensity, float r, float g, float b, float a) {
+        bind(texture.getWidth(), texture.getHeight(), radiusPx, intensity, r, g, b, a);
+        texture.draw();
+        unbind();
+    }
+
+    /**
+     * Configures and binds this shader program for rendering with a soft glow effect.
+     *
+     * @param textureWidth  the width of the texture in pixels
+     * @param textureHeight the height of the texture in pixels
+     * @param radiusPx      the glow radius in texture pixels (>= 0)
+     * @param intensity     the glow strength multiplier (>= 0 recommended)
+     * @param r             the red component of the glow color
+     * @param g             the green component of the glow color
+     * @param b             the blue component of the glow color
+     * @param a             the alpha component of the glow color
+     */
+    public void bind(float textureWidth, float textureHeight, float radiusPx, float intensity, float r, float g, float b, float a) {
         bind();
         setUniform1i("u_texture", 0);
 
-        float texelX = 1f / texture.getData().width();
-        float texelY = 1f / texture.getData().height();
+        float texelX = 1f / textureWidth;
+        float texelY = 1f / textureHeight;
         setUniform2f("u_texelSize", texelX, texelY);
 
         setUniform1f("u_radiusPx", radiusPx);

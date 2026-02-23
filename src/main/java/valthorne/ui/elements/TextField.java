@@ -10,7 +10,8 @@ import valthorne.graphics.Drawable;
 import valthorne.graphics.font.Font;
 import valthorne.math.MathUtils;
 import valthorne.math.Vector2f;
-import valthorne.ui.*;
+import valthorne.ui.Element;
+import valthorne.ui.UIAction;
 import valthorne.ui.enums.Alignment;
 import valthorne.ui.styles.TextFieldStyle;
 import valthorne.viewport.Viewport;
@@ -901,7 +902,7 @@ public class TextField extends Element {
      * </ul>
      */
     private void updateFontPosition() {
-        Vector2f align = Alignment.align(this, font, Alignment.CENTER, Alignment.START);
+        Vector2f align = Alignment.align(this, font, Alignment.START, Alignment.CENTER);
         font.setPosition(align.getX() + padding + textOffsetX, align.getY());
     }
 
@@ -1095,6 +1096,15 @@ public class TextField extends Element {
     private float getCaretHeight() {
         float availHeight = height - caretPadY * 2;
         return Math.min(maxCaretHeight, availHeight);
+    }
+
+    /**
+     * Retrieves the font currently set for use.
+     *
+     * @return the Font object representing the current font settings
+     */
+    public Font getFont() {
+        return font;
     }
 
 }

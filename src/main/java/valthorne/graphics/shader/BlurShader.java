@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.texture.Texture;
+
 /**
  * Simple 3x3 box blur shader (fixed-function friendly) built on top of {@link Shader}.
  *
@@ -26,11 +28,11 @@ package valthorne.graphics.shader;
  * <h2>Usage</h2>
  * <pre>{@code
  * BlurShader blur = new BlurShader();
+ * Texture texture = ...;
  *
  * // Before drawing your textured quads:
- * blur.apply(1f / texWidth, 1f / texHeight, 2f);
- * // draw calls...
- * blur.unbind(); // optional, if your pipeline expects it
+ * blur.apply(texture, 2f);
+ *
  * }</pre>
  *
  * <h2>Notes</h2>
@@ -88,22 +90,34 @@ public class BlurShader extends Shader {
     }
 
     /**
-     * Binds the shader and sets blur uniforms for the current draw sequence.
+     * Applies the blur shader to the given texture with the specified blur radius.
+     * <p>
+     * This method binds the shader with the texture's width, height, and the desired
+     * blur radius. It then draws the texture and unbinds the shader.
      *
-     * <p>This method:</p>
-     * <ul>
-     *     <li>Binds the program via {@link #bind()}.</li>
-     *     <li>Sets {@code u_texture} to texture unit 0.</li>
-     *     <li>Sets {@code u_texelSize} to the provided texel step (usually {@code 1/width, 1/height}).</li>
-     *     <li>Sets {@code u_radiusPx} to the provided radius (clamped in shader to {@code >= 0}).</li>
-     * </ul>
-     *
-     * @param texelX   texel size x ({@code 1/textureWidth})
-     * @param texelY   texel size y ({@code 1/textureHeight})
-     * @param radiusPx blur radius multiplier in "pixel units" (non-negative recommended)
+     * @param texture  the texture to which the blur effect will be applied
+     * @param radiusPx the radius of the blur effect in pixels
      */
-    public void apply(float texelX, float texelY, float radiusPx) {
+    public void apply(Texture texture, float radiusPx) {
+        bind(texture.getData().width(), texture.getData().height(), radiusPx);
+        texture.draw();
+        unbind();
+    }
+
+    /**
+     * Applies the blur shader with the specified texture dimensions and blur radius.
+     * <p>
+     * This method sets up the shader uniforms for texture size, texel size, and blur radius,
+     * and ensures the shader is bound before these values are applied.
+     *
+     * @param textureWidth  the width of the texture in pixels
+     * @param textureHeight the height of the texture in pixels
+     * @param radiusPx      the blur radius in pixels
+     */
+    public void bind(float textureWidth, float textureHeight, float radiusPx) {
         bind();
+        float texelX = 1f / textureWidth;
+        float texelY = 1f / textureHeight;
         setUniform1i("u_texture", 0);
         setUniform2f("u_texelSize", texelX, texelY);
         setUniform1f("u_radiusPx", radiusPx);

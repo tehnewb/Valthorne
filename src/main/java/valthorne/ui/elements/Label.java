@@ -2,8 +2,8 @@ package valthorne.ui.elements;
 
 import valthorne.graphics.font.Font;
 import valthorne.math.Vector2f;
-import valthorne.ui.enums.Alignment;
 import valthorne.ui.Element;
+import valthorne.ui.enums.Alignment;
 import valthorne.ui.styles.LabelStyle;
 
 public class Label extends Element {
@@ -51,6 +51,29 @@ public class Label extends Element {
         Vector2f fontPosition = Alignment.align(this, font, textAlignment);
 
         font.setPosition(fontPosition.getX(), fontPosition.getY());
+    }
+
+    public void setText(String text) {
+        this.text = text;
+        this.font.setText(text);
+
+        Vector2f fontPosition = Alignment.align(this, font, textAlignment);
+
+        font.setPosition(fontPosition.getX(), fontPosition.getY());
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public Label setStyle(LabelStyle style) {
+        this.style = style;
+        return this;
+    }
+
+    public Label setTextAlignment(Alignment alignment) {
+        this.textAlignment = alignment;
+        return this;
     }
 
     public Font getFont() {

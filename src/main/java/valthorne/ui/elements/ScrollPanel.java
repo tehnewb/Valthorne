@@ -97,6 +97,7 @@ public class ScrollPanel extends ElementContainer {
 
     @Override
     public void setUI(UI ui) {
+        if (ui == null) return;
         super.setUI(ui);
         ensureBars();
         ui.addElement(vBar);
