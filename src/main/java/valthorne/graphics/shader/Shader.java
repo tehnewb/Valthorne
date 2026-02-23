@@ -14,6 +14,26 @@ import static org.lwjgl.opengl.GL31.glUniformBlockBinding;
  * OpenGL shader program wrapper that compiles, links, validates, and manages a GLSL
  * vertex/fragment shader pair, with hot-reload support and cached lookups.
  *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * // Build
+ * Shader shader = new Shader(VERT_SRC, FRAG_SRC);
+ *
+ * // Optional: lock attribute indices BEFORE the first link (or call reload() after changing bindings)
+ * shader.bindAttribLocation(0, "a_pos");
+ * shader.bindAttribLocation(1, "a_uv");
+ * shader.reload();
+ *
+ * // Use
+ * shader.bind();
+ * shader.setUniform1i("u_tex0", 0);
+ * shader.setUniform2f("u_resolution", Window.getWidth(), Window.getHeight());
+ * shader.unbind();
+ *
+ * // Cleanup
+ * shader.dispose();
+ * }</pre>
+ *
  * <h2>Features</h2>
  * <ul>
  *     <li><b>Compile + link</b> of vertex + fragment shader sources into one program.</li>
@@ -37,20 +57,32 @@ import static org.lwjgl.opengl.GL31.glUniformBlockBinding;
  */
 public class Shader {
 
-    private int programID;                                          // OpenGL program object id (0 if not created/disposed).
-    private int vertexID;                                           // OpenGL vertex shader object id (0 if not created/disposed).
-    private int fragmentID;                                         // OpenGL fragment shader object id (0 if not created/disposed).
+    private int programID; // OpenGL program object id (0 if not created/disposed).
+    private int vertexID; // OpenGL vertex shader object id (0 if not created/disposed).
+    private int fragmentID; // OpenGL fragment shader object id (0 if not created/disposed).
 
-    private String vertexSource;                                    // Last stored vertex shader source string (used by reload()).
-    private String fragmentSource;                                  // Last stored fragment shader source string (used by reload()).
+    private String vertexSource; // Last stored vertex shader source string (used by reload()).
+    private String fragmentSource; // Last stored fragment shader source string (used by reload()).
 
-    private final Map<String, Integer> uniformCache = new HashMap<>();       // Cache of uniform name -> uniform location (glGetUniformLocation).
-    private final Map<String, Integer> attribCache = new HashMap<>();        // Cache of attribute name -> attribute location (glGetAttribLocation).
-    private final Map<String, Integer> uniformBlockCache = new HashMap<>();  // Cache of uniform block name -> block index (glGetUniformBlockIndex).
-    private final Map<String, Integer> attribBindings = new HashMap<>();     // Requested attribute bindings applied during link: name -> index.
+    private final Map<String, Integer> uniformCache = new HashMap<>(); // Cache: uniform name -> location (glGetUniformLocation).
+    private final Map<String, Integer> attribCache = new HashMap<>(); // Cache: attribute name -> location (glGetAttribLocation).
+    private final Map<String, Integer> uniformBlockCache = new HashMap<>(); // Cache: uniform block name -> index (glGetUniformBlockIndex).
+    private final Map<String, Integer> attribBindings = new HashMap<>(); // Requested attribute bindings applied during link: name -> index.
 
     /**
      * Creates and builds a shader program from the provided GLSL sources.
+     *
+     * <p>This constructor compiles both stages and links them into a program immediately.</p>
+     *
+     * <p>If you need explicit attribute locations, call {@link #bindAttribLocation(int, String)}
+     * <b>before</b> linking. Since this constructor links immediately, the typical pattern is:</p>
+     *
+     * <pre>{@code
+     * Shader s = new Shader(v, f);
+     * s.bindAttribLocation(0, "a_pos");
+     * s.bindAttribLocation(1, "a_uv");
+     * s.reload(); // apply bindings by relinking
+     * }</pre>
      *
      * @param vertexSource   GLSL vertex shader source (must not be null)
      * @param fragmentSource GLSL fragment shader source (must not be null)
@@ -68,10 +100,13 @@ public class Shader {
     }
 
     /**
-     * Compiles a single shader stage.
+     * Compiles a single shader stage from source.
+     *
+     * <p>This method creates a shader object, assigns the source, compiles it, and validates the compile status.
+     * If compilation fails, it deletes the shader object and throws an exception that includes the driver log.</p>
      *
      * @param type shader type (e.g., {@link GL20#GL_VERTEX_SHADER} or {@link GL20#GL_FRAGMENT_SHADER})
-     * @param src  GLSL source code
+     * @param src  GLSL source code (must be non-null)
      * @return compiled shader object id
      * @throws IllegalStateException if compilation fails
      */
@@ -92,9 +127,19 @@ public class Shader {
     /**
      * Builds (or rebuilds) the OpenGL program from the currently stored sources.
      *
-     * <p>This compiles the vertex/fragment shaders, attaches them, applies any requested attribute bindings,
-     * links, and validates the program. If a previous program existed, it is deleted after the new program
-     * is successfully created.</p>
+     * <p>Steps:</p>
+     * <ol>
+     *     <li>Compile vertex + fragment shaders.</li>
+     *     <li>Create a new program and attach both stages.</li>
+     *     <li>Apply requested attribute bindings (if any) before linking.</li>
+     *     <li>Link the program and fail hard if linking fails.</li>
+     *     <li>Validate the program (prints a warning log if validation fails).</li>
+     *     <li>If a previous program existed, safely detach/delete old program and shaders.</li>
+     *     <li>Swap in the new ids and clear lookup caches (locations can change after relink).</li>
+     * </ol>
+     *
+     * <p>This method is the core of hot reload. It is intentionally strict on compile/link errors,
+     * because using a half-built program usually leads to undefined rendering behavior.</p>
      *
      * @throws IllegalStateException if compilation or linking fails
      */
@@ -152,14 +197,23 @@ public class Shader {
     }
 
     /**
-     * Binds this shader program (calls {@code glUseProgram(programID)}).
+     * Binds this shader program.
+     *
+     * <p>This is a direct wrapper over {@code glUseProgram(programID)}.</p>
+     *
+     * <p>Call this before setting uniforms and issuing draw calls that depend on this program.</p>
      */
     public void bind() {
         glUseProgram(programID);
     }
 
     /**
-     * Unbinds any shader program (calls {@code glUseProgram(0)}).
+     * Unbinds any active shader program.
+     *
+     * <p>This is a direct wrapper over {@code glUseProgram(0)}.</p>
+     *
+     * <p>Unbinding is optional in many engines, but it can be useful for debugging state leaks
+     * or when mixing fixed-function pipeline behavior with shaders.</p>
      */
     public void unbind() {
         glUseProgram(0);
@@ -168,9 +222,11 @@ public class Shader {
     /**
      * Hot-reloads using the last known vertex/fragment sources.
      *
-     * <p>If rebuilding fails, the old program remains alive.</p>
+     * <p>If rebuilding succeeds, the program ids are replaced and uniform/attribute caches are cleared.</p>
      *
-     * @return true if reload succeeded, false if it failed
+     * <p>If rebuilding fails, the old program remains alive and this method returns false.</p>
+     *
+     * @return true if reload succeeded, false otherwise
      */
     public boolean reload() {
         try {
@@ -183,9 +239,12 @@ public class Shader {
     }
 
     /**
-     * Hot-reloads using new sources (also updates stored sources if build succeeds).
+     * Hot-reloads using new sources.
      *
-     * <p>If rebuilding fails, this restores the old sources and keeps the old program alive.</p>
+     * <p>This method updates the stored sources <b>only if</b> the rebuild succeeds.</p>
+     *
+     * <p>If the build fails, it restores the old sources and keeps the old program alive,
+     * so you can retry or fall back without losing a working program.</p>
      *
      * @param newVertexSource   new vertex shader source (must not be null)
      * @param newFragmentSource new fragment shader source (must not be null)
@@ -214,28 +273,33 @@ public class Shader {
     }
 
     /**
-     * Requests an attribute binding (name -> index).
+     * Requests an explicit attribute binding (name -> index).
      *
-     * <p>This only takes effect on link, so call this before first use, or call {@link #reload()}
-     * after adding bindings if the program was already linked.</p>
+     * <p>This is applied during {@link #buildProgram()} (before linking) via {@code glBindAttribLocation}.</p>
      *
-     * @param index attribute index
-     * @param name  attribute name in GLSL
+     * <p>If the program has already been linked, call {@link #reload()} to relink and apply the new binding.</p>
+     *
+     * <p>This method also clears any cached attribute location for {@code name}, since a relink can change it.</p>
+     *
+     * @param index attribute index you want this name to occupy
+     * @param name  attribute name as declared in GLSL (must not be null)
      * @throws NullPointerException if name is null
      */
     public void bindAttribLocation(int index, String name) {
         if (name == null) throw new NullPointerException("name");
         attribBindings.put(name, index);
-
-        // Attribute locations may change after relink, so clear cache now.
         attribCache.remove(name);
     }
 
     /**
      * Returns the attribute location for the given attribute name.
      *
-     * @param name attribute name in GLSL
-     * @return location, or -1 if not found/optimized out
+     * <p>This uses an internal cache to avoid repeated {@code glGetAttribLocation} calls.</p>
+     *
+     * <p>Drivers may optimize out unused attributes, in which case OpenGL returns {@code -1}.</p>
+     *
+     * @param name attribute name in GLSL (must not be null)
+     * @return attribute location, or -1 if not found/optimized out
      * @throws NullPointerException if name is null
      */
     public int getAttribLocation(String name) {
@@ -250,12 +314,19 @@ public class Shader {
     }
 
     /**
-     * Returns the cached uniform location for a given uniform name, querying OpenGL if needed.
+     * Returns the uniform location for a given uniform name, querying OpenGL if needed.
      *
-     * @param name uniform name in GLSL
+     * <p>This uses an internal cache because {@code glGetUniformLocation} can be relatively expensive.</p>
+     *
+     * <p>Drivers may optimize out uniforms that are never used; such uniforms return {@code -1}.</p>
+     *
+     * @param name uniform name in GLSL (must not be null)
      * @return uniform location, or -1 if not found/optimized out
+     * @throws NullPointerException if name is null
      */
     private int uniformLocation(String name) {
+        if (name == null) throw new NullPointerException("name");
+
         Integer cached = uniformCache.get(name);
         if (cached != null) return cached;
 
@@ -267,9 +338,14 @@ public class Shader {
     /**
      * Sets an {@code int} uniform (1 component).
      *
-     * @param name uniform name
+     * <p>This method looks up the uniform location (cached) and calls {@code glUniform1i} if the location is valid.</p>
+     *
+     * <p>If the uniform is optimized out (location {@code -1}), this method does nothing.</p>
+     *
+     * @param name uniform name (must not be null)
      * @param v    value
      * @return this shader for chaining
+     * @throws NullPointerException if name is null
      */
     public Shader setUniform1i(String name, int v) {
         int loc = uniformLocation(name);
@@ -280,9 +356,14 @@ public class Shader {
     /**
      * Sets a {@code float} uniform (1 component).
      *
-     * @param name uniform name
+     * <p>This method looks up the uniform location (cached) and calls {@code glUniform1f} if the location is valid.</p>
+     *
+     * <p>If the uniform is optimized out (location {@code -1}), this method does nothing.</p>
+     *
+     * @param name uniform name (must not be null)
      * @param v    value
      * @return this shader for chaining
+     * @throws NullPointerException if name is null
      */
     public Shader setUniform1f(String name, float v) {
         int loc = uniformLocation(name);
@@ -293,10 +374,15 @@ public class Shader {
     /**
      * Sets a {@code vec2} uniform.
      *
-     * @param name uniform name
+     * <p>This method looks up the uniform location (cached) and calls {@code glUniform2f} if the location is valid.</p>
+     *
+     * <p>If the uniform is optimized out (location {@code -1}), this method does nothing.</p>
+     *
+     * @param name uniform name (must not be null)
      * @param x    x component
      * @param y    y component
      * @return this shader for chaining
+     * @throws NullPointerException if name is null
      */
     public Shader setUniform2f(String name, float x, float y) {
         int loc = uniformLocation(name);
@@ -305,14 +391,37 @@ public class Shader {
     }
 
     /**
+     * Sets a {@code vec3} uniform.
+     *
+     * <p>This method looks up the uniform location (cached) and calls {@code glUniform3f} if the location is valid.</p>
+     *
+     * <p>If the uniform is optimized out (location {@code -1}), this method does nothing.</p>
+     *
+     * @param name uniform name (must not be null)
+     * @param x    x component
+     * @param y    y component
+     * @param z    z component
+     * @throws NullPointerException if name is null
+     */
+    public void setUniform3f(String name, float x, float y, float z) {
+        int loc = uniformLocation(name);
+        if (loc != -1) glUniform3f(loc, x, y, z);
+    }
+
+    /**
      * Sets a {@code vec4} uniform.
      *
-     * @param name uniform name
+     * <p>This method looks up the uniform location (cached) and calls {@code glUniform4f} if the location is valid.</p>
+     *
+     * <p>If the uniform is optimized out (location {@code -1}), this method does nothing.</p>
+     *
+     * @param name uniform name (must not be null)
      * @param x    x component
      * @param y    y component
      * @param z    z component
      * @param w    w component
      * @return this shader for chaining
+     * @throws NullPointerException if name is null
      */
     public Shader setUniform4f(String name, float x, float y, float z, float w) {
         int loc = uniformLocation(name);
@@ -321,9 +430,14 @@ public class Shader {
     }
 
     /**
-     * Gets the uniform block index for a named block.
+     * Gets the uniform block index for a named uniform block.
      *
-     * @param blockName uniform block name in GLSL (e.g., "Globals")
+     * <p>This uses an internal cache to avoid repeated {@code glGetUniformBlockIndex} calls.</p>
+     *
+     * <p>If the block is not present (or was optimized out), OpenGL may return {@code GL_INVALID_INDEX}.
+     * This method normalizes that to {@code -1}.</p>
+     *
+     * @param blockName uniform block name in GLSL (must not be null)
      * @return block index, or -1 if not found/optimized out
      * @throws NullPointerException if blockName is null
      */
@@ -343,20 +457,22 @@ public class Shader {
     /**
      * Binds a named uniform block to a binding point.
      *
-     * <p>GLSL example:</p>
-     * <pre>{@code
-     * layout(std140) uniform Globals { mat4 u_proj; };
-     * }</pre>
+     * <p>This is a convenience wrapper for:</p>
+     * <ol>
+     *     <li>{@link #getUniformBlockIndex(String)} to resolve the block index</li>
+     *     <li>{@code glUniformBlockBinding(programID, blockIndex, bindingPoint)}</li>
+     * </ol>
      *
-     * <p>Java example:</p>
+     * <p>Typical usage is to bind the block to a fixed binding point, then bind your UBO to the same point:</p>
      * <pre>{@code
      * shader.bindUniformBlock("Globals", 0);
      * glBindBufferBase(GL_UNIFORM_BUFFER, 0, uboId);
      * }</pre>
      *
-     * @param blockName    uniform block name
+     * @param blockName    uniform block name in GLSL (must not be null)
      * @param bindingPoint binding point index used with glBindBufferBase
-     * @return true if the block exists and was bound, false otherwise
+     * @return true if the block exists and was bound, false if not found/optimized out
+     * @throws NullPointerException if blockName is null
      */
     public boolean bindUniformBlock(String blockName, int bindingPoint) {
         int idx = getUniformBlockIndex(blockName);
@@ -367,6 +483,10 @@ public class Shader {
 
     /**
      * Binds a uniform block (by index) to a binding point.
+     *
+     * <p>This is useful when you already cached the block index yourself.</p>
+     *
+     * <p>If {@code blockIndex < 0}, this method does nothing.</p>
      *
      * @param blockIndex   uniform block index (-1 does nothing)
      * @param bindingPoint binding point index
@@ -379,25 +499,31 @@ public class Shader {
     /**
      * Returns the OpenGL program id.
      *
-     * @return program id
+     * <p>Useful for advanced interop (manual uniform setting, pipeline debugging, etc.).</p>
+     *
+     * @return program id (0 if disposed or never built)
      */
     public int getProgramID() {
         return programID;
     }
 
     /**
-     * Returns the last stored vertex shader source (used by {@link #reload()}).
+     * Returns the last stored vertex shader source.
      *
-     * @return vertex shader source
+     * <p>This is the source used when calling {@link #reload()}.</p>
+     *
+     * @return vertex shader source (may be null only if you deliberately pass null via reflection, etc.)
      */
     public String getVertexSource() {
         return vertexSource;
     }
 
     /**
-     * Returns the last stored fragment shader source (used by {@link #reload()}).
+     * Returns the last stored fragment shader source.
      *
-     * @return fragment shader source
+     * <p>This is the source used when calling {@link #reload()}.</p>
+     *
+     * @return fragment shader source (may be null only if you deliberately pass null via reflection, etc.)
      */
     public String getFragmentSource() {
         return fragmentSource;
@@ -406,7 +532,9 @@ public class Shader {
     /**
      * Deletes the program and shader objects and clears all caches/bindings.
      *
-     * <p>Safe to call multiple times.</p>
+     * <p>This method is safe to call multiple times.</p>
+     *
+     * <p>It will unbind the program first to avoid leaving OpenGL bound to a deleted id.</p>
      */
     public void dispose() {
         unbind();

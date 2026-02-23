@@ -29,7 +29,7 @@ package valthorne.graphics.shader;
  * FlashShader flash = new FlashShader();
  *
  * // Repeating flash (0.5 seconds per cycle).
- * flash.apply(JGL.getTime(), 0.5f, 1f, 0.2f, 0.2f);
+ * flash.apply(JGL.getTime(), 0.5f, 1f, 0.2f, 0.2f, 1.0f);
  * // draw your quad(s)...
  * flash.unbind(); // optional
  * }</pre>
@@ -54,28 +54,30 @@ public class FlashShader extends Shader {
                 v_uv = gl_MultiTexCoord0.st;
                 v_color = gl_Color;
             }
-            """; // GLSL vertex shader source (passes UVs + vertex color through).
+            """;
 
     private static final String FRAG_SRC = """
             #version 120
             uniform sampler2D u_texture;
             uniform vec4 u_flashColor;
             uniform float u_amount;
-            
+
             varying vec2 v_uv;
             varying vec4 v_color;
-            
+
             void main(){
                 vec4 c = texture2D(u_texture, v_uv) * v_color;
-            
+
                 float amt = clamp(u_amount, 0.0, 1.0);
                 if (amt <= 0.0 || c.a <= 0.001) {
                     gl_FragColor = c;
                     return;
                 }
-            
+
                 vec3 rgb = mix(c.rgb, u_flashColor.rgb, amt);
-                gl_FragColor = vec4(rgb, c.a);
+                float a = c.a * mix(1.0, clamp(u_flashColor.a, 0.0, 1.0), amt);
+
+                gl_FragColor = vec4(rgb, a);
             }
             """; // GLSL fragment shader source (mixes RGB toward flash color, preserves alpha).
 
@@ -108,9 +110,10 @@ public class FlashShader extends Shader {
      * @param r               flash red component
      * @param g               flash green component
      * @param b               flash blue component
+     * @param a               flash alpha component
      * @throws IllegalArgumentException if {@code durationSeconds <= 0}
      */
-    public void apply(float timeSeconds, float durationSeconds, float r, float g, float b) {
+    public void apply(float timeSeconds, float durationSeconds, float r, float g, float b, float a) {
         if (durationSeconds <= 0f) throw new IllegalArgumentException("durationSeconds must be > 0");
 
         bind();
@@ -122,6 +125,6 @@ public class FlashShader extends Shader {
 
         setUniform1i("u_texture", 0);
         setUniform1f("u_amount", amount);
-        setUniform4f("u_flashColor", r, g, b, 1.0f);
+        setUniform4f("u_flashColor", r, g, b, a);
     }
 }

@@ -41,8 +41,6 @@ import valthorne.graphics.texture.Texture;
  * Texture texture = ...;
  *
  * outline.apply(texture, 1f, 0f, 0f, 0f, 1f); // 1px black outline
- * // draw your sprite(s)...
- * outline.unbind(); // optional
  * }</pre>
  *
  * @author Albert Beaupre
@@ -116,14 +114,32 @@ public class OutlineShader extends Shader {
      * @param a           outline alpha
      */
     public void apply(Texture texture, float thicknessPx, float r, float g, float b, float a) {
+        bind(texture.getData().width(), texture.getData().height(), thicknessPx, r, g, b, a);
+        texture.draw();
+        unbind();
+    }
+
+    /**
+     * Binds the shader program and sets uniforms for texture dimensions, outline thickness,
+     * and outline color. This method calculates the texel size based on the given texture
+     * dimensions and updates the relevant uniforms using the given parameters.
+     *
+     * @param textureWidth  the width of the texture in pixels
+     * @param textureHeight the height of the texture in pixels
+     * @param thicknessPx   thickness of the outline in pixels
+     * @param r             red component of the outline color (0.0 to 1.0)
+     * @param g             green component of the outline color (0.0 to 1.0)
+     * @param b             blue component of the outline color (0.0 to 1.0)
+     * @param a             alpha component of the outline color (0.0 to 1.0)
+     */
+    public void bind(float textureWidth, float textureHeight, float thicknessPx, float r, float g, float b, float a) {
         bind();
         setUniform1i("u_texture", 0);
 
         // Compute texel size internally (no caller math).
-        float texelX = 1f / texture.getData().width();
-        float texelY = 1f / texture.getData().height();
+        float texelX = 1f / textureWidth;
+        float texelY = 1f / textureHeight;
         setUniform2f("u_texelSize", texelX, texelY);
-
         setUniform1f("u_thicknessPx", thicknessPx);
         setUniform4f("u_outlineColor", r, g, b, a);
     }

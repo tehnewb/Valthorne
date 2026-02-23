@@ -34,7 +34,7 @@ package valthorne.graphics.shader;
  * float t = (float)elapsedSeconds;
  * float threshold = Math.min(1f, t * 0.25f);
  *
- * burn.apply(t, threshold, 1f, 0.35f, 0.05f, 1f);
+ * burn.bind(t, threshold, 1f, 0.35f, 0.05f, 1f);
  * // draw your textured quad(s)...
  * burn.unbind(); // optional
  * }</pre>
@@ -124,7 +124,7 @@ public class BurnShader extends Shader {
      * @param burnB       burn edge blue component
      * @param burnA       burn edge alpha component (currently not used for output alpha)
      */
-    public void apply(float timeSeconds, float threshold, float burnR, float burnG, float burnB, float burnA) {
+    public void bind(float timeSeconds, float threshold, float burnR, float burnG, float burnB, float burnA) {
         bind();
         setUniform1i("u_texture", 0);
         setUniform1f("u_time", timeSeconds);
