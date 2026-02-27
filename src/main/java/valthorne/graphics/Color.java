@@ -10,6 +10,14 @@ package valthorne.graphics;
 public class Color {
 
     /**
+     * A constant representing the reciprocal of 255 as a float.
+     * It is used to perform inverse division operations, commonly
+     * in scenarios requiring normalization, such as scaling values
+     * to a 0.0 to 1.0 range.
+     */
+    private static final float INVERSE_DIVISION = 1.0f / 255.0f;
+
+    /**
      * Pure white color (0xFFFFFFFF)
      */
     public static final Color WHITE = new Color(0xFFFFFFFF);
@@ -555,10 +563,7 @@ public class Color {
     public void lerp(Color target, float t) {
         if (target == null) throw new NullPointerException("target cannot be null");
         t = clamp01(t);
-        set(r() + (target.r() - r()) * t,
-                g() + (target.g() - g()) * t,
-                b() + (target.b() - b()) * t,
-                a() + (target.a() - a()) * t);
+        set(r() + (target.r() - r()) * t, g() + (target.g() - g()) * t, b() + (target.b() - b()) * t, a() + (target.a() - a()) * t);
     }
 
     /**
@@ -763,7 +768,7 @@ public class Color {
      * @return The normalized alpha value
      */
     public float a() {
-        return getAlpha() / 255.0f;
+        return getAlpha() * INVERSE_DIVISION;
     }
 
     /**
@@ -773,7 +778,7 @@ public class Color {
      * @return The normalized red value
      */
     public float r() {
-        return getRed() / 255.0f;
+        return getRed() * INVERSE_DIVISION;
     }
 
     /**
@@ -783,7 +788,7 @@ public class Color {
      * @return The normalized green value
      */
     public float g() {
-        return getGreen() / 255.0f;
+        return getGreen() * INVERSE_DIVISION;
     }
 
     /**
@@ -793,6 +798,6 @@ public class Color {
      * @return The normalized blue value
      */
     public float b() {
-        return getBlue() / 255.0f;
+        return getBlue() * INVERSE_DIVISION;
     }
 }

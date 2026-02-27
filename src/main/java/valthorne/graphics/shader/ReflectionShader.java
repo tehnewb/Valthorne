@@ -65,42 +65,42 @@ public class ReflectionShader extends Shader {
     private static final String FRAG_SRC = """
             #version 120
             uniform sampler2D u_texture;
-
+            
             uniform float u_alpha;
             uniform vec4  u_tint;
             uniform float u_time;
-
+            
             uniform float u_rippleAmpPx;
             uniform float u_rippleFreq;
             uniform float u_rippleSpeed;
-
+            
             uniform vec2  u_texelSize;
-
+            
             varying vec2 v_uv;
             varying vec4 v_color;
-
+            
             void main(){
                 vec2 uv = v_uv;
-
+            
                 // Mirror vertically: top of reflection quad samples bottom of sprite.
                 uv.y = 1.0 - uv.y;
-
+            
                 float ampPx = max(0.0, u_rippleAmpPx);
                 if (ampPx > 0.0) {
                     vec2 amp = u_texelSize * ampPx;
                     float w = sin(uv.x * u_rippleFreq + u_time * u_rippleSpeed);
                     uv.x += w * amp.x;
                 }
-
+            
                 vec4 c = texture2D(u_texture, uv) * v_color;
-
+            
                 // Fade out as we go downward (top of quad is strongest).
                 float fade = clamp(v_uv.y, 0.0, 1.0);
                 fade = fade * fade;
-
+            
                 vec3 rgb = mix(c.rgb, u_tint.rgb, 0.35);
                 float a = c.a * fade * clamp(u_alpha, 0.0, 1.0);
-
+            
                 gl_FragColor = vec4(rgb, a);
             }
             """; // GLSL 120 fragment shader source.
@@ -142,28 +142,19 @@ public class ReflectionShader extends Shader {
      *     <li>If {@code amount <= 0} (after clamping), nothing is drawn and the method returns.</li>
      * </ul>
      *
-     * @param texture      the sprite texture to reflect (must be non-null)
-     * @param timeSeconds  time in seconds (usually accumulated time) used for animation
-     * @param amount       reflection height as a fraction of the sprite height (clamped to 0..1)
-     * @param alpha        overall reflection alpha multiplier (recommended 0..1)
-     * @param tintR        tint red channel (0..1 recommended)
-     * @param tintG        tint green channel (0..1 recommended)
-     * @param tintB        tint blue channel (0..1 recommended)
-     * @param rippleAmpPx  ripple amplitude in pixels (0 disables ripple)
-     * @param rippleFreq   ripple frequency across X (e.g., 12..30 typical)
-     * @param rippleSpeed  ripple speed multiplier (e.g., 1..5 typical)
+     * @param texture     the sprite texture to reflect (must be non-null)
+     * @param timeSeconds time in seconds (usually accumulated time) used for animation
+     * @param amount      reflection height as a fraction of the sprite height (clamped to 0..1)
+     * @param alpha       overall reflection alpha multiplier (recommended 0..1)
+     * @param tintR       tint red channel (0..1 recommended)
+     * @param tintG       tint green channel (0..1 recommended)
+     * @param tintB       tint blue channel (0..1 recommended)
+     * @param rippleAmpPx ripple amplitude in pixels (0 disables ripple)
+     * @param rippleFreq  ripple frequency across X (e.g., 12..30 typical)
+     * @param rippleSpeed ripple speed multiplier (e.g., 1..5 typical)
      * @throws NullPointerException if {@code texture} is null
      */
-    public void apply(Texture texture,
-                      float timeSeconds,
-                      float amount,
-                      float alpha,
-                      float tintR,
-                      float tintG,
-                      float tintB,
-                      float rippleAmpPx,
-                      float rippleFreq,
-                      float rippleSpeed) {
+    public void apply(Texture texture, float timeSeconds, float amount, float alpha, float tintR, float tintG, float tintB, float rippleAmpPx, float rippleFreq, float rippleSpeed) {
         if (texture == null) throw new NullPointerException("Texture cannot be null");
 
         float ox = texture.getX();
@@ -180,23 +171,15 @@ public class ReflectionShader extends Shader {
         texture.setSize(ow, rh);
 
         bind();
-
         setUniform1i("u_texture", 0);
-
-        setUniform2f("u_texelSize",
-                1f / texture.getData().width(),
-                1f / texture.getData().height());
-
+        setUniform2f("u_texelSize", 1f / texture.getData().width(), 1f / texture.getData().height());
         setUniform1f("u_alpha", alpha);
         setUniform4f("u_tint", tintR, tintG, tintB, 1.0f);
         setUniform1f("u_time", timeSeconds);
-
         setUniform1f("u_rippleAmpPx", rippleAmpPx);
         setUniform1f("u_rippleFreq", rippleFreq);
         setUniform1f("u_rippleSpeed", rippleSpeed);
-
         texture.draw();
-
         unbind();
 
         texture.setPosition(ox, oy);
