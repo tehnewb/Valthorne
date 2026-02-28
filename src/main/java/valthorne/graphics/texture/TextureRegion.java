@@ -239,11 +239,11 @@ public class TextureRegion {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < columns; c++) {
                 float rx = c * cellW;
-                float ry = r * cellH;
+                float ry = texH - ((r + 1) * cellH);
 
                 TextureRegion region = new TextureRegion(texture, rx, ry, cellW, cellH);
-
                 region.setSize(cellW, cellH);
+
                 regions[r][c] = region;
             }
         }

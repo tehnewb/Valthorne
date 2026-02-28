@@ -1,30 +1,34 @@
 package valthorne.math;
 
 /**
- * Represents a 2D vector with float components. Provides methods for common vector
- * operations such as addition, subtraction, scalar multiplication, and linear interpolation.
+ * A 2D vector class that provides common operations for working with vectors
+ * in two-dimensional space. It contains methods for basic vector arithmetic,
+ * transformation, and utility functions.
+ *
+ * @author Albert Beaupre
+ * @since October 15th, 2025
  */
 public class Vector2f {
 
     /**
-     * The x-coordinate of this vector
+     * The x-coordinate of this vector.
      */
     private float x;
 
     /**
-     * The y-coordinate of this vector
+     * The y-coordinate of this vector.
      */
     private float y;
 
     /**
-     * Creates a zero vector (0,0)
+     * Creates a zero vector (0,0).
      */
     public Vector2f() {
         this(0, 0);
     }
 
     /**
-     * Creates a vector with the given coordinates
+     * Creates a vector with the given coordinates.
      *
      * @param x The x-coordinate
      * @param y The y-coordinate
@@ -35,14 +39,14 @@ public class Vector2f {
     }
 
     /**
-     * Negates the components of this vector, producing a new vector
-     * where each coordinate is the inverse of the corresponding
-     * coordinate in the original vector.
+     * Negates this vector in-place.
      *
-     * @return A new vector with components (-x, -y).
+     * @return This vector for chaining.
      */
     public Vector2f negate() {
-        return new Vector2f(-x, -y);
+        this.x = -this.x;
+        this.y = -this.y;
+        return this;
     }
 
     /**
@@ -82,7 +86,7 @@ public class Vector2f {
     }
 
     /**
-     * Sets this vector's coordinates to the specified values
+     * Sets this vector's coordinates to the specified values.
      *
      * @param x The new x-coordinate
      * @param y The new y-coordinate
@@ -95,7 +99,7 @@ public class Vector2f {
     }
 
     /**
-     * Adds the specified offsets to this vector's coordinates
+     * Adds the specified offsets to this vector's coordinates.
      *
      * @param dx The x offset to add
      * @param dy The y offset to add
@@ -108,7 +112,7 @@ public class Vector2f {
     }
 
     /**
-     * Adds another vector to this vector
+     * Adds another vector to this vector.
      *
      * @param v The vector to add
      * @return This vector for chaining
@@ -120,7 +124,7 @@ public class Vector2f {
     }
 
     /**
-     * Subtracts another vector from this vector
+     * Subtracts another vector from this vector.
      *
      * @param v The vector to subtract
      * @return This vector for chaining
@@ -132,7 +136,7 @@ public class Vector2f {
     }
 
     /**
-     * Multiplies this vector by a scalar value
+     * Multiplies this vector by a scalar value.
      *
      * @param s The scalar to multiply by
      * @return This vector for chaining
@@ -144,7 +148,7 @@ public class Vector2f {
     }
 
     /**
-     * Linearly interpolates this vector toward target vector by alpha amount
+     * Linearly interpolates this vector toward target vector by alpha amount.
      *
      * @param t The target vector
      * @param a The interpolation factor (0-1)
@@ -157,18 +161,21 @@ public class Vector2f {
     }
 
     /**
-     * Creates and returns a copy of this vector
+     * Copies the coordinates of {@code other} into this vector.
      *
-     * @return A new vector with the same coordinates
+     * <p>This replaces the old allocation-based {@code copy()} usage in hot paths.</p>
+     *
+     * @param other The vector to copy from
+     * @return This vector for chaining
      */
-    public Vector2f copy() {
-        return new Vector2f(x, y);
+    public Vector2f copy(Vector2f other) {
+        this.x = other.x;
+        this.y = other.y;
+        return this;
     }
 
     /**
      * Calculates the length (magnitude) of this vector.
-     * The length is computed as the square root of the sum
-     * of the squares of the x and y components.
      *
      * @return The length (magnitude) of this vector.
      */
@@ -177,27 +184,37 @@ public class Vector2f {
     }
 
     /**
-     * Normalizes this vector to have a unit length of 1 while preserving its direction.
-     * If the vector's length is zero, this method may result in an undefined behavior.
+     * Normalizes this vector in-place to have a unit length of 1 while preserving its direction.
      *
-     * @return A new vector that is the normalized version of this vector.
+     * <p>If the vector length is zero, this method leaves the vector unchanged.</p>
+     *
+     * @return This vector for chaining.
      */
     public Vector2f normalize() {
         float len = length();
-        return new Vector2f(x / len, y / len);
+        if (len != 0.0f) {
+            x /= len;
+            y /= len;
+        }
+        return this;
     }
 
     /**
-     * Rotates this 2D vector by the specified angle in radians and returns a new vector
-     * with the rotated coordinates.
+     * Rotates this vector in-place by the specified angle in radians.
      *
      * @param angle the angle of rotation in radians
-     * @return a new vector representing the result of the rotation
+     * @return This vector for chaining
      */
     public Vector2f rotate(float angle) {
         float sin = (float) Math.sin(angle);
         float cos = (float) Math.cos(angle);
-        return new Vector2f(cos * x - sin * y, sin * x + cos * y);
+
+        float nx = x * cos - y * sin;
+        float ny = x * sin + y * cos;
+
+        this.x = nx;
+        this.y = ny;
+        return this;
     }
 
     /**
@@ -211,67 +228,70 @@ public class Vector2f {
     }
 
     /**
-     * Calculates the cross-product of this vector with another vector.
-     * The cross-product in 2D is a scalar value, but here it is represented as a vector.
+     * Calculates the 2D cross product (scalar) of this vector with another vector.
      *
-     * @param v The other vector with which to calculate the cross-product.
-     * @return A new vector representing the result of the cross-product.
+     * <p>
+     * In 2D physics, the cross product of two vectors is a scalar:
+     * {@code cross(a,b) = a.x*b.y - a.y*b.x}.
+     * </p>
+     *
+     * @param v The other vector
+     * @return The scalar cross product
      */
-    public Vector2f cross(Vector2f v) {
-        return new Vector2f(x * v.y - y * v.x, y * v.x - x * v.y);
+    public float cross(Vector2f v) {
+        return x * v.y - y * v.x;
     }
 
-    /*
-     * Clamps the x and y coordinates of this vector to the specified minimum and maximum values.
+    /**
+     * Clamps this vector's x and y coordinates to the specified minimum and maximum values in-place.
      *
      * @param min The minimum value to clamp to.
      * @param max The maximum value to clamp to.
-     * @return A new vector with x and y coordinates clamped between the specified minimum and maximum limits.
+     * @return This vector for chaining.
      */
     public Vector2f clamp(float min, float max) {
-        return new Vector2f(Math.max(min, Math.min(max, x)), Math.max(min, Math.min(max, y)));
+        this.x = Math.max(min, Math.min(max, this.x));
+        this.y = Math.max(min, Math.min(max, this.y));
+        return this;
     }
 
     /**
-     * Clamps the x and y coordinates of this vector within the bounds defined by the given minimum and maximum vectors.
-     * The resulting vector will have each coordinate individually clamped between the corresponding coordinates of the
-     * minimum and maximum vectors.
+     * Clamps this vector's x and y coordinates within the bounds defined by the given minimum and maximum vectors.
      *
      * @param min The vector representing the minimum bounds for clamping.
      * @param max The vector representing the maximum bounds for clamping.
-     * @return A new vector with x and y coordinates clamped between the corresponding values of the specified minimum
-     * and maximum vectors.
+     * @return This vector for chaining.
      */
     public Vector2f clamp(Vector2f min, Vector2f max) {
-        return new Vector2f(Math.max(min.x, Math.min(max.x, x)), Math.max(min.y, Math.min(max.y, y)));
+        this.x = Math.max(min.x, Math.min(max.x, this.x));
+        this.y = Math.max(min.y, Math.min(max.y, this.y));
+        return this;
     }
 
     /**
-     * Clamps the x and y coordinates of this vector to the specified minimum value,
+     * Clamps this vector's x and y coordinates to the specified minimum value,
      * using {@code Float.MAX_VALUE} as the maximum limit.
      *
      * @param min The minimum value to clamp the vector's coordinates to.
-     * @return A new vector with x and y coordinates clamped to the specified minimum limit
-     * and {@code Float.MAX_VALUE} as the maximum limit.
+     * @return This vector for chaining.
      */
     public Vector2f clamp(float min) {
         return clamp(min, Float.MAX_VALUE);
     }
 
     /**
-     * Clamps the x and y coordinates of this vector to the specified minimum vector.
-     * The maximum limit for clamping is set to a vector with coordinates {@code Float.MAX_VALUE, Float.MAX_VALUE}.
+     * Clamps this vector's x and y coordinates to the specified minimum vector.
+     * The maximum limit for clamping is set to {@code (Float.MAX_VALUE, Float.MAX_VALUE)}.
      *
      * @param min The vector representing the minimum bounds for clamping.
-     * @return A new vector with x and y coordinates clamped to the specified minimum vector
-     * and a maximum vector of {@code Float.MAX_VALUE, Float.MAX_VALUE}.
+     * @return This vector for chaining.
      */
     public Vector2f clamp(Vector2f min) {
         return clamp(min, new Vector2f(Float.MAX_VALUE, Float.MAX_VALUE));
     }
 
     /**
-     * Returns a string representation of this vector
+     * Returns a string representation of this vector.
      *
      * @return String in format "(x, y)"
      */
