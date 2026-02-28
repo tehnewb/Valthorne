@@ -1,4 +1,4 @@
-# Valthorne
+# Valthorne - Check out the [Wiki](https://github.com/tehnewb/Valthorne/wiki/00.-Getting-Started)
 
 ### What this project does best
 
