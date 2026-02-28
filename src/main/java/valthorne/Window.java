@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
+import valthorne.graphics.Color;
 import valthorne.ui.Dimensional;
 
 import java.nio.IntBuffer;
@@ -231,6 +232,19 @@ public final class Window {
         glOrtho(0, Window.getWidth(), 0, Window.getHeight(), -1, 1);
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
+    }
+
+    /**
+     * Clears the current OpenGL framebuffer using the specified color.
+     * <p>
+     * This sets the clear color to the RGBA values of the provided {@code Color} object
+     * and clears the color buffer bit, effectively resetting the frame for new drawing.
+     *
+     * @param color the color to use for clearing the framebuffer; must not be null
+     */
+    public static void clear(Color color) {
+        glClearColor(color.r(), color.g(), color.b(), color.a());
+        glClear(GL_COLOR_BUFFER_BIT);
     }
 
     /**
@@ -581,7 +595,6 @@ public final class Window {
      * Disposes of window resources.
      *
      * <p>This frees all registered GLFW callbacks and destroys the GLFW window handle.</p>
-
      */
     static void dispose() {
         if (fbCallback != null) fbCallback.free();
