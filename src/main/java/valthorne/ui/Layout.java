@@ -25,12 +25,12 @@ package valthorne.ui;
  *
  * <h2>Example</h2>
  * <pre>{@code
- * Layout layout = new Layout()
- *         .setX(Value.alignment(Alignment.CENTER)
- *         .setY(Value.alignment(Alignment.CENTER)
- *         .setWidth(Value.pixels(160))
- *         .setHeight(Value.percentage(50))
- *         .setPadding(Value.pixels(10));
+ * Layout layout = Layout.of()
+ *         .x(Value.alignment(Alignment.CENTER)
+ *         .y(Value.alignment(Alignment.CENTER)
+ *         .width(Value.pixels(160))
+ *         .height(Value.percentage(50))
+ *         .padding(Value.pixels(10));
  *
  * Element button = new Button("Play");
  * button.setLayout(layout);
@@ -50,6 +50,15 @@ public final class Layout {
     private Value y = DEFAULT;                         // Optional Y-position constraint (layout engine may ignore depending on container).
     private Value width = DEFAULT;                     // Width constraint for the element (AUTO/PIXELS/PERCENT/FILL).
     private Value height = DEFAULT;                    // Height constraint for the element (AUTO/PIXELS/PERCENT/FILL).
+
+    /**
+     * Creates a new instance of the Layout class with default settings.
+     *
+     * @return a new Layout instance
+     */
+    public static Layout of() {
+        return new Layout();
+    }
 
     /**
      * Returns the bottom padding value.
@@ -74,7 +83,7 @@ public final class Layout {
      * @param bottomPadding the new bottom padding {@link Value}
      * @return this layout for chaining
      */
-    public Layout setBottomPadding(Value bottomPadding) {
+    public Layout padBottom(Value bottomPadding) {
         this.bottomPadding = bottomPadding;
         return this;
     }
@@ -100,7 +109,7 @@ public final class Layout {
      * @param topPadding the new top padding {@link Value}
      * @return this layout for chaining
      */
-    public Layout setTopPadding(Value topPadding) {
+    public Layout padTop(Value topPadding) {
         this.topPadding = topPadding;
         return this;
     }
@@ -126,7 +135,7 @@ public final class Layout {
      * @param rightPadding the new right padding {@link Value}
      * @return this layout for chaining
      */
-    public Layout setRightPadding(Value rightPadding) {
+    public Layout padRight(Value rightPadding) {
         this.rightPadding = rightPadding;
         return this;
     }
@@ -152,7 +161,7 @@ public final class Layout {
      * @param leftPadding the new left padding {@link Value}
      * @return this layout for chaining
      */
-    public Layout setLeftPadding(Value leftPadding) {
+    public Layout padLeft(Value leftPadding) {
         this.leftPadding = leftPadding;
         return this;
     }
@@ -171,7 +180,7 @@ public final class Layout {
      * @param padding the padding {@link Value} to apply to every side
      * @return this layout for chaining
      */
-    public Layout setPadding(Value padding) {
+    public Layout padding(Value padding) {
         this.leftPadding = padding;
         this.rightPadding = padding;
         this.topPadding = padding;
@@ -199,7 +208,7 @@ public final class Layout {
      * @param x the new x constraint {@link Value}
      * @return this layout for chaining
      */
-    public Layout setX(Value x) {
+    public Layout x(Value x) {
         this.x = x;
         return this;
     }
@@ -223,7 +232,7 @@ public final class Layout {
      * @param y the new y constraint {@link Value}
      * @return this layout for chaining
      */
-    public Layout setY(Value y) {
+    public Layout y(Value y) {
         this.y = y;
         return this;
     }
@@ -248,7 +257,7 @@ public final class Layout {
      * @param width the new width constraint {@link Value}
      * @return this layout for chaining
      */
-    public Layout setWidth(Value width) {
+    public Layout width(Value width) {
         this.width = width;
         return this;
     }
@@ -273,7 +282,7 @@ public final class Layout {
      * @param height the new height constraint {@link Value}
      * @return this layout for chaining
      */
-    public Layout setHeight(Value height) {
+    public Layout height(Value height) {
         this.height = height;
         return this;
     }

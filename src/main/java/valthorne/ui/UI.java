@@ -39,6 +39,12 @@ public class UI extends ElementContainer {
         Mouse.addMouseListener(mouseListener);
         Mouse.addScrollListener(scrollListener);
         Window.addWindowResizeListener(windowListener);
+
+        setLayout(Layout.of()
+                .height(Value.percentage(1f))
+                .width(Value.percentage(1f))
+                .x(Value.pixels(0))
+                .y(Value.pixels(0)));
     }
 
     @Override

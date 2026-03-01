@@ -6,6 +6,7 @@ import org.lwjgl.system.MemoryStack;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
+import valthorne.graphics.texture.TextureData;
 import valthorne.ui.Dimensional;
 
 import java.nio.IntBuffer;
@@ -70,12 +71,12 @@ public final class Window {
     private static final Dimensional dimensional = new Dimensional() {                       // Dimensional adapter for treating the window as a UI rectangle.
         @Override
         public float getX() {
-            return Window.getX();
+            return 0;
         }
 
         @Override
         public float getY() {
-            return Window.getY();
+            return 0;
         }
 
         @Override
@@ -558,6 +559,28 @@ public final class Window {
         if (address == NULL) return;
         opacity = Math.max(0f, Math.min(1f, opacity));
         glfwSetWindowOpacity(address, opacity);
+    }
+
+    /**
+     * Sets the icon of the window using the provided texture data.
+     *
+     * @param texture the texture data that defines the icon. It cannot be null.
+     *                The data should include the width, height, and pixel buffer
+     *                of the image to be used as the window's icon.
+     * @throws NullPointerException if the texture parameter is null.
+     */
+    public static void setIcon(TextureData texture) {
+        if (address == NULL) return;
+        if (texture == null) throw new NullPointerException("TextureData cannot be null");
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            GLFWImage glfwImage = GLFWImage.malloc(stack);
+            glfwImage.set(texture.width(), texture.height(), texture.buffer());
+            GLFWImage.Buffer images = GLFWImage.malloc(1, stack);
+            images.put(0, glfwImage);
+
+            glfwSetWindowIcon(address, images);
+        }
     }
 
     /**
