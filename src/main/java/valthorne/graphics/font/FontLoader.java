@@ -1,25 +1,36 @@
 package valthorne.graphics.font;
 
 import valthorne.asset.AssetLoader;
-import valthorne.graphics.texture.TextureData;
 
 /**
- * Loads a TTF/OTF file with LWJGL STB TrueType, packs a contiguous glyph range into an atlas,
- * and returns a {@link FontData} containing the atlas {@link TextureData} and glyph metrics.
- *
+ * The FontLoader class is responsible for loading font data using specified font parameters.
+ * It implements the AssetLoader interface, utilizing FontParameters as the configuration
+ * and returning FontData as the loaded asset type.
  * <p>
- * This loader does NOT create a {@code Texture} instance. It returns raw {@link TextureData}
- * so your asset system can decide when/how to upload to OpenGL.
- * </p>
+ * This class supports loading fonts from both file paths and byte arrays, utilizing the
+ * FontSource encapsulated in the provided FontParameters. Depending on the type of
+ * FontSource provided, the appropriate loading method is invoked.
+ * <p>
+ * If an unsupported or unknown FontSource is provided, an IllegalStateException is thrown.
  *
- * @author Albert Beaupre
- * @since January 29th, 2026
+ * @see AssetLoader
+ * @see FontParameters
+ * @see FontData
  */
 public class FontLoader implements AssetLoader<FontParameters, FontData> {
 
     @Override
     public FontData load(FontParameters parameters) {
-        return FontData.load(parameters.path(), parameters.fontSize(), parameters.firstCharacterIndex(), parameters.characterCount());
-    }
+        FontSource src = parameters.source();
 
+        if (src instanceof FontSource.PathSource(String path)) {
+            return FontData.load(path, parameters.fontSize(), parameters.firstCharacterIndex(), parameters.characterCount());
+        }
+
+        if (src instanceof FontSource.BytesSource(byte[] bytes)) {
+            return FontData.load(bytes, parameters.fontSize(), parameters.firstCharacterIndex(), parameters.characterCount());
+        }
+
+        throw new IllegalStateException("Unknown FontSource: " + src.getClass().getName());
+    }
 }

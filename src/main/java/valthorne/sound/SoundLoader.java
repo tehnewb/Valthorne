@@ -3,26 +3,26 @@ package valthorne.sound;
 import valthorne.asset.AssetLoader;
 
 /**
- * SoundLoader is an implementation of the AssetLoader interface used for loading audio data
- * from specified sound parameters into a SoundData object. This class handles the process
- * of converting the input parameters into the corresponding sound data for playback and processing.
+ * The SoundLoader class is responsible for loading sound data by implementing the AssetLoader interface.
+ * It supports loading sound data either from a file path or directly from a byte array, based on the type
+ * of SoundSource provided in the SoundParameters.
  * <p>
- * This class is designed to work with configuration parameters of type SoundParameters,
- * which encapsulate the necessary information to identify the audio asset to be loaded.
- * The resulting audio data is encapsulated within the SoundData object, which provides
- * encoded sound details like audio buffer, duration, format, and sample data.
- * <p>
- * The primary responsibility of this class is to leverage the {@code SoundData.load(String path)}
- * method by extracting the relevant key from the provided sound parameters and delegating the
- * actual loading process to the SoundData class.
- *
- * @see AssetLoader
- * @see SoundParameters
- * @see SoundData
+ * This class determines the source type dynamically and delegates the loading operation to the appropriate
+ * method in the SoundData class. Unsupported or unknown source types will result in an exception being thrown.
  */
 public class SoundLoader implements AssetLoader<SoundParameters, SoundData> {
     @Override
     public SoundData load(SoundParameters parameters) {
-        return SoundData.load(parameters.path());
+        SoundSource src = parameters.source();
+
+        if (src instanceof SoundSource.PathSource(String path)) {
+            return SoundData.load(path);
+        }
+
+        if (src instanceof SoundSource.BytesSource(byte[] bytes)) {
+            return SoundData.load(bytes);
+        }
+
+        throw new IllegalStateException("Unknown SoundSource: " + src.getClass().getName());
     }
 }
