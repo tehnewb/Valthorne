@@ -41,6 +41,8 @@ public abstract class ElementContainer extends Element {
         elements[size++] = element;
         onAdd(element);
         element.onAdd();
+
+        this.layout();
     }
 
     /**
@@ -76,6 +78,7 @@ public abstract class ElementContainer extends Element {
 
         onRemove(element);
         element.onRemove();
+        this.layout();
     }
 
     /**

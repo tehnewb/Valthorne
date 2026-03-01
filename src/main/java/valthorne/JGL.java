@@ -4,14 +4,33 @@ import valthorne.event.Event;
 import valthorne.event.EventListener;
 import valthorne.event.EventPublisher;
 
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.glClear;
+
 
 /**
- * The JGL class serves as the main entry point for managing OpenGL-based applications
- * using GLFW. It provides methods to initialize and run an application, track frame
- * rate and time, and release resources.
+ * The {@code JGL} class forms the core of the Valthorne 2D game engine framework.
+ * It operates as a high-level orchestrator responsible for managing the application's lifecycle,
+ * initializing essential subsystems, and executing the game loop. The class is designed
+ * to be versatile, allowing developers to focus on implementing game logic while JGL
+ * handles resource management and low-level operations.
+ * <p>
+ * Key capabilities of the {@code JGL} class include:
+ * <ul>
+ *   <li>Framework Initialization: Initializes GLFW as a windowing system and configures
+ *       systems like audio, input devices (keyboard, mouse), and window display.</li>
+ *   <li>Main Application Loop: Ensures consistent updates to the game state and renders
+ *       every frame, calculating delta time and frame rates for precise updates.</li>
+ *   <li>Event-Driven Design: Provides a centralized event bus to facilitate communication
+ *       between various components by subscribing, unsubscribing, and broadcasting events.</li>
+ *   <li>Resource Cleanup: At the end of the application's lifecycle, ensures proper
+ *       disposal of resources like the input devices, window, and audio systems.</li>
+ * </ul>
+ * The {@code JGL} class requires that an {@link Application} implementation is passed to
+ * provide game-specific lifecycle methods, offering entry points for initialization,
+ * updates, rendering, and cleanup.
  *
  * @author Albert Beaupre
  * @since October 17th, 2025
@@ -19,20 +38,24 @@ import static org.lwjgl.opengl.GL11.glClear;
 public class JGL {
 
     private static final EventPublisher events = new EventPublisher();
+    private static final BlockingDeque<Runnable> tasks = new LinkedBlockingDeque<>();
     private static float deltaTime;
     private static short framesPerSecond;
 
     /**
-     * Initializes the OpenGL-based application and sets up the main application loop.
-     * This method initializes GLFW, creates the application window, manages input devices,
-     * and runs the lifecycle of the provided application. It also handles frame updates,
-     * rendering, and resource disposal.
+     * Initializes the JGL framework and starts the main rendering loop.
+     * This method sets up the application window, input devices, and audio.
+     * It also invokes the lifecycle methods of the provided {@link Application}
+     * implementation.
      *
-     * @param application The application instance implementing the {@code Application} interface.
-     * @param title       The title of the application window.
-     * @param width       The width of the application window in pixels.
-     * @param height      The height of the application window in pixels.
-     * @throws IllegalStateException if GLFW initialization fails.
+     * @param application the {@link Application} instance that defines the core
+     *                    logic and lifecycle of the application
+     * @param title       the title of the application window
+     * @param width       the width of the application window in pixels
+     * @param height      the height of the application window in pixels
+     * @throws IllegalStateException if the method is not called from the JVM main thread,
+     *                               GLFW initialization fails, or if the JGL framework
+     *                               is already initialized
      */
     public static void init(Application application, String title, int width, int height) {
         if (!glfwInit())
@@ -49,6 +72,8 @@ public class JGL {
 
         application.init();
         while (!Window.shouldClose()) {
+            if (!tasks.isEmpty()) tasks.poll().run();
+
             float now = (float) glfwGetTime();
             deltaTime = now - lastTime;
             lastTime = now;
@@ -73,6 +98,20 @@ public class JGL {
         }
         application.dispose();
         dispose();
+    }
+
+    /**
+     * Schedules a task for execution. The provided {@code Runnable} task will
+     * be added to the task list for processing. If the specified task is null,
+     * a {@code NullPointerException} is thrown.
+     *
+     * @param task the {@code Runnable} task to be added to the task list
+     * @throws NullPointerException if {@code task} is null
+     */
+    public static void runTask(Runnable task) {
+        if (task == null)
+            throw new NullPointerException("A null task cannot be executed.");
+        tasks.add(task);
     }
 
     /**
@@ -121,8 +160,7 @@ public class JGL {
      * @throws NullPointerException if the provided event is null
      */
     public static void publish(Event event) {
-        if (event == null)
-            throw new NullPointerException("A null event cannot be published to the event bus.");
+        if (event == null) throw new NullPointerException("A null event cannot be published to the event bus.");
         events.publish(event);
     }
 

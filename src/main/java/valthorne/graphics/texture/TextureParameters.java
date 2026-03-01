@@ -1,6 +1,7 @@
 package valthorne.graphics.texture;
 
 import valthorne.asset.AssetParameters;
+import valthorne.io.file.ValthorneFiles;
 
 
 /**
@@ -96,6 +97,33 @@ public record TextureParameters(TextureSource source, String name, boolean flipV
      */
     public static TextureParameters fromBytes(byte[] bytes, String name, boolean flipVertically) {
         return new TextureParameters(new TextureSource.BytesSource(bytes), name, flipVertically);
+    }
+
+    /**
+     * Creates a new {@code TextureParameters} instance from a resource located on the classpath.
+     * The texture is configured with the specified resource name and is set to be vertically flipped by default.
+     *
+     * @param resourcePath the path to the resource on the classpath. Must not be null or blank.
+     * @param name         the unique name of the texture. Must not be null or blank.
+     * @return a {@code TextureParameters} instance configured with the specified classpath resource and name.
+     * @throws IllegalArgumentException if {@code resourcePath} is null or blank, or if {@code name} is null or blank.
+     */
+    public static TextureParameters fromClasspath(String resourcePath, String name) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, true);
+    }
+
+    /**
+     * Creates a new {@code TextureParameters} instance from a resource located on the classpath.
+     * The texture is configured with the specified resource name and the specified flip vertically option.
+     *
+     * @param resourcePath   the path to the resource on the classpath. Must not be null or blank.
+     * @param name           the unique name of the texture. Must not be null or blank.
+     * @param flipVertically a boolean indicating whether the texture should be flipped vertically during loading.
+     * @return a {@code TextureParameters} instance configured with the specified classpath resource, name, and flip vertically option.
+     * @throws IllegalArgumentException if {@code resourcePath} is null or blank, or if {@code name} is null or blank.
+     */
+    public static TextureParameters fromClasspath(String resourcePath, String name, boolean flipVertically) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, flipVertically);
     }
 
     @Override

@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.tehnewb"
-version = "1.1.1"
+version = "1.1.2"
 description = "A 2D game development library"
 
 repositories {
@@ -41,7 +41,6 @@ dependencies {
         api "org.lwjgl:${m}"
     }
 
-    implementation "org.bytedeco:ffmpeg-platform:8.0.1-1.5.13"
     implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
 

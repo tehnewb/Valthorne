@@ -1,6 +1,7 @@
 package valthorne.sound;
 
 import valthorne.asset.AssetParameters;
+import valthorne.io.file.ValthorneFiles;
 
 /**
  * Represents the parameters required to initialize or manage a sound resource.
@@ -73,6 +74,38 @@ public record SoundParameters(SoundSource source, String name) implements AssetP
      */
     public static SoundParameters fromBytes(byte[] bytes, String name) {
         return new SoundParameters(new SoundSource.BytesSource(bytes), name);
+    }
+
+    /**
+     * Creates a {@code SoundParameters} instance using a classpath resource as the sound source.
+     * This method loads the resource's bytes and uses the resource path as the name of the sound.
+     *
+     * @param resourcePath The path to the resource file, relative to the classpath root.
+     *                     Must not be null or blank.
+     * @return A {@code SoundParameters} instance with the sound source initialized from
+     * the resource bytes and the name set to the resource path.
+     * @throws IllegalArgumentException If the {@code resourcePath} is null or empty,
+     *                                  or if the resource could not be loaded.
+     */
+    public static SoundParameters fromClasspath(String resourcePath) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), resourcePath);
+    }
+
+    /**
+     * Creates a {@code SoundParameters} instance using a classpath resource as the sound source
+     * and a custom name. This method loads the resource's bytes and sets the name explicitly.
+     *
+     * @param resourcePath The path to the resource file, relative to the classpath root.
+     *                     Must not be null or blank.
+     * @param name         A custom name or identifier for the sound. Must not be null or blank.
+     * @return A {@code SoundParameters} instance with the sound source initialized from
+     * the resource bytes and the name explicitly set to the provided value.
+     * @throws IllegalArgumentException If the {@code resourcePath} is null or empty,
+     *                                  or if the resource could not be loaded,
+     *                                  or if {@code name} is null or blank.
+     */
+    public static SoundParameters fromClasspath(String resourcePath, String name) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), name);
     }
 
     @Override

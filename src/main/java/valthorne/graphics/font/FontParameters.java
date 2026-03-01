@@ -1,6 +1,7 @@
 package valthorne.graphics.font;
 
 import valthorne.asset.AssetParameters;
+import valthorne.io.file.ValthorneFiles;
 
 /**
  * Represents the parameters required to define and load a font asset.
@@ -98,6 +99,39 @@ public record FontParameters(FontSource source, String name, int fontSize, int f
      */
     public static FontParameters fromBytes(byte[] bytes, String name, int fontSize, int firstChar, int count) {
         return new FontParameters(new FontSource.BytesSource(bytes), name, fontSize, firstChar, count);
+    }
+
+    /**
+     * Creates a new {@code FontParameters} instance from a resource path on the classpath,
+     * along with the specified font name and font size. This method uses default values
+     * for the first character index and character count.
+     *
+     * @param resourcePath the path to the font resource located on the classpath; must not be null or blank
+     * @param name         the name of the font; must not be null or blank
+     * @param fontSize     the size of the font; must be greater than 0
+     * @return a new {@code FontParameters} instance representing the font configuration
+     * @throws IllegalArgumentException if resourcePath is null or blank, if name is null or blank,
+     *                                  or if fontSize is less than or equal to 0
+     */
+    public static FontParameters fromClasspath(String resourcePath, String name, int fontSize) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, fontSize);
+    }
+
+    /**
+     * Creates a new {@code FontParameters} instance from the specified resource path on the
+     * classpath, font name, font size, first character index, and character count.
+     *
+     * @param resourcePath the path to the font resource located on the classpath; must not be null or blank
+     * @param name         the name of the font; must not be null or blank
+     * @param fontSize     the size of the font; must be greater than 0
+     * @param firstChar    the index of the first character in the font
+     * @param count        the number of characters in the font; must be greater than 0
+     * @return a new {@code FontParameters} instance representing the font configuration
+     * @throws IllegalArgumentException if resourcePath is null or blank, if name is null or blank,
+     *                                  if fontSize is less than or equal to 0, or if count is less than or equal to 0
+     */
+    public static FontParameters fromClasspath(String resourcePath, String name, int fontSize, int firstChar, int count) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, fontSize, firstChar, count);
     }
 
     @Override

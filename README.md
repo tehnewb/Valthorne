@@ -38,12 +38,12 @@ Add Valthorne to your build as a dependency.
 
 ### Gradle (Groovy)
 ```groovy
-implementation 'io.github.tehnewb:Valthorne:1.1.1'
+implementation 'io.github.tehnewb:Valthorne:1.1.2'
 ```
 
 ### Gradle (Kotlin DSL)
 ```kotlin
-implementation("io.github.tehnewb:Valthorne:1.1.1")
+implementation("io.github.tehnewb:Valthorne:1.1.2")
 ```
 
 ### Maven
@@ -51,7 +51,7 @@ implementation("io.github.tehnewb:Valthorne:1.1.1")
 <dependency>
     <groupId>io.github.tehnewb</groupId>
     <artifactId>Valthorne</artifactId>
-    <version>1.1.1</version>
+    <version>1.1.2</version>
 </dependency>
 ```
 
