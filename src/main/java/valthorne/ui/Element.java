@@ -59,6 +59,7 @@ public abstract class Element implements Dimensional, DrawFunction {
     private Layout layout;
     private UI ui;
 
+    private Rectangle bounds = new Rectangle();
     private Rectangle clipBounds;
 
     /**
@@ -547,6 +548,7 @@ public abstract class Element implements Dimensional, DrawFunction {
     public void setSize(float width, float height) {
         this.width = width;
         this.height = height;
+        this.bounds.setSize(width, height);
     }
 
     @Override
@@ -557,6 +559,17 @@ public abstract class Element implements Dimensional, DrawFunction {
     @Override
     public void setY(float y) {
         this.setPosition(x, y);
+    }
+
+    /**
+     * Calculates and returns the bounding rectangle defined by the current
+     * coordinates and dimensions.
+     *
+     * @return a Rectangle object representing the bounds with the current
+     *         x, y, width, and height values.
+     */
+    public Rectangle getBounds() {
+        return new Rectangle(x, y, width, height);
     }
 
     /**
@@ -595,6 +608,8 @@ public abstract class Element implements Dimensional, DrawFunction {
             this.localX = x;
             this.localY = y;
         }
+
+        this.bounds.setPosition(x, y);
     }
 
     /**
