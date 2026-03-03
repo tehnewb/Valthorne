@@ -132,10 +132,14 @@ public abstract class ElementContainer extends Element {
 
     @Override
     public void update(float delta) {
+        Rectangle clip = this.getClipBounds();
         for (int i = 0; i < size; i++) {
             Element element = elements[i];
             if (element == null || element.isHidden())
                 continue;
+            if (clip != null && !clip.overlaps(element.getBounds()))
+                continue;
+
             element.update(delta);
         }
     }
@@ -143,8 +147,8 @@ public abstract class ElementContainer extends Element {
     @Override
     public void draw() {
         Viewport viewport = getUI().getViewport();
-        if (this.getClipBounds() != null) {
-            Rectangle clip = this.getClipBounds();
+        Rectangle clip = this.getClipBounds();
+        if (clip != null) {
             viewport.applyScissor(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight(), draw);
         } else {
             drawElements();
@@ -153,14 +157,18 @@ public abstract class ElementContainer extends Element {
 
     private void drawElements() {
         Viewport viewport = getUI().getViewport();
+        Rectangle clip = this.getClipBounds();
         for (int i = 0; i < size; i++) {
             Element element = elements[i];
             if (element == null || element.isHidden())
                 continue;
 
+            if (clip != null && !clip.overlaps(element.getBounds()))
+                continue;
+
             if (element.getClipBounds() != null) {
-                Rectangle clip = element.getClipBounds();
-                viewport.applyScissor(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight(), element);
+                Rectangle clipBounds = element.getClipBounds();
+                viewport.applyScissor(clipBounds.getX(), clipBounds.getY(), clipBounds.getWidth(), clipBounds.getHeight(), element);
             } else {
                 element.draw();
             }
