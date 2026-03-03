@@ -11,7 +11,7 @@ repositories {
     mavenCentral()
 }
 
-def lwjglVersion = "3.3.4"
+def lwjglVersion = "3.4.1"
 
 // If you want more modules, add them to both lists below.
 def lwjglModules = [
@@ -54,7 +54,7 @@ dependencies {
 }
 
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(23) }
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
     withSourcesJar()
     withJavadocJar()
 }
@@ -75,6 +75,29 @@ tasks.matching { it.name == "plainJavadocJar" }.configureEach {
     enabled = false
 }
 
+// ---- Java 25 LWJGL warning suppression / compatibility JVM args ----
+def lwjglJvmArgs = [
+        // Required for Java 21+ restricted native access warnings
+        "--enable-native-access=ALL-UNNAMED",
+
+        // Opens commonly needed by LWJGL / Unsafe / internal buffers
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+
+        // Silences many "illegal access" warning prints on newer JDKs (best-effort)
+        "-Djdk.module.illegalAccess.silent=true"
+]
+
+// Apply to any JavaExec tasks (e.g., application plugin's run task, custom runners)
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += lwjglJvmArgs
+}
+
+// Apply to all tests
+tasks.withType(Test).configureEach {
+    jvmArgs += lwjglJvmArgs
+}
 
 mavenPublishing {
     coordinates(group.toString(), project.name.toString(), version.toString())
