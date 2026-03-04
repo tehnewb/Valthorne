@@ -3,73 +3,90 @@ package valthorne.encryption;
 import java.util.Arrays;
 
 /**
- * The Whirlpool hashing function.
+ * Whirlpool hash function implementation (NESSIE reference style API).
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * // One-shot hashing (byte[] slice).
+ * byte[] digest = Whirlpool.whirlpool(data, 0, data.length);
+ *
+ * // Streaming-style hashing (NESSIE API).
+ * Whirlpool w = new Whirlpool();
+ * w.NESSIEinit();
+ * w.NESSIEadd("hello world");          // ASCII helper
+ * w.NESSIEadd(moreBytes, moreBits);    // bit-precise update
+ * byte[] out = new byte[64];           // Whirlpool digest is 512 bits
+ * w.NESSIEfinalize(out);
+ * }</pre>
+ *
+ * <h2>How this implementation works</h2>
+ * <p>
+ * Whirlpool processes input in 512-bit (64-byte) blocks and produces a 512-bit (64-byte) digest.
+ * This implementation follows the common NESSIE reference API pattern:
+ * </p>
+ * <ul>
+ *     <li>{@link #NESSIEinit()} resets all internal state</li>
+ *     <li>{@link #NESSIEadd(byte[], long)} feeds bits into the internal buffer</li>
+ *     <li>{@link #NESSIEfinalize(byte[])} pads, appends bit-length, and emits the digest</li>
+ * </ul>
+ *
+ * <h2>Bit-precise updates</h2>
+ * <p>
+ * {@link #NESSIEadd(byte[], long)} accepts a bit count (not a byte count). This allows hashing inputs
+ * that are not byte-aligned. Internally, the class maintains:
+ * </p>
+ * <ul>
+ *     <li>a 64-byte buffer</li>
+ *     <li>a counter of how many bits are currently in the buffer</li>
+ *     <li>a 256-bit total length counter stored as a 32-byte big-endian array</li>
+ * </ul>
+ *
+ * <h2>Transform</h2>
+ * <p>
+ * The core compression step is performed by {@link #processBuffer()}:
+ * </p>
+ * <ul>
+ *     <li>maps the 64-byte buffer into eight 64-bit words</li>
+ *     <li>runs a 10-round internal block cipher-like permutation</li>
+ *     <li>applies the Miyaguchi–Preneel compression function to update {@link #hash}</li>
+ * </ul>
  *
  * <p>
  * <b>References</b>
- *
+ * </p>
  * <p>
- * The Whirlpool algorithm was developed by
- * <a href="mailto:pbarreto@scopus.com.br">Paulo S. L. M. Barreto</a> and
- * <a href="mailto:vincent.rijmen@cryptomathic.com">Vincent Rijmen</a>.
- * <p>
- * See P.S.L.M. Barreto, V. Rijmen, ``The Whirlpool hashing function,'' First
- * NESSIE workshop, 2000 (tweaked version, 2003),
- * <https://www.cosic.esat.kuleuven.ac.be/nessie/workshop/submissions/whirlpool.zip>
+ * The Whirlpool algorithm was developed by Paulo S. L. M. Barreto and Vincent Rijmen.
+ * This code originates from the reference style implementation (v3.0 2003.03.12) and retains
+ * its structure and naming conventions (e.g., "NESSIE" method names).
+ * </p>
  *
  * @author Paulo S.L.M. Barreto
  * @author Vincent Rijmen.
- * @version 3.0 (2003.03.12)
- * <p>
- * =============================================================================
- * <p>
- * Differences from version 2.1:
- * <p>
- * - Suboptimal diffusion matrix replaced by cir(1, 1, 4, 1, 8, 5, 2,
- * 9).
- * <p>
- * =============================================================================
- * <p>
- * Differences from version 2.0:
- * <p>
- * - Generation of ISO/IEC 10118-3 test vectors. - Bug fix: nonzero
- * carry was ignored when tallying the data length (this bug apparently
- * only manifested itself when feeding data in pieces rather than in a
- * single chunk at once).
- * <p>
- * Differences from version 1.0:
- * <p>
- * - Original S-box replaced by the tweaked, hardware-efficient
- * version.
- * <p>
- * =============================================================================
- * <p>
- * THIS SOFTWARE IS PROVIDED BY THE AUTHORS ''AS IS'' AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 public class Whirlpool {
 
-    /**
-     * The number of rounds of the internal dedicated block cipher.
-     */
-    protected static final int R = 10;
+    protected static final int R = 10; // Round count for the internal dedicated block cipher.
 
-    /**
-     * The substitution box.
-     */
-    private static final String sbox = "\u1823\uc6E8\u87B8\u014F\u36A6\ud2F5\u796F\u9152" + "\u60Bc\u9B8E\uA30c\u7B35\u1dE0\ud7c2\u2E4B\uFE57" + "\u1577\u37E5\u9FF0\u4AdA\u58c9\u290A\uB1A0\u6B85" + "\uBd5d\u10F4\ucB3E\u0567\uE427\u418B\uA77d\u95d8" + "\uFBEE\u7c66\udd17\u479E\ucA2d\uBF07\uAd5A\u8333" + "\u6302\uAA71\uc819\u49d9\uF2E3\u5B88\u9A26\u32B0" + "\uE90F\ud580\uBEcd\u3448\uFF7A\u905F\u2068\u1AAE" + "\uB454\u9322\u64F1\u7312\u4008\uc3Ec\udBA1\u8d3d" + "\u9700\ucF2B\u7682\ud61B\uB5AF\u6A50\u45F3\u30EF" + "\u3F55\uA2EA\u65BA\u2Fc0\udE1c\uFd4d\u9275\u068A" + "\uB2E6\u0E1F\u62d4\uA896\uF9c5\u2559\u8472\u394c" + "\u5E78\u388c\ud1A5\uE261\uB321\u9c1E\u43c7\uFc04" + "\u5199\u6d0d\uFAdF\u7E24\u3BAB\ucE11\u8F4E\uB7EB" + "\u3c81\u94F7\uB913\u2cd3\uE76E\uc403\u5644\u7FA9" + "\u2ABB\uc153\udc0B\u9d6c\u3174\uF646\uAc89\u14E1" + "\u163A\u6909\u70B6\ud0Ed\ucc42\u98A4\u285c\uF886";
+    private static final String sbox =
+            "\u1823\uc6E8\u87B8\u014F\u36A6\ud2F5\u796F\u9152"
+                    + "\u60Bc\u9B8E\uA30c\u7B35\u1dE0\ud7c2\u2E4B\uFE57"
+                    + "\u1577\u37E5\u9FF0\u4AdA\u58c9\u290A\uB1A0\u6B85"
+                    + "\uBd5d\u10F4\ucB3E\u0567\uE427\u418B\uA77d\u95d8"
+                    + "\uFBEE\u7c66\udd17\u479E\ucA2d\uBF07\uAd5A\u8333"
+                    + "\u6302\uAA71\uc819\u49d9\uF2E3\u5B88\u9A26\u32B0"
+                    + "\uE90F\ud580\uBEcd\u3448\uFF7A\u905F\u2068\u1AAE"
+                    + "\uB454\u9322\u64F1\u7312\u4008\uc3Ec\udBA1\u8d3d"
+                    + "\u9700\ucF2B\u7682\ud61B\uB5AF\u6A50\u45F3\u30EF"
+                    + "\u3F55\uA2EA\u65BA\u2Fc0\udE1c\uFd4d\u9275\u068A"
+                    + "\uB2E6\u0E1F\u62d4\uA896\uF9c5\u2559\u8472\u394c"
+                    + "\u5E78\u388c\ud1A5\uE261\uB321\u9c1E\u43c7\uFc04"
+                    + "\u5199\u6d0d\uFAdF\u7E24\u3BAB\ucE11\u8F4E\uB7EB"
+                    + "\u3c81\u94F7\uB913\u2cd3\uE76E\uc403\u5644\u7FA9"
+                    + "\u2ABB\uc153\udc0B\u9d6c\u3174\uF646\uAc89\u14E1"
+                    + "\u163A\u6909\u70B6\ud0Ed\ucc42\u98A4\u285c\uF886"; // Packed S-box values used to build the C tables.
 
-    private static final long[][] C = new long[8][256];
-    private static final long[] rc = new long[R + 1];
+    private static final long[][] C = new long[8][256]; // Circulant tables used by the round transformation.
+    private static final long[] rc = new long[R + 1]; // Round constants (index 1..R).
 
     static {
         for (int x = 0; x < 256; x++) {
@@ -89,56 +106,62 @@ public class Whirlpool {
                 v8 ^= 0x11dL;
             }
             long v9 = v8 ^ v1;
-            /*
-             * build the circulant table C[0][x] = S[x].[1, 1, 4, 1, 8, 5, 2, 9]:
-             */
+
             C[0][x] = (v1 << 56) | (v1 << 48) | (v4 << 40) | (v1 << 32) | (v8 << 24) | (v5 << 16) | (v2 << 8) | (v9);
-            /*
-             * build the remaining circulant tables C[t][x] = C[0][x] rotr t
-             */
+
             for (int t = 1; t < 8; t++) {
                 C[t][x] = (C[t - 1][x] >>> 8) | ((C[t - 1][x] << 56));
             }
         }
 
-        /*
-         * build the round constants:
-         */
-        rc[0] = 0L; /* not used (assigment kept only to properly initialize all variables) */
+        rc[0] = 0L;
         for (int r = 1; r <= R; r++) {
             int i = 8 * (r - 1);
-            rc[r] = (C[0][i] & 0xff00000000000000L) ^ (C[1][i + 1] & 0x00ff000000000000L) ^ (C[2][i + 2] & 0x0000ff0000000000L) ^ (C[3][i + 3] & 0x000000ff00000000L) ^ (C[4][i + 4] & 0x00000000ff000000L) ^ (C[5][i + 5] & 0x0000000000ff0000L) ^ (C[6][i + 6] & 0x000000000000ff00L) ^ (C[7][i + 7] & 0x00000000000000ffL);
+            rc[r] = (C[0][i] & 0xff00000000000000L)
+                    ^ (C[1][i + 1] & 0x00ff000000000000L)
+                    ^ (C[2][i + 2] & 0x0000ff0000000000L)
+                    ^ (C[3][i + 3] & 0x000000ff00000000L)
+                    ^ (C[4][i + 4] & 0x00000000ff000000L)
+                    ^ (C[5][i + 5] & 0x0000000000ff0000L)
+                    ^ (C[6][i + 6] & 0x000000000000ff00L)
+                    ^ (C[7][i + 7] & 0x00000000000000ffL);
         }
     }
 
-    /**
-     * Global number of hashed bits (256-bit counter).
-     */
-    protected byte[] bitLength = new byte[32];
-    /**
-     * Buffer of data to hash.
-     */
-    protected byte[] buffer = new byte[64];
-    /**
-     * Current number of bits on the buffer.
-     */
-    protected int bufferBits = 0;
-    /**
-     * Current (possibly incomplete) byte slot on the buffer.
-     */
-    protected int bufferPos = 0;
-    /**
-     * The hashing state.
-     */
-    protected long[] hash = new long[8];
-    protected long[] K = new long[8]; // the round key
-    protected long[] L = new long[8];
-    protected long[] block = new long[8]; // mu(buffer)
-    protected long[] state = new long[8]; // the cipher state
+    protected byte[] bitLength = new byte[32]; // Total number of hashed bits as a 256-bit big-endian counter.
+    protected byte[] buffer = new byte[64]; // Current 512-bit message block buffer (byte-oriented).
+    protected int bufferBits = 0; // Number of valid bits currently in {@link #buffer}.
+    protected int bufferPos = 0; // Current byte index in {@link #buffer} where new bits will be written.
+    protected long[] hash = new long[8]; // Current 512-bit chaining value (eight 64-bit words).
+    protected long[] K = new long[8]; // Round key schedule state for the internal cipher.
+    protected long[] L = new long[8]; // Temporary word array used during key/state mixing.
+    protected long[] block = new long[8]; // Current 512-bit block mapped from {@link #buffer}.
+    protected long[] state = new long[8]; // Internal cipher state for the current block transform.
 
+    /**
+     * Creates a new Whirlpool instance with uninitialized state.
+     *
+     * <p>
+     * Call {@link #NESSIEinit()} before feeding data, or use {@link #whirlpool(byte[], int, int)}
+     * for one-shot hashing.
+     * </p>
+     */
     public Whirlpool() {
     }
 
+    /**
+     * Convenience one-shot helper that hashes a byte array slice and returns the 64-byte digest.
+     *
+     * <p>
+     * If {@code off > 0}, this copies the slice into a new array before hashing. The digest is always
+     * computed over {@code len} bytes (i.e., {@code len * 8} bits).
+     * </p>
+     *
+     * @param data source byte array
+     * @param off starting offset into {@code data}
+     * @param len number of bytes to hash
+     * @return 64-byte Whirlpool digest
+     */
     public static byte[] whirlpool(byte[] data, int off, int len) {
         byte[] source;
         if (off <= 0) {
@@ -156,28 +179,37 @@ public class Whirlpool {
     }
 
     /**
-     * The core Whirlpool transform.
+     * Processes the current 512-bit {@link #buffer} contents and updates {@link #hash}.
+     *
+     * <p>
+     * This is the compression step. It maps the byte buffer into eight 64-bit words ({@link #block}),
+     * initializes the internal cipher state ({@link #state}) with {@code block ^ hash}, then executes
+     * {@link #R} rounds where both the key schedule and state are transformed using the precomputed
+     * circulant tables {@link #C} and round constants {@link #rc}.
+     * </p>
+     *
+     * <p>
+     * After the rounds, it applies the Miyaguchi–Preneel construction:
+     * {@code hash ^= state ^ block}.
+     * </p>
      */
     protected void processBuffer() {
-        /*
-         * map the buffer to a block:
-         */
         for (int i = 0, j = 0; i < 8; i++, j += 8) {
-            block[i] = (((long) buffer[j]) << 56) ^ (((long) buffer[j + 1] & 0xffL) << 48) ^ (((long) buffer[j + 2] & 0xffL) << 40) ^ (((long) buffer[j + 3] & 0xffL) << 32) ^ (((long) buffer[j + 4] & 0xffL) << 24) ^ (((long) buffer[j + 5] & 0xffL) << 16) ^ (((long) buffer[j + 6] & 0xffL) << 8) ^ (((long) buffer[j + 7] & 0xffL));
+            block[i] = (((long) buffer[j]) << 56)
+                    ^ (((long) buffer[j + 1] & 0xffL) << 48)
+                    ^ (((long) buffer[j + 2] & 0xffL) << 40)
+                    ^ (((long) buffer[j + 3] & 0xffL) << 32)
+                    ^ (((long) buffer[j + 4] & 0xffL) << 24)
+                    ^ (((long) buffer[j + 5] & 0xffL) << 16)
+                    ^ (((long) buffer[j + 6] & 0xffL) << 8)
+                    ^ (((long) buffer[j + 7] & 0xffL));
         }
-        /*
-         * compute and apply K^0 to the cipher state:
-         */
+
         for (int i = 0; i < 8; i++) {
             state[i] = block[i] ^ (K[i] = hash[i]);
         }
-        /*
-         * iterate over all rounds:
-         */
+
         for (int r = 1; r <= R; r++) {
-            /*
-             * compute K^r from K^{r-1}:
-             */
             for (int i = 0; i < 8; i++) {
                 L[i] = 0L;
                 for (int t = 0, s = 56; t < 8; t++, s -= 8) {
@@ -186,9 +218,7 @@ public class Whirlpool {
             }
             System.arraycopy(L, 0, K, 0, 8);
             K[0] ^= rc[r];
-            /*
-             * apply the r-th round transformation:
-             */
+
             for (int i = 0; i < 8; i++) {
                 L[i] = K[i];
                 for (int t = 0, s = 56; t < 8; t++, s -= 8) {
@@ -197,44 +227,54 @@ public class Whirlpool {
             }
             System.arraycopy(L, 0, state, 0, 8);
         }
-        /*
-         * apply the Miyaguchi-Preneel compression function:
-         */
+
         for (int i = 0; i < 8; i++) {
             hash[i] ^= state[i] ^ block[i];
         }
     }
 
     /**
-     * Initialize the hashing state.
+     * Resets the instance to the initial hashing state.
+     *
+     * <p>
+     * This clears the total bit-length counter, resets the internal buffer and counters, and sets the
+     * chaining value {@link #hash} to its initial (all-zero) value.
+     * </p>
+     *
+     * <p>
+     * Call this before starting a new hash computation with this instance.
+     * </p>
      */
     public void NESSIEinit() {
         Arrays.fill(bitLength, (byte) 0);
         bufferBits = bufferPos = 0;
-        buffer[0] = 0; // it's only necessary to cleanup buffer[bufferPos].
-        Arrays.fill(hash, 0L); // initial value
+        buffer[0] = 0;
+        Arrays.fill(hash, 0L);
     }
 
     /**
-     * Delivers input data to the hashing algorithm.
+     * Feeds input bits into the hash function.
      *
-     * @param source     plaintext data to hash.
-     * @param sourceBits how many bits of plaintext to process.
-     *                   <p>
-     *                   This method maintains the invariant: bufferBits < 512
+     * <p>
+     * This method accepts an explicit bit count, allowing non-byte-aligned hashing. It updates the
+     * 256-bit {@link #bitLength} counter, then shifts bits from {@code source} into {@link #buffer}.
+     * When the buffer reaches 512 bits, {@link #processBuffer()} is called and the buffer is reset.
+     * </p>
+     *
+     * <p>
+     * The buffer is treated as a bit stream; {@link #bufferBits} and {@link #bufferPos} track the current
+     * write location. This method maintains the invariant {@code bufferBits < 512} when it returns.
+     * </p>
+     *
+     * @param source input bytes containing the bits to hash
+     * @param sourceBits number of bits from {@code source} to consume
      */
     public void NESSIEadd(byte[] source, long sourceBits) {
-        /*
-         * sourcePos | +-------+-------+------- ||||||||||||||||||||| source
-         * +-------+-------+------- +-------+-------+-------+-------+-------+-------
-         * |||||||||||||||||||||| buffer
-         * +-------+-------+-------+-------+-------+------- | bufferPos
-         */
-        int sourcePos = 0; // index of leftmost source byte containing data (1 to 8 bits).
-        int sourceGap = (8 - ((int) sourceBits & 7)) & 7; // space on source[sourcePos].
-        int bufferRem = bufferBits & 7; // occupied bits on buffer[bufferPos].
+        int sourcePos = 0; // Index into source for the current byte being consumed.
+        int sourceGap = (8 - ((int) sourceBits & 7)) & 7; // Number of "unused" low bits in the last source byte.
+        int bufferRem = bufferBits & 7; // Number of already-occupied bits in the current buffer byte.
         int b;
-        // tally the length of the added data:
+
         long value = sourceBits;
         for (int i = 31, carry = 0; i >= 0; i--) {
             carry += (bitLength[i] & 0xff) + ((int) value & 0xff);
@@ -242,50 +282,41 @@ public class Whirlpool {
             carry >>>= 8;
             value >>>= 8;
         }
-        // process data in chunks of 8 bits:
-        while (sourceBits > 8) { // at least source[sourcePos] and source[sourcePos+1] contain data.
-            // take a byte from the source:
+
+        while (sourceBits > 8) {
             b = ((source[sourcePos] << sourceGap) & 0xff) | ((source[sourcePos + 1] & 0xff) >>> (8 - sourceGap));
             if (b < 0 || b >= 256)
                 throw new RuntimeException("LOGIC ERROR");
 
-            // process this byte:
             buffer[bufferPos++] |= b >>> bufferRem;
-            bufferBits += 8 - bufferRem; // bufferBits = 8*bufferPos;
+            bufferBits += 8 - bufferRem;
             if (bufferBits == 512) {
-                // process data block:
                 processBuffer();
-                // reset buffer:
                 bufferBits = bufferPos = 0;
             }
             buffer[bufferPos] = (byte) ((b << (8 - bufferRem)) & 0xff);
             bufferBits += bufferRem;
-            // proceed to remaining data:
+
             sourceBits -= 8;
             sourcePos++;
         }
-        // now 0 <= sourceBits <= 8;
-        // furthermore, all data (if any is left) is in source[sourcePos].
+
         if (sourceBits > 0) {
-            b = (source[sourcePos] << sourceGap) & 0xff; // bits are left-justified on b.
-            // process the remaining bits:
+            b = (source[sourcePos] << sourceGap) & 0xff;
             buffer[bufferPos] |= b >>> bufferRem;
         } else {
             b = 0;
         }
+
         if (bufferRem + sourceBits < 8) {
-            // all remaining data fits on buffer[bufferPos], and there still remains some space.
             bufferBits += sourceBits;
         } else {
-            // buffer[bufferPos] is full:
             bufferPos++;
-            bufferBits += 8 - bufferRem; // bufferBits = 8*bufferPos;
+            bufferBits += 8 - bufferRem;
             sourceBits -= 8 - bufferRem;
-            // now 0 <= sourceBits < 8; furthermore, all data is in source[sourcePos].
+
             if (bufferBits == 512) {
-                // process data block:
                 processBuffer();
-                // reset buffer:
                 bufferBits = bufferPos = 0;
             }
             buffer[bufferPos] = (byte) ((b << (8 - bufferRem)) & 0xff);
@@ -294,32 +325,42 @@ public class Whirlpool {
     }
 
     /**
-     * Get the hash value from the hashing state.
+     * Finalizes hashing, writes the digest, and leaves the instance in a "consumed" state.
+     *
      * <p>
-     * This method uses the invariant: bufferBits < 512
+     * This performs Whirlpool padding:
+     * </p>
+     * <ul>
+     *     <li>append a single {@code 1} bit</li>
+     *     <li>append {@code 0} bits until the buffer has room for the 256-bit length field</li>
+     *     <li>append the 256-bit total bit-length stored in {@link #bitLength}</li>
+     * </ul>
+     *
+     * <p>
+     * After padding, it processes the final block and writes the 512-bit digest (64 bytes) to {@code digest}
+     * in big-endian word order.
+     * </p>
+     *
+     * @param digest output buffer that receives exactly 64 bytes
      */
     public void NESSIEfinalize(byte[] digest) {
-        // append a '1'-bit:
         buffer[bufferPos] |= 0x80 >>> (bufferBits & 7);
-        bufferPos++; // all remaining bits on the current byte are set to zero.
-        // pad with zero bits to complete 512N + 256 bits:
+        bufferPos++;
+
         if (bufferPos > 32) {
             while (bufferPos < 64) {
                 buffer[bufferPos++] = 0;
             }
-            // process data block:
             processBuffer();
-            // reset buffer:
             bufferPos = 0;
         }
         while (bufferPos < 32) {
             buffer[bufferPos++] = 0;
         }
-        // append bit length of hashed data:
+
         System.arraycopy(bitLength, 0, buffer, 32, 32);
-        // process data block:
         processBuffer();
-        // return the completed message digest:
+
         for (int i = 0, j = 0; i < 8; i++, j += 8) {
             long h = hash[i];
             digest[j] = (byte) (h >>> 56);
@@ -334,11 +375,15 @@ public class Whirlpool {
     }
 
     /**
-     * Delivers string input data to the hashing algorithm.
+     * Convenience helper that hashes an ASCII string using {@link #NESSIEadd(byte[], long)}.
      *
-     * @param source plaintext data to hash (ASCII text string).
-     *               <p>
-     *               This method maintains the invariant: bufferBits < 512
+     * <p>
+     * This method converts each {@code char} to a single byte via simple casting, which matches the
+     * original reference behavior. It is intended for ASCII text only. For UTF-8 or other encodings,
+     * convert the string yourself and call {@link #NESSIEadd(byte[], long)}.
+     * </p>
+     *
+     * @param source ASCII plaintext string to hash
      */
     public void NESSIEadd(String source) {
         if (!source.isEmpty()) {
@@ -349,5 +394,4 @@ public class Whirlpool {
             NESSIEadd(data, 8L * data.length);
         }
     }
-
 }

@@ -11,10 +11,27 @@ package valthorne.compression;
  * compression techniques may be more suitable.
  *
  * @author Albert Beaupre
- * @version 1.0
- * @since 1.0
+ * @since September 2nd, 2024
  */
 public interface CompressionStrategy {
+
+    /**
+     * A predefined instance of the `LZMAStrategy` class, which implements the `CompressionStrategy`
+     * interface for performing data compression and decompression using the LZMA (Lempel–Ziv–Markov chain algorithm) algorithm.
+     */
+    LZMAStrategy LZMA = new LZMAStrategy();
+
+    /**
+     * A predefined instance of the `XZStrategy` class, which implements the `CompressionStrategy`
+     * interface for performing data compression and decompression using the XZ algorithm.
+     */
+    XZStrategy XZ = new XZStrategy();
+
+    /**
+     * A predefined instance of the `BZIP2Strategy` class, which implements the `CompressionStrategy`
+     * interface for performing data compression and decompression using the BZIP2 algorithm.
+     */
+    BZIP2Strategy BZIP2 = new BZIP2Strategy();
 
     /**
      * A predefined instance of the GZIP class, which implements the CompressionStrategy

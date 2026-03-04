@@ -95,6 +95,24 @@ public class DynamicByteBuffer {
     private ByteOrder byteOrder = ByteOrder.BIG_ENDIAN;
 
     /**
+     * Constructs a new instance of DynamicByteBuffer with an initial capacity of 16 bytes.
+     * This constructor initializes the internal buffer to a default size, allowing for dynamic resizing
+     * as new data is added.
+     */
+    public DynamicByteBuffer() {
+        this(new byte[16]);
+    }
+
+    /**
+     * Constructs a new DynamicByteBuffer with the specified initial capacity.
+     *
+     * @param capacity the initial capacity of the byte buffer
+     */
+    public DynamicByteBuffer(int capacity) {
+        this(new byte[capacity]);
+    }
+
+    /**
      * Constructs a new {@code DynamicByteBuffer} with the specified byte array.
      * <p>
      * The buffer is used directly (not copied), and the read and write positions are initialized to 0.
@@ -506,8 +524,7 @@ public class DynamicByteBuffer {
      * @throws BufferUnderflowException if there are not enough bytes to read the length or the string data
      * @throws IllegalArgumentException if the length is negative
      */
-    public String readString() {
-        int length = readShort();
+    public String readString(int length) {
         if (length < 0)
             throw new BufferUnderflowException();
         checkRead(length);
@@ -534,7 +551,6 @@ public class DynamicByteBuffer {
 
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         checkWrite(4 + bytes.length);
-        writeShort((short) bytes.length);
         for (byte b : bytes) {
             buffer[writePosition++] = b;
         }
@@ -639,6 +655,7 @@ public class DynamicByteBuffer {
         }
         return this;
     }
+
 
     /**
      * Reads a specified number of bits from the buffer and returns them as an integer.
@@ -821,8 +838,53 @@ public class DynamicByteBuffer {
         return this;
     }
 
+    /**
+     * Retrieves the data stored in the buffer.
+     *
+     * @return A byte array representing the data contained in the buffer.
+     */
     public byte[] getData() {
         return this.buffer;
+    }
+
+    /**
+     * Returns a trimmed copy of the internal buffer, up to the current write position.
+     * <p>
+     * This is the method you want after writing. It flushes any pending bits first so the
+     * returned byte array includes all data.
+     * </p>
+     *
+     * @return a new byte array containing bytes [0, writePosition)
+     */
+    public byte[] toTrimmedWriteArray() {
+        flushBits();
+        return Arrays.copyOf(buffer, writePosition);
+    }
+
+    /**
+     * Returns a trimmed copy of the internal buffer, up to the current read position.
+     * <p>
+     * This is useful if you want "what has been consumed so far" during reading.
+     * </p>
+     *
+     * @return a new byte array containing bytes [0, readPosition)
+     */
+    public byte[] toTrimmedReadArray() {
+        return Arrays.copyOf(buffer, readPosition);
+    }
+
+    /**
+     * Returns a trimmed copy of the internal buffer using whichever position is farther.
+     * <p>
+     * Useful when you don't care whether the buffer was primarily used for reading or writing.
+     * If you wrote then read, this returns the larger of the two.
+     * </p>
+     *
+     * @return a new byte array containing bytes [0, max(readPosition, writePosition))
+     */
+    public byte[] toTrimmedArray() {
+        flushBits();
+        return Arrays.copyOf(buffer, Math.max(readPosition, writePosition));
     }
 
     /**
@@ -902,19 +964,5 @@ public class DynamicByteBuffer {
     public int hashCode() {
         return Objects.hash(readPosition, writePosition, bitReadCount, bitWriteCount,
                 bitReadBuffer, bitWriteBuffer, byteOrder, Arrays.hashCode(buffer));
-    }
-
-    /**
-     * Enum representing the byte order for multi-byte data types.
-     */
-    public enum ByteOrder {
-        /**
-         * Big-endian order (the most significant byte first).
-         */
-        BIG_ENDIAN,
-        /**
-         * Little-endian order (the least significant byte first).
-         */
-        LITTLE_ENDIAN
     }
 }
