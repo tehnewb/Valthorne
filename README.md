@@ -1,6 +1,6 @@
 # Valthorne
 
-## Check out the [Wiki](https://github.com/tehnewb/Valthorne/wiki/00.-Getting-Started) and Build a project with the [Valthorne Project Builder](https://github.com/tehnewb/Valthorne/wiki/00.-Getting-Started)
+## Check out the [Wiki](https://github.com/tehnewb/Valthorne/wiki/00.-Getting-Started) and Build a project with the [Valthorne Project Builder](https://github.com/tehnewb/ValthorneProjectBuilder)
 
 ### What this project does best
 
