@@ -68,26 +68,25 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
  */
 public class Texture implements Poolable {
 
-    private TextureData data;                                     // Decoded image data used to upload pixels and resolve region UVs.
-    private FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // World-space vertex positions (4 corners, x/y pairs).
-    private FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);     // Normalized UV coordinates (4 corners, u/v pairs).
-    private float[] localVertices = new float[8];                 // Local-space quad corners relative to the rotation origin.
-    private Vector2f origin = new Vector2f(0f, 0f);                // OpenGL texture object ID returned by glGenTextures().
-    private final int textureID;
-    private TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.          // Rotation/pivot point relative to the quad’s top-left.
-    private final Rectangle bounds;
-    private float leftRegion;                                           // Normalized U coordinate for the left edge of the region.
-    private float topRegion;                                            // Normalized V coordinate for the top edge of the region.
-    private float rightRegion = 1f;                                     // Normalized U coordinate for the right edge of the region.
-    private float bottomRegion = 1f;                                    // Normalized V coordinate for the bottom edge of the region.
-    private float rotation;                                             // Rotation angle in degrees (clockwise by convention here).
-    private float sinRot, cosRot = 1f;                                  // Cached sine/cosine for the current rotation angle.
-    private boolean flippedX;                                           // Whether UVs are currently flipped horizontally (left/right swapped).
-    private boolean flippedY;                                           // Whether UVs are currently flipped vertically (top/bottom swapped).
-    private float scaleX = 1f;                                          // Horizontal scale factor applied during local vertex generation.
-    private float scaleY = 1f;                                          // Vertical scale factor applied during local vertex generation.
-    private Color color = Color.WHITE;                                  // Tint color multiplied in fixed-function pipeline via glColor4f().
-
+    protected TextureData data;                                     // Decoded image data used to upload pixels and resolve region UVs.
+    protected FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // World-space vertex positions (4 corners, x/y pairs).
+    protected FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8);     // Normalized UV coordinates (4 corners, u/v pairs).
+    protected float[] localVertices = new float[8];                 // Local-space quad corners relative to the rotation origin.
+    protected Vector2f origin = new Vector2f(0f, 0f);                // OpenGL texture object ID returned by glGenTextures().
+    protected final int textureID;
+    protected TextureFilter filter = TextureFilter.NEAREST;               // Current sampling filter used for MIN/MAG scaling.          // Rotation/pivot point relative to the quad’s top-left.
+    protected final Rectangle bounds;
+    protected float leftRegion;                                           // Normalized U coordinate for the left edge of the region.
+    protected float topRegion;                                            // Normalized V coordinate for the top edge of the region.
+    protected float rightRegion = 1f;                                     // Normalized U coordinate for the right edge of the region.
+    protected float bottomRegion = 1f;                                    // Normalized V coordinate for the bottom edge of the region.
+    protected float rotation;                                             // Rotation angle in degrees (clockwise by convention here).
+    protected float sinRot, cosRot = 1f;                                  // Cached sine/cosine for the current rotation angle.
+    protected boolean flippedX;                                           // Whether UVs are currently flipped horizontally (left/right swapped).
+    protected boolean flippedY;                                           // Whether UVs are currently flipped vertically (top/bottom swapped).
+    protected float scaleX = 1f;                                          // Horizontal scale factor applied during local vertex generation.
+    protected float scaleY = 1f;                                          // Vertical scale factor applied during local vertex generation.
+    protected Color color = Color.WHITE;                                  // Tint color multiplied in fixed-function pipeline via glColor4f().
 
     /**
      * Loads a texture from an image file path using {@link TextureData}.
@@ -154,6 +153,23 @@ public class Texture implements Poolable {
         this.bounds.setWidth(data.width());
         this.bounds.setHeight(data.height());
 
+        updateLocalVertices();
+        updateUVBuffer();
+        updateVertexBuffer();
+    }
+
+    /**
+     * Constructs a new Texture instance with the specified texture ID and texture data.
+     *
+     * @param textureID the unique identifier for the texture
+     * @param data the data associated with the texture, including its dimensions and properties
+     */
+    protected Texture(int textureID, TextureData data) {
+        this.textureID = textureID;
+        this.data = data;
+        this.bounds = new Rectangle(0, 0, data.width(), data.height());
+        this.bounds.setWidth(data.width());
+        this.bounds.setHeight(data.height());
         updateLocalVertices();
         updateUVBuffer();
         updateVertexBuffer();

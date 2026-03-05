@@ -146,10 +146,8 @@ public class TexturePacker {
      */
     public void addRegion(TextureRegion region, int dx, int dy) {
         Objects.requireNonNull(region, "region");
-        Texture texture = region.getTexture();
-        if (texture == null) throw new NullPointerException("TextureRegion has null backing Texture");
 
-        TextureData data = texture.getData();
+        TextureData data = region.getData();
 
         int sx = (int) region.getRegionX();
         int sy = (int) region.getRegionY();
