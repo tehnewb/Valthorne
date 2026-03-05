@@ -324,7 +324,7 @@ public final class TextureBatch {
      */
     public void draw(Texture tex, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
-        drawUV(tex, tex.getX(), tex.getY(), tex.getWidth(), tex.getHeight(), 0f, 0f, 1f, 1f, tint);
+        drawUV(tex, tex.getX(), tex.getY(), tex.getWidth(), tex.getHeight(), tex.leftRegion, tex.topRegion, tex.rightRegion, tex.bottomRegion, tint);
     }
 
     /**
@@ -420,8 +420,14 @@ public final class TextureBatch {
     public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
 
-        float texW = tex.getWidth();
-        float texH = tex.getHeight();
+        TextureData d = tex.getData();
+        if (d == null) {
+            drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
+            return;
+        }
+
+        float texW = d.width();
+        float texH = d.height();
 
         if (texW == 0f || texH == 0f) {
             drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
@@ -446,7 +452,7 @@ public final class TextureBatch {
      */
     public void drawRegion(TextureRegion region) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region.getTexture(), region.getX(), region.getY(), region.getWidth(), region.getHeight(), region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
+        drawRegion(region, region.getX(), region.getY(), region.getWidth(), region.getHeight(), region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
     }
 
     /**
@@ -463,7 +469,7 @@ public final class TextureBatch {
      */
     public void drawRegion(TextureRegion region, float x, float y, float w, float h) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
+        drawRegion(region, x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
     }
 
     /**
@@ -481,7 +487,7 @@ public final class TextureBatch {
      */
     public void drawRegion(TextureRegion region, float x, float y, float w, float h, Color tint) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
+        drawRegion(region, x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
     }
 
     /**

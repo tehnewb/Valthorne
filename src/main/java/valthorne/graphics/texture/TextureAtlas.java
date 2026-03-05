@@ -246,11 +246,8 @@ public final class TextureAtlas {
      * @return this
      */
     public TextureAtlas add(String key, TextureRegion region) {
-        Objects.requireNonNull(region, "region");
-        Texture t = region.getTexture();
-        if (t == null) throw new NullPointerException("TextureRegion has null backing Texture for key=" + key);
-        TextureData data = t.getData();
-        if (data == null) throw new NullPointerException("region.getTexture().getData() returned null for key=" + key);
+        Objects.requireNonNull(region, "TextureRegion cannot be null");
+        TextureData data = region.getData();
 
         int sx = (int) region.getRegionX();
         int sy = (int) region.getRegionY();

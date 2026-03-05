@@ -12,23 +12,66 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * The Assets class is a utility class for managing the asynchronous loading and caching
- * of assets used within an application. It provides mechanisms to add asset loaders, load assets
- * asynchronously, prepare assets for loading, and retrieve loaded assets.
+ * Asset manager for Valthorne that supports "prepare then load" and direct async loads with caching.
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * // 1) Register loaders (optional if you rely on the defaults in the static initializer).
+ * Assets.addLoader(TextureParameters.class, new TextureLoader());
+ * Assets.addLoader(SoundParameters.class,   new SoundLoader());
+ * Assets.addLoader(FontParameters.class,    new FontLoader());
+ *
+ * // 2) Queue assets you want to load as a batch.
+ * Assets.resetProgress();
+ * Assets.prepare(TextureParameters.fromClasspath("ui/button.png", "btn"));
+ * Assets.prepare(FontParameters.fromClasspath("ui/font.ttf", "font", 18));
+ *
+ * // 3) Kick off the batch load.
+ * Assets.load().thenRun(() -> {
+ *     TextureData btn = Assets.get("btn", TextureData.class);
+ *     FontData font = Assets.get("font", FontData.class);
+ * });
+ *
+ * // 4) You can also load something immediately (deduped by key).
+ * Assets.loadAsync(TextureParameters.fromClasspath("ui/bg.png", "bg"), TextureData.class)
+ *       .thenAccept(bg -> {  });
+ *
+ * // 5) Progress reporting for loading screens.
+ * float p = Assets.getProgress(); // 0..1
+ *
+ * // 6) Shutdown at the end of the app if you want to stop background work.
+ * Assets.shutdown();
+ * }</pre>
+ *
+ * <h2>What this class does</h2>
  * <p>
- * This class is designed to ensure efficient and thread-safe asset management using a combination
- * of concurrent utilities, such as ExecutorService and ConcurrentHashMap. It supports typical
- * asset lifecycle operations like preparation, asynchronous loading, caching, and progress tracking.
+ * {@code Assets} provides a static, thread-safe cache of asynchronously loaded assets keyed by
+ * {@link AssetParameters#key()}. It supports two primary workflows:
+ * </p>
+ * <ul>
+ *     <li><b>Batch loading</b>: call {@link #prepare(AssetParameters)} many times, then call {@link #load()}
+ *     once to load the entire batch and track progress.</li>
+ *     <li><b>Direct loading</b>: call {@link #loadAsync(AssetParameters, Class)} for one-off loads (also cached).</li>
+ * </ul>
+ *
+ * <h2>Caching and deduplication</h2>
  * <p>
- * Key Features:
- * - Registering custom asset loaders
- * - Preparing assets to be loaded
- * - Asynchronous asset loading with automatic caching
- * - Accessing and removing assets from the cache
- * - Tracking loading progress and load completion state
- * - Safe shutdown of the ExecutorService used for loading operations
+ * Both workflows deduplicate by the parameter key. If the same key is requested multiple times,
+ * callers will share the same {@link CompletableFuture} instance from {@link #cache}.
+ * </p>
+ *
+ * <h2>Threading model</h2>
  * <p>
- * Thread safety is ensured for all static methods in this class.
+ * All loading work runs on {@link #service}. Loaders are looked up by the runtime class of the parameter
+ * instance (e.g. {@code TextureParameters.class}). The cache stores futures so callers can join or compose
+ * without blocking the render thread.
+ * </p>
+ *
+ * <h2>Progress tracking</h2>
+ * <p>
+ * Progress is defined as {@code completedCount / preparedCount}. It only applies to the batch workflow
+ * (prepared and load). Direct {@link #loadAsync(AssetParameters, Class)} calls do not increment the prepared count.
+ * </p>
  *
  * @author Albert Beaupre
  * @since December 7th, 2025
@@ -231,7 +274,10 @@ public final class Assets {
                         return loader.load(parameters);
                     }, service)
                     .whenComplete((_, ex) -> {
-                        if (ex != null) { ex.printStackTrace(); return; }
+                        if (ex != null) {
+                            ex.printStackTrace();
+                            return;
+                        }
                         completedCount.incrementAndGet();
                     });
 
