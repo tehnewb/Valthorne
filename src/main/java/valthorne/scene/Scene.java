@@ -4,14 +4,7 @@ import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.Window;
 import valthorne.camera.Camera2D;
-import valthorne.event.events.KeyPressEvent;
-import valthorne.event.events.KeyReleaseEvent;
-import valthorne.event.events.MouseDragEvent;
-import valthorne.event.events.MouseMoveEvent;
-import valthorne.event.events.MousePressEvent;
-import valthorne.event.events.MouseReleaseEvent;
-import valthorne.event.events.MouseScrollEvent;
-import valthorne.event.events.WindowResizeEvent;
+import valthorne.event.events.*;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UI;
 import valthorne.viewport.ScreenViewport;
@@ -175,12 +168,10 @@ public abstract class Scene {
 
         batch.begin();
         render(batch);
-
-        if (ui != null) {
-            ui.draw(batch);
-        }
-
         batch.end();
+
+        if (ui != null)
+            ui.draw();
     }
 
     /**
@@ -200,6 +191,9 @@ public abstract class Scene {
         }
 
         update(delta);
+
+        if (ui != null)
+            ui.update(delta);
     }
 
     /**
