@@ -37,10 +37,6 @@ import java.nio.file.Path;
  */
 public record TextureData(ByteBuffer buffer, short width, short height) {
 
-    private static final IntBuffer w = BufferUtils.createIntBuffer(1);
-    private static final IntBuffer h = BufferUtils.createIntBuffer(1);
-    private static final IntBuffer comp = BufferUtils.createIntBuffer(1);
-
     /**
      * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
      *
@@ -99,6 +95,10 @@ public record TextureData(ByteBuffer buffer, short width, short height) {
      * @throws RuntimeException if STBImage fails to decode the image
      */
     public static TextureData load(byte[] data, boolean flipVertically) {
+        final IntBuffer w = BufferUtils.createIntBuffer(1);
+        final IntBuffer h = BufferUtils.createIntBuffer(1);
+        final IntBuffer comp = BufferUtils.createIntBuffer(1);
+
         ByteBuffer dataBuffer = BufferUtils.createByteBuffer(data.length);
         dataBuffer.put(data).flip();
 
