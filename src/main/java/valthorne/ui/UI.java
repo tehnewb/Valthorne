@@ -81,9 +81,7 @@ import valthorne.viewport.Viewport;
  * rootPanel.add(login);
  * ui.add(rootPanel);
  *
- * batch.begin();
- * ui.draw(batch);
- * batch.end();
+ * ui.draw();
  *
  * // Later during shutdown:
  * ui.dispose();
@@ -106,6 +104,7 @@ public class UI extends ElementContainer {
     private final UIMouseListener mouseListener = new UIMouseListener(); // Mouse listener registered against the global mouse input system.
     private final UIScrollListener scrollListener = new UIScrollListener(); // Scroll listener registered against the global mouse scroll input system.
     private final UIWindowListener windowListener = new UIWindowListener(); // Window resize listener registered against the global window system.
+    private final TextureBatch batch;
 
     /**
      * Creates the root UI object, registers all required global listeners, and initializes the
@@ -118,6 +117,7 @@ public class UI extends ElementContainer {
      * </p>
      */
     public UI() {
+        this.batch = new TextureBatch(4096);
         Keyboard.addKeyListener(keyListener);
         Mouse.addMouseListener(mouseListener);
         Mouse.addScrollListener(scrollListener);
@@ -159,7 +159,7 @@ public class UI extends ElementContainer {
     }
 
     /**
-     * Draws the entire UI tree using the supplied batch.
+     * Draws the entire UI tree
      *
      * <p>
      * When a viewport is assigned, the viewport is bound before drawing begins and unbound
@@ -172,18 +172,25 @@ public class UI extends ElementContainer {
      * When no viewport is assigned, the method simply delegates directly to the inherited
      * container draw logic.
      * </p>
-     *
-     * @param batch batch used to draw all UI elements
      */
-    @Override
-    public void draw(TextureBatch batch) {
+    public void draw() {
         if (viewport != null) {
             viewport.bind();
+            batch.begin();
             super.draw(batch);
+            batch.end();
             viewport.unbind();
         } else {
+            batch.begin();
             super.draw(batch);
+            batch.end();
         }
+    }
+
+    @Override
+    @Deprecated
+    public void draw(TextureBatch batch) {
+        throw new UnsupportedOperationException("UI.draw(TextureBatch) is not supported. Use UI.draw() instead.");
     }
 
     /**

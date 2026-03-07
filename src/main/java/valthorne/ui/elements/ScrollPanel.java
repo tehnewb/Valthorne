@@ -184,9 +184,10 @@ public class ScrollPanel extends ElementContainer {
     private void applyContentClipBounds(boolean needV, boolean needH) {
         float t = scrollbarThickness;
 
-        // We reserve "t + pad" inside the panel so content doesn't draw under the bar.
-        float reserveW = needV ? t : 0f;
-        float reserveH = needH ? t : 0f;
+        clipBounds.setX(x);
+        clipBounds.setY(y + (needH ? t : 0f));
+        clipBounds.setWidth(width - (needV ? t : 0f));
+        clipBounds.setHeight(height - (needH ? t : 0f));
     }
 
     /**
@@ -284,7 +285,6 @@ public class ScrollPanel extends ElementContainer {
             style.getBackground().draw(batch, x, y, width, height);
         }
 
-        // Children clipped by ElementContainer's scissor logic (uses clipBounds).
         super.draw(batch);
 
         // Bars on top (not scrolled)
