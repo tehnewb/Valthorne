@@ -1,9 +1,9 @@
 package valthorne.cache;
 
+import valthorne.cache.checksum.ChecksumTable;
 import valthorne.io.buffer.DynamicByteBuffer;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -59,6 +59,12 @@ import java.nio.file.StandardOpenOption;
  * Archive payload encoding/decoding is handled by {@link CacheArchive#compress(CacheArchive)} and
  * {@link CacheArchive#decompress(byte[], byte)}.
  * </p>
+ * Alongside the cache file, {@link #save(Path)} will also write a checksum table file:
+ * </p>
+ * <ul>
+ *     <li>{@code cache.vthn} -> main cache</li>
+ *     <li>{@code cache.chk} -> checksum table (manifest)</li>
+ * </ul>
  *
  * @author Albert Beaupre
  * @since March 3rd, 2026
@@ -66,6 +72,7 @@ import java.nio.file.StandardOpenOption;
 public class CacheStore {
 
     private CacheArchive[] archives; // Archives contained by this store (ordered by index/id).
+    private ChecksumTable checksums;
     private int version; // Store format version written as an unsigned short.
 
     /**
@@ -306,23 +313,14 @@ public class CacheStore {
     }
 
     /**
-     * Saves this cache store to disk using the VTHN binary format.
+     * Saves the current state of the cache store to the specified file path,
+     * writing its archives and associated data. A corresponding checksum file
+     * with the ".chk" extension is also created alongside the main file.
      *
-     * <p>
-     * This writes:
-     * </p>
-     * <ul>
-     *     <li>store version (short)</li>
-     *     <li>archive count (short)</li>
-     *     <li>archive entries (compression id + payload size + payload bytes)</li>
-     * </ul>
-     *
-     * <p>
-     * Archive payload bytes are produced by {@link CacheArchive#compress(CacheArchive)}.
-     * </p>
-     *
-     * @param path destination path to write
-     * @throws NullPointerException if path is null
+     * @param path the file path where the cache store and its checksum data
+     *             will be written
+     * @throws RuntimeException if an {@code IOException} occurs during
+     *                          any file write operations
      */
     public void save(Path path) {
         DynamicByteBuffer buffer = new DynamicByteBuffer();
@@ -335,28 +333,53 @@ public class CacheStore {
             buffer.writeInt(compressed.length);
             buffer.writeBytes(compressed);
         }
+
         try {
             Files.write(path, buffer.toTrimmedWriteArray(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+            this.checksums = ChecksumTable.build(this, true);
+
+            String fileName = path.getFileName().toString();
+            int dot = fileName.lastIndexOf('.');
+            String base = dot == -1 ? fileName : fileName.substring(0, dot);
+
+            Path checksumPath = path.resolveSibling(base + ".chk");
+
+            byte[] checksumBytes = ChecksumTable.encode(checksums);
+            Files.write(checksumPath, checksumBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
     /**
-     * Loads a cache store from a file path.
-     *
+     * Loads a cache store from a file at the specified path.
      * <p>
-     * This is a convenience method that reads all bytes from the file and delegates to
-     * {@link #load(byte[])}.
-     * </p>
+     * This method reads the file data and attempts to decode it into a {@code CacheStore} instance.
+     * If a matching checksum file exists in the same location with a ".chk" extension, it will also parse
+     * and associate the checksum data with the loaded store.
      *
-     * @param path cache store file path
-     * @return loaded cache store
-     * @throws RuntimeException if reading fails
+     * @param path the path to the cache store file to be loaded
+     * @return a {@code CacheStore} instance initialized from the file data
+     * @throws RuntimeException if an {@code IOException} occurs during file read operations
      */
     public static CacheStore load(Path path) {
         try {
-            return load(Files.readAllBytes(path));
+            CacheStore store = load(Files.readAllBytes(path));
+
+            String fileName = path.getFileName().toString();
+            int dot = fileName.lastIndexOf('.');
+            String base = dot == -1 ? fileName : fileName.substring(0, dot);
+
+            Path checksumPath = path.resolveSibling(base + ".chk");
+
+            if (Files.exists(checksumPath)) {
+                byte[] checksumBytes = Files.readAllBytes(checksumPath);
+                store.checksums = ChecksumTable.decode(checksumBytes);
+            }
+
+            return store;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -389,7 +412,6 @@ public class CacheStore {
             byte[] payload = buffer.readBytes(compressedSize);
             archives[archiveID] = CacheArchive.decompress(payload, compression);
         }
-
         return store;
     }
 }
