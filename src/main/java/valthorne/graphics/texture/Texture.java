@@ -86,7 +86,7 @@ public class Texture implements Poolable {
     protected boolean flippedY;                                           // Whether UVs are currently flipped vertically (top/bottom swapped).
     protected float scaleX = 1f;                                          // Horizontal scale factor applied during local vertex generation.
     protected float scaleY = 1f;                                          // Vertical scale factor applied during local vertex generation.
-    protected Color color = Color.WHITE;                                  // Tint color multiplied in fixed-function pipeline via glColor4f().
+    protected Color color = new Color(1, 1, 1, 1);  // Tint color multiplied in fixed-function pipeline via glColor4f().
 
     /**
      * Loads a texture from an image file path using {@link TextureData}.

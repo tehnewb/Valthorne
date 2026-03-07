@@ -5,11 +5,14 @@ import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.KeyReleaseEvent;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
-import valthorne.graphics.DrawFunction;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.font.Font;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.Vector2f;
-import valthorne.ui.*;
+import valthorne.ui.Dimensional;
+import valthorne.ui.Element;
+import valthorne.ui.Sizeable;
+import valthorne.ui.UIAction;
 import valthorne.ui.enums.Alignment;
 import valthorne.ui.styles.ButtonStyle;
 
@@ -67,7 +70,6 @@ public class Button extends Element {
     private Drawable current;                // Currently active drawable (background/hovered/pressed/etc.).
     private UIAction<Button> action;         // Optional action invoked on activation (mouse release / Enter).
     private Alignment textAlignment;         // Alignment used to position the font relative to this element.
-    private final DrawFunction draw;         // Scissored draw callback that renders background + text.
 
     /**
      * Constructs a button with centered text and a default {@link ButtonStyle}.
@@ -175,10 +177,6 @@ public class Button extends Element {
         this.font.setText(text);
         this.action = action;
         this.setFocusable(true);
-        this.draw = () -> {
-            current.draw(this.x, this.y, this.width, this.height);
-            font.draw();
-        };
         this.setSize(font.getWidth(), font.getHeight());
     }
 
@@ -208,11 +206,14 @@ public class Button extends Element {
      * <p>The draw callback renders the current background first, then the label text.</p>
      */
     @Override
-    public void draw() {
+    public void draw(TextureBatch batch) {
         if (current == null)
             return;
 
-        this.getUI().getViewport().applyScissor(this.x, this.y, this.width, this.height, draw);
+        batch.beginScissor((int) this.x, (int) this.y, (int) this.width, (int) this.height);
+        current.draw(batch, this.x, this.y, this.width, this.height);
+        font.draw(batch);
+        batch.endScissor();
     }
 
     /**

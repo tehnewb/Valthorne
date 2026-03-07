@@ -1,6 +1,7 @@
 package valthorne.ui.elements;
 
 import valthorne.graphics.font.Font;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.math.Vector2f;
 import valthorne.ui.enums.Alignment;
@@ -35,13 +36,13 @@ public class ProgressBar extends Element {
     }
 
     @Override
-    public void draw() {
+    public void draw(TextureBatch batch) {
         float percentage = displayedProgress / (max - min);
 
-        style.getBackground().draw(this.x, this.y, this.width, this.height);
-        style.getForeground().draw(this.x, this.y, this.width * percentage, this.height);
+        style.getBackground().draw(batch, this.x, this.y, this.width, this.height);
+        style.getForeground().draw(batch, this.x, this.y, this.width * percentage, this.height);
         if (displayPercentage)
-            font.draw();
+            font.draw(batch);
     }
 
     @Override

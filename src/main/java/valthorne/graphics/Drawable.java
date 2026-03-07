@@ -1,5 +1,7 @@
 package valthorne.graphics;
 
+import valthorne.graphics.texture.TextureBatch;
+
 /**
  * Defines an interface for objects that can be drawn to a specific position
  * and size on a rendering surface. Implementations of this interface
@@ -17,15 +19,15 @@ package valthorne.graphics;
 public interface Drawable {
 
     /**
-     * Renders the drawable object on the rendering surface at the specified position
-     * and with the specified dimensions.
+     * Renders the drawable object to the specified position and size on the rendering surface.
      *
-     * @param x      The x-coordinate of the top-left corner where the object should be drawn.
-     * @param y      The y-coordinate of the top-left corner where the object should be drawn.
-     * @param width  The width of the drawable object.
-     * @param height The height of the drawable object.
+     * @param batch the batch used for drawing, which manages rendering operations
+     * @param x the x-coordinate of the position where the object should be drawn
+     * @param y the y-coordinate of the position where the object should be drawn
+     * @param width the width of the area where the object should be drawn
+     * @param height the height of the area where the object should be drawn
      */
-    void draw(float x, float y, float width, float height);
+    void draw(TextureBatch batch, float x, float y, float width, float height);
 
     /**
      * Retrieves the width of the drawable object.

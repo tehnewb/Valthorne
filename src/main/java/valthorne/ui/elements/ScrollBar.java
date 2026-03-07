@@ -4,6 +4,7 @@ import valthorne.event.events.MouseDragEvent;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Drawable;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.math.Vector2f;
 import valthorne.math.geometry.Rectangle;
@@ -130,20 +131,20 @@ public class ScrollBar extends Element {
     }
 
     @Override
-    public void draw() {
+    public void draw(TextureBatch batch) {
         if (!isNeeded()) return;
 
         Drawable barDrawable = (style != null) ? style.getBar() : null;
         Drawable thumbDrawable = (style != null) ? style.getThumb() : null;
 
         if (barDrawable != null) {
-            barDrawable.draw(track.getX(), track.getY(), track.getWidth(), track.getHeight());
+            barDrawable.draw(batch, track.getX(), track.getY(), track.getWidth(), track.getHeight());
         } else {
             drawSolidRect(track.getX(), track.getY(), track.getWidth(), track.getHeight(), 1f, 1f, 1f, 0.12f);
         }
 
         if (thumbDrawable != null) {
-            thumbDrawable.draw(thumb.getX(), thumb.getY(), thumb.getWidth(), thumb.getHeight());
+            thumbDrawable.draw(batch, thumb.getX(), thumb.getY(), thumb.getWidth(), thumb.getHeight());
         } else {
             drawSolidRect(thumb.getX(), thumb.getY(), thumb.getWidth(), thumb.getHeight(), 1f, 1f, 1f, 0.8f);
         }

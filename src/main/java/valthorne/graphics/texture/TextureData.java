@@ -41,7 +41,6 @@ public record TextureData(ByteBuffer buffer, short width, short height) {
     private static final IntBuffer h = BufferUtils.createIntBuffer(1);
     private static final IntBuffer comp = BufferUtils.createIntBuffer(1);
 
-
     /**
      * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
      *

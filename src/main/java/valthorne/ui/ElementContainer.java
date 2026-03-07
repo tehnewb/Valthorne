@@ -1,6 +1,6 @@
 package valthorne.ui;
 
-import valthorne.graphics.DrawFunction;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.geometry.Rectangle;
 import valthorne.viewport.Viewport;
 
@@ -19,7 +19,6 @@ import java.util.Collections;
  */
 public abstract class ElementContainer extends Element {
 
-    private final DrawFunction draw = this::drawElements;
     protected Element[] elements = new Element[8]; // Array to store child elements with initial capacity of 8
     protected int size; // Current number of elements in the container
 
@@ -145,18 +144,18 @@ public abstract class ElementContainer extends Element {
     }
 
     @Override
-    public void draw() {
-        Viewport viewport = getUI().getViewport();
+    public void draw(TextureBatch batch) {
         Rectangle clip = this.getClipBounds();
         if (clip != null) {
-            viewport.applyScissor(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight(), draw);
+            batch.beginScissor((int) clip.getX(), (int) clip.getY(), (int) clip.getWidth(), (int) clip.getHeight());
+            this.drawElements(batch);
+            batch.endScissor();
         } else {
-            drawElements();
+            drawElements(batch);
         }
     }
 
-    private void drawElements() {
-        Viewport viewport = getUI().getViewport();
+    private void drawElements(TextureBatch batch) {
         Rectangle clip = this.getClipBounds();
         for (int i = 0; i < size; i++) {
             Element element = elements[i];
@@ -168,9 +167,11 @@ public abstract class ElementContainer extends Element {
 
             if (element.getClipBounds() != null) {
                 Rectangle clipBounds = element.getClipBounds();
-                viewport.applyScissor(clipBounds.getX(), clipBounds.getY(), clipBounds.getWidth(), clipBounds.getHeight(), element);
+                batch.beginScissor((int) clipBounds.getX(), (int) clipBounds.getY(), (int) clipBounds.getWidth(), (int) clipBounds.getHeight());
+                element.draw(batch);
+                batch.endScissor();
             } else {
-                element.draw();
+                element.draw(batch);
             }
         }
     }

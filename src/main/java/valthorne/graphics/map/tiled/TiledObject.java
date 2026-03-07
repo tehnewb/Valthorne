@@ -6,22 +6,45 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-public class TiledObject {
-    public final int id;                       // Object id.
-    public final String name;                  // Object name.
-    public final String type;                  // Object type (often used like an entity class).
-    public final float x;                      // X in pixels (Tiled space).
-    public final float y;                      // Y in pixels (Tiled space).
-    public final float width;                  // Width in pixels.
-    public final float height;                 // Height in pixels.
-    public final float rotation;               // Rotation degrees.
-    public final boolean visible;              // Visible.
-    public final int gid;                      // If this object is a tile object, gid != 0.
-    public final Map<String, String> properties;// Properties.
-    public final TiledShapeType tiledShapeType;                  // TiledShapeType type.
-    public final float[] points;               // For polygon/polyline: x0,y0,x1,y1...
-    public final String text;                  // For text objects.
 
+/**
+ * Represents an object within a Tiled map with a variety of properties.
+ *
+ * @param id             The unique identifier for the object.
+ * @param name           The name of the object, which may be an empty string if not specified.
+ * @param type           The type of the object, which is used to define its category and may be an empty string if not specified.
+ * @param x              The x-coordinate of the object's position in the Tiled map.
+ * @param y              The y-coordinate of the object's position in the Tiled map.
+ * @param width          The width of the object, or zero if it is undefined.
+ * @param height         The height of the object, or zero if it is undefined.
+ * @param rotation       The rotation of the object in degrees.
+ * @param visible        A boolean indicating whether the object is visible.
+ * @param gid            The global identifier for a tile, or zero if the object is not connected to a tile.
+ * @param properties     A map of custom properties as key-value pairs defined for the object.
+ * @param tiledShapeType The shape type of the object (e.g., RECT, POINT, ELLIPSE, etc.) as defined by {@link TiledShapeType}.
+ * @param points         An array of points representing polygons or polylines, or null if the object does not use points.
+ * @param text           The text content of the object (if it is a text object), or null if no text is associated.
+ */
+public record TiledObject(int id, String name, String type, float x, float y, float width, float height, float rotation, boolean visible, int gid, Map<String, String> properties, TiledShapeType tiledShapeType, float[] points, String text) {
+
+    /**
+     * Constructs a TiledObject instance with the specified parameters.
+     *
+     * @param id             the unique identifier for the TiledObject
+     * @param name           the name of the TiledObject, defaults to an empty string if null
+     * @param type           the type of the TiledObject, defaults to an empty string if null
+     * @param x              the x-coordinate position of the TiledObject
+     * @param y              the y-coordinate position of the TiledObject
+     * @param width          the width of the TiledObject
+     * @param height         the height of the TiledObject
+     * @param rotation       the rotation angle of the TiledObject in degrees
+     * @param visible        the visibility state of the TiledObject
+     * @param gid            the global identifier of the associated tile, or 0 if there is no associated tile
+     * @param properties     a map of custom properties for the TiledObject, defaults to an empty map if null
+     * @param tiledShapeType the shape type of the TiledObject, defaults to TiledShapeType.RECT if null
+     * @param points         an array of floats representing points for polygon or polyline shapes
+     * @param text           the text content of the TiledObject, if applicable
+     */
     public TiledObject(int id, String name, String type, float x, float y, float width, float height, float rotation, boolean visible, int gid, Map<String, String> properties, TiledShapeType tiledShapeType, float[] points, String text) {
         this.id = id;
         this.name = (name != null) ? name : "";
@@ -39,6 +62,16 @@ public class TiledObject {
         this.text = text;
     }
 
+    /**
+     * Reads and parses a TiledObject from the given XMLStreamReader.
+     * This method processes various attributes and elements of a TiledObject,
+     * including its geometry, properties, and other metadata,
+     * during the parsing of an XML document.
+     *
+     * @param r the XMLStreamReader from which the TiledObject is read and parsed
+     * @return a TiledObject instance representing the parsed XML element
+     * @throws Exception if an error occurs while parsing the XML
+     */
     public static TiledObject readObject(XMLStreamReader r) throws Exception {
         int id = TiledXML.readInteger(r, "id", 0);
         String name = TiledXML.readAttribute(r, "name", "");

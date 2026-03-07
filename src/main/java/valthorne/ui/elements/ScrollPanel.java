@@ -4,6 +4,7 @@ import valthorne.event.events.MouseDragEvent;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.event.events.MouseScrollEvent;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.geometry.Rectangle;
 import valthorne.ui.Element;
 import valthorne.ui.ElementContainer;
@@ -278,18 +279,18 @@ public class ScrollPanel extends ElementContainer {
     }
 
     @Override
-    public void draw() {
+    public void draw(TextureBatch batch) {
         if (style != null && style.getBackground() != null) {
-            style.getBackground().draw(x, y, width, height);
+            style.getBackground().draw(batch, x, y, width, height);
         }
 
         // Children clipped by ElementContainer's scissor logic (uses clipBounds).
-        super.draw();
+        super.draw(batch);
 
         // Bars on top (not scrolled)
         if (showScrollbars) {
-            if (vBar != null && vBar.isNeeded()) vBar.draw();
-            if (hBar != null && hBar.isNeeded()) hBar.draw();
+            if (vBar != null && vBar.isNeeded()) vBar.draw(batch);
+            if (hBar != null && hBar.isNeeded()) hBar.draw(batch);
         }
     }
 

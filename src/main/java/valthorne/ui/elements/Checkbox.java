@@ -4,6 +4,7 @@ import valthorne.event.events.KeyReleaseEvent;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Drawable;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.Element;
 import valthorne.ui.UIAction;
 import valthorne.ui.styles.CheckboxStyle;
@@ -31,15 +32,15 @@ public class Checkbox extends Element {
     }
 
     @Override
-    public void draw() {
+    public void draw(TextureBatch batch) {
         if (current == null)
             return;
 
-        current.draw(this.x, this.y, this.width, this.height);
+        current.draw(batch, this.x, this.y, this.width, this.height);
         if (checked && style.getCheckmark() != null) {
             float cw = this.width / 2f;
             float ch = this.height / 2f;
-            style.getCheckmark().draw(this.x + (this.width - cw) / 2, this.y + (this.height - ch) / 2, cw, ch);
+            style.getCheckmark().draw(batch, this.x + (this.width - cw) / 2, this.y + (this.height - ch) / 2, cw, ch);
         }
     }
 

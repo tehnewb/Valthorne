@@ -7,115 +7,231 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The Text class provides utility methods for manipulating text strings.
+ * <h1>TextUtility</h1>
+ *
+ * <p>
+ * {@code TextUtility} is a mutable, chainable text helper built for situations where you want to
+ * progressively transform a single piece of text through a fluent API. Instead of repeatedly
+ * creating new strings at the call site and manually reassigning them, this class keeps an internal
+ * {@link String} value and lets you apply multiple operations to that value in sequence.
+ * </p>
+ *
+ * <p>
+ * The class is intentionally stateful. Most modifier methods update the current internal text and
+ * then return {@code this}, which makes it convenient for method chaining. This design works well in
+ * UI formatting, debug output generation, lightweight text cleanup, quick user-facing string
+ * transformations, and other engine-side or tooling-side scenarios where a mutable wrapper is more
+ * convenient than manually composing several separate string expressions.
+ * </p>
+ *
+ * <h2>How this class behaves</h2>
+ * <ul>
+ *     <li>The current text is stored in a single internal field.</li>
+ *     <li>Most transformation methods mutate that field and return the same instance.</li>
+ *     <li>Query methods such as word counts or palindrome checks inspect the current text without replacing it.</li>
+ *     <li>Factory methods are provided for common primitive types so this utility can be created fluently.</li>
+ * </ul>
+ *
+ * <h2>Important design notes</h2>
+ * <ul>
+ *     <li>This class is mutable, so one instance should usually represent one evolving text value.</li>
+ *     <li>Null input is tolerated in some places, but most transformation methods expect a non-null internal string.</li>
+ *     <li>Methods that interpret the internal text as another type, such as {@link #formatStorageUnits()}, require compatible content.</li>
+ *     <li>Regex-based methods use the Java regular-expression engine, not plain literal replacement.</li>
+ * </ul>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * String result = TextUtility.of("hello amazing world")
+ *         .upperFirst()
+ *         .withSuffix("from Valthorne")
+ *         .abbreviate(24)
+ *         .toString();
+ *
+ * System.out.println(result);
+ *
+ * TextUtility utility = TextUtility.of("playerHealthValue");
+ * utility.camelCaseToWords().toTitleCase();
+ * System.out.println(utility); // Player Health Value
+ *
+ * String encoded = TextUtility.of("save data")
+ *         .base64Encode()
+ *         .toString();
+ *
+ * System.out.println(encoded);
+ * }</pre>
  *
  * @author Albert Beaupre
- * @version 1.0
- * @since May 1st, 2024
+ * @since March 7th, 2026
  */
 public class TextUtility {
-    public static final String[] VOWELS = {"a", "e", "i", "o", "u", "A", "E", "I", "O", "U"};
-
-    private String string;
 
     /**
-     * Constructs a Text object with the given string.
+     * Common vowels used by {@link #withPrefix(String)} when deciding whether to prepend
+     * {@code "a"} or {@code "an"}.
+     */
+    public static final String[] VOWELS = {"a", "e", "i", "o", "u", "A", "E", "I", "O", "U"};
+
+    private String string; // The current mutable text value wrapped by this utility instance.
+
+    /**
+     * Creates a new utility instance that wraps the provided text.
      *
-     * @param string The input text string.
+     * <p>
+     * The provided value becomes the internal text that all future operations read from and write to.
+     * No defensive copy is needed because {@link String} is immutable.
+     * </p>
+     *
+     * @param string the initial text value to wrap
      */
     public TextUtility(String string) {
         this.string = string;
     }
 
     /**
-     * Constructs a Text object with the given string.
+     * Creates a new utility instance from a string value.
      *
-     * @param string The input text string.
+     * <p>
+     * This is the main convenience factory for fluent creation.
+     * </p>
+     *
+     * @param string the initial text value
+     * @return a new utility instance wrapping the provided text
      */
     public static TextUtility of(String string) {
         return new TextUtility(string);
     }
 
     /**
-     * Constructs a Text object converting the given byte to a string.
+     * Creates a new utility instance from a byte value.
      *
-     * @param b The byte to convert.
+     * <p>
+     * The byte is converted using {@link String#valueOf(int)} before being wrapped.
+     * </p>
+     *
+     * @param b the byte value to wrap
+     * @return a new utility instance containing the byte as text
      */
     public static TextUtility of(byte b) {
         return new TextUtility(String.valueOf(b));
     }
 
     /**
-     * Constructs a Text object converting the given character to a string.
+     * Creates a new utility instance from a character value.
      *
-     * @param c The character to convert.
+     * <p>
+     * The character is converted using {@link String#valueOf(char)} before being wrapped.
+     * </p>
+     *
+     * @param c the character value to wrap
+     * @return a new utility instance containing the character as text
      */
     public static TextUtility of(char c) {
         return new TextUtility(String.valueOf(c));
     }
 
     /**
-     * Constructs a Text object converting the given boolean to a string.
+     * Creates a new utility instance from a boolean value.
      *
-     * @param b The boolean to convert.
+     * <p>
+     * The boolean is converted using {@link String#valueOf(boolean)} before being wrapped.
+     * </p>
+     *
+     * @param b the boolean value to wrap
+     * @return a new utility instance containing the boolean as text
      */
     public static TextUtility of(boolean b) {
         return new TextUtility(String.valueOf(b));
     }
 
     /**
-     * Constructs a Text object converting the given float to a string.
+     * Creates a new utility instance from a float value.
      *
-     * @param f The float to convert.
+     * <p>
+     * The float is converted using {@link String#valueOf(float)} before being wrapped.
+     * </p>
+     *
+     * @param f the float value to wrap
+     * @return a new utility instance containing the float as text
      */
     public static TextUtility of(float f) {
         return new TextUtility(String.valueOf(f));
     }
 
     /**
-     * Constructs a Text object converting the given short to a string.
+     * Creates a new utility instance from a short value.
      *
-     * @param s The short to convert.
+     * <p>
+     * The short is converted using {@link String#valueOf(int)} before being wrapped.
+     * </p>
+     *
+     * @param s the short value to wrap
+     * @return a new utility instance containing the short as text
      */
     public static TextUtility of(short s) {
         return new TextUtility(String.valueOf(s));
     }
 
     /**
-     * Constructs a Text object converting the given integer to a string.
+     * Creates a new utility instance from an integer value.
      *
-     * @param integer The integer to convert.
+     * <p>
+     * The integer is converted using {@link String#valueOf(int)} before being wrapped.
+     * </p>
+     *
+     * @param integer the integer value to wrap
+     * @return a new utility instance containing the integer as text
      */
     public static TextUtility of(int integer) {
         return new TextUtility(String.valueOf(integer));
     }
 
     /**
-     * Constructs a Text object converting the given double to a string.
+     * Creates a new utility instance from a double value.
      *
-     * @param d The double to convert.
+     * <p>
+     * The double is converted using {@link String#valueOf(double)} before being wrapped.
+     * </p>
+     *
+     * @param d the double value to wrap
+     * @return a new utility instance containing the double as text
      */
     public static TextUtility of(double d) {
         return new TextUtility(String.valueOf(d));
     }
 
     /**
-     * Constructs a Text object converting the given long to a string.
+     * Creates a new utility instance from a long value.
      *
-     * @param l The long to convert.
+     * <p>
+     * The long is converted using {@link String#valueOf(long)} before being wrapped.
+     * </p>
+     *
+     * @param l the long value to wrap
+     * @return a new utility instance containing the long as text
      */
     public static TextUtility of(long l) {
         return new TextUtility(String.valueOf(l));
     }
 
-
     /**
-     * Wraps the text to fit within the specified line length.
+     * Wraps the current text into multiple lines.
      *
-     * @param lineLength The maximum line length.
-     * @param wrapWords  If true, words will be wrapped to the next line if they exceed the line length.
-     *                   If false, the text will be broken at the line length boundary regardless of word boundaries.
-     * @return The modified Text object with wrapped text.
+     * <p>
+     * The text is split into whitespace-delimited words, then rebuilt line by line. When the next
+     * word would exceed the requested line length, a newline is inserted first. The
+     * {@code wrapWords} flag controls how the internal line-length tracker behaves after a forced
+     * line break.
+     * </p>
+     *
+     * <p>
+     * This method does not hyphenate or split long individual words. It wraps only at whitespace
+     * boundaries.
+     * </p>
+     *
+     * @param lineLength the preferred maximum line length
+     * @param wrapWords  whether the current line length should continue tracking the moved word after a line break
+     * @return this utility instance for chaining
      */
     public TextUtility wrap(int lineLength, boolean wrapWords) {
         String[] words = string.split("\\s+");
@@ -125,121 +241,198 @@ public class TextUtility {
         for (String word : words) {
             if (currentLineLength + word.length() <= lineLength) {
                 wrappedText.append(word).append(" ");
-                currentLineLength += word.length() + 1; // +1 for the space
+                currentLineLength += word.length() + 1;
             } else {
-                if (wrapWords) {
-                    wrappedText.append("\n").append(word).append(" ");
-                    currentLineLength = word.length() + 1; // +1 for the space
-                } else {
-                    wrappedText.append("\n").append(word).append(" ");
-                    currentLineLength = 0;
-                }
+                wrappedText.append("\n").append(word).append(" ");
+                currentLineLength = wrapWords ? word.length() + 1 : 0;
             }
         }
-        return new TextUtility(wrappedText.toString().trim());
+
+        this.string = wrappedText.toString().trim();
+        return this;
     }
 
     /**
-     * Adds a prefix "a" or "an" to the text based on the presence of vowels.
+     * Prepends {@code "a"} or {@code "an"} to the provided input string.
      *
-     * @param string The prefix string to be added.
-     * @return The modified Text object.
+     * <p>
+     * This method does not inspect the current internal text. Instead, it uses the provided
+     * argument as the noun phrase and then replaces the internal value with the resulting prefixed
+     * text.
+     * </p>
+     *
+     * <p>
+     * The decision is based on a simple first-character vowel test and is therefore intentionally
+     * lightweight rather than linguistically perfect.
+     * </p>
+     *
+     * @param string the word or phrase to prefix
+     * @return this utility instance for chaining
      */
     public TextUtility withPrefix(String string) {
         for (String vowel : VOWELS) {
             if (string.startsWith(vowel)) {
-                return new TextUtility("an " + string);
+                this.string = "an " + string;
+                return this;
             }
         }
-        return new TextUtility("a " + string);
+
+        this.string = "a " + string;
+        return this;
     }
 
     /**
-     * Capitalizes the first letter of the text and converts the rest to lowercase.
+     * Uppercases the first character and lowercases the remainder of the text.
      *
-     * @return The modified Text object.
+     * <p>
+     * This is useful for normalizing a sentence-like word or short phrase when the desired result
+     * is a single leading uppercase character followed by lowercase characters.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility upperFirst() {
-        return new TextUtility(string.substring(0, 1).toUpperCase() + string.substring(1).toLowerCase());
+        if (string == null || string.isEmpty()) {
+            return this;
+        }
+
+        this.string = string.substring(0, 1).toUpperCase() + string.substring(1).toLowerCase();
+        return this;
     }
 
     /**
-     * Appends a suffix to the text.
+     * Appends a suffix to the current text separated by a single space.
      *
-     * @param suffix The suffix string to be added.
-     * @return The modified Text object.
+     * <p>
+     * This method always inserts one space between the current text and the provided suffix.
+     * </p>
+     *
+     * @param suffix the suffix text to append
+     * @return this utility instance for chaining
      */
     public TextUtility withSuffix(String suffix) {
-        return new TextUtility(string + " " + suffix);
+        this.string = string + " " + suffix;
+        return this;
     }
 
     /**
-     * Replaces all occurrences of a substring with another string.
+     * Replaces all regex matches in the current text.
      *
-     * @param target      The target substring to be replaced.
-     * @param replacement The replacement string.
-     * @return The modified Text object.
+     * <p>
+     * This method delegates to {@link String#replaceAll(String, String)}, which means
+     * {@code target} is treated as a regular expression rather than a literal string.
+     * </p>
+     *
+     * @param target      the regex pattern to replace
+     * @param replacement the replacement text
+     * @return this utility instance for chaining
      */
     public TextUtility replaceAll(String target, String replacement) {
-        return new TextUtility(string.replaceAll(target, replacement));
+        this.string = string.replaceAll(target, replacement);
+        return this;
     }
 
     /**
-     * Truncates the text to a specified length.
+     * Truncates the current text to the requested number of characters.
      *
-     * @param length The maximum length of the text.
-     * @return The modified Text object.
+     * <p>
+     * If the text is already short enough, it is left unchanged. This method performs a hard cut
+     * and does not append ellipses.
+     * </p>
+     *
+     * @param length the maximum number of characters to keep
+     * @return this utility instance for chaining
+     * @throws IllegalArgumentException if {@code length} is negative
      */
     public TextUtility truncate(int length) {
-        return new TextUtility(string.substring(0, length));
+        if (length < 0) {
+            throw new IllegalArgumentException("length cannot be negative");
+        }
+
+        this.string = string.length() <= length ? string : string.substring(0, length);
+        return this;
     }
 
     /**
-     * Counts the number of words in the text.
+     * Counts whitespace-delimited words in the current text.
      *
-     * @return The number of words in the text.
+     * <p>
+     * Blank or null content returns zero. Word splitting is performed using one or more whitespace
+     * characters.
+     * </p>
+     *
+     * @return the number of detected words
      */
     public int countWords() {
-        String[] words = string.split("\\s+");
+        if (string == null || string.isBlank()) {
+            return 0;
+        }
+
+        String[] words = string.trim().split("\\s+");
         return words.length;
     }
 
     /**
-     * Reverses the order of words in the text.
+     * Reverses the order of words in the current text.
      *
-     * @return The modified Text object with reversed words.
+     * <p>
+     * Word boundaries are determined using whitespace splitting. The characters inside each word are
+     * preserved; only the word order changes.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility reverseWords() {
         String[] words = string.split("\\s+");
         StringBuilder reversed = new StringBuilder();
+
         for (int i = words.length - 1; i >= 0; i--) {
-            reversed.append(words[i]).append(" ");
+            reversed.append(words[i]);
+            if (i > 0) {
+                reversed.append(" ");
+            }
         }
-        return new TextUtility(reversed.toString().trim());
+
+        this.string = reversed.toString();
+        return this;
     }
 
     /**
-     * Checks if the text is a pangram (contains every letter of the alphabet at least once).
+     * Checks whether the current text is a pangram.
      *
-     * @return true if the text is a pangram, otherwise false.
+     * <p>
+     * A pangram is a sentence or phrase that contains every English alphabet letter at least once.
+     * Case is ignored during the test.
+     * </p>
+     *
+     * @return true if all letters from {@code a} through {@code z} appear at least once
      */
     public boolean isPangram() {
         String lowercaseText = string.toLowerCase();
+
         for (char letter = 'a'; letter <= 'z'; letter++) {
             if (lowercaseText.indexOf(letter) == -1) {
                 return false;
             }
         }
+
         return true;
     }
 
     /**
-     * Formats the internal string to be represented as a storage unit.
+     * Interprets the current text as a byte count and returns a formatted storage-unit string.
+     *
      * <p>
-     * For example, 1024 bytes is equal to 1 kilobyte, so it would look like: "1KB"
+     * The internal text is parsed as a {@code long}. The returned value is formatted using binary
+     * unit steps of 1024 for KB, MB, and GB.
      * </p>
      *
-     * @return the formatted string.
+     * <p>
+     * This method does not replace the internal text. It only returns the formatted result.
+     * </p>
+     *
+     * @return the formatted byte-count string
+     * @throws NumberFormatException if the current text is not a valid integer byte count
      */
     public String formatStorageUnits() {
         long bytes = Long.parseLong(this.string);
@@ -258,29 +451,43 @@ public class TextUtility {
         }
     }
 
-
     /**
-     * Removes all non-alphanumeric characters from the text.
+     * Removes all non-alphanumeric characters except whitespace.
      *
-     * @return The modified Text object with non-alphanumeric characters removed.
+     * <p>
+     * Characters outside {@code a-z}, {@code A-Z}, {@code 0-9}, and whitespace are removed.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility removeNonAlphaNumeric() {
-        return new TextUtility(string.replaceAll("[^a-zA-Z0-9\\s]", ""));
+        this.string = string.replaceAll("[^a-zA-Z0-9\\s]", "");
+        return this;
     }
 
     /**
-     * Reverses the characters in the text.
+     * Reverses the characters in the current text.
      *
-     * @return The modified Text object with reversed characters.
+     * <p>
+     * This is a character-level reversal, not a word-order reversal.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility reverse() {
-        return new TextUtility(new StringBuilder(string).reverse().toString());
+        this.string = new StringBuilder(string).reverse().toString();
+        return this;
     }
 
     /**
-     * Checks if the text is a palindrome (reads the same forwards and backwards).
+     * Checks whether the current text reads the same forward and backward.
      *
-     * @return true if the text is a palindrome, otherwise false.
+     * <p>
+     * The comparison is case-insensitive. No normalization is applied for spaces or punctuation, so
+     * those characters still affect the result.
+     * </p>
+     *
+     * @return true if the text is a case-insensitive palindrome
      */
     public boolean isPalindrome() {
         String reversed = new StringBuilder(string).reverse().toString();
@@ -288,101 +495,182 @@ public class TextUtility {
     }
 
     /**
-     * Removes HTML tags from the text.
+     * Removes simple HTML tags from the current text.
      *
-     * @return The modified Text object with HTML tags removed.
+     * <p>
+     * This is a regex-based strip operation intended for lightweight cleanup. It is not a full HTML
+     * parser and should not be treated as a robust HTML sanitization tool.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility stripHtmlTags() {
-        return new TextUtility(string.replaceAll("\\<.*?\\>", ""));
+        this.string = string.replaceAll("<.*?>", "");
+        return this;
     }
 
     /**
-     * Converts a camelCase or PascalCase string to separate words.
+     * Inserts spaces between lowercase-to-uppercase camel-case transitions.
      *
-     * @return The modified Text object with words separated.
+     * <p>
+     * For example, {@code "playerHealthValue"} becomes {@code "player Health Value"}.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility camelCaseToWords() {
-        return new TextUtility(string.replaceAll("([a-z])([A-Z])", "$1 $2"));
+        this.string = string.replaceAll("([a-z])([A-Z])", "$1 $2");
+        return this;
     }
 
     /**
-     * Counts the number of lines in the text.
+     * Counts the number of lines in the current text.
      *
-     * @return The number of lines in the text.
+     * <p>
+     * Line counting is based on splitting with either Unix or Windows newline separators.
+     * </p>
+     *
+     * @return the number of lines represented by the current text
      */
     public int countLines() {
         return string.split("\\r?\\n").length;
     }
 
     /**
-     * Converts the text to title case.
+     * Converts each whitespace-delimited word to title-like casing.
      *
-     * @return The modified Text object in title case.
+     * <p>
+     * The first character of each word is uppercased. The remainder of each word is lowercase.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility toTitleCase() {
         String[] words = string.split("\\s+");
         StringBuilder result = new StringBuilder();
-        for (String word : words) {
-            result.append(word.substring(0, 1).toUpperCase()).append(word.substring(1)).append(" ");
+
+        for (int i = 0; i < words.length; i++) {
+            String word = words[i];
+            if (!word.isEmpty()) {
+                result.append(Character.toUpperCase(word.charAt(0)));
+                if (word.length() > 1) {
+                    result.append(word.substring(1).toLowerCase());
+                }
+            }
+            if (i < words.length - 1) {
+                result.append(" ");
+            }
         }
-        return new TextUtility(result.toString().trim());
+
+        this.string = result.toString();
+        return this;
     }
 
     /**
-     * Abbreviates the text to a specified maximum length, adding an ellipsis if truncated.
+     * Abbreviates the current text to a maximum length using ellipses.
      *
-     * @param maxLength The maximum length of the text.
-     * @return The modified Text object.
+     * <p>
+     * If the text already fits, it remains unchanged. For very small maximum lengths of three or
+     * less, the result becomes a sequence of dots with that exact length.
+     * </p>
+     *
+     * @param maxLength the maximum allowed result length
+     * @return this utility instance for chaining
+     * @throws IllegalArgumentException if {@code maxLength} is negative
      */
     public TextUtility abbreviate(int maxLength) {
-        return new TextUtility(string.substring(0, maxLength - 3) + "...");
+        if (maxLength < 0) {
+            throw new IllegalArgumentException("maxLength cannot be negative");
+        }
+
+        if (string.length() <= maxLength) {
+            return this;
+        }
+
+        if (maxLength <= 3) {
+            this.string = ".".repeat(maxLength);
+            return this;
+        }
+
+        this.string = string.substring(0, maxLength - 3) + "...";
+        return this;
     }
 
     /**
-     * Pads the text to the specified length with whitespace if it is shorter.
+     * Pads the current text with spaces until it reaches the requested length.
      *
-     * @param length The target length to pad the text to.
-     * @return The modified Text object with padded text.
+     * <p>
+     * Padding is applied only when the current text is shorter than the target length.
+     * </p>
+     *
+     * @param length the minimum total length of the resulting text
+     * @return this utility instance for chaining
+     * @throws IllegalArgumentException if {@code length} is negative
      */
     public TextUtility padToLength(int length) {
-        String whitespace = " ";
-        if (string.length() < length)
-            string = string.concat(whitespace.repeat(length - string.length()));
-        return new TextUtility(string);
+        if (length < 0) {
+            throw new IllegalArgumentException("length cannot be negative");
+        }
+
+        if (string.length() < length) {
+            string = string.concat(" ".repeat(length - string.length()));
+        }
+
+        return this;
     }
 
     /**
-     * Shuffles the characters within the text randomly.
+     * Randomly shuffles the characters in the current text.
      *
-     * @return The modified Text object with shuffled characters.
+     * <p>
+     * The text is converted into a list of characters, shuffled using
+     * {@link Collections#shuffle(List)}, and then rebuilt.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility shuffle() {
         char[] chars = string.toCharArray();
-        List<Character> charList = new ArrayList<>();
+        List<Character> characters = new ArrayList<>(chars.length);
+
         for (char c : chars) {
-            charList.add(c);
+            characters.add(c);
         }
-        Collections.shuffle(charList);
-        StringBuilder shuffled = new StringBuilder();
-        for (Character c : charList) {
+
+        Collections.shuffle(characters);
+
+        StringBuilder shuffled = new StringBuilder(characters.size());
+        for (Character c : characters) {
             shuffled.append(c);
         }
-        return new TextUtility(shuffled.toString());
+
+        this.string = shuffled.toString();
+        return this;
     }
 
     /**
-     * Checks if the text represents a numeric value.
+     * Checks whether the current text looks numeric.
      *
-     * @return true if the text is numeric, otherwise false.
+     * <p>
+     * This method supports optional leading negative signs and an optional decimal portion.
+     * It is intended as a lightweight regex-based numeric test rather than a full parser.
+     * </p>
+     *
+     * @return true if the current text matches the numeric pattern used by this class
      */
     public boolean isNumeric() {
         return string.matches("-?\\d+(\\.\\d+)?");
     }
 
     /**
-     * Counts the number of consonants in the text (non-vowel, non-digit characters).
+     * Counts consonant characters in the current text.
      *
-     * @return The count of consonants.
+     * <p>
+     * Vowels, digits, and whitespace are removed first. The remaining characters are counted as
+     * consonants by this method's simple rule set.
+     * </p>
+     *
+     * @return the number of consonant characters detected
      */
     public int countConsonants() {
         String consonants = string.replaceAll("[aeiouAEIOU0-9\\s]", "");
@@ -390,44 +678,69 @@ public class TextUtility {
     }
 
     /**
-     * Concatenates multiple strings to the end of the current text.
+     * Appends one or more additional strings directly to the current text.
      *
-     * @param strings The strings to concatenate.
-     * @return The modified Text object with concatenated text.
+     * <p>
+     * No separator is inserted automatically. Each provided string is appended exactly as given.
+     * </p>
+     *
+     * @param strings the strings to append in order
+     * @return this utility instance for chaining
      */
     public TextUtility concatenate(String... strings) {
-        StringBuilder builder = new StringBuilder();
-        for (String str : strings) {
-            builder.append(str);
+        StringBuilder builder = new StringBuilder(this.string);
+
+        for (String value : strings) {
+            builder.append(value);
         }
-        return new TextUtility(builder.toString());
+
+        this.string = builder.toString();
+        return this;
     }
 
     /**
-     * Base64 encodes the text using the default character encoding (UTF-8).
+     * Base64-encodes the current text using UTF-8 bytes.
      *
-     * @return The modified Text object with Base64-encoded text.
+     * <p>
+     * The current text is first converted to UTF-8 bytes, encoded with
+     * {@link Base64#getEncoder()}, and then stored back as text.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public TextUtility base64Encode() {
-        byte[] encodedBytes = Base64.getEncoder().encode(string.getBytes());
-        return new TextUtility(new String(encodedBytes, StandardCharsets.UTF_8));
+        byte[] encodedBytes = Base64.getEncoder().encode(string.getBytes(StandardCharsets.UTF_8));
+        this.string = new String(encodedBytes, StandardCharsets.UTF_8);
+        return this;
     }
 
     /**
-     * Base64 decodes the text to its original form using the default character encoding (UTF-8).
+     * Base64-decodes the current text using UTF-8 bytes.
      *
-     * @return The modified Text object with Base64-decoded text.
+     * <p>
+     * The current text is interpreted as Base64-encoded content, decoded into bytes, and then
+     * converted back into a UTF-8 string.
+     * </p>
+     *
+     * @return this utility instance for chaining
+     * @throws IllegalArgumentException if the current text is not valid Base64
      */
     public TextUtility base64Decode() {
         byte[] decodedBytes = Base64.getDecoder().decode(string);
-        return new TextUtility(new String(decodedBytes, StandardCharsets.UTF_8));
+        this.string = new String(decodedBytes, StandardCharsets.UTF_8);
+        return this;
     }
 
     /**
-     * Sets the string of this Text to the specified string.
+     * Replaces the internal text with a new value.
      *
-     * @param string The string to set.
-     * @return This instance for chaining.
+     * <p>
+     * This method is useful when you want to reuse the same utility instance with a different
+     * source string.
+     * </p>
+     *
+     * @param string the new text value to store
+     * @return this utility instance for chaining
      */
     public TextUtility set(String string) {
         this.string = string;
@@ -435,18 +748,28 @@ public class TextUtility {
     }
 
     /**
-     * Retrieves the byte array tied to the internal string.
+     * Converts the current text into UTF-8 bytes.
      *
-     * @return The byte array.
+     * <p>
+     * This is useful when the current transformed text needs to be written to a file, network
+     * stream, cache payload, or other binary destination.
+     * </p>
+     *
+     * @return the UTF-8 byte representation of the current text
      */
     public byte[] toBytes() {
-        return string.getBytes();
+        return string.getBytes(StandardCharsets.UTF_8);
     }
 
     /**
-     * Gets the current text string.
+     * Returns the current internal text value.
      *
-     * @return The current text string.
+     * <p>
+     * This is the main terminal operation when the utility has been used in a fluent chain and the
+     * final text is needed.
+     * </p>
+     *
+     * @return the current wrapped text
      */
     @Override
     public String toString() {

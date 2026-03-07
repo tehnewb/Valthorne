@@ -3,41 +3,130 @@ package valthorne.utility;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A utility class for manipulating and mutating a numeric value.
+ * <h1>NumberUtility</h1>
+ *
+ * <p>
+ * {@code NumberUtility} is a mutable, chainable numeric helper built around a single internal
+ * {@code double} value. It is designed for situations where you want to progressively transform
+ * a number through a fluent API without repeatedly reassigning temporary variables.
+ * </p>
+ *
+ * <p>
+ * This class extends {@link Number}, which means it can still be used in places where a normal
+ * numeric wrapper is expected, while also exposing many convenience methods for arithmetic,
+ * rounding, comparisons, percentage operations, trigonometry, logarithms, bitwise operations,
+ * formatting, and unit conversion.
+ * </p>
+ *
+ * <h2>How this class works</h2>
+ * <ul>
+ *     <li>The instance stores one mutable numeric value in {@link #number}.</li>
+ *     <li>Most modifier methods update that value and return {@code this} for chaining.</li>
+ *     <li>Query methods return derived information without replacing the stored value.</li>
+ *     <li>Because the internal representation is a {@code double}, some operations are approximate by nature.</li>
+ * </ul>
+ *
+ * <h2>When this class is useful</h2>
+ * <ul>
+ *     <li>Quick math pipelines in gameplay code</li>
+ *     <li>Formatting numbers for UI or debugging output</li>
+ *     <li>Percentage and clamping operations</li>
+ *     <li>Simple rounding or conversion helpers</li>
+ *     <li>Readable chained numeric transformations</li>
+ * </ul>
+ *
+ * <h2>Important notes</h2>
+ * <ul>
+ *     <li>This class is mutable and not thread-safe.</li>
+ *     <li>Bitwise methods cast the current value to an {@code int} before applying the operation.</li>
+ *     <li>Methods such as {@link #fact()}, {@link #sqrt()}, {@link #log()}, and {@link #recip()} validate input and throw when invalid.</li>
+ *     <li>Because this class stores a {@code double}, floating-point precision rules still apply.</li>
+ * </ul>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * NumberUtility damage = new NumberUtility(125);
+ *
+ * double result = damage
+ *         .incrByPerc(10)
+ *         .clamp(0, 200)
+ *         .round(2)
+ *         .doubleValue();
+ *
+ * System.out.println(result);
+ *
+ * String formatted = new NumberUtility(15342.875)
+ *         .divide(3)
+ *         .round(2)
+ *         .format("#,##0.00");
+ *
+ * System.out.println(formatted);
+ *
+ * NumberUtility movement = new NumberUtility(64);
+ * movement
+ *         .mult(1.5)
+ *         .subtr(4)
+ *         .ceil();
+ *
+ * System.out.println(movement.intValue());
+ * }</pre>
  *
  * @author Albert Beaupre
- * @version 1.0
- * @since May 1st, 2024
+ * @since March 7th, 2026
  */
 public class NumberUtility extends Number {
 
-    private static final DecimalFormat df = new DecimalFormat();
-    private double number; // the number to mutate
+    /**
+     * Shared decimal formatter used by {@link #format(String)} to produce custom string output.
+     *
+     * <p>
+     * This formatter is reused to avoid unnecessary allocation during repeated formatting calls.
+     * Because {@link DecimalFormat} is mutable, access is synchronized inside the format method.
+     * </p>
+     */
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat();
+
+    private double number; // The current mutable numeric value wrapped by this utility instance.
 
     /**
-     * Constructs a new Value object with a default value of 0.
+     * Creates a new utility initialized to zero.
+     *
+     * <p>
+     * This constructor is useful when you want to create the utility first and assign or build
+     * the value later through chained operations.
+     * </p>
      */
     public NumberUtility() {
-        this(0);
+        this(0D);
     }
 
     /**
-     * Constructs a new Value object using a number to provide an initial value.
+     * Creates a new utility initialized with the provided number.
      *
-     * @param number The initial number.
+     * <p>
+     * The given value becomes the internal mutable number used by every later operation.
+     * </p>
+     *
+     * @param number the initial numeric value
      */
     public NumberUtility(double number) {
         this.number = number;
     }
 
     /**
-     * Sets the number of this Value to the specified number.
+     * Replaces the current internal value.
      *
-     * @param number The number to set
-     * @return This Value object after the number change.
+     * <p>
+     * This is useful when reusing the same instance for a new numeric workflow.
+     * </p>
+     *
+     * @param number the new value to store
+     * @return this utility instance for chaining
      */
     public NumberUtility set(double number) {
         this.number = number;
@@ -45,297 +134,413 @@ public class NumberUtility extends Number {
     }
 
     /**
-     * Mutates the value by a specified percentage.
+     * Replaces the current value with the requested percentage of the current value.
      *
-     * @param input The percentage by which to adjust the value.
-     * @return This Value object after the mutation.
+     * <p>
+     * For example, if the current value is {@code 200} and the input percentage is {@code 25},
+     * the new value becomes {@code 50}.
+     * </p>
+     *
+     * @param input the percentage to extract from the current value
+     * @return this utility instance for chaining
      */
     public NumberUtility percent(double input) {
-        return new NumberUtility(number * (input / 100D));
+        this.number = number * (input / 100D);
+        return this;
     }
 
     /**
-     * Restricts the value to be within a specified range.
+     * Clamps the current value between the provided minimum and maximum.
      *
-     * @param min The minimum value in the range.
-     * @param max The maximum value in the range.
-     * @return This Value object after the restriction.
+     * <p>
+     * If the value is below {@code min}, it becomes {@code min}. If it is above {@code max},
+     * it becomes {@code max}. Otherwise it remains unchanged.
+     * </p>
+     *
+     * @param min the minimum allowed value
+     * @param max the maximum allowed value
+     * @return this utility instance for chaining
      */
     public NumberUtility clamp(double min, double max) {
-        return new NumberUtility(Math.min(Math.max(number, min), max));
+        this.number = Math.min(Math.max(number, min), max);
+        return this;
     }
 
     /**
-     * Checks if this value is within the specified range.
+     * Checks whether the current value lies within the provided inclusive range.
      *
-     * @param min The minimum value in the range.
-     * @param max The maximum value in the range.
-     * @return This Value object after the restriction.
+     * <p>
+     * Both range endpoints are included in the comparison.
+     * </p>
+     *
+     * @param min the lower inclusive bound
+     * @param max the upper inclusive bound
+     * @return true if the current value is within the range, otherwise false
      */
     public boolean within(double min, double max) {
         return number >= min && number <= max;
     }
 
     /**
-     * Adds a specified value to the current value.
+     * Adds the provided value to the current number.
      *
-     * @param value The value to add.
-     * @return This Value object after the addition.
+     * @param value the amount to add
+     * @return this utility instance for chaining
      */
     public NumberUtility add(double value) {
-        return new NumberUtility(this.number + value);
+        this.number += value;
+        return this;
     }
 
     /**
-     * Subtracts a specified value from the current value.
+     * Subtracts the provided value from the current number.
      *
-     * @param value The value to subtract.
-     * @return This Value object after the subtraction.
+     * @param value the amount to subtract
+     * @return this utility instance for chaining
      */
     public NumberUtility subtr(double value) {
-        return new NumberUtility(this.number - value);
+        this.number -= value;
+        return this;
     }
 
     /**
-     * Multiplies the current value by a specified factor.
+     * Multiplies the current value by the provided factor.
      *
-     * @param factor The factor by which to multiply the value.
-     * @return This Value object after the multiplication.
+     * @param factor the multiplier to apply
+     * @return this utility instance for chaining
      */
     public NumberUtility mult(double factor) {
-        return new NumberUtility(this.number * factor);
+        this.number *= factor;
+        return this;
     }
 
     /**
-     * Divides the current value by a specified divisor.
+     * Divides the current value by the provided divisor.
      *
-     * @param divisor The divisor by which to divide the value.
-     * @return This Value object after the division.
+     * <p>
+     * This method follows normal Java floating-point division behavior.
+     * </p>
+     *
+     * @param divisor the divisor to use
+     * @return this utility instance for chaining
      */
     public NumberUtility divide(double divisor) {
-        return new NumberUtility(this.number / divisor);
+        this.number /= divisor;
+        return this;
     }
 
     /**
-     * Raises the current value to a specified power.
+     * Raises the current value to the specified exponent.
      *
-     * @param exponent The exponent to which to raise the value.
-     * @return This Value object after the exponentiation.
+     * <p>
+     * This method delegates to {@link Math#pow(double, double)} using the current number
+     * as the base.
+     * </p>
+     *
+     * @param exponent the exponent to apply
+     * @return this utility instance for chaining
      */
     public NumberUtility power(double exponent) {
-        return new NumberUtility(Math.pow(number, exponent));
+        this.number = Math.pow(number, exponent);
+        return this;
     }
 
     /**
-     * Rounds the current value to a specified number of decimal places using the default rounding mode (HALF_UP).
+     * Rounds the current value to the given number of decimal places using
+     * {@link RoundingMode#HALF_UP}.
      *
-     * @param decimalPlaces The number of decimal places to round to.
-     * @return This Value object after rounding.
+     * @param decimalPlaces the number of decimal places to retain
+     * @return this utility instance for chaining
      */
     public NumberUtility round(int decimalPlaces) {
         return round(decimalPlaces, RoundingMode.HALF_UP);
     }
 
     /**
-     * Rounds the current value to a specified number of decimal places using the specified rounding mode.
+     * Rounds the current value to the given number of decimal places using the specified rounding mode.
      *
-     * @param decimalPlaces The number of decimal places to round to.
-     * @param roundingMode  The rounding mode to use.
-     * @return This Value object after rounding.
+     * <p>
+     * This method uses {@link BigDecimal} so the rounding mode is explicit and predictable.
+     * </p>
+     *
+     * @param decimalPlaces the number of decimal places to retain
+     * @param roundingMode  the rounding mode to apply
+     * @return this utility instance for chaining
+     * @throws NullPointerException if {@code roundingMode} is null
      */
     public NumberUtility round(int decimalPlaces, RoundingMode roundingMode) {
-        BigDecimal bd = new BigDecimal(number);
+        Objects.requireNonNull(roundingMode, "roundingMode cannot be null");
+        BigDecimal bd = BigDecimal.valueOf(number);
         bd = bd.setScale(decimalPlaces, roundingMode);
-        return new NumberUtility(bd.doubleValue());
+        this.number = bd.doubleValue();
+        return this;
     }
 
     /**
-     * Ensures that the current value is positive.
+     * Replaces the current value with its absolute value.
      *
-     * @return This Value object with a positive value.
+     * @return this utility instance for chaining
      */
     public NumberUtility abs() {
-        return new NumberUtility(Math.abs(number));
+        this.number = Math.abs(number);
+        return this;
     }
 
     /**
      * Negates the current value.
      *
-     * @return This Value object with the negated value.
+     * <p>
+     * Positive values become negative, negative values become positive, and zero remains zero.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility negate() {
-        return new NumberUtility(-number);
+        this.number = -number;
+        return this;
     }
 
     /**
-     * Sets the current value to a random number within a specified range.
+     * Replaces the current value with a random number in the provided range.
      *
-     * @param min The minimum value for the random number.
-     * @param max The maximum value for the random number.
-     * @return This Value object with the random value.
+     * <p>
+     * The range is generated using {@link ThreadLocalRandom}. The minimum is inclusive and the
+     * maximum is exclusive in practice, following the behavior of uniform floating-point generation.
+     * </p>
+     *
+     * @param min the lower bound of the random range
+     * @param max the upper bound of the random range
+     * @return this utility instance for chaining
      */
     public NumberUtility randomize(double min, double max) {
-        return new NumberUtility(min + (Math.random() * (max - min)));
+        this.number = ThreadLocalRandom.current().nextDouble(min, max);
+        return this;
     }
 
     /**
-     * Checks if the current value is equal to a specified value.
+     * Checks whether the current value is exactly equal to another value.
      *
-     * @param otherValue The value to compare with.
-     * @return true if the values are equal, false otherwise.
+     * <p>
+     * This uses {@link Double#compare(double, double)} for an exact floating-point comparison.
+     * </p>
+     *
+     * @param otherValue the value to compare against
+     * @return true if the two values are exactly equal, otherwise false
      */
     public boolean isEqualTo(double otherValue) {
         return Double.compare(number, otherValue) == 0;
     }
 
     /**
-     * Checks if the current value is greater than a specified value.
+     * Checks whether the current value is greater than the provided value.
      *
-     * @param otherValue The value to compare with.
-     * @return true if the current value is greater, false otherwise.
+     * @param otherValue the comparison target
+     * @return true if the current value is greater
      */
     public boolean isGreaterThan(double otherValue) {
         return number > otherValue;
     }
 
     /**
-     * Checks if the current value is less than a specified value.
+     * Checks whether the current value is less than the provided value.
      *
-     * @param otherValue The value to compare with.
-     * @return true if the current value is less, false otherwise.
+     * @param otherValue the comparison target
+     * @return true if the current value is less
      */
     public boolean isLessThan(double otherValue) {
         return number < otherValue;
     }
 
     /**
-     * Formats the current value as a string using the specified format pattern.
+     * Formats the current value using a custom {@link DecimalFormat} pattern.
      *
-     * @param formatPattern The format pattern to use.
-     * @return The formatted string representation of the current value.
+     * <p>
+     * The shared formatter is synchronized because {@link DecimalFormat} is mutable and not thread-safe.
+     * </p>
+     *
+     * @param formatPattern the decimal format pattern to apply
+     * @return the formatted numeric string
+     * @throws NullPointerException if {@code formatPattern} is null
      */
     public String format(String formatPattern) {
-        df.applyPattern(formatPattern);
-        return df.format(number);
+        Objects.requireNonNull(formatPattern, "formatPattern cannot be null");
+        synchronized (DECIMAL_FORMAT) {
+            DECIMAL_FORMAT.applyPattern(formatPattern);
+            return DECIMAL_FORMAT.format(number);
+        }
     }
 
     /**
-     * Converts the current value to an integer.
+     * Returns the current value as an {@code int}.
      *
-     * @return The integer representation of the current value.
+     * <p>
+     * This performs a narrowing primitive conversion using Java cast rules.
+     * </p>
+     *
+     * @return the current value converted to int
      */
+    @Override
     public int intValue() {
         return (int) number;
     }
 
     /**
-     * Converts the current value to a long.
+     * Returns the current value as a {@code long}.
      *
-     * @return The long representation of the current value.
+     * <p>
+     * This performs a narrowing primitive conversion using Java cast rules.
+     * </p>
+     *
+     * @return the current value converted to long
      */
+    @Override
     public long longValue() {
         return (long) number;
     }
 
     /**
-     * Converts the current value to a float.
+     * Returns the current value as a {@code float}.
      *
-     * @return The float representation of the current value.
+     * <p>
+     * This performs a narrowing primitive conversion using Java cast rules.
+     * </p>
+     *
+     * @return the current value converted to float
      */
+    @Override
     public float floatValue() {
         return (float) number;
     }
 
     /**
-     * Converts the current value to a double.
+     * Returns the current value as a {@code double}.
      *
-     * @return The double representation of the current value.
+     * @return the current stored double value
      */
+    @Override
     public double doubleValue() {
         return number;
     }
 
     /**
-     * Gets the fractional part of the current value.
+     * Returns the fractional part of the current value.
      *
-     * @return The fractional part of the current value.
+     * <p>
+     * This subtracts the truncated integer portion from the current number.
+     * </p>
+     *
+     * @return the fractional component of the current value
      */
     public double getFractPart() {
-        return number - (int) number;
+        return number - (long) number;
     }
 
     /**
-     * Increases the current value by a specified percentage.
+     * Increases the current value by the specified percentage.
      *
-     * @param percentage The percentage by which to increase the value.
-     * @return This Value object after the increase.
+     * <p>
+     * For example, increasing {@code 100} by {@code 25} results in {@code 125}.
+     * </p>
+     *
+     * @param percentage the percentage increase to apply
+     * @return this utility instance for chaining
      */
     public NumberUtility incrByPerc(double percentage) {
-        return new NumberUtility(number * (1 + (percentage / 100)));
+        this.number = number * (1 + (percentage / 100));
+        return this;
     }
 
     /**
-     * Decreases the current value by a specified percentage.
+     * Decreases the current value by the specified percentage.
      *
-     * @param percentage The percentage by which to decrease the value.
-     * @return This Value object after the decrease.
+     * <p>
+     * For example, decreasing {@code 100} by {@code 25} results in {@code 75}.
+     * </p>
+     *
+     * @param percentage the percentage decrease to apply
+     * @return this utility instance for chaining
      */
     public NumberUtility decrByPerc(double percentage) {
-        return new NumberUtility(number * (1 - (percentage / 100)));
+        this.number = number * (1 - (percentage / 100));
+        return this;
     }
 
     /**
-     * Truncates the decimal part of the current value.
+     * Removes the fractional component of the current value.
      *
-     * @return This Value object after truncation.
+     * <p>
+     * This behaves like numeric truncation toward zero.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility truncate() {
-        return new NumberUtility((double) ((int) number));
+        this.number = (double) ((long) number);
+        return this;
     }
 
     /**
-     * Rounds the current value up to the nearest integer (ceiling).
+     * Replaces the current value with its mathematical ceiling.
      *
-     * @return This Value object after rounding up.
+     * @return this utility instance for chaining
      */
     public NumberUtility ceil() {
-        return new NumberUtility(Math.ceil(number));
+        this.number = Math.ceil(number);
+        return this;
     }
 
     /**
-     * Rounds the current value down to the nearest integer (floor).
+     * Replaces the current value with its mathematical floor.
      *
-     * @return This Value object after rounding down.
+     * @return this utility instance for chaining
      */
     public NumberUtility flr() {
-        return new NumberUtility(Math.floor(number));
+        this.number = Math.floor(number);
+        return this;
     }
 
     /**
-     * Gets the signum (sign) of the current value.
+     * Returns the sign of the current value.
      *
-     * @return 1 if the value is positive, 0 if it's zero, -1 if it's negative.
+     * <p>
+     * The result is {@code -1}, {@code 0}, or {@code 1} depending on whether the value is
+     * negative, zero, or positive.
+     * </p>
+     *
+     * @return the sign indicator of the current value
      */
     public int signum() {
         return Double.compare(number, 0.0);
     }
 
     /**
-     * Calculates the percentage difference between the current value and another value.
+     * Computes the percentage difference between the current value and another value.
      *
-     * @param otherValue The value to compare with.
-     * @return The percentage difference between the values.
+     * <p>
+     * The calculation is based on the absolute difference divided by the absolute value of
+     * {@code otherValue}, then multiplied by {@code 100}.
+     * </p>
+     *
+     * @param otherValue the reference value
+     * @return the percentage difference relative to {@code otherValue}
      */
     public double percDiff(double otherValue) {
-        if (otherValue == 0)
+        if (otherValue == 0) {
             return Double.POSITIVE_INFINITY;
+        }
         return (Math.abs(number - otherValue) / Math.abs(otherValue)) * 100.0;
     }
 
     /**
-     * Calculates the factorial of the current value (if it's a non-negative integer).
+     * Replaces the current value with its factorial.
      *
-     * @return This Value object after the factorial calculation.
+     * <p>
+     * This method only accepts non-negative whole-number values. Because the result is stored back
+     * into a {@code double}, very large factorials will eventually lose precision.
+     * </p>
+     *
+     * @return this utility instance for chaining
+     * @throws ArithmeticException if the current value is negative or not a whole number
      */
     public NumberUtility fact() {
         if (number >= 0 && number == Math.floor(number)) {
@@ -343,243 +548,341 @@ public class NumberUtility extends Number {
             for (int i = 1; i <= (int) number; i++) {
                 result *= i;
             }
-            return new NumberUtility(result);
-        } else {
-            throw new ArithmeticException("Invalid Factorial Value: " + number);
+            this.number = result;
+            return this;
         }
+        throw new ArithmeticException("Invalid factorial value: " + number);
     }
 
     /**
-     * Calculates the exponential (e^x) of the current value.
+     * Replaces the current value with Euler's exponential function of the current value.
      *
-     * @return This Value object after the exponentiation.
+     * <p>
+     * This method delegates to {@link Math#exp(double)}.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility exp() {
-        return new NumberUtility(Math.exp(number));
+        this.number = Math.exp(number);
+        return this;
     }
 
     /**
-     * Calculates the natural logarithm (ln) of the current value.
+     * Replaces the current value with its natural logarithm.
      *
-     * @return This Value object after the logarithm calculation.
+     * <p>
+     * This method is only valid for positive values.
+     * </p>
+     *
+     * @return this utility instance for chaining
+     * @throws ArithmeticException if the current value is not positive
      */
     public NumberUtility log() {
         if (number > 0) {
-            return new NumberUtility(Math.log(number));
-        } else {
-            throw new ArithmeticException("Cannot calculate the natural logarithm for: " + number);
+            this.number = Math.log(number);
+            return this;
         }
+        throw new ArithmeticException("Cannot calculate the natural logarithm for: " + number);
     }
 
     /**
-     * Rounds the current value to the nearest Nth decimal place.
+     * Rounds the current value to the requested decimal place using {@link Math#round(float)}-style scaling.
      *
-     * @param decimalPlace The decimal place to round to.
-     * @return This Value object after rounding.
+     * <p>
+     * This is a lightweight rounding method compared to the {@link BigDecimal}-based
+     * {@link #round(int, RoundingMode)} method.
+     * </p>
+     *
+     * @param decimalPlace the number of decimal places to retain
+     * @return this utility instance for chaining
      */
     public NumberUtility roundToDecimalPlace(int decimalPlace) {
         double scale = Math.pow(10, decimalPlace);
-        return new NumberUtility(Math.round(number * scale) / scale);
+        this.number = Math.round(number * scale) / scale;
+        return this;
     }
 
     /**
-     * Calculates the sine of the current value (assuming the value is in radians).
+     * Replaces the current value with its sine.
      *
-     * @return This Value object after calculating the sine.
+     * <p>
+     * The input is interpreted in radians.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility sin() {
-        return new NumberUtility(Math.sin(number));
+        this.number = Math.sin(number);
+        return this;
     }
 
     /**
-     * Calculates the cosine of the current value (assuming the value is in radians).
+     * Replaces the current value with its cosine.
      *
-     * @return This Value object after calculating the cosine.
+     * <p>
+     * The input is interpreted in radians.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility cos() {
-        return new NumberUtility(Math.cos(number));
+        this.number = Math.cos(number);
+        return this;
     }
 
     /**
-     * Calculates the tangent of the current value (assuming the value is in radians).
+     * Replaces the current value with its tangent.
      *
-     * @return This Value object after calculating the tangent.
+     * <p>
+     * The input is interpreted in radians.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility tan() {
-        return new NumberUtility(Math.tan(number));
+        this.number = Math.tan(number);
+        return this;
     }
 
     /**
-     * Calculates the square root of the current value.
+     * Replaces the current value with its square root.
      *
-     * @return This Value object after the square root calculation.
-     * @throws ArithmeticException if the current value is negative.
+     * <p>
+     * This method is only valid for zero and positive values.
+     * </p>
+     *
+     * @return this utility instance for chaining
+     * @throws ArithmeticException if the current value is negative
      */
     public NumberUtility sqrt() {
         if (number >= 0) {
-            return new NumberUtility(Math.sqrt(number));
-        } else {
-            throw new ArithmeticException("Square root of a negative number is undefined.");
+            this.number = Math.sqrt(number);
+            return this;
         }
+        throw new ArithmeticException("Square root of a negative number is undefined.");
     }
 
     /**
-     * Calculates the cube root of the current value.
+     * Replaces the current value with its cube root.
      *
-     * @return This Value object after the cube root calculation.
+     * <p>
+     * This method delegates to {@link Math#cbrt(double)} and supports negative inputs.
+     * </p>
+     *
+     * @return this utility instance for chaining
      */
     public NumberUtility cubeRoot() {
-        return new NumberUtility(Math.cbrt(number));
+        this.number = Math.cbrt(number);
+        return this;
     }
 
     /**
-     * Calculates the hypotenuse of a right triangle with the current value as one of the sides.
+     * Replaces the current value with the hypotenuse of the current value and another side.
      *
-     * @param otherSide The length of the other side of the right triangle.
-     * @return This Value object after the hypotenuse calculation.
+     * <p>
+     * This method delegates to {@link Math#hypot(double, double)}.
+     * </p>
+     *
+     * @param otherSide the second side length
+     * @return this utility instance for chaining
      */
     public NumberUtility hypot(double otherSide) {
-        return new NumberUtility(Math.hypot(number, otherSide));
+        this.number = Math.hypot(number, otherSide);
+        return this;
     }
 
     /**
-     * Calculates the result of raising the current value to a specified base.
+     * Raises the provided base to the power of the current value.
      *
-     * @param base The base to which the current value is raised.
-     * @return This Value object after the exponentiation.
+     * <p>
+     * This is the inverse ordering of {@link #power(double)}.
+     * </p>
+     *
+     * @param base the base to raise
+     * @return this utility instance for chaining
      */
     public NumberUtility pow(double base) {
-        return new NumberUtility(Math.pow(base, number));
+        this.number = Math.pow(base, number);
+        return this;
     }
 
     /**
-     * Performs a bitwise AND operation with the current value and another integer.
+     * Applies a bitwise AND between the integer form of the current value and the provided value.
      *
-     * @param otherValue The integer to perform the bitwise AND operation with.
-     * @return This Value object after the bitwise AND operation.
+     * <p>
+     * The current value is first cast to {@code int}, the bitwise operation is applied, and the
+     * resulting integer is stored back as a {@code double}.
+     * </p>
+     *
+     * @param otherValue the integer value to AND with
+     * @return this utility instance for chaining
      */
     public NumberUtility bitAnd(int otherValue) {
-        return new NumberUtility((int) number & otherValue);
+        this.number = (int) number & otherValue;
+        return this;
     }
 
     /**
-     * Performs a bitwise OR operation with the current value and another integer.
+     * Applies a bitwise OR between the integer form of the current value and the provided value.
      *
-     * @param otherValue The integer to perform the bitwise OR operation with.
-     * @return This Value object after the bitwise OR operation.
+     * <p>
+     * The current value is first cast to {@code int}, the bitwise operation is applied, and the
+     * resulting integer is stored back as a {@code double}.
+     * </p>
+     *
+     * @param otherValue the integer value to OR with
+     * @return this utility instance for chaining
      */
     public NumberUtility bitOr(int otherValue) {
-        return new NumberUtility((int) number | otherValue);
+        this.number = (int) number | otherValue;
+        return this;
     }
 
     /**
-     * Performs a bitwise XOR operation with the current value and another integer.
+     * Applies a bitwise XOR between the integer form of the current value and the provided value.
      *
-     * @param otherValue The integer to perform the bitwise XOR operation with.
-     * @return This Value object after the bitwise XOR operation.
+     * <p>
+     * The current value is first cast to {@code int}, the bitwise operation is applied, and the
+     * resulting integer is stored back as a {@code double}.
+     * </p>
+     *
+     * @param otherValue the integer value to XOR with
+     * @return this utility instance for chaining
      */
     public NumberUtility bitXor(int otherValue) {
-        return new NumberUtility((int) number ^ otherValue);
+        this.number = (int) number ^ otherValue;
+        return this;
     }
 
     /**
-     * Calculates the logarithm of the current value with a specified base.
+     * Replaces the current value with its logarithm in the specified base.
      *
-     * @param base The base of the logarithm.
-     * @return This Value object after the logarithm calculation.
-     * @throws ArithmeticException if the current value is non-positive or if the base is non-positive.
+     * <p>
+     * Both the current value and the base must be positive, and the base must not equal {@code 1}.
+     * </p>
+     *
+     * @param base the logarithm base
+     * @return this utility instance for chaining
+     * @throws ArithmeticException if the input or base is invalid
      */
     public NumberUtility log(double base) {
-        if (number > 0 && base > 0) {
-            return new NumberUtility(Math.log(number) / Math.log(base));
-        } else {
-            throw new ArithmeticException("Logarithm input must be positive.");
+        if (number > 0 && base > 0 && base != 1.0) {
+            this.number = Math.log(number) / Math.log(base);
+            return this;
         }
+        throw new ArithmeticException("Logarithm input must be positive and base must not equal 1.");
     }
 
     /**
-     * Checks if the current value is approximately equal to another value within a specified epsilon.
+     * Checks whether the current value is approximately equal to another value using a tolerance.
      *
-     * @param otherValue The value to compare with.
-     * @param epsilon    The tolerance for approximate equality.
-     * @return true if the values are approximately equal within the epsilon, false otherwise.
+     * @param otherValue the comparison target
+     * @param epsilon    the maximum allowed absolute difference
+     * @return true if the values are within {@code epsilon} of each other
      */
     public boolean isApproxEqualTo(double otherValue, double epsilon) {
         return Math.abs(number - otherValue) <= epsilon;
     }
 
     /**
-     * Rounds the current value to the nearest multiple of a specified value.
+     * Rounds the current value to the nearest multiple of the provided step.
      *
-     * @param multiple The value to round to.
-     * @return This Value object after rounding.
+     * <p>
+     * For example, rounding {@code 37} to the nearest multiple of {@code 5} produces {@code 35}.
+     * </p>
+     *
+     * @param multiple the multiple to round toward
+     * @return this utility instance for chaining
      */
     public NumberUtility roundToNearestMultiple(double multiple) {
-        return new NumberUtility(Math.round(number / multiple) * multiple);
+        this.number = Math.round(number / multiple) * multiple;
+        return this;
     }
 
     /**
-     * Calculates the reciprocal (1/x) of the current value.
+     * Replaces the current value with its reciprocal.
      *
-     * @return This Value object after the reciprocal calculation.
-     * @throws ArithmeticException if the current value is zero.
+     * <p>
+     * The reciprocal is {@code 1 / number}.
+     * </p>
+     *
+     * @return this utility instance for chaining
+     * @throws ArithmeticException if the current value is zero
      */
     public NumberUtility recip() {
         if (number != 0) {
-            return new NumberUtility(1 / number);
-        } else {
-            throw new ArithmeticException("Reciprocal of zero is undefined.");
+            this.number = 1 / number;
+            return this;
         }
+        throw new ArithmeticException("Reciprocal of zero is undefined.");
     }
 
     /**
-     * Checks if the current value is even.
+     * Checks whether the integer form of the current value is even.
      *
-     * @return true if the current value is even, false otherwise.
+     * <p>
+     * The current value is cast to {@code long} before evaluation.
+     * </p>
+     *
+     * @return true if the integer form is even
      */
     public boolean isEven() {
-        return ((int) number) % 2 == 0;
+        return ((long) number) % 2 == 0;
     }
 
     /**
-     * Checks if the current value is odd.
+     * Checks whether the integer form of the current value is odd.
      *
-     * @return true if the current value is odd, false otherwise.
+     * <p>
+     * The current value is cast to {@code long} before evaluation.
+     * </p>
+     *
+     * @return true if the integer form is odd
      */
     public boolean isOdd() {
-        return ((int) number) % 2 != 0;
+        return ((long) number) % 2 != 0;
     }
 
     /**
-     * Calculates the absolute difference between the current value and another value.
+     * Computes the absolute difference between the current value and another value.
      *
-     * @param otherValue The value to compare with.
-     * @return The absolute difference between the values.
+     * @param otherValue the comparison target
+     * @return the absolute numeric difference
      */
     public double absDiff(double otherValue) {
         return Math.abs(number - otherValue);
     }
 
     /**
-     * Converts this Value to the specified TimeUnit based on the given TimeUnits.
+     * Converts the current value between {@link TimeUnit}s.
      *
-     * @param from The TimeUnit to convert from.
-     * @param to   The TimeUnit to convert to.
-     * @return The converted time in a long format.
+     * <p>
+     * The current number is cast to {@code long} before conversion.
+     * </p>
+     *
+     * @param from the source time unit
+     * @param to   the target time unit
+     * @return the converted long value
+     * @throws NullPointerException if {@code from} or {@code to} is null
      */
     public long convert(TimeUnit from, TimeUnit to) {
-        return from.convert((long) number, to);
+        Objects.requireNonNull(from, "from cannot be null");
+        Objects.requireNonNull(to, "to cannot be null");
+        return to.convert((long) number, from);
     }
 
     /**
-     * Returns the current numeric value as a string.
+     * Returns the current internal number as a string.
      *
-     * @return The string representation of the current numeric value.
+     * <p>
+     * This method delegates to {@link String#valueOf(double)}.
+     * </p>
+     *
+     * @return the current numeric value as text
      */
     @Override
     public String toString() {
         return String.valueOf(number);
     }
-
-
 }

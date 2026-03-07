@@ -23,10 +23,8 @@ public record TextureDrawable(Texture texture) implements Drawable {
     }
 
     @Override
-    public void draw(float x, float y, float width, float height) {
-        texture.setPosition(x, y);
-        texture.setSize(width, height);
-        texture.draw();
+    public void draw(TextureBatch batch, float x, float y, float width, float height) {
+        batch.draw(texture, x, y, width, height);
     }
 
     @Override

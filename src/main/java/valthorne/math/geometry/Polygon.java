@@ -39,10 +39,9 @@ public class Polygon extends Shape {
 
     @Override
     public void move(Vector2f offset) {
-        for (int i = 0; i < points.length; i++) {
-            Vector2f p = points[i];
+        for (Vector2f p : points) {
             if (p == null) continue;
-            points[i] = new Vector2f(p.getX() + offset.getX(), p.getY() + offset.getY());
+            p.set(p.getX() + offset.getX(), p.getY() + offset.getY());
         }
     }
 

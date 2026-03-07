@@ -3,27 +3,38 @@ package valthorne.graphics.map.tiled;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.InflaterInputStream;
 
+/**
+ * Represents a tile-based layer in a tiled map, extending from the base MapLayer class.
+ * This layer contains information about tile arrangement, dimensions, tile IDs,
+ * and whether the map uses infinite tiling.
+ */
 public class TiledTileMapLayer extends MapLayer {
-    public final int width;                     // Width in tiles (finite layers).
-    public final int height;                    // Height in tiles (finite layers).
-    public final int[] gids;                    // Tile globalTileIDs (finite only).
-    public final boolean infinite;              // True if chunks are used.
-    public final Map<Long, MapChunk> chunks;       // MapChunk data (infinite only).
+    private final int width;
+    private final int height;
+    private final int[] gids;
+    private final boolean infinite;
+    private final Map<Long, MapChunk> chunks;
 
+    /**
+     * Creates a new instance of the TiledTileMapLayer class, representing a layer in a tiled map.
+     *
+     * @param name       the name of the layer.
+     * @param width      the width of the layer in tiles.
+     * @param height     the height of the layer in tiles.
+     * @param visible    a boolean indicating whether the layer is visible.
+     * @param opacity    the opacity of the layer, specified as a float value between 0 and 1.
+     * @param offsetX    the horizontal offset of the layer in pixels.
+     * @param offsetY    the vertical offset of the layer in pixels.
+     * @param properties a map containing custom properties associated with the layer.
+     * @param gids       a one-dimensional array of global tile IDs representing the layer's tiles.
+     * @param infinite   a boolean indicating whether the layer is an infinite layer (supports chunks).
+     * @param chunks     a map associating chunk keys (packed long values) to {@code MapChunk} objects.
+     *                   If null, an empty map is assigned.
+     */
     public TiledTileMapLayer(String name, int width, int height, boolean visible, float opacity, float offsetX, float offsetY, Map<String, String> properties, int[] gids, boolean infinite, Map<Long, MapChunk> chunks) {
         super(name, visible, opacity, offsetX, offsetY, properties);
         this.width = width;
@@ -33,7 +44,15 @@ public class TiledTileMapLayer extends MapLayer {
         this.chunks = (chunks != null) ? chunks : new HashMap<>();
     }
 
-    public static TiledTileMapLayer load(Path tmxPath, XMLStreamReader r, int mapTileWidth, int mapTileHeight) throws Exception {
+    /**
+     * Loads a TiledTileMapLayer from the provided TMX bytes and XML stream reader.
+     *
+     * @param tmxBytes the byte array containing the TMX file data.
+     * @param r        the XMLStreamReader used to parse the TMX file.
+     * @return an instance of TiledTileMapLayer, representing the layer described in the TMX data.
+     * @throws Exception if an error occurs during the reading or parsing process.
+     */
+    public static TiledTileMapLayer load(byte[] tmxBytes, XMLStreamReader r) throws Exception {
         String name = TiledXML.readAttribute(r, "name", "");
         int width = TiledXML.readInteger(r, "width", 0);
         int height = TiledXML.readInteger(r, "height", 0);
@@ -70,27 +89,14 @@ public class TiledTileMapLayer extends MapLayer {
                                 int ch = TiledXML.readInteger(r, "height", 0);
 
                                 String chunkText = TiledXML.readElementText(r, "chunk");
-                                int[] cgids = decodeLayerData(chunkText, encoding, compression, cw * ch);
+                                int[] cgids = TiledDecoding.decodeLayerData(chunkText, encoding, compression, cw * ch);
                                 MapChunk c = new MapChunk(cx, cy, cw, ch, cgids);
                                 chunks.put(packChunkKey(cx, cy), c);
                             } else {
                                 TiledXML.skipElement(r);
                             }
-                        } else if (ev2 == XMLStreamConstants.CHARACTERS || ev2 == XMLStreamConstants.CDATA) {
-                            if (infinite) {
-                                TiledXML.skipElement(r);
-                            } else {
-                                String text = readCollectedTextInsideJustClosedData(r);
-                                gids = decodeLayerData(text, encoding, compression, width * height);
-                            }
-                            break;
                         } else if (ev2 == XMLStreamConstants.END_ELEMENT) {
-                            if ("data".equals(r.getLocalName())) {
-                                if (!infinite) {
-                                    String text = readCollectedTextInsideJustClosedData(r);
-                                }
-                                break;
-                            }
+                            if ("data".equals(r.getLocalName())) break;
                         }
                     }
                 } else {
@@ -103,53 +109,27 @@ public class TiledTileMapLayer extends MapLayer {
         }
 
         if (!infinite) {
-            gids = secondPassDecodeFiniteLayerData(tmxPath, name, width, height);
+            gids = secondPassDecodeFiniteLayerData(tmxBytes, name, width, height);
         }
 
         return new TiledTileMapLayer(name, width, height, visible, opacity, offsetX, offsetY, props, gids, infinite, chunks);
     }
 
-    private static String readCollectedTextInsideJustClosedData(XMLStreamReader r) {
-        return "";
-    }
-
-    private static int[] decodeLayerData(String text, String encoding, String compression, int expectedCount) throws IOException {
-        if (text == null) return new int[Math.max(0, expectedCount)];
-        String trimmed = text.trim();
-        if (trimmed.isEmpty()) return new int[Math.max(0, expectedCount)];
-
-        if (encoding == null || encoding.isBlank() || "xml".equalsIgnoreCase(encoding)) {
-            throw new IllegalStateException("TMX layer encoding XML is not implemented. Use CSV or Base64.");
-        }
-
-        if ("csv".equalsIgnoreCase(encoding)) {
-            return decodeCsv(trimmed, expectedCount);
-        }
-
-        if ("base64".equalsIgnoreCase(encoding)) {
-            byte[] raw = Base64.getMimeDecoder().decode(trimmed);
-
-            InputStream in = new ByteArrayInputStream(raw);
-            if (compression != null && !compression.isBlank()) {
-                if ("gzip".equalsIgnoreCase(compression)) {
-                    in = new GZIPInputStream(in);
-                } else if ("zlib".equalsIgnoreCase(compression)) {
-                    in = new InflaterInputStream(in);
-                } else {
-                    throw new IllegalStateException("Unsupported TMX compression: " + compression);
-                }
-            }
-
-            byte[] bytes = readAllBytes(in);
-            return decodeLittleEndianU32(bytes, expectedCount);
-        }
-
-        throw new IllegalStateException("Unsupported TMX encoding: " + encoding);
-    }
-
-
-    private static int[] secondPassDecodeFiniteLayerData(Path tmxPath, String layerName, int w, int h) throws Exception {
-        try (InputStream in = Files.newInputStream(tmxPath)) {
+    /**
+     * Decodes the data for a specific finite layer from a byte array, based on its name.
+     * This method performs a second pass to parse and decode the XML representation
+     * of the layer data, including attributes like encoding and compression.
+     *
+     * @param data       the byte array containing the XML data of the map.
+     * @param layerName  the name of the layer to decode.
+     * @param w          the width of the layer in tiles.
+     * @param h          the height of the layer in tiles.
+     * @return an integer array representing the decoded tile data of the specified layer.
+     *         If the layer is not found, a default array of size w * h is returned.
+     * @throws Exception if an error occurs during XML parsing or data decoding.
+     */
+    private static int[] secondPassDecodeFiniteLayerData(byte[] data, String layerName, int w, int h) throws Exception {
+        try (InputStream in = new ByteArrayInputStream(data)) {
             XMLStreamReader r = TiledXML.getXMLFactory().createXMLStreamReader(in);
             TiledXML.moveToStart(r, "map");
 
@@ -160,7 +140,7 @@ public class TiledTileMapLayer extends MapLayer {
                     int lw = TiledXML.readInteger(r, "width", 0);
                     int lh = TiledXML.readInteger(r, "height", 0);
 
-                    if (!Objects.equals(name, layerName)) {
+                    if (!java.util.Objects.equals(name, layerName)) {
                         TiledXML.skipElement(r);
                         continue;
                     }
@@ -174,7 +154,7 @@ public class TiledTileMapLayer extends MapLayer {
                             String text = TiledXML.readElementText(r, "data");
                             int expected = Math.max(0, lw * lh);
                             if (expected == 0) expected = Math.max(0, w * h);
-                            return decodeLayerData(text, encoding, compression, expected);
+                            return TiledDecoding.decodeLayerData(text, encoding, compression, expected);
                         } else if (ev2 == XMLStreamConstants.END_ELEMENT && "layer".equals(r.getLocalName())) {
                             break;
                         } else if (ev2 == XMLStreamConstants.START_ELEMENT) {
@@ -188,46 +168,56 @@ public class TiledTileMapLayer extends MapLayer {
         return new int[Math.max(0, w * h)];
     }
 
-    private static byte[] readAllBytes(InputStream in) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(4096);
-        byte[] buf = new byte[8192];
-        int read;
-        while ((read = in.read(buf)) != -1) bos.write(buf, 0, read);
-        return bos.toByteArray();
-    }
-
-    private static int[] decodeLittleEndianU32(byte[] bytes, int expectedCount) {
-        int count = (bytes.length / 4);
-        int n = expectedCount > 0 ? Math.min(expectedCount, count) : count;
-
-        int[] out = new int[n];
-        ByteBuffer bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
-        for (int i = 0; i < n; i++) {
-            out[i] = bb.getInt();
-        }
-        return out;
-    }
-
-    private static int[] decodeCsv(String csv, int expectedCount) {
-        String[] parts = csv.split("[,\\s]+");
-        int n = expectedCount > 0 ? expectedCount : parts.length;
-        int[] out = new int[n];
-
-        int i = 0;
-        for (; i < parts.length && i < n; i++) {
-            String p = parts[i].trim();
-            if (p.isEmpty()) {
-                out[i] = 0;
-                continue;
-            }
-            long v = Long.parseLong(p);
-            out[i] = (int) v;
-        }
-        for (; i < n; i++) out[i] = 0;
-        return out;
-    }
-
     private static long packChunkKey(int x, int y) {
         return (((long) x) << 32) ^ (y & 0xFFFF_FFFFL);
+    }
+
+    /**
+     * Retrieves the width of the layer in tiles.
+     *
+     * @return the width of the layer as an integer.
+     */
+    public int getWidth() {
+        return width;
+    }
+
+    /**
+     * Retrieves the height of the layer in tiles.
+     *
+     * @return the height of the layer as an integer.
+     */
+    public int getHeight() {
+        return height;
+    }
+
+    /**
+     * Retrieves the array of global tile IDs (gids) representing the tiles in this layer.
+     *
+     * @return an integer array of global tile IDs, where each ID corresponds to a tile in the layer.
+     */
+    public int[] getGids() {
+        return gids;
+    }
+
+    /**
+     * Determines if the layer is infinite, meaning it supports chunked maps rather
+     * than having a fixed width and height.
+     *
+     * @return true if the layer is infinite, false otherwise.
+     */
+    public boolean isInfinite() {
+        return infinite;
+    }
+
+    /**
+     * Retrieves the chunks associated with this layer. Each chunk is represented as
+     * a {@code MapChunk} object and is associated with a unique key of type {@code Long}.
+     *
+     * @return a map where keys are {@code Long} values representing chunk identifiers
+     *         and values are {@code MapChunk} objects representing the corresponding
+     *         chunk data.
+     */
+    public Map<Long, MapChunk> getChunks() {
+        return chunks;
     }
 }
