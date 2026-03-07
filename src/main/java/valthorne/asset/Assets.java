@@ -228,7 +228,7 @@ public final class Assets {
      * @param params The asset parameters to prepare. Must not be null.
      * @throws NullPointerException If {@code params} is null.
      */
-    public static void prepare(AssetParameters params) {
+    public static synchronized void prepare(AssetParameters params) {
         Objects.requireNonNull(params);
         if (prepared.contains(params)) return;
 

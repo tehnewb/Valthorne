@@ -72,7 +72,7 @@ public class JGL {
 
         application.init();
         while (!Window.shouldClose()) {
-            if (!tasks.isEmpty()) tasks.poll().run();
+            while (!tasks.isEmpty()) tasks.poll().run();
 
             float now = (float) glfwGetTime();
             deltaTime = now - lastTime;
