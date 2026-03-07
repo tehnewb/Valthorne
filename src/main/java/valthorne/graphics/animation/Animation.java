@@ -2,9 +2,8 @@ package valthorne.graphics.animation;
 
 import valthorne.collections.bits.ByteBits;
 import valthorne.graphics.Drawable;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * A lightweight, time-driven frame animation player.
@@ -38,9 +37,11 @@ import java.util.concurrent.ThreadLocalRandom;
  *     }
  * });
  *
+ * TextureBatch batch = new TextureBatch(512, 50);
+ *
  * // Game loop usage.
  * walk.update(deltaSeconds);
- * walk.draw(playerX, playerY, 64, 64);
+ * walk.draw(batch, playerX, playerY, 64, 64);
  *
  * // Seek (optional).
  * walk.setTime(0.15f);       // jump to time in seconds along the timeline
@@ -69,7 +70,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>This class uses {@link ByteBits} to pack common booleans into one byte:
  * paused, looping, returning (ping-pong), and finished.</p>
  *
- * <p><b>Important:</b> If {@code frames} is null/empty, {@link #update(float)} and {@link #draw(float, float, float, float)}
+ * <p><b>Important:</b> If {@code frames} is null/empty, {@link #update(float)} and {@link #draw(TextureBatch, float, float, float, float)}
  * safely no-op and query methods return safe defaults.</p>
  *
  * @author Albert Beaupre
@@ -124,22 +125,20 @@ public class Animation implements Drawable {
     }
 
     /**
-     * Draws the current frame's {@link Drawable} into a destination rectangle.
+     * Draws the current animation frame using the specified texture batch.
      *
-     * <p>This does not advance time. Call {@link #update(float)} to progress the animation.</p>
-     * <p>If the current frame (or its drawable) is null, this method safely no-ops.</p>
-     *
-     * @param x      destination x (world space)
-     * @param y      destination y (world space)
-     * @param width  destination width
-     * @param height destination height
+     * @param batch  the texture batch used for rendering the frame
+     * @param x      the x-coordinate where the frame should be drawn
+     * @param y      the y-coordinate where the frame should be drawn
+     * @param width  the width of the frame to be drawn
+     * @param height the height of the frame to be drawn
      */
-    public void draw(float x, float y, float width, float height) {
+    public void draw(TextureBatch batch, float x, float y, float width, float height) {
         AnimationFrame currentFrame = getCurrentFrame();
         if (currentFrame == null) return;
         if (currentFrame.drawable() == null) return;
 
-        currentFrame.drawable().draw(x, y, width, height);
+        currentFrame.drawable().draw(batch, x, y, width, height);
     }
 
     /**

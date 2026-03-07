@@ -13,6 +13,7 @@ import valthorne.math.Vector2f;
 public class Circle extends Shape {
 
     private Vector2f[] points;
+    private final Vector2f center;
     private float x; // bottom-left x
     private float y; // bottom-left y
     private float radius;
@@ -31,8 +32,14 @@ public class Circle extends Shape {
         this.y = y;
         this.radius = Math.max(0f, radius);
         this.segments = Math.max(3, segments);
-        this.points = new Vector2f[segments];
-        this.updatePoints();
+        this.center = new Vector2f();
+        this.points = new Vector2f[this.segments];
+
+        for (int i = 0; i < this.segments; i++) {
+            this.points[i] = new Vector2f();
+        }
+
+        updatePoints();
     }
 
     public Circle(float x, float y, float radius) {
@@ -57,45 +64,58 @@ public class Circle extends Shape {
 
     public void setX(float x) {
         this.x = x;
-        this.updatePoints();
+        updatePoints();
     }
 
     public void setY(float y) {
         this.y = y;
-        this.updatePoints();
+        updatePoints();
     }
 
     public void setRadius(float radius) {
         this.radius = Math.max(0f, radius);
-        this.updatePoints();
+        updatePoints();
     }
 
     public void setSegments(int segments) {
-        this.segments = Math.max(3, segments);
-        this.updatePoints();
+        int newSegments = Math.max(3, segments);
+        if (this.segments == newSegments) {
+            return;
+        }
+
+        this.segments = newSegments;
+        this.points = new Vector2f[this.segments];
+
+        for (int i = 0; i < this.segments; i++) {
+            this.points[i] = new Vector2f();
+        }
+
+        updatePoints();
     }
 
     public Vector2f getCenter() {
-        return new Vector2f(x + radius, y + radius);
+        return center;
     }
 
     public void move(Vector2f offset) {
         x += offset.getX();
         y += offset.getY();
-        this.updatePoints();
+        updatePoints();
     }
 
     private void updatePoints() {
-        if (this.points.length != this.segments) this.points = new Vector2f[segments];
-
         double step = (Math.PI * 2.0) / segments;
 
         float centerX = x + radius;
         float centerY = y + radius;
 
+        center.set(centerX, centerY);
+
         for (int i = 0; i < segments; i++) {
-            double a = i * step;
-            points[i] = new Vector2f((float) (centerX + Math.cos(a) * radius), (float) (centerY + Math.sin(a) * radius));
+            double angle = i * step;
+            float px = (float) (centerX + Math.cos(angle) * radius);
+            float py = (float) (centerY + Math.sin(angle) * radius);
+            points[i].set(px, py);
         }
     }
 

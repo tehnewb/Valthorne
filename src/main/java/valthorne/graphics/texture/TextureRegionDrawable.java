@@ -28,10 +28,8 @@ public record TextureRegionDrawable(TextureRegion region) implements Drawable {
     }
 
     @Override
-    public void draw(float x, float y, float width, float height) {
-        region.setPosition(x, y);
-        region.setSize(width, height);
-        region.draw();
+    public void draw(TextureBatch batch, float x, float y, float width, float height) {
+        batch.drawRegion(region, x, y, width, height);
     }
 
     @Override

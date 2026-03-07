@@ -1,6 +1,7 @@
 package valthorne.ui.elements;
 
 import valthorne.graphics.font.Font;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.Vector2f;
 import valthorne.ui.Element;
 import valthorne.ui.enums.Alignment;
@@ -31,8 +32,8 @@ public class Label extends Element {
     }
 
     @Override
-    public void draw() {
-        font.draw();
+    public void draw(TextureBatch batch) {
+        font.draw(batch);
     }
 
     @Override

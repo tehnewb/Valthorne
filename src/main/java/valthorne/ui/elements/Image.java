@@ -1,6 +1,7 @@
 package valthorne.ui.elements;
 
 import valthorne.graphics.texture.Texture;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.ui.Element;
 
@@ -26,8 +27,8 @@ public class Image extends Element {
     }
 
     @Override
-    public void draw() {
-        texture.draw();
+    public void draw(TextureBatch batch) {
+       batch.draw(texture, this.x, this.y, this.width, this.height);
     }
 
     @Override

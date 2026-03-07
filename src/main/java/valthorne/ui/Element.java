@@ -3,6 +3,7 @@ package valthorne.ui;
 import valthorne.Window;
 import valthorne.event.events.*;
 import valthorne.graphics.DrawFunction;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.geometry.Rectangle;
 import valthorne.ui.enums.Alignment;
 
@@ -32,13 +33,13 @@ import valthorne.ui.enums.Alignment;
  *   <li>Spatial hit testing through the inside() method</li>
  * </ul>
  * <p>
- * Subclasses must implement the {@link #update(float)} and {@link #draw()} methods to define
+ * Subclasses must implement the {@link #update(float)} and {@link #draw(TextureBatch)} methods to define
  * their specific behavior and appearance.
  *
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
-public abstract class Element implements Dimensional, DrawFunction {
+public abstract class Element implements Dimensional {
 
     private static final AlignmentTarget ALIGN_TARGET = new AlignmentTarget();
     public static final byte HIDDEN = 1;      // Flag indicating if element is not visible
@@ -59,7 +60,7 @@ public abstract class Element implements Dimensional, DrawFunction {
     private Layout layout;
     private UI ui;
 
-    private Rectangle bounds = new Rectangle();
+    private final Rectangle bounds = new Rectangle();
     private Rectangle clipBounds;
 
     /**
@@ -82,17 +83,12 @@ public abstract class Element implements Dimensional, DrawFunction {
     public abstract void update(float delta);
 
     /**
-     * Renders the visual representation of this element.
-     * <p>
-     * This method is typically invoked to draw the element on the screen, including
-     * any styles, content, or visual decorations associated with it. Subclasses must
-     * provide their specific implementation of the drawing behavior for the element.
-     * <p>
-     * The specific rendering logic can vary depending on the element type and its
-     * visual representation. This method must handle all necessary graphics operations
-     * to ensure that the element is properly displayed.
+     * Renders the object using the provided texture batch.
+     * Implementations of this method should define how the object is drawn.
+     *
+     * @param batch the texture batch used for rendering
      */
-    public abstract void draw();
+    public abstract void draw(TextureBatch batch);
 
     /**
      * Handles the key press event for the element.
@@ -566,10 +562,10 @@ public abstract class Element implements Dimensional, DrawFunction {
      * coordinates and dimensions.
      *
      * @return a Rectangle object representing the bounds with the current
-     *         x, y, width, and height values.
+     * x, y, width, and height values.
      */
     public Rectangle getBounds() {
-        return new Rectangle(x, y, width, height);
+        return bounds;
     }
 
     /**

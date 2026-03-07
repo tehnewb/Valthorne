@@ -28,6 +28,13 @@ public class Vector2f {
     }
 
     /**
+     * Creates a zero vector (0,0).
+     */
+    public Vector2f(Vector2f vector) {
+        this(vector.x, vector.y);
+    }
+
+    /**
      * Creates a vector with the given coordinates.
      *
      * @param x The x-coordinate
@@ -83,6 +90,18 @@ public class Vector2f {
      */
     public void setY(float y) {
         this.y = y;
+    }
+
+    /**
+     * Sets this vector's coordinates to the same as the specified vector.
+     *
+     * @param vector The vector whose coordinates will be copied to this vector.
+     * @return This vector for chaining.
+     */
+    public Vector2f set(Vector2f vector) {
+        this.x = vector.getX();
+        this.y = vector.getY();
+        return this;
     }
 
     /**
@@ -277,17 +296,6 @@ public class Vector2f {
      */
     public Vector2f clamp(float min) {
         return clamp(min, Float.MAX_VALUE);
-    }
-
-    /**
-     * Clamps this vector's x and y coordinates to the specified minimum vector.
-     * The maximum limit for clamping is set to {@code (Float.MAX_VALUE, Float.MAX_VALUE)}.
-     *
-     * @param min The vector representing the minimum bounds for clamping.
-     * @return This vector for chaining.
-     */
-    public Vector2f clamp(Vector2f min) {
-        return clamp(min, new Vector2f(Float.MAX_VALUE, Float.MAX_VALUE));
     }
 
     /**
