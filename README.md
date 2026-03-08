@@ -1,4 +1,6 @@
-<h1 align="center">Valthorne</h1>
+<p align="center">
+  <img width="768" height="512" src="https://github.com/user-attachments/assets/9c2b0063-f868-48f6-a827-50fe814c8305">
+</p>
 
 <p align="center">
 A lightweight 2D Java game engine built on LWJGL.
