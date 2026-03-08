@@ -145,6 +145,7 @@ public abstract class Scene {
 
         this.initialized = true;
         this.infrastructureDisposed = false;
+        this.viewport.update(Window.getWidth(), Window.getHeight());
     }
 
     /**
