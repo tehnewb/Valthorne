@@ -20,9 +20,7 @@ A lightweight 2D Java game engine built on LWJGL.
 ### Check out the [Wiki](https://github.com/tehnewb/Valthorne/wiki/00.-Getting-Started) and Build a project with the [Valthorne Project Builder](https://github.com/tehnewb/ValthorneProjectBuilder)
 
 
-## Getting Started
-
-Add Valthorne to your build as a dependency.
+## Dependencies
 
 ### Gradle (Groovy)
 ```groovy
