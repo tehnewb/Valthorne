@@ -9,10 +9,10 @@ A lightweight 2D Java game engine built on LWJGL.
   &nbsp;&nbsp;&nbsp;
   <img src="https://img.shields.io/github/stars/tehnewb/Valthorne">
   &nbsp;&nbsp;&nbsp;
-  <img src="https://img.shields.io/github/license/tehnewb/Valthorne?cacheSeconds=60">
+  <img src="https://img.shields.io/github/license/tehnewb/Valthorne?cacheSeconds=60&color=orange">
   &nbsp;&nbsp;&nbsp;
   <a href="https://discord.gg/CcunJY275M" style="text-decoration:none;">
-    <img src="https://img.shields.io/discord/1480243912240136395?logo=discord&logoColor=white&label=Discord&color=5865F2">
+    <img src="https://img.shields.io/discord/1480243912240136395?logo=discord&logoColor=white&label=Discord&color=green">
   </a>
 </p>
 
