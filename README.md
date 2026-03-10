@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-A lightweight 2D Java game engine built on LWJGL.
+A lightweight 2D Java game engine built on LWJGL and inspired by libGDX
 </p>
 
 <p align="center">
