@@ -1,191 +1,321 @@
 package valthorne.graphics.texture;
 
+import valthorne.graphics.Sprite;
+
 /**
- * Represents a rectangular region inside an existing {@link Texture}.
+ * <p>
+ * {@code TextureRegion} represents a rectangular subsection of a {@link Texture}.
+ * Instead of rendering an entire texture, this class allows a specific portion
+ * of the texture to be referenced and used for rendering. This is commonly used
+ * with sprite sheets, texture atlases, tile maps, and UI element collections
+ * where multiple images are stored within a single texture.
+ * </p>
  *
- * <h2>Example</h2>
+ * <p>
+ * The region is defined using pixel coordinates relative to the underlying
+ * texture. The class then exposes both pixel-space values and normalized
+ * texture coordinates ({@code u, v}) used by OpenGL rendering.
+ * </p>
+ *
+ * <p>
+ * A {@code TextureRegion} does not allocate GPU resources and does not perform
+ * rendering itself. It simply describes a subsection of a texture that can be
+ * used by higher-level rendering types such as:
+ * </p>
+ *
+ * <ul>
+ *     <li>{@link Sprite}</li>
+ *     <li>{@link NinePatchTexture}</li>
+ *     <li>{@link TextureBatch}</li>
+ * </ul>
+ *
+ * <p>
+ * Regions can be freely modified after creation. Changing the region updates
+ * the pixel bounds used to compute UV coordinates but does not affect the
+ * underlying texture.
+ * </p>
+ *
+ * <h2>Example Usage</h2>
+ *
  * <pre>{@code
- * // Load a sprite sheet texture.
- * Texture sheet = new Texture("assets/player_sprites.png");
+ * Texture texture = new Texture("spritesheet.png");
  *
- * // Create a region that represents a 32x32 sprite located at (64, 0).
- * TextureRegion idleFrame = new TextureRegion(sheet, 64, 0, 32, 32);
+ * TextureRegion playerIdle = new TextureRegion(texture, 0, 0, 32, 32);
+ * TextureRegion playerWalk = new TextureRegion(texture, 32, 0, 32, 32);
  *
- * // Draw the region like a normal texture.
- * idleFrame.setPosition(200, 100);
- * idleFrame.draw();
+ * float u = playerIdle.getU();
+ * float v = playerIdle.getV();
+ * float u2 = playerIdle.getU2();
+ * float v2 = playerIdle.getV2();
  *
- * // Resize it on screen (region sampling does not change).
- * idleFrame.setSize(96, 96);
- * idleFrame.draw();
+ * playerWalk.setRegion(64, 0, 32, 32);
  *
- * // Change the sampled sprite region dynamically.
- * idleFrame.setRegion(96, 0, 32, 32);
- * idleFrame.draw();
- *
- * // IMPORTANT:
- * // Disposing a TextureRegion does nothing because it does not own the texture.
- * // Always dispose the original Texture instead.
- * sheet.dispose();
+ * TextureBatch batch = new TextureBatch(1000);
+ * batch.begin();
+ * batch.drawRegion(playerIdle.getTexture(), 100, 100,
+ *                  playerIdle.getRegionWidth(),
+ *                  playerIdle.getRegionHeight(),
+ *                  playerIdle.getRegionX(),
+ *                  playerIdle.getRegionY(),
+ *                  playerIdle.getRegionWidth(),
+ *                  playerIdle.getRegionHeight());
+ * batch.end();
  * }</pre>
  *
- * <h2>What this class does</h2>
  * <p>
- * {@code TextureRegion} is a lightweight view into a portion of an existing {@link Texture}.
- * Instead of creating a new OpenGL texture, this class reuses the parent texture's OpenGL ID
- * and {@link TextureData}. The region defines which part of the parent texture should be
- * sampled during rendering.
- * </p>
- *
- * <h2>How regions work</h2>
- * <p>
- * Internally, the base {@link Texture} class stores normalized UV coordinates
- * ({@code leftRegion}, {@code rightRegion}, {@code topRegion}, {@code bottomRegion}).
- * This class converts pixel coordinates into those normalized UV values by calling
- * {@link Texture#setRegion(float, float, float, float)}.
- * </p>
- *
- * <h2>Ownership and disposal</h2>
- * <p>
- * A {@code TextureRegion} does not own any GPU resources. It simply references the
- * OpenGL texture ID of the parent texture. Calling {@link #dispose()} on this class
- * intentionally does nothing. The parent {@link Texture} must be disposed instead.
+ * This example demonstrates creating regions from a sprite sheet, modifying
+ * their coordinates, retrieving normalized UV values, and using them during
+ * rendering.
  * </p>
  *
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
-public final class TextureRegion extends Texture {
+public final class TextureRegion {
+
+    private final Texture texture; // The underlying texture that contains this region
+
+    private float regionX; // X coordinate of the region within the texture (in pixels)
+    private float regionY; // Y coordinate of the region within the texture (in pixels)
+    private float regionWidth; // Width of the region (in pixels)
+    private float regionHeight; // Height of the region (in pixels)
 
     /**
-     * Creates a {@code TextureRegion} that covers the entire parent texture.
-     *
      * <p>
-     * This constructor is equivalent to creating a region starting at (0,0)
-     * with the full width and height of the parent texture.
+     * Creates a {@code TextureRegion} that represents the entire texture.
      * </p>
      *
-     * @param parent the parent texture whose pixels will be sampled
+     * <p>
+     * The region bounds are initialized to match the full width and height
+     * of the provided texture.
+     * </p>
+     *
+     * @param texture the texture backing this region
      */
-    public TextureRegion(Texture parent) {
-        this(parent, 0f, 0f, parent.getData().width(), parent.getData().height());
+    public TextureRegion(Texture texture) {
+        this(texture, 0f, 0f, texture.getWidth(), texture.getHeight());
     }
 
     /**
-     * Creates a {@code TextureRegion} representing a rectangular portion of the parent texture.
-     *
      * <p>
-     * The region is defined in source pixel coordinates. The provided rectangle is converted
-     * into normalized UV coordinates internally by forwarding the values to
-     * {@link Texture#setRegion(float, float, float, float)}.
+     * Creates a {@code TextureRegion} describing a subsection of a texture.
      * </p>
      *
      * <p>
-     * The region size is also applied as the initial render size using {@link #setSize(float, float)}.
-     * This means the region will draw at its native pixel dimensions unless resized later.
+     * The supplied values define the rectangular area in pixel coordinates
+     * relative to the texture.
      * </p>
      *
-     * @param parent       the parent texture whose OpenGL ID and data will be reused
-     * @param regionX      the left pixel coordinate of the region
-     * @param regionY      the top pixel coordinate of the region
+     * @param texture      the texture backing this region
+     * @param regionX      the X coordinate of the region in pixels
+     * @param regionY      the Y coordinate of the region in pixels
      * @param regionWidth  the width of the region in pixels
      * @param regionHeight the height of the region in pixels
+     * @throws NullPointerException if {@code texture} is {@code null}
      */
-    public TextureRegion(Texture parent, float regionX, float regionY, float regionWidth, float regionHeight) {
-        super(parent.getTextureID(), parent.getData());
-        setRegion(regionX, regionY, regionWidth, regionHeight);
-        setSize(regionWidth, regionHeight);
+    public TextureRegion(Texture texture, float regionX, float regionY, float regionWidth, float regionHeight) {
+        if (texture == null) throw new NullPointerException("Texture cannot be null");
+
+        this.texture = texture;
+        this.regionX = regionX;
+        this.regionY = regionY;
+        this.regionWidth = regionWidth;
+        this.regionHeight = regionHeight;
     }
 
     /**
-     * Updates the sampled region of the parent texture.
-     *
      * <p>
-     * This method defines a rectangle in source pixel coordinates. Internally,
-     * the right and bottom edges are computed by adding the width and height
-     * to the provided starting position.
+     * Returns the texture associated with this region.
      * </p>
      *
-     * <p>
-     * The resulting rectangle is forwarded to the base {@link Texture#setRegion}
-     * method which converts the coordinates into normalized UV values used during rendering.
-     * </p>
-     *
-     * @param regionX      the left pixel coordinate of the region
-     * @param regionY      the top pixel coordinate of the region
-     * @param regionWidth  the width of the region in pixels
-     * @param regionHeight the height of the region in pixels
+     * @return the underlying texture
      */
-    public void setRegion(float regionX, float regionY, float regionWidth, float regionHeight) {
-        super.setRegion(regionX, regionY, regionX + regionWidth, regionY + regionHeight);
+    public Texture getTexture() {
+        return texture;
     }
 
     /**
-     * Returns the left pixel coordinate of the current region.
-     *
      * <p>
-     * The base texture stores normalized UV coordinates. This method converts
-     * the normalized value back into pixel space using the texture width.
+     * Returns the region's X coordinate in pixels.
      * </p>
      *
-     * @return the region's left pixel coordinate
+     * @return the region X position
      */
     public float getRegionX() {
-        return leftRegion * data.width();
+        return regionX;
     }
 
     /**
-     * Returns the top pixel coordinate of the current region.
-     *
      * <p>
-     * This value is calculated by converting the normalized UV coordinate
-     * into pixel space using the texture height.
+     * Sets the region's X coordinate.
      * </p>
      *
-     * @return the region's top pixel coordinate
+     * @param regionX the new region X position in pixels
+     */
+    public void setRegionX(float regionX) {
+        this.regionX = regionX;
+    }
+
+    /**
+     * <p>
+     * Returns the region's Y coordinate in pixels.
+     * </p>
+     *
+     * @return the region Y position
      */
     public float getRegionY() {
-        return topRegion * data.height();
+        return regionY;
     }
 
     /**
-     * Returns the width of the region in pixels.
-     *
      * <p>
-     * The width is derived from the difference between the normalized
-     * right and left UV coordinates multiplied by the texture width.
+     * Sets the region's Y coordinate.
      * </p>
      *
-     * @return region width in pixels
+     * @param regionY the new region Y position in pixels
+     */
+    public void setRegionY(float regionY) {
+        this.regionY = regionY;
+    }
+
+    /**
+     * <p>
+     * Returns the region width in pixels.
+     * </p>
+     *
+     * @return the region width
      */
     public float getRegionWidth() {
-        return (rightRegion - leftRegion) * data.width();
+        return regionWidth;
     }
 
     /**
-     * Returns the height of the region in pixels.
-     *
      * <p>
-     * The height is derived from the difference between the normalized
-     * bottom and top UV coordinates multiplied by the texture height.
+     * Sets the region width.
      * </p>
      *
-     * @return region height in pixels
+     * @param regionWidth the new region width in pixels
+     */
+    public void setRegionWidth(float regionWidth) {
+        this.regionWidth = regionWidth;
+    }
+
+    /**
+     * <p>
+     * Returns the region height in pixels.
+     * </p>
+     *
+     * @return the region height
      */
     public float getRegionHeight() {
-        return (bottomRegion - topRegion) * data.height();
+        return regionHeight;
     }
 
     /**
-     * Disposes the region.
+     * <p>
+     * Sets the region height.
+     * </p>
+     *
+     * @param regionHeight the new region height in pixels
+     */
+    public void setRegionHeight(float regionHeight) {
+        this.regionHeight = regionHeight;
+    }
+
+    /**
+     * <p>
+     * Updates the full region bounds at once.
+     * </p>
      *
      * <p>
-     * This method intentionally performs no action. The region does not
-     * own the OpenGL texture resource. The parent {@link Texture} must
-     * be disposed instead.
+     * This method replaces the X, Y, width, and height values in a single call.
      * </p>
+     *
+     * @param regionX      the new region X coordinate
+     * @param regionY      the new region Y coordinate
+     * @param regionWidth  the new region width
+     * @param regionHeight the new region height
      */
-    @Override
-    public void dispose() {
+    public void setRegion(float regionX, float regionY, float regionWidth, float regionHeight) {
+        this.regionX = regionX;
+        this.regionY = regionY;
+        this.regionWidth = regionWidth;
+        this.regionHeight = regionHeight;
+    }
+
+    /**
+     * <p>
+     * Returns the right edge of the region in pixel space.
+     * </p>
+     *
+     * @return the right coordinate
+     */
+    public float getRight() {
+        return regionX + regionWidth;
+    }
+
+    /**
+     * <p>
+     * Returns the bottom edge of the region in pixel space.
+     * </p>
+     *
+     * @return the bottom coordinate
+     */
+    public float getBottom() {
+        return regionY + regionHeight;
+    }
+
+    /**
+     * <p>
+     * Returns the normalized U coordinate for the left side of the region.
+     * </p>
+     *
+     * <p>
+     * This value is calculated by dividing the region's X position by the
+     * full texture width.
+     * </p>
+     *
+     * @return the normalized U coordinate
+     */
+    public float getU() {
+        return regionX / texture.getWidth();
+    }
+
+    /**
+     * <p>
+     * Returns the normalized V coordinate for the top side of the region.
+     * </p>
+     *
+     * <p>
+     * This value is calculated by dividing the region's Y position by the
+     * full texture height.
+     * </p>
+     *
+     * @return the normalized V coordinate
+     */
+    public float getV() {
+        return regionY / texture.getHeight();
+    }
+
+    /**
+     * <p>
+     * Returns the normalized U coordinate for the right side of the region.
+     * </p>
+     *
+     * @return the normalized U2 coordinate
+     */
+    public float getU2() {
+        return (regionX + regionWidth) / texture.getWidth();
+    }
+
+    /**
+     * <p>
+     * Returns the normalized V coordinate for the bottom side of the region.
+     * </p>
+     *
+     * @return the normalized V2 coordinate
+     */
+    public float getV2() {
+        return (regionY + regionHeight) / texture.getHeight();
     }
 }

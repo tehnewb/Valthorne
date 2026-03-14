@@ -3,10 +3,10 @@ package valthorne.scene;
 import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.Window;
-import valthorne.camera.Camera2D;
+import valthorne.camera.Camera;
 import valthorne.event.events.*;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.ui.UI;
+import valthorne.ui.UIRoot;
 import valthorne.viewport.ScreenViewport;
 import valthorne.viewport.Viewport;
 
@@ -33,12 +33,10 @@ import valthorne.viewport.Viewport;
  * The intended lifecycle is:
  * </p>
  * <ol>
- *     <li>{@link #initializeFields()} is called once before the scene starts running.</li>
  *     <li>{@link #init()} performs subclass-specific setup.</li>
- *     <li>{@link #drawScene()} is used by the scene controller to render the world and UI.</li>
- *     <li>{@link #updateScene(float)} is used by the scene controller to update the scene when not paused.</li>
+ *     <li>{@link #draw(TextureBatch)} is used by the scene controller to render the world and UI.</li>
+ *     <li>{@link #update(float)} is used by the scene controller to update the scene when not paused.</li>
  *     <li>{@link #dispose()} releases subclass-owned resources.</li>
- *     <li>{@link #disposeScene()} releases shared scene infrastructure and unregisters listeners.</li>
  * </ol>
  *
  * <h2>Important design rule</h2>
@@ -51,7 +49,7 @@ import valthorne.viewport.Viewport;
  * <h2>Rendering behavior</h2>
  * <p>
  * {@link #drawScene()} wraps the scene render flow in a single {@link TextureBatch} begin/end cycle.
- * It first calls {@link #render(TextureBatch)} so subclasses can draw scene content, then it draws the
+ * It first calls {@link #draw(TextureBatch)} so subclasses can draw scene content, then it draws the
  * scene UI. This keeps the common render path in one place and avoids duplicating batch begin/end code
  * in every controller.
  * </p>
@@ -69,24 +67,22 @@ import valthorne.viewport.Viewport;
  *
  *     @Override
  *     public void init() {
- *         camera = new Camera2D();
- *         viewport.setCamera(camera);
+ *
  *     }
  *
  *     @Override
  *     public void render(TextureBatch batch) {
- *         // Draw world here.
+ *
  *     }
  *
  *     @Override
  *     public void update(float delta) {
- *         ui.update(delta);
+ *
  *     }
  *
  *     @Override
  *     public void dispose() {
- *         // Dispose scene-specific resources here.
- *         disposeSceneInfrastructure();
+ *
  *     }
  * }
  * }</pre>
@@ -96,8 +92,8 @@ import valthorne.viewport.Viewport;
  */
 public abstract class Scene {
 
-    protected UI ui; // The root UI object owned by this scene.
-    protected Camera2D camera; // The optional camera used to render world content for this scene.
+    protected UIRoot ui; // The root UI object owned by this scene.
+    protected Camera camera; // The optional camera used to render world content for this scene.
     protected Viewport viewport; // The viewport controlling projection, coordinate mapping, and UI/world bounds.
     protected TextureBatch batch; // The shared texture batch used to render this scene.
     private boolean paused; // Whether this scene is currently paused.
@@ -129,9 +125,10 @@ public abstract class Scene {
             return;
 
         this.batch = new TextureBatch(4096, 16);
-        this.ui = new UI();
+        this.ui = new UIRoot();
         this.viewport = new ScreenViewport(Window.getWidth(), Window.getHeight());
-        this.ui.setViewport(viewport);
+        this.viewport.update(Window.getWidth(), Window.getHeight());
+        this.ui.setViewport(new ScreenViewport(Window.getWidth(), Window.getHeight()));
 
         this.windowResizeListener = new SceneWindowResizeListener(this);
         this.keyListener = new SceneKeyListener(this);
@@ -145,7 +142,7 @@ public abstract class Scene {
 
         this.initialized = true;
         this.infrastructureDisposed = false;
-        this.viewport.update(Window.getWidth(), Window.getHeight());
+        init();
     }
 
     /**
@@ -163,13 +160,14 @@ public abstract class Scene {
      * </p>
      */
     protected void drawScene() {
-        if (batch == null) {
+        if (batch == null)
             return;
-        }
 
+        viewport.bind();
         batch.begin();
-        render(batch);
+        draw(batch);
         batch.end();
+        viewport.unbind();
 
         if (ui != null)
             ui.draw();
@@ -219,7 +217,7 @@ public abstract class Scene {
      *
      * @param batch the texture batch supplied for rendering this scene
      */
-    public abstract void render(TextureBatch batch);
+    public abstract void draw(TextureBatch batch);
 
     /**
      * Updates scene-specific logic.
@@ -323,7 +321,7 @@ public abstract class Scene {
         }
 
         if (camera != null && viewport != null) {
-            camera.setCenter(viewport.getWorldWidth() * 0.5f, viewport.getWorldHeight() * 0.5f);
+            camera.setCenter(event.getNewWidth() * 0.5f, event.getNewHeight() * 0.5f);
         }
     }
 
@@ -446,7 +444,7 @@ public abstract class Scene {
      *
      * @return the scene UI, or null if the scene infrastructure has not been initialized
      */
-    public UI getUI() {
+    public UIRoot getUI() {
         return ui;
     }
 
@@ -455,7 +453,7 @@ public abstract class Scene {
      *
      * @return the scene camera, or null if no camera is assigned
      */
-    public Camera2D getCamera() {
+    public Camera getCamera() {
         return camera;
     }
 
@@ -464,7 +462,7 @@ public abstract class Scene {
      *
      * @param camera the camera to assign, or null to remove the current camera
      */
-    public void setCamera(Camera2D camera) {
+    public void setCamera(Camera camera) {
         this.camera = camera;
     }
 
@@ -489,10 +487,6 @@ public abstract class Scene {
      */
     public void setViewport(Viewport viewport) {
         this.viewport = viewport;
-
-        if (ui != null) {
-            ui.setViewport(viewport);
-        }
     }
 
     /**

@@ -247,7 +247,7 @@ public final class TextureAtlas {
      */
     public TextureAtlas add(String key, TextureRegion region) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        TextureData data = region.getData();
+        TextureData data = region.getTexture().getData();
 
         int sx = (int) region.getRegionX();
         int sy = (int) region.getRegionY();

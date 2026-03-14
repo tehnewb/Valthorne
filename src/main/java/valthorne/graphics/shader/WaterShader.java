@@ -1,6 +1,6 @@
 package valthorne.graphics.shader;
 
-import valthorne.graphics.texture.Texture;
+import valthorne.graphics.Sprite;
 
 /**
  * Simple UV-distortion "water" shader (wobble / ripple) for 2D sprites.
@@ -96,21 +96,12 @@ public class WaterShader extends Shader {
         super(VERT_SRC, FRAG_SRC);
     }
 
-    /**
-     * Binds this shader and sets uniforms for the animated water distortion.
-     *
-     * @param texture     the texture being drawn (used to compute texel size)
-     * @param timeSeconds time in seconds (e.g., {@code JGL.getTime()})
-     * @param ampPx       distortion amplitude in pixels (>= 0 recommended)
-     * @param freq        ripple frequency (typical range 6..30 depending on look)
-     * @param speed       ripple speed multiplier (typical range 0..5)
-     */
-    public void apply(Texture texture, float timeSeconds, float ampPx, float freq, float speed) {
+    public void apply(Sprite sprite, float timeSeconds, float ampPx, float freq, float speed) {
         bind();
         setUniform1i("u_texture", 0);
 
-        float texelX = 1f / texture.getData().width();
-        float texelY = 1f / texture.getData().height();
+        float texelX = 1f / sprite.getTexture().getData().width();
+        float texelY = 1f / sprite.getTexture().getData().height();
         setUniform2f("u_texelSize", texelX, texelY);
 
         setUniform1f("u_time", timeSeconds);

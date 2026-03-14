@@ -16,6 +16,11 @@ import valthorne.graphics.Drawable;
  */
 public record TextureRegionDrawable(TextureRegion region) implements Drawable {
 
+
+    public TextureRegionDrawable(Texture texture, float regionX, float regionY, float regionWidth, float regionHeight) {
+        this(new TextureRegion(texture, regionX, regionY, regionWidth, regionHeight));
+    }
+
     /**
      * Creates a new {@code TextureRegionDrawable} that wraps the specified
      * {@link TextureRegion}, allowing it to be drawn with specified dimensions
@@ -34,12 +39,12 @@ public record TextureRegionDrawable(TextureRegion region) implements Drawable {
 
     @Override
     public float getWidth() {
-        return region.getWidth();
+        return region.getRegionWidth();
     }
 
     @Override
     public float getHeight() {
-        return region.getHeight();
+        return region.getRegionHeight();
     }
 
     /**

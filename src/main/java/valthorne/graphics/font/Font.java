@@ -75,6 +75,7 @@ import java.util.Arrays;
  * font.setShadow(2f, -2f, new Color(0f, 0f, 0f, 0.65f));
  * font.setOutline(1, new Color(0f, 0f, 0f, 1f));
  *
+ *
  * TextureBatch batch = new TextureBatch(4096);
  *
  * batch.begin();
@@ -107,6 +108,7 @@ public class Font implements Dimensional {
     private FontData data; // Font metadata and glyph metrics used for measurement and rendering.
     private Glyph spaceGlyph; // Cached space glyph used to derive tab width efficiently.
     private String text = ""; // Current text content assigned to this font instance.
+    private final Color color = new Color(1, 1, 1, 1);
     private float x; // World-space x position of the text origin.
     private float y; // World-space y position of the text origin.
     private float width; // Cached measured width of the current text block.
@@ -225,6 +227,223 @@ public class Font implements Dimensional {
     }
 
     /**
+     * Renders the specified text using the provided TextureBatch at the given coordinates.
+     *
+     * @param batch the TextureBatch used for rendering
+     * @param text  the text to be drawn
+     * @param x     the x-coordinate where the text will be rendered
+     * @param y     the y-coordinate where the text will be rendered
+     */
+    public void draw(TextureBatch batch, String text, float x, float y) {
+        draw(batch, text, x, y, color);
+    }
+
+    /**
+     * Renders the specified text at the given position with the provided tint color.
+     * Supports additional features such as shadow and outline rendering if enabled.
+     *
+     * @param batch the TextureBatch used for rendering
+     * @param text  the string to draw; if null or empty, nothing will be rendered
+     * @param x     the x-coordinate where the text drawing starts
+     * @param y     the y-coordinate where the text drawing starts
+     * @param tint  the color to tint the text during rendering
+     */
+    public void draw(TextureBatch batch, String text, float x, float y, Color tint) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+
+        final float texW = texture.getWidth();
+        final float texH = texture.getHeight();
+        if (texW <= 0f || texH <= 0f) {
+            return;
+        }
+
+        if (atlasInvW == 0f || atlasInvH == 0f) {
+            refreshAtlasInv();
+        }
+
+        if (shadowEnabled && shadowColor.a() > 0f) {
+            drawImmediatePass(batch, text, x + shadowOffsetX, y + shadowOffsetY, shadowColor);
+        }
+
+        if (outlineEnabled && outlinePx > 0 && outlineColor.a() > 0f) {
+            rebuildOutlineOffsetsIfNeeded();
+            drawImmediateOutlinePass(batch, text, x, y, outlineColor);
+        }
+
+        drawImmediatePass(batch, text, x, y, tint);
+    }
+
+    private void drawImmediateOutlinePass(TextureBatch batch, String text, float startX, float startY, Color tint) {
+        final float sx = this.scaleX;
+        final float sy = this.scaleY;
+        final float tabAdv = tabAdvanceBase * sx;
+        final float fallbackAdv = fallbackAdvance * sx;
+
+        float penX = 0f;
+        float baselineY = -baselineDescentY;
+        int lineIndex = 0;
+        int glyphIndex = 0;
+
+        tempColor.r(tint.r());
+        tempColor.g(tint.g());
+        tempColor.b(tint.b());
+
+        for (int i = 0, n = text.length(); i < n; i++) {
+            char c = text.charAt(i);
+
+            if (c == '\n') {
+                penX = 0f;
+                baselineY -= lineAdvanceY;
+                lineIndex++;
+                continue;
+            }
+
+            if (c == '\t') {
+                penX += tabAdv;
+                continue;
+            }
+
+            Glyph g = data.glyph(c);
+            if (g == null) {
+                penX += fallbackAdv;
+                continue;
+            }
+
+            final int gw = g.width();
+            final int gh = g.height();
+            final float adv = g.xAdvance() * sx;
+
+            if (gw <= 0 || gh <= 0) {
+                penX += adv;
+                continue;
+            }
+
+            float dx = startX + penX + (g.xOffset() * sx);
+            float dy = startY + baselineY - (g.yOffset() * sy);
+            float dw = gw * sx;
+            float dh = -(gh * sy);
+
+            float u0 = g.x0() * atlasInvW;
+            float v0 = g.y0() * atlasInvH;
+            float u1 = g.x1() * atlasInvW;
+            float v1 = g.y1() * atlasInvH;
+
+            if (styler != null) {
+                tempStyle.reset();
+                tempCtx.set(c, i, glyphIndex, lineIndex, dx - startX, dy - startY, dw, dh, dx, dy);
+                styler.style(tempStyle, tempCtx);
+
+                if (!tempStyle.isVisible()) {
+                    penX += adv;
+                    glyphIndex++;
+                    continue;
+                }
+
+                dx += tempStyle.getOffsetX();
+                dy += tempStyle.getOffsetY();
+                dw *= tempStyle.getScaleX();
+                dh *= tempStyle.getScaleY();
+            }
+
+            for (int k = 0, m = outlineOffsetCount; k < m; k++) {
+                OutlineOffset offset = outlineOffsets[k];
+                tempColor.a(tint.a() * offset.aMul);
+                batch.drawUV(texture, dx + offset.ox, dy + offset.oy, dw, dh, u0, v0, u1, v1, tempColor);
+            }
+
+            penX += adv;
+            glyphIndex++;
+        }
+    }
+
+    private void drawImmediatePass(TextureBatch batch, String text, float startX, float startY, Color tint) {
+        final float sx = this.scaleX;
+        final float sy = this.scaleY;
+        final float tabAdv = tabAdvanceBase * sx;
+        final float fallbackAdv = fallbackAdvance * sx;
+
+        float penX = 0f;
+        float baselineY = -baselineDescentY;
+        int lineIndex = 0;
+        int glyphIndex = 0;
+
+        for (int i = 0, n = text.length(); i < n; i++) {
+            char c = text.charAt(i);
+
+            if (c == '\n') {
+                penX = 0f;
+                baselineY -= lineAdvanceY;
+                lineIndex++;
+                continue;
+            }
+
+            if (c == '\t') {
+                penX += tabAdv;
+                continue;
+            }
+
+            Glyph g = data.glyph(c);
+            if (g == null) {
+                penX += fallbackAdv;
+                continue;
+            }
+
+            final int gw = g.width();
+            final int gh = g.height();
+            final float adv = g.xAdvance() * sx;
+
+            if (gw <= 0 || gh <= 0) {
+                penX += adv;
+                continue;
+            }
+
+            float dx = startX + penX + (g.xOffset() * sx);
+            float dy = startY + baselineY - (g.yOffset() * sy);
+            float dw = gw * sx;
+            float dh = -(gh * sy);
+
+            float u0 = g.x0() * atlasInvW;
+            float v0 = g.y0() * atlasInvH;
+            float u1 = g.x1() * atlasInvW;
+            float v1 = g.y1() * atlasInvH;
+
+            Color drawColor = tint;
+
+            if (styler != null) {
+                tempStyle.reset();
+                tempCtx.set(c, i, glyphIndex, lineIndex, dx - startX, dy - startY, dw, dh, dx, dy);
+                styler.style(tempStyle, tempCtx);
+
+                if (!tempStyle.isVisible()) {
+                    penX += adv;
+                    glyphIndex++;
+                    continue;
+                }
+
+                dx += tempStyle.getOffsetX();
+                dy += tempStyle.getOffsetY();
+                dw *= tempStyle.getScaleX();
+                dh *= tempStyle.getScaleY();
+
+                if (tempStyle.hasColor()) {
+                    tempGlyphColor.r(tempStyle.r());
+                    tempGlyphColor.g(tempStyle.g());
+                    tempGlyphColor.b(tempStyle.b());
+                    tempGlyphColor.a(tempStyle.a());
+                    drawColor = tempGlyphColor;
+                }
+            }
+
+            batch.drawUV(texture, dx, dy, dw, dh, u0, v0, u1, v1, drawColor);
+
+            penX += adv;
+            glyphIndex++;
+        }
+    }
+
+    /**
      * Draws the currently cached text through the supplied {@link TextureBatch}.
      *
      * <p>
@@ -271,7 +490,7 @@ public class Font implements Dimensional {
             drawOutlinePass(batch, outlineColor);
         }
 
-        drawPass(batch, 0f, 0f, texture.getColor());
+        drawPass(batch, 0f, 0f, color);
     }
 
     /**
@@ -701,7 +920,7 @@ public class Font implements Dimensional {
      * @return font color
      */
     public Color getColor() {
-        return texture.getColor();
+        return color;
     }
 
     /**
@@ -710,7 +929,7 @@ public class Font implements Dimensional {
      * @param color new main color
      */
     public void setColor(Color color) {
-        texture.setColor(color);
+        this.color.set(color);
     }
 
     /**
@@ -1180,6 +1399,13 @@ public class Font implements Dimensional {
         if (x >= b) return 1f;
         x = (x - a) / (b - a);
         return x * x * (3f - 2f * x);
+    }
+
+    /**
+     * @return The FontData corresponding to this Font.
+     */
+    public FontData getData() {
+        return data;
     }
 
     /**

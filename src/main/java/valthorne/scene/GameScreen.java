@@ -78,7 +78,6 @@ public class GameScreen implements Application {
         }
 
         this.currentScene.initializeFields();
-        this.currentScene.init();
     }
 
     /**
@@ -87,7 +86,7 @@ public class GameScreen implements Application {
      * <p>
      * Rendering is wrapped in the scene's internal {@link valthorne.graphics.texture.TextureBatch}
      * begin/end calls so scene implementations only need to focus on issuing draw commands inside
-     * {@link Scene#render(valthorne.graphics.texture.TextureBatch)}.
+     * {@link Scene#draw(valthorne.graphics.texture.TextureBatch)}.
      * </p>
      */
     @Override
@@ -157,7 +156,7 @@ public class GameScreen implements Application {
      */
     public void setScene(Scene scene) {
         if (currentScene != null) {
-            currentScene.dispose();
+            currentScene.disposeScene();
         }
 
         currentScene = scene;
@@ -167,7 +166,6 @@ public class GameScreen implements Application {
         }
 
         scene.initializeFields();
-        scene.init();
     }
 
     /**

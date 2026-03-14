@@ -2,6 +2,7 @@ package valthorne.graphics.texture;
 
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
+import valthorne.graphics.Sprite;
 import valthorne.graphics.shader.Shader;
 
 import java.nio.FloatBuffer;
@@ -23,174 +24,161 @@ import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
 import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
 
 /**
- * <h1>TextureBatch</h1>
- *
  * <p>
- * {@code TextureBatch} is a high-performance 2D sprite batcher built around instanced rendering.
- * It allows many textured quads to be queued on the CPU and submitted to the GPU in large grouped
- * draw calls instead of issuing one draw call per sprite. This is especially useful for UI systems,
- * bitmap font rendering, tile maps, sprites, and other 2D render workloads where large numbers of
- * quads are drawn every frame.
+ * {@code TextureBatch} is Valthorne's instanced textured-quad renderer. It is designed
+ * to batch many sprite draw operations into as few OpenGL draw calls as possible while
+ * still supporting several advanced rendering features such as color tinting, sprite
+ * scaling, sprite rotation, nine-patch rendering, nested clipping, translation stacks,
+ * shader overrides, and rendering into a {@link FrameBuffer}.
  * </p>
  *
  * <p>
- * The batch stores per-instance data for each queued quad in a reusable {@link FloatBuffer}. Each
- * instance contains world-space position and size, tint color, texture unit selection, UV rectangle,
- * and optional clip rectangle data. A single static quad mesh is reused for every sprite, while
- * instancing attributes provide the per-sprite variation. This keeps the CPU-side draw path small
- * and efficient.
+ * Instead of immediately sending every individual sprite to the GPU, this class stores
+ * per-instance data inside an internal {@link FloatBuffer}. Once the batch is full or
+ * the caller explicitly ends the batch, that instance data is uploaded to the GPU and
+ * rendered with {@code glDrawArraysInstanced}. This greatly reduces driver overhead and
+ * improves rendering performance when drawing large numbers of textured objects.
  * </p>
- *
- * <h2>How this batch works</h2>
- *
- * <ul>
- *     <li>A static quad VBO stores the six vertices needed for two triangles.</li>
- *     <li>A dynamic instance VBO stores one packed record per sprite.</li>
- *     <li>{@link #drawUV(Texture, float, float, float, float, float, float, float, float, Color)}
- *     writes one sprite instance into the reusable CPU buffer.</li>
- *     <li>{@link #flush()} uploads queued instances and submits them in one instanced draw call.</li>
- *     <li>Textures are assigned to texture units dynamically and reused within the batch until a flush is needed.</li>
- * </ul>
- *
- * <h2>Shader model</h2>
  *
  * <p>
- * This batch owns a default shader but also supports temporarily switching to a custom shader.
- * The active shader must respect the same attribute layout used by the batch contract because the
- * batch binds its vertex attributes using {@link TextureBatchContract}. If a custom shader is used
- * while drawing, the batch is flushed before the shader switch to preserve correctness.
+ * The batch uses a static quad as its base geometry. Every sprite draw call writes a
+ * small set of instance attributes describing where that quad should appear, which
+ * texture unit it should sample from, what UV region should be used, what color should
+ * tint it, whether clipping is active, and how rotation should be applied. The shader
+ * then reconstructs the final sprite from this data for each instance.
  * </p>
- *
- * <h2>Clipping model</h2>
  *
  * <p>
- * Instead of relying on OpenGL scissor changes for every nested UI clip, this batch stores clip
- * rectangles per sprite instance. The active shader discards fragments outside the assigned clip
- * rectangle when clipping is enabled. This allows nested clipping without repeatedly forcing flushes.
+ * This class supports multiple textures in a single batch, up to the configured texture
+ * unit limit. When a draw call references a texture that does not fit in the currently
+ * active set of bound textures, the batch is flushed automatically and starts filling
+ * again with a fresh texture unit set.
  * </p>
- *
- * <h2>Framebuffer support</h2>
  *
  * <p>
- * The batch may render directly to the current framebuffer or to a supplied {@link FrameBuffer}.
- * When rendering into an FBO, the previous framebuffer binding and viewport are captured and
- * restored automatically at {@link #end()}.
+ * Typical usage follows the standard batching lifecycle:
  * </p>
- *
- * <h2>Usage example</h2>
  *
  * <pre>{@code
- * TextureBatch batch = new TextureBatch(4096, 16);
+ * TextureBatch batch = new TextureBatch(2000);
+ * Texture texture = new Texture(...);
+ * TextureRegion region = new TextureRegion(texture);
+ * Sprite sprite = new Sprite(region);
+ *
+ * sprite.setX(100);
+ * sprite.setY(50);
+ * sprite.setRotation(25f);
  *
  * batch.begin();
- * batch.setColor(1f, 1f, 1f, 1f);
+ * batch.draw(sprite);
+ * batch.draw(texture, 300, 100, 64, 64);
  *
- * batch.draw(playerTexture, 100f, 80f, 64f, 64f);
- * batch.drawRegion(atlasRegion, 200f, 120f, 32f, 32f);
+ * batch.pushTranslation(20, 10);
+ * batch.draw(sprite, 400, 200, 96, 96);
+ * batch.popTranslation();
  *
- * batch.beginScissor(50f, 50f, 300f, 200f);
- * batch.draw(uiTexture, 60f, 60f, 128f, 48f);
+ * batch.beginScissor(0, 0, 800, 600);
+ * batch.drawRegion(region, 50, 50, 128, 128);
  * batch.endScissor();
  *
  * batch.end();
- *
- * batch.dispose();
  * }</pre>
  *
- * <h2>Custom shader example</h2>
- *
- * <pre>{@code
- * Shader glowShader = new Shader(customVertexSource, customFragmentSource);
- * TextureBatchContract.bindAttributes(glowShader);
- * glowShader.reload();
- * TextureBatchContract.bindSamplers(glowShader, 16);
- *
- * batch.begin();
- * batch.setShader(glowShader);
- * batch.draw(texture, 10f, 10f, 64f, 64f);
- * batch.setShader(null);
- * batch.end();
- * }</pre>
+ * <p>
+ * This class is intended to be reused every frame rather than recreated constantly.
+ * Create it once, use it for the lifetime of the renderer, and dispose it when the
+ * graphics context is being shut down.
+ * </p>
  *
  * @author Albert Beaupre
  * @since February 8th, 2026
  */
 public final class TextureBatch {
 
+    private final FloatBuffer instanceBuffer; // Buffer holding queued per-instance sprite data before upload
+    private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
+    private final Shader defaultShader; // Built-in shader used when no custom shader is active
+    private Shader customShader; // Optional user-supplied shader override
+    private Shader activeShader; // Shader currently bound and used for rendering
+    private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
+    private final int maxTextureUnits; // Maximum number of texture units this batch may use
+    private final int quadVBO; // VBO containing the shared quad geometry used by all instances
+    private final int instanceVBO; // VBO containing uploaded instance data for the current flush
+    private int[] textureIDs; // Cached texture IDs currently bound to the batch's texture units
+    private final int[] vp = new int[4]; // Temporary viewport storage used when switching framebuffer targets
+    private final int[] previousScissorBox = new int[4]; // Previous OpenGL scissor rectangle restored after batching
+    private final float[] clipStack = new float[256]; // Stack storing nested clip rectangles as x, y, width, height groups
+    private final float[] translationStack = new float[256]; // Stack storing nested translation states as x and y pairs
+    private int translationDepth; // Current depth of the translation stack
+    private float translationX; // Current accumulated translation offset on the X axis
+    private float translationY; // Current accumulated translation offset on the Y axis
+
+    private int textureUnitCapacity; // Current active texture-unit cache capacity
+    private int activeTextureCount; // Number of texture units currently populated in this batch
+    private int lastTextureID = -1; // Cached last texture ID for fast consecutive reuse
+    private int lastTextureUnit = -1; // Cached texture unit index for the last bound texture
+
+    private int instanceCount; // Number of queued sprite instances currently waiting to be drawn
+    private boolean drawing; // Whether begin() has been called and the batch is currently active
+
+    private boolean usingFBO; // Whether the current batch is rendering to a framebuffer object
+    private int previousFBO; // Previously bound framebuffer restored after end()
+    private int prevViewportX; // Previous viewport X restored after rendering to an FBO
+    private int prevViewportY; // Previous viewport Y restored after rendering to an FBO
+    private int prevViewportW; // Previous viewport width restored after rendering to an FBO
+    private int prevViewportH; // Previous viewport height restored after rendering to an FBO
+
+    private int clipDepth; // Current number of active nested clip rectangles
+    private boolean clipEnabled; // Whether clipping is active for newly queued instances
+    private float clipX; // Active clip rectangle X
+    private float clipY; // Active clip rectangle Y
+    private float clipW; // Active clip rectangle width
+    private float clipH; // Active clip rectangle height
+
+    private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
+
     /**
-     * The CPU-side instance buffer that stores packed per-sprite data before upload.
-     */
-    private final FloatBuffer instanceBuffer; // Reusable CPU buffer used to stage per-instance sprite data.
-
-    private final Color color = new Color(1f, 1f, 1f, 1f); // The default tint color used when a draw call does not provide one.
-    private final Shader defaultShader; // The built-in shader used when no custom shader is assigned.
-    private Shader customShader; // The optional user-supplied shader that overrides the default shader.
-    private Shader activeShader; // The shader currently bound for rendering during an active batch.
-    private final int maxSprites; // The maximum number of sprite instances that may be queued before forcing a flush.
-    private final int maxTextureUnits; // The hard upper bound on simultaneous texture units supported by this batch.
-    private final int quadVBO; // The OpenGL buffer id that stores the static shared quad geometry.
-    private final int instanceVBO; // The OpenGL buffer id that stores uploaded per-instance data.
-    private int[] textureIDs; // The currently assigned texture id for each active texture unit slot.
-    private final int[] vp = new int[4]; // Temporary viewport storage used when capturing and restoring framebuffer state.
-    private final int[] previousScissorBox = new int[4]; // The previously active OpenGL scissor rectangle captured before batch rendering.
-    private final float[] clipStack = new float[256 * 4]; // The nested clip stack storing x, y, width, and height for each clip level.
-
-    private int textureUnitCapacity; // The currently allocated size of the texture unit id array.
-    private int activeTextureCount; // The number of texture units currently used by the active batch contents.
-    private int lastTextureID = -1; // The last texture id looked up or bound, used as a small cache.
-    private int lastTextureUnit = -1; // The texture unit index associated with the cached last texture id.
-
-    private int instanceCount; // The number of queued sprite instances currently waiting to be flushed.
-    private boolean drawing; // Whether begin() has been called and the batch is currently active.
-
-    private boolean usingFBO; // Whether the current begin/end block is rendering into a framebuffer.
-    private int previousFBO; // The framebuffer binding that was active before begin(FrameBuffer) changed it.
-    private int prevViewportX; // The previous viewport x coordinate captured before framebuffer rendering began.
-    private int prevViewportY; // The previous viewport y coordinate captured before framebuffer rendering began.
-    private int prevViewportW; // The previous viewport width captured before framebuffer rendering began.
-    private int prevViewportH; // The previous viewport height captured before framebuffer rendering began.
-
-    private int clipDepth; // The current depth of nested clip rectangles.
-    private boolean clipEnabled; // Whether clipping is currently active for queued draw calls.
-    private float clipX; // The current effective clip rectangle x coordinate.
-    private float clipY; // The current effective clip rectangle y coordinate.
-    private float clipW; // The current effective clip rectangle width.
-    private float clipH; // The current effective clip rectangle height.
-
-    private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before this batch began rendering.
-
-    /**
-     * Creates a batch with the given maximum sprite count and an automatically detected texture unit limit.
-     *
      * <p>
-     * This constructor queries {@code GL_MAX_TEXTURE_IMAGE_UNITS}, clamps it to a safe upper bound,
-     * and uses that value as the maximum simultaneous texture unit count for the batch.
+     * Creates a new {@code TextureBatch} with the requested sprite capacity and an
+     * automatically detected texture unit limit clamped to sixteen.
      * </p>
      *
-     * @param maxSprites the maximum number of sprites that may be queued before a flush is required
+     * <p>
+     * This constructor is convenient for most normal usage. It queries the OpenGL
+     * context for supported texture image units and keeps the batch within a safe
+     * upper bound.
+     * </p>
+     *
+     * @param maxSprites the maximum number of sprite instances that may be queued
+     *                   before the batch must flush
      */
     public TextureBatch(int maxSprites) {
         this(maxSprites, detectTextureUnitsClamped(16));
     }
 
     /**
-     * Creates a batch with an explicit sprite capacity and texture unit limit.
-     *
      * <p>
-     * This constructor allocates the reusable CPU-side instance buffer, creates the static quad VBO,
-     * creates the dynamic instance VBO, builds and initializes the default shader, and prepares the
-     * texture unit bookkeeping array.
+     * Creates a new {@code TextureBatch} with an explicit sprite capacity and explicit
+     * texture unit limit.
      * </p>
      *
      * <p>
-     * The texture unit array begins at a smaller working size and grows on demand up to
-     * {@code maxTextureUnits}. This avoids scanning a large fixed array every time when only a few
-     * textures are actually used in a given batch.
+     * This constructor allocates the CPU-side instance buffer, creates the default
+     * shader, binds its expected attributes and samplers, builds the base quad vertex
+     * data, and creates the OpenGL buffer objects required for batched instanced
+     * rendering.
+     * </p>
+     *
+     * <p>
+     * The texture unit count is clamped to sixteen to keep the generated fragment shader
+     * and sampler setup within the intended supported range for this batch.
      * </p>
      *
      * @param maxSprites      the maximum number of sprite instances that may be queued
-     * @param maxTextureUnits the maximum number of texture units this batch may use at once
-     * @throws IllegalArgumentException if {@code maxSprites <= 0} or {@code maxTextureUnits < 2}
+     *                        before the batch flushes
+     * @param maxTextureUnits the maximum number of texture units this batch should use
+     * @throws IllegalArgumentException if {@code maxSprites <= 0}
+     * @throws IllegalArgumentException if {@code maxTextureUnits < 2}
      */
     public TextureBatch(int maxSprites, int maxTextureUnits) {
         if (maxSprites <= 0) {
@@ -240,39 +228,50 @@ public final class TextureBatch {
     }
 
     /**
-     * Returns the currently selected shader.
-     *
      * <p>
-     * If a custom shader has been assigned, it is returned. Otherwise the internal default shader is
-     * returned.
+     * Returns the shader that is currently considered active for external callers.
      * </p>
      *
-     * @return the shader that the batch will currently use
+     * <p>
+     * If a custom shader has been assigned with {@link #setShader(Shader)}, that shader
+     * is returned. Otherwise the internally managed default shader is returned.
+     * </p>
+     *
+     * @return the currently selected shader for this batch
      */
     public Shader getShader() {
         return customShader != null ? customShader : defaultShader;
     }
 
     /**
-     * Returns the built-in default shader owned by this batch.
+     * <p>
+     * Returns the default shader owned by this batch.
+     * </p>
      *
-     * @return the default shader instance
+     * <p>
+     * This can be useful when the caller wants to inspect, configure, or compare the
+     * built-in shader without affecting the custom shader state.
+     * </p>
+     *
+     * @return the default batch shader
      */
     public Shader getDefaultShader() {
         return defaultShader;
     }
 
     /**
-     * Sets the shader used by this batch.
-     *
      * <p>
-     * Passing {@code null} restores the batch to its default shader. Passing the same instance as the
-     * default shader is also treated as restoring the default shader. If the batch is currently
-     * drawing, it is flushed before the shader switch so that already queued instances render using
-     * the old shader and later instances render using the new shader.
+     * Sets a custom shader for the batch.
      * </p>
      *
-     * @param shader the custom shader to use, or null to restore the default shader
+     * <p>
+     * Passing the same instance as the default shader clears the custom override and
+     * reverts the batch back to its internal shader. If the batch is currently drawing,
+     * it flushes queued data first, unbinds the old shader, switches the active shader,
+     * and then rebinds the required vertex attribute state.
+     * </p>
+     *
+     * @param shader the shader to use, or {@code null} to revert to the default shader
      */
     public void setShader(Shader shader) {
         if (shader == defaultShader) {
@@ -295,14 +294,18 @@ public final class TextureBatch {
     }
 
     /**
-     * Sets the default batch tint using the provided color object.
+     * <p>
+     * Sets the batch's default tint color using a {@link Color} instance.
+     * </p>
      *
      * <p>
-     * This color is used for draw calls that do not explicitly pass their own tint.
+     * This default tint is used for draw calls that do not provide their own tint
+     * argument. The supplied color is copied into the internal batch color rather
+     * than storing the reference directly.
      * </p>
      *
      * @param tint the new default tint color
-     * @throws NullPointerException if {@code tint} is null
+     * @throws NullPointerException if {@code tint} is {@code null}
      */
     public void setColor(Color tint) {
         Objects.requireNonNull(tint, "Color cannot be null");
@@ -310,7 +313,13 @@ public final class TextureBatch {
     }
 
     /**
-     * Sets the default batch tint using raw color components.
+     * <p>
+     * Sets the batch's default tint color using explicit RGBA components.
+     * </p>
+     *
+     * <p>
+     * This affects future draw calls that do not pass a per-draw tint.
+     * </p>
      *
      * @param r the red component
      * @param g the green component
@@ -325,28 +334,127 @@ public final class TextureBatch {
     }
 
     /**
-     * Pushes a new scissor-like clip rectangle onto the batch clip stack.
-     *
      * <p>
-     * Unlike traditional OpenGL scissor changes, this method does not immediately alter GPU scissor
-     * state. Instead it computes the effective clip rectangle by intersecting with the current clip
-     * if needed, stores the result on the clip stack, and causes subsequent queued instances to carry
-     * that clip rectangle in their per-instance data.
+     * Pushes the current translation state onto the translation stack and applies an
+     * additional translation offset.
      * </p>
      *
-     * @param x      the clip x coordinate
-     * @param y      the clip y coordinate
-     * @param width  the clip width
-     * @param height the clip height
-     * @throws IllegalStateException if the batch is not drawing or the clip stack overflows
+     * <p>
+     * This is useful for hierarchical rendering where a parent container wants child
+     * draw calls to inherit an offset without manually adjusting every coordinate.
+     * The translation affects queued draw coordinates only and remains active until
+     * {@link #popTranslation()} is called.
+     * </p>
+     *
+     * @param x the translation offset to add on the X axis
+     * @param y the translation offset to add on the Y axis
+     * @throws IllegalStateException if the batch is not currently drawing
+     * @throws IllegalStateException if the translation stack overflows
+     */
+    public void pushTranslation(float x, float y) {
+        if (!drawing) {
+            throw new IllegalStateException("Call begin() before pushTranslation().");
+        }
+        if ((translationDepth + 1) * 2 > translationStack.length) {
+            throw new IllegalStateException("Translation stack overflow.");
+        }
+
+        int index = translationDepth * 2;
+        translationStack[index] = translationX;
+        translationStack[index + 1] = translationY;
+        translationDepth++;
+
+        translationX += x;
+        translationY += y;
+    }
+
+    /**
+     * <p>
+     * Pops the most recently pushed translation state from the translation stack.
+     * </p>
+     *
+     * <p>
+     * After this call, future draw operations use the previously stored translation
+     * values. This method must be paired with an earlier call to
+     * {@link #pushTranslation(float, float)}.
+     * </p>
+     *
+     * @throws IllegalStateException if the batch is not currently drawing
+     * @throws IllegalStateException if there is no translation state to pop
+     */
+    public void popTranslation() {
+        if (!drawing) {
+            throw new IllegalStateException("Call begin() before popTranslation().");
+        }
+        if (translationDepth <= 0) {
+            throw new IllegalStateException("No active translation to pop.");
+        }
+
+        translationDepth--;
+        int index = translationDepth * 2;
+        translationX = translationStack[index];
+        translationY = translationStack[index + 1];
+    }
+
+    /**
+     * <p>
+     * Returns the currently accumulated X translation offset.
+     * </p>
+     *
+     * <p>
+     * This value reflects the active translation stack state and is added to draw
+     * positions when sprites are queued.
+     * </p>
+     *
+     * @return the current X translation offset
+     */
+    public float getTranslationX() {
+        return translationX;
+    }
+
+    /**
+     * <p>
+     * Returns the currently accumulated Y translation offset.
+     * </p>
+     *
+     * <p>
+     * This value reflects the active translation stack state and is added to draw
+     * positions when sprites are queued.
+     * </p>
+     *
+     * @return the current Y translation offset
+     */
+    public float getTranslationY() {
+        return translationY;
+    }
+
+    /**
+     * <p>
+     * Begins a new scissor clip region for subsequently queued draw operations.
+     * </p>
+     *
+     * <p>
+     * The clip state is stored on an internal stack, allowing nested clipping. When a
+     * new clip is added while another clip is already active, the resulting effective
+     * region becomes the intersection of the existing clip and the new one. This
+     * guarantees that nested clips cannot expand outside of their parent region.
+     * </p>
+     *
+     * <p>
+     * The clip rectangle is stored as instance data and later interpreted by the shader.
+     * It does not directly call {@code glScissor} for every nested region.
+     * </p>
+     *
+     * @param x      the clip region X coordinate
+     * @param y      the clip region Y coordinate
+     * @param width  the clip region width
+     * @param height the clip region height
+     * @throws IllegalStateException if the batch is not currently drawing
+     * @throws IllegalStateException if the clip stack overflows
      */
     public void beginScissor(float x, float y, float width, float height) {
-        if (!drawing) {
-            throw new IllegalStateException("Call begin() before beginScissor().");
-        }
-        if ((clipDepth + 1) * 4 > clipStack.length) {
-            throw new IllegalStateException("Scissor stack overflow.");
-        }
+        if (!drawing) throw new IllegalStateException("Call begin() before beginScissor().");
+        if ((clipDepth + 1) * 4 > clipStack.length) throw new IllegalStateException("Scissor stack overflow.");
 
         float fx = x;
         float fy = y;
@@ -392,14 +500,17 @@ public final class TextureBatch {
     }
 
     /**
-     * Pops the most recently applied clip rectangle from the clip stack.
-     *
      * <p>
-     * If another clip rectangle remains below it, that rectangle becomes the active clip. Otherwise
-     * clipping is disabled for future queued instances.
+     * Ends the most recently begun scissor clip region.
      * </p>
      *
-     * @throws IllegalStateException if the batch is not drawing or no clip is active
+     * <p>
+     * If a parent clip still exists after the pop, that parent becomes the newly active
+     * clip. If no clip remains, clipping is disabled entirely for future queued draws.
+     * </p>
+     *
+     * @throws IllegalStateException if the batch is not currently drawing
+     * @throws IllegalStateException if there is no active scissor region to end
      */
     public void endScissor() {
         if (!drawing) {
@@ -428,10 +539,13 @@ public final class TextureBatch {
     }
 
     /**
-     * Begins rendering to the currently bound framebuffer.
+     * <p>
+     * Begins a new rendering batch using the default framebuffer.
+     * </p>
      *
      * <p>
-     * This is a convenience overload for {@link #begin(FrameBuffer)} using a null framebuffer.
+     * This is the standard entry point for normal rendering when no off-screen target
+     * is needed.
      * </p>
      */
     public void begin() {
@@ -439,22 +553,34 @@ public final class TextureBatch {
     }
 
     /**
-     * Begins a new batch rendering session.
-     *
      * <p>
-     * This method prepares the batch for rendering by optionally switching to the supplied
-     * framebuffer, capturing the prior framebuffer and viewport state, resetting clip and texture
-     * state, disabling OpenGL scissor testing if it was active, clearing the CPU instance buffer,
-     * and binding the active shader plus vertex attribute state.
+     * Begins a new rendering batch, optionally rendering into a {@link FrameBuffer}.
      * </p>
      *
-     * @param fbo the framebuffer to render into, or null to render into the currently bound target
-     * @throws IllegalStateException if the batch is already drawing
+     * <p>
+     * This method initializes batch state, resets clip and translation stacks, saves
+     * and temporarily modifies relevant OpenGL state, clears instance bookkeeping, and
+     * binds the currently active shader and vertex attributes. If an FBO is provided,
+     * the current framebuffer and viewport are captured and restored later in
+     * {@link #end()}.
+     * </p>
+     *
+     * <p>
+     * If the provided framebuffer size does not match the current viewport size, the
+     * framebuffer is resized to match the viewport before rendering begins.
+     * </p>
+     *
+     * @param fbo the framebuffer target to render into, or {@code null} to render to
+     *            the currently bound default framebuffer
+     * @throws IllegalStateException if the batch is already active
+     * @throws IllegalStateException if the current viewport is invalid while rendering
+     *                               into a framebuffer
      */
     public void begin(FrameBuffer fbo) {
-        if (drawing) {
-            throw new IllegalStateException("Already drawing.");
-        }
+        if (drawing) throw new IllegalStateException("Already drawing.");
+        translationDepth = 0;
+        translationX = 0f;
+        translationY = 0f;
         drawing = true;
 
         usingFBO = fbo != null;
@@ -510,79 +636,389 @@ public final class TextureBatch {
     }
 
     /**
-     * Queues a texture using its own stored transform and the current batch color.
+     * <p>
+     * Queues a {@link Sprite} for rendering using the sprite's own transform, region,
+     * size, flip state, rotation state, and color.
+     * </p>
      *
-     * @param tex the texture to draw
+     * <p>
+     * This overload simply delegates to {@link #draw(Sprite, Color)} with a
+     * {@code null} tint, allowing the sprite's own color to be used.
+     * </p>
+     *
+     * @param sprite the sprite to draw
+     * @throws NullPointerException if {@code sprite} is {@code null}
      */
-    public void draw(Texture tex) {
-        draw(tex, null);
+    public void draw(Sprite sprite) {
+        Objects.requireNonNull(sprite, "Sprite cannot be null");
+        draw(sprite, null);
     }
 
     /**
-     * Queues a texture using its own stored transform and an optional tint.
+     * <p>
+     * Queues a {@link Sprite} for rendering using the sprite's current transform data
+     * but with an optional tint override.
+     * </p>
      *
-     * @param tex  the texture to draw
-     * @param tint the tint to use, or null to use the current batch tint
+     * <p>
+     * The sprite's region UVs are resolved, its flip flags are applied by swapping UV
+     * bounds, scaled width and height are computed, and the sprite's rotation is
+     * converted into sine and cosine values used by the shader. The result is then
+     * forwarded to {@link #drawUV(Texture, float, float, float, float, float, float, float, float, float, float, float, float, Color)}.
+     * </p>
+     *
+     * @param sprite the sprite to draw
+     * @param tint   an optional tint override, or {@code null} to use the sprite's own color
+     * @throws NullPointerException if {@code sprite} is {@code null}
      */
-    public void draw(Texture tex, Color tint) {
-        Objects.requireNonNull(tex, "Texture cannot be null");
-        drawUV(tex, tex.getX(), tex.getY(), tex.getWidth(), tex.getHeight(), tex.leftRegion, tex.topRegion, tex.rightRegion, tex.bottomRegion, tint);
+    public void draw(Sprite sprite, Color tint) {
+        Objects.requireNonNull(sprite, "Sprite cannot be null");
+
+        TextureRegion region = sprite.getRegion();
+
+        float u0 = region.getU();
+        float v0 = region.getV();
+        float u1 = region.getU2();
+        float v1 = region.getV2();
+
+        if (sprite.isFlippedX()) {
+            float temp = u0;
+            u0 = u1;
+            u1 = temp;
+        }
+
+        if (sprite.isFlippedY()) {
+            float temp = v0;
+            v0 = v1;
+            v1 = temp;
+        }
+
+        float scaleX = sprite.getScaleX();
+        float scaleY = sprite.getScaleY();
+        float w = sprite.getWidth() * scaleX;
+        float h = sprite.getHeight() * scaleY;
+
+        float rad = (float) Math.toRadians(-sprite.getRotation());
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        Color drawColor = tint != null ? tint : sprite.getColor();
+
+        drawUV(region.getTexture(), sprite.getX(), sprite.getY(), w, h, u0, v0, u1, v1, sprite.getRotationOrigin().getX(), sprite.getRotationOrigin().getY(), sin, cos, drawColor);
     }
 
     /**
-     * Queues a full-texture quad using the current batch tint.
+     * <p>
+     * Queues a {@link Sprite} for rendering at a custom position using the sprite's
+     * original width and height.
+     * </p>
+     *
+     * @param sprite the sprite to draw
+     * @param x      the destination X position
+     * @param y      the destination Y position
+     * @throws NullPointerException if {@code sprite} is {@code null}
+     */
+    public void draw(Sprite sprite, float x, float y) {
+        Objects.requireNonNull(sprite, "Sprite cannot be null");
+        draw(sprite, x, y, sprite.getWidth(), sprite.getHeight(), null);
+    }
+
+    /**
+     * <p>
+     * Queues a {@link Sprite} for rendering at a custom position using the sprite's
+     * original width and height and an optional tint override.
+     * </p>
+     *
+     * @param sprite the sprite to draw
+     * @param x      the destination X position
+     * @param y      the destination Y position
+     * @param tint   an optional tint override
+     * @throws NullPointerException if {@code sprite} is {@code null}
+     */
+    public void draw(Sprite sprite, float x, float y, Color tint) {
+        Objects.requireNonNull(sprite, "Sprite cannot be null");
+        draw(sprite, x, y, sprite.getWidth(), sprite.getHeight(), tint);
+    }
+
+    /**
+     * <p>
+     * Queues a {@link Sprite} for rendering at a custom position and custom size.
+     * </p>
+     *
+     * @param sprite the sprite to draw
+     * @param x      the destination X position
+     * @param y      the destination Y position
+     * @param width  the destination width
+     * @param height the destination height
+     * @throws NullPointerException if {@code sprite} is {@code null}
+     */
+    public void draw(Sprite sprite, float x, float y, float width, float height) {
+        Objects.requireNonNull(sprite, "Sprite cannot be null");
+        draw(sprite, x, y, width, height, null);
+    }
+
+    /**
+     * <p>
+     * Queues a {@link Sprite} for rendering at a custom position and size with an
+     * optional tint override.
+     * </p>
+     *
+     * <p>
+     * This overload recalculates the effective rotation origin based on how the
+     * destination size compares to the sprite's original size. That allows rotated
+     * rendering to remain visually correct even when the sprite is stretched or shrunk.
+     * </p>
+     *
+     * @param sprite the sprite to draw
+     * @param x      the destination X position
+     * @param y      the destination Y position
+     * @param width  the destination width
+     * @param height the destination height
+     * @param tint   an optional tint override, or {@code null} to use the sprite's color
+     * @throws NullPointerException if {@code sprite} is {@code null}
+     */
+    public void draw(Sprite sprite, float x, float y, float width, float height, Color tint) {
+        Objects.requireNonNull(sprite, "Sprite cannot be null");
+
+        TextureRegion region = sprite.getRegion();
+
+        float u0 = region.getU();
+        float v0 = region.getV();
+        float u1 = region.getU2();
+        float v1 = region.getV2();
+
+        if (sprite.isFlippedX()) {
+            float temp = u0;
+            u0 = u1;
+            u1 = temp;
+        }
+
+        if (sprite.isFlippedY()) {
+            float temp = v0;
+            v0 = v1;
+            v1 = temp;
+        }
+
+        float baseWidth = sprite.getWidth();
+        float baseHeight = sprite.getHeight();
+
+        float scaleX = baseWidth == 0f ? 1f : width / baseWidth;
+        float scaleY = baseHeight == 0f ? 1f : height / baseHeight;
+
+        float originX = sprite.getRotationOrigin().getX() * scaleX;
+        float originY = sprite.getRotationOrigin().getY() * scaleY;
+
+        float rad = (float) Math.toRadians(-sprite.getRotation());
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        Color drawColor = tint != null ? tint : sprite.getColor();
+
+        drawUV(region.getTexture(), x, y, width, height, u0, v0, u1, v1, originX, originY, sin, cos, drawColor);
+    }
+
+    /**
+     * <p>
+     * Queues a {@link NinePatchTexture} using the texture's own position and size.
+     * </p>
+     *
+     * <p>
+     * This overload delegates to
+     * {@link #draw(NinePatchTexture, float, float, float, float)}.
+     * </p>
+     *
+     * @param texture the nine-patch texture to draw
+     */
+    public void draw(NinePatchTexture texture) {
+        draw(texture, texture.getX(), texture.getY(), texture.getWidth(), texture.getHeight());
+    }
+
+    /**
+     * <p>
+     * Queues a {@link NinePatchTexture} for rendering at the requested destination
+     * rectangle.
+     * </p>
+     *
+     * <p>
+     * The source region is divided into a 3x3 grid representing fixed-size corners,
+     * stretchable edges, and a stretchable center. Each visible patch is translated
+     * into its own draw call with correct UVs, optional flips, rotation origin
+     * adjustment, and tint. Empty patches caused by zero size are skipped.
+     * </p>
+     *
+     * @param texture the nine-patch texture to draw
+     * @param x       the destination X position
+     * @param y       the destination Y position
+     * @param width   the destination width
+     * @param height  the destination height
+     * @throws NullPointerException if {@code texture} is {@code null}
+     */
+    public void draw(NinePatchTexture texture, float x, float y, float width, float height) {
+        Objects.requireNonNull(texture, "NinePatchTexture cannot be null");
+
+        TextureData data = texture.getData();
+        if (data == null) {
+            return;
+        }
+
+        float texW = data.width();
+        float texH = data.height();
+
+        if (texW <= 0f || texH <= 0f) {
+            return;
+        }
+
+        TextureRegion region = texture.getRegion();
+
+        float baseU0 = Math.min(region.getU(), region.getU2());
+        float baseU1 = Math.max(region.getU(), region.getU2());
+        float baseV0 = Math.min(region.getV(), region.getV2());
+        float baseV1 = Math.max(region.getV(), region.getV2());
+
+        boolean flipX = (region.getU() > region.getU2()) ^ texture.isFlippedX();
+        boolean flipY = (region.getV() > region.getV2()) ^ texture.isFlippedY();
+
+        float left = texture.getLeft();
+        float right = texture.getRight();
+        float top = texture.getTop();
+        float bottom = texture.getBottom();
+
+        float centerW = Math.max(0f, width - left - right);
+        float centerH = Math.max(0f, height - top - bottom);
+
+        float[] dstX = {0f, left, left + centerW};
+        float[] dstY = {0f, bottom, bottom + centerH};
+        float[] dstW = {left, centerW, right};
+        float[] dstH = {bottom, centerH, top};
+
+        float srcX0 = 0f;
+        float srcX2 = texW - right;
+
+        float srcY0 = 0f;
+        float srcY2 = texH - top;
+
+        float[] srcXs = {srcX0, left, srcX2, texW};
+        float[] srcYs = {srcY0, bottom, srcY2, texH};
+
+        float originX = texture.getRotationOrigin().getX();
+        float originY = texture.getRotationOrigin().getY();
+
+        float rad = (float) Math.toRadians(-texture.getRotation());
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        Color tint = texture.getColor();
+        Texture base = texture.getTexture();
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                float patchW = dstW[col];
+                float patchH = dstH[row];
+
+                if (patchW <= 0f || patchH <= 0f) {
+                    continue;
+                }
+
+                float localX = dstX[col];
+                float localY = dstY[row];
+
+                float rx0 = srcXs[col] / texW;
+                float rx1 = srcXs[col + 1] / texW;
+                float ry0 = srcYs[row] / texH;
+                float ry1 = srcYs[row + 1] / texH;
+
+                float u0 = baseU0 + (baseU1 - baseU0) * rx0;
+                float u1 = baseU0 + (baseU1 - baseU0) * rx1;
+                float v0 = baseV0 + (baseV1 - baseV0) * ry0;
+                float v1 = baseV0 + (baseV1 - baseV0) * ry1;
+
+                if (flipX) {
+                    float t = u0;
+                    u0 = u1;
+                    u1 = t;
+                }
+
+                if (flipY) {
+                    float t = v0;
+                    v0 = v1;
+                    v1 = t;
+                }
+
+                drawUV(base, x + localX, y + localY, patchW, patchH, u0, v0, u1, v1, originX - localX, originY - localY, sin, cos, tint);
+            }
+        }
+    }
+
+    /**
+     * <p>
+     * Queues a full {@link Texture} for rendering with normalized UVs covering the
+     * entire image and no additional tint override.
+     * </p>
      *
      * @param tex the texture to draw
-     * @param x   the destination x coordinate
-     * @param y   the destination y coordinate
+     * @param x   the destination X position
+     * @param y   the destination Y position
      * @param w   the destination width
      * @param h   the destination height
      */
     public void draw(Texture tex, float x, float y, float w, float h) {
-        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, null);
+        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, 0f, 0f, 0f, 1f, null);
     }
 
     /**
-     * Queues a full-texture quad using an optional tint.
+     * <p>
+     * Queues a full {@link Texture} for rendering with normalized UVs covering the
+     * entire image and an optional tint override.
+     * </p>
      *
      * @param tex  the texture to draw
-     * @param x    the destination x coordinate
-     * @param y    the destination y coordinate
+     * @param x    the destination X position
+     * @param y    the destination Y position
      * @param w    the destination width
      * @param h    the destination height
-     * @param tint the tint to use, or null to use the current batch tint
+     * @param tint the tint override to apply
      */
     public void draw(Texture tex, float x, float y, float w, float h, Color tint) {
-        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
+        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, 0f, 0f, 0f, 1f, tint);
     }
 
     /**
-     * Queues a textured quad using explicit normalized UV coordinates and the current batch tint.
+     * <p>
+     * Queues a {@link Texture} for rendering using explicit normalized UV bounds.
+     * </p>
      *
      * @param tex the texture to draw
-     * @param x   the destination x coordinate
-     * @param y   the destination y coordinate
+     * @param x   the destination X position
+     * @param y   the destination Y position
      * @param w   the destination width
      * @param h   the destination height
-     * @param u0  the left u coordinate
-     * @param v0  the bottom or top v coordinate depending on the texture convention
-     * @param u1  the right u coordinate
-     * @param v1  the opposite v coordinate
+     * @param u0  the starting U coordinate
+     * @param v0  the starting V coordinate
+     * @param u1  the ending U coordinate
+     * @param v1  the ending V coordinate
      */
     public void draw(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
-        drawUV(tex, x, y, w, h, u0, v0, u1, v1, null);
+        drawUV(tex, x, y, w, h, u0, v0, u1, v1, 0f, 0f, 0f, 1f, null);
     }
 
     /**
-     * Queues a rectangular pixel region from a texture using the current batch tint.
+     * <p>
+     * Queues a pixel-space source region from a {@link Texture} for rendering without
+     * a tint override.
+     * </p>
      *
-     * @param tex          the texture to sample
-     * @param x            the destination x coordinate
-     * @param y            the destination y coordinate
+     * <p>
+     * The supplied source rectangle is converted into normalized UV coordinates using
+     * the texture's metadata.
+     * </p>
+     *
+     * @param tex          the texture to sample from
+     * @param x            the destination X position
+     * @param y            the destination Y position
      * @param w            the destination width
      * @param h            the destination height
-     * @param regionX      the source region x coordinate in pixels
-     * @param regionY      the source region y coordinate in pixels
+     * @param regionX      the source region X in pixels
+     * @param regionY      the source region Y in pixels
      * @param regionWidth  the source region width in pixels
      * @param regionHeight the source region height in pixels
      */
@@ -591,31 +1027,35 @@ public final class TextureBatch {
     }
 
     /**
-     * Queues a rectangular pixel region from a texture using an optional tint.
-     *
      * <p>
-     * The supplied pixel region is converted into normalized UV coordinates using the texture's
-     * underlying {@link TextureData}. If texture data is unavailable or reports zero size, the
-     * method falls back to drawing the full texture.
+     * Queues a pixel-space source region from a {@link Texture} for rendering with an
+     * optional tint override.
      * </p>
      *
-     * @param tex          the texture to sample
-     * @param x            the destination x coordinate
-     * @param y            the destination y coordinate
+     * <p>
+     * If the texture does not expose valid metadata, the method falls back to drawing
+     * the full texture rather than failing. If the texture width or height is zero, it
+     * also falls back to full-texture normalized UVs.
+     * </p>
+     *
+     * @param tex          the texture to sample from
+     * @param x            the destination X position
+     * @param y            the destination Y position
      * @param w            the destination width
      * @param h            the destination height
-     * @param regionX      the source region x coordinate in pixels
-     * @param regionY      the source region y coordinate in pixels
+     * @param regionX      the source region X in pixels
+     * @param regionY      the source region Y in pixels
      * @param regionWidth  the source region width in pixels
      * @param regionHeight the source region height in pixels
-     * @param tint         the tint to use, or null to use the current batch tint
+     * @param tint         the tint override to apply
+     * @throws NullPointerException if {@code tex} is {@code null}
      */
     public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
 
         TextureData d = tex.getData();
         if (d == null) {
-            drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
+            drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, 0f, 0f, 0f, 1f, tint);
             return;
         }
 
@@ -623,7 +1063,7 @@ public final class TextureBatch {
         float texH = d.height();
 
         if (texW == 0f || texH == 0f) {
-            drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, tint);
+            drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, 0f, 0f, 0f, 1f, tint);
             return;
         }
 
@@ -632,71 +1072,106 @@ public final class TextureBatch {
         float u1 = (regionX + regionWidth) / texW;
         float v1 = (regionY + regionHeight) / texH;
 
-        drawUV(tex, x, y, w, h, u0, v0, u1, v1, tint);
+        drawUV(tex, x, y, w, h, u0, v0, u1, v1, 0f, 0f, 0f, 1f, tint);
     }
 
     /**
-     * Queues a {@link TextureRegion} using its own stored destination transform.
+     * <p>
+     * Queues a {@link TextureRegion} for rendering without a tint override.
+     * </p>
+     *
+     * <p>
+     * This overload resolves the region's source rectangle and delegates to the
+     * texture-based {@code drawRegion(...)} overload.
+     * </p>
      *
      * @param region the texture region to draw
-     */
-    public void drawRegion(TextureRegion region) {
-        Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region, region.getX(), region.getY(), region.getWidth(), region.getHeight(), region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
-    }
-
-    /**
-     * Queues a {@link TextureRegion} using a custom destination rectangle and the current batch tint.
-     *
-     * @param region the texture region to draw
-     * @param x      the destination x coordinate
-     * @param y      the destination y coordinate
+     * @param x      the destination X position
+     * @param y      the destination Y position
      * @param w      the destination width
      * @param h      the destination height
+     * @throws NullPointerException if {@code region} is {@code null}
      */
     public void drawRegion(TextureRegion region, float x, float y, float w, float h) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region, x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
+        drawRegion(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
     }
 
     /**
-     * Queues a {@link TextureRegion} using a custom destination rectangle and an optional tint.
+     * <p>
+     * Queues a {@link TextureRegion} for rendering with an optional tint override.
+     * </p>
      *
      * @param region the texture region to draw
-     * @param x      the destination x coordinate
-     * @param y      the destination y coordinate
+     * @param x      the destination X position
+     * @param y      the destination Y position
      * @param w      the destination width
      * @param h      the destination height
-     * @param tint   the tint to use, or null to use the current batch tint
+     * @param tint   the tint override to apply
+     * @throws NullPointerException if {@code region} is {@code null}
      */
     public void drawRegion(TextureRegion region, float x, float y, float w, float h, Color tint) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region, x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
+        drawRegion(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
     }
 
     /**
-     * Queues one sprite instance using explicit UV coordinates and an optional tint.
+     * <p>
+     * Queues a texture draw using explicit normalized UV bounds without rotation data.
+     * </p>
      *
      * <p>
-     * This is the main low-level draw path used by the rest of the batch helpers. It ensures that
-     * the batch is active, resolves or binds a texture unit for the texture, writes packed instance
-     * data into the CPU buffer, and stores the current clip state if clipping is enabled.
+     * This overload is a convenience wrapper that forwards to the more complete
+     * rotation-aware UV draw method with a zero origin and identity rotation.
      * </p>
      *
      * @param tex  the texture to draw
-     * @param x    the destination x coordinate
-     * @param y    the destination y coordinate
+     * @param x    the destination X position
+     * @param y    the destination Y position
      * @param w    the destination width
      * @param h    the destination height
-     * @param u0   the left u coordinate
-     * @param v0   the first v coordinate
-     * @param u1   the right u coordinate
-     * @param v1   the second v coordinate
-     * @param tint the tint to use, or null to use the current batch tint
-     * @throws IllegalStateException if the batch is not currently drawing
-     * @throws NullPointerException  if {@code tex} is null
+     * @param u0   the starting U coordinate
+     * @param v0   the starting V coordinate
+     * @param u1   the ending U coordinate
+     * @param v1   the ending V coordinate
+     * @param tint the tint override to apply
      */
     public void drawUV(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, Color tint) {
+        drawUV(tex, x, y, w, h, u0, v0, u1, v1, 0f, 0f, 0f, 1f, tint);
+    }
+
+    /**
+     * <p>
+     * Queues a texture draw using explicit normalized UV bounds, an arbitrary rotation
+     * origin, precomputed rotation sine and cosine values, and an optional tint.
+     * </p>
+     *
+     * <p>
+     * This is the core draw path used by most other draw overloads. It validates batch
+     * state, flushes if instance or texture-unit limits are reached, resolves the
+     * correct texture unit for the texture, selects the final tint color, applies the
+     * current translation stack, writes all instance attributes into the internal buffer,
+     * and increments the queued instance count.
+     * </p>
+     *
+     * @param tex     the texture to draw
+     * @param x       the destination X position
+     * @param y       the destination Y position
+     * @param w       the destination width
+     * @param h       the destination height
+     * @param u0      the starting U coordinate
+     * @param v0      the starting V coordinate
+     * @param u1      the ending U coordinate
+     * @param v1      the ending V coordinate
+     * @param originX the rotation origin X relative to the destination quad
+     * @param originY the rotation origin Y relative to the destination quad
+     * @param sinRot  the sine of the desired rotation angle
+     * @param cosRot  the cosine of the desired rotation angle
+     * @param tint    the tint override to apply, or {@code null} to use the batch color
+     * @throws IllegalStateException if the batch is not currently drawing
+     * @throws NullPointerException  if {@code tex} is {@code null}
+     */
+    public void drawUV(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float originX, float originY, float sinRot, float cosRot, Color tint) {
         if (!drawing) {
             throw new IllegalStateException("Call begin() before draw().");
         }
@@ -727,10 +1202,15 @@ public final class TextureBatch {
             a = tint.a();
         }
 
+        x += translationX;
+        y += translationY;
+
         instanceBuffer.put(x).put(y).put(w).put(h);
         instanceBuffer.put(r).put(g).put(b).put(a);
         instanceBuffer.put((float) texUnit);
         instanceBuffer.put(u0).put(v0).put(u1).put(v1);
+        instanceBuffer.put(originX).put(originY);
+        instanceBuffer.put(sinRot).put(cosRot);
 
         if (clipEnabled) {
             instanceBuffer.put(clipX).put(clipY).put(clipW).put(clipH);
@@ -744,20 +1224,22 @@ public final class TextureBatch {
     }
 
     /**
-     * Ends the active batch and restores previously captured GL state.
-     *
      * <p>
-     * This flushes any remaining instances, resets divisors and enabled vertex attributes,
-     * unbinds textures, restores scissor state, restores the previous framebuffer and viewport if
-     * rendering into an FBO, and marks the batch as no longer drawing.
+     * Ends the current batch, flushes any remaining queued instances, restores OpenGL
+     * state modified by {@link #begin()} and unbinds textures and shaders used by the
+     * batch.
      * </p>
      *
-     * @throws IllegalStateException if the batch is not currently drawing
+     * <p>
+     * This method also resets clip and translation state, restores the previous
+     * framebuffer and viewport when rendering to an FBO, and clears texture cache state
+     * so the next batch begins cleanly.
+     * </p>
+     *
+     * @throws IllegalStateException if the batch is not currently active
      */
     public void end() {
-        if (!drawing) {
-            throw new IllegalStateException("Call begin() before end().");
-        }
+        if (!drawing) throw new IllegalStateException("Call begin() before end().");
 
         flush();
 
@@ -765,6 +1247,8 @@ public final class TextureBatch {
         glVertexAttribDivisor(TextureBatchContract.ATTR_COL, 0);
         glVertexAttribDivisor(TextureBatchContract.ATTR_TEX, 0);
         glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 0);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 0);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 0);
         glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 0);
         glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 0);
 
@@ -774,6 +1258,8 @@ public final class TextureBatch {
         glDisableVertexAttribArray(TextureBatchContract.ATTR_COL);
         glDisableVertexAttribArray(TextureBatchContract.ATTR_TEX);
         glDisableVertexAttribArray(TextureBatchContract.ATTR_UVRECT);
+        glDisableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
+        glDisableVertexAttribArray(TextureBatchContract.ATTR_ROT);
         glDisableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
         glDisableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
 
@@ -803,6 +1289,9 @@ public final class TextureBatch {
         clipY = 0f;
         clipW = 0f;
         clipH = 0f;
+        translationDepth = 0;
+        translationX = 0f;
+        translationY = 0f;
 
         if (usingFBO) {
             glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
@@ -812,11 +1301,18 @@ public final class TextureBatch {
     }
 
     /**
-     * Uploads queued instances to the GPU and draws them in one instanced draw call.
+     * <p>
+     * Flushes queued sprite instances to the GPU if any are currently buffered.
+     * </p>
      *
      * <p>
-     * If no instances are queued, the method returns immediately. After drawing, the CPU instance
-     * buffer is cleared and texture unit bookkeeping is reset so the next batch segment starts fresh.
+     * The instance buffer is flipped, uploaded into the instance VBO, and then rendered
+     * with a single instanced draw call. After rendering, the CPU-side buffer and all
+     * texture cache bookkeeping are reset so new instances can be queued.
+     * </p>
+     *
+     * <p>
+     * Calling this method while no instances are queued is safe and returns immediately.
      * </p>
      */
     public void flush() {
@@ -843,11 +1339,13 @@ public final class TextureBatch {
     }
 
     /**
-     * Disposes GPU resources owned by this batch.
+     * <p>
+     * Releases native and OpenGL resources owned by this batch.
+     * </p>
      *
      * <p>
-     * This disposes the default shader and deletes the quad and instance VBOs. Custom shaders are
-     * not disposed here because they are not owned by the batch.
+     * This disposes the internally owned default shader and deletes the quad and
+     * instance VBOs. After this method is called, the batch should no longer be used.
      * </p>
      */
     public void dispose() {
@@ -857,11 +1355,15 @@ public final class TextureBatch {
     }
 
     /**
-     * Binds the currently active shader and configures all vertex attribute pointers and divisors.
+     * <p>
+     * Binds the active shader and configures all required vertex attribute pointers for
+     * both the shared quad geometry and the per-instance attribute stream.
+     * </p>
      *
      * <p>
-     * This method is used at begin time and again when switching shaders during an active batch.
-     * The shader is expected to use the attribute layout defined by {@link TextureBatchContract}.
+     * This method is used when a batch begins and whenever the active shader changes
+     * while drawing. It assumes the active shader already exposes the attribute layout
+     * defined by {@link TextureBatchContract}.
      * </p>
      */
     private void bindActiveShaderState() {
@@ -895,30 +1397,41 @@ public final class TextureBatch {
         glVertexAttribPointer(TextureBatchContract.ATTR_UVRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 9L * TextureBatchContract.BYTES_PER_FLOAT);
         glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 1);
 
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
+        glVertexAttribPointer(TextureBatchContract.ATTR_ORIGIN, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 13L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_ROT);
+        glVertexAttribPointer(TextureBatchContract.ATTR_ROT, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 15L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 1);
+
         glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 13L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 17L * TextureBatchContract.BYTES_PER_FLOAT);
         glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 1);
 
         glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPENABLED, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 17L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPENABLED, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 21L * TextureBatchContract.BYTES_PER_FLOAT);
         glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 1);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
     /**
-     * Returns an already assigned texture unit for the given texture id, or binds the texture to a
-     * newly allocated unit if needed.
-     *
      * <p>
-     * This method first checks the small last-texture cache, then scans the active texture units,
-     * then grows the texture unit bookkeeping array if necessary, and finally binds the texture into
-     * a new unit slot if one is available. If no more units may be used, {@code -1} is returned so
-     * the caller can flush and retry.
+     * Returns the texture unit index for the given texture ID, binding the texture into
+     * the current batch if necessary.
      * </p>
      *
-     * @param textureID the OpenGL texture id to resolve
-     * @return the texture unit index, or -1 if no more units are available without flushing
+     * <p>
+     * The method first checks the last bound texture cache for fast repeated access,
+     * then scans the currently active texture unit array. If the texture is not present
+     * and capacity is available, it binds the texture into the next free texture unit.
+     * If no further texture units are available, {@code -1} is returned so the caller
+     * can flush and retry.
+     * </p>
+     *
+     * @param textureID the OpenGL texture ID to resolve
+     * @return the texture unit index, or {@code -1} if the batch must flush first
      */
     private int getOrBindTextureUnit(int textureID) {
         if (lastTextureID == textureID && lastTextureUnit >= 0 && lastTextureUnit < activeTextureCount) {
@@ -953,11 +1466,13 @@ public final class TextureBatch {
     }
 
     /**
-     * Grows the texture unit bookkeeping array up to the configured maximum texture unit limit.
+     * <p>
+     * Expands the internal texture unit cache capacity.
+     * </p>
      *
      * <p>
-     * The new capacity is either doubled or increased by one, whichever is larger, but it never
-     * exceeds {@link #maxTextureUnits}.
+     * The capacity grows by doubling when possible, while still respecting the maximum
+     * allowed texture unit count configured for this batch.
      * </p>
      */
     private void growTextureUnitCapacity() {
@@ -969,14 +1484,18 @@ public final class TextureBatch {
     }
 
     /**
-     * Detects the OpenGL texture unit count and clamps it to a chosen maximum.
-     *
      * <p>
-     * If OpenGL reports an invalid value, a fallback of eight units is used.
+     * Detects the number of supported texture image units from the current OpenGL
+     * context and clamps the result to a caller-provided maximum.
      * </p>
      *
-     * @param clampTo the maximum allowed return value
-     * @return the detected unit count clamped to the supplied maximum
+     * <p>
+     * If the driver reports an invalid value less than or equal to zero, the method
+     * falls back to eight texture units as a conservative default.
+     * </p>
+     *
+     * @param clampTo the maximum allowed texture unit count
+     * @return the detected and clamped texture unit count
      */
     private static int detectTextureUnitsClamped(int clampTo) {
         int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);

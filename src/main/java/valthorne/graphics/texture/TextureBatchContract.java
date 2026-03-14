@@ -3,47 +3,49 @@ package valthorne.graphics.texture;
 import valthorne.graphics.shader.Shader;
 
 /**
- * <h1>TextureBatchContract</h1>
- *
  * <p>
- * {@code TextureBatchContract} defines the shared rendering contract used by {@link TextureBatch},
- * {@link TextureBatchShader}, and any custom shader intended to work with the texture batch
- * pipeline. It centralizes all fixed constants, attribute locations, attribute names, vertex shader
- * defaults, fragment shader generation, and sampler binding helpers so every batch-compatible shader
- * uses the exact same layout.
+ * {@code TextureBatchContract} defines the shared rendering contract used by
+ * {@link TextureBatch} and its shaders. It centralizes all attribute indices,
+ * attribute names, vertex layout constants, instance layout constants, and
+ * shader source generation helpers so that both the Java-side renderer and the
+ * GLSL-side programs stay in sync.
  * </p>
  *
  * <p>
- * This class is intentionally stateless and non-instantiable. It exists purely as a shared source of
- * truth for the batch rendering format. Any code that wants to remain compatible with the batch
- * should rely on these constants and helper methods instead of duplicating names or indices manually.
+ * The main purpose of this class is to ensure that the batch renderer uses a
+ * single authoritative definition for:
  * </p>
- *
- * <h2>What the contract includes</h2>
  *
  * <ul>
- *     <li>Quad geometry constants used for the static shared sprite mesh</li>
- *     <li>Per-instance layout constants that define how instance data is packed</li>
- *     <li>Attribute locations and names for local position, UVs, tint, texture unit, and clipping</li>
- *     <li>A default batch-compatible vertex shader</li>
- *     <li>A generated default fragment shader for a configurable number of samplers</li>
- *     <li>A generated fragment preamble for partial fragment shader authoring</li>
- *     <li>Helpers for binding attributes and texture samplers on shader objects</li>
+ *     <li>how many vertices make up the base quad</li>
+ *     <li>how many floats are stored per quad vertex</li>
+ *     <li>how many floats are stored per instance</li>
+ *     <li>which attribute locations map to which shader variables</li>
+ *     <li>how the default batch shaders are generated</li>
+ *     <li>how texture sampler uniforms are bound</li>
  * </ul>
  *
- * <h2>Why this exists</h2>
- *
  * <p>
- * Without a shared contract, it is easy for attribute indices, names, or sampler bindings to drift
- * out of sync between the batch and custom shaders. This class prevents that problem by keeping the
- * entire agreement in one place.
+ * Since the batch renderer relies on instanced rendering, the layout defined
+ * here is extremely important. If the attribute indices, names, or buffer
+ * packing order ever drift apart from the data written by {@link TextureBatch},
+ * rendering will break immediately. Keeping all of that information in one
+ * final utility class prevents duplication and makes maintenance much easier.
  * </p>
  *
- * <h2>Example</h2>
+ * <p>
+ * This class also generates shader source strings for the default vertex shader,
+ * the default fragment shader, and the reusable fragment preamble used when
+ * building custom fragment shaders that still need access to the batch's
+ * texture-sampling and clipping logic.
+ * </p>
+ *
+ * <h2>Example Usage</h2>
+ *
  * <pre>{@code
  * Shader shader = new Shader(
- *     TextureBatchContract.defaultVertexShader(),
- *     TextureBatchContract.buildDefaultFragmentShader(8)
+ *         TextureBatchContract.defaultVertexShader(),
+ *         TextureBatchContract.buildDefaultFragmentShader(8)
  * );
  *
  * TextureBatchContract.bindAttributes(shader);
@@ -51,15 +53,10 @@ import valthorne.graphics.shader.Shader;
  * TextureBatchContract.bindSamplers(shader, 8);
  * }</pre>
  *
- * <h2>Partial fragment example</h2>
- * <pre>{@code
- * String fragment = TextureBatchContract.buildFragmentPreamble(8) + """
- * void main() {
- *     if (batchClipped()) discard;
- *     gl_FragColor = sampleBatchTexture(v_uv) * v_col;
- * }
- * """;
- * }</pre>
+ * <p>
+ * In normal usage, you will not create instances of this class. It is a pure
+ * static contract holder and helper.
+ * </p>
  *
  * @author Albert Beaupre
  * @since March 8th, 2026
@@ -67,131 +64,155 @@ import valthorne.graphics.shader.Shader;
 public final class TextureBatchContract {
 
     /**
-     * The number of vertices used to represent one quad as two triangles.
+     * The number of vertices used to represent the base quad.
      */
     public static final int QUAD_VERTS = 6;
 
     /**
-     * The number of floats stored for each vertex in the static quad mesh.
+     * The number of float components stored for each quad vertex.
      */
     public static final int QUAD_FLOATS_PER_VERT = 4;
 
     /**
-     * The size in bytes of one float value.
+     * The size of a single float in bytes.
      */
     public static final int BYTES_PER_FLOAT = 4;
 
     /**
-     * The number of floats stored for one sprite instance in the instance buffer.
+     * The number of float components stored for each sprite instance.
      */
-    public static final int INST_FLOATS = 18;
+    public static final int INST_FLOATS = 22;
 
     /**
-     * The size in bytes of one packed sprite instance record.
+     * The total size in bytes of one instance entry.
      */
     public static final int INST_STRIDE_BYTES = INST_FLOATS * BYTES_PER_FLOAT;
 
     /**
-     * Attribute index for the local quad position.
+     * Attribute index for the quad's local position attribute.
      */
     public static final int ATTR_LOCAL = 0;
 
     /**
-     * Attribute index for the local quad UV coordinates.
+     * Attribute index for the quad's local UV attribute.
      */
     public static final int ATTR_UV = 1;
 
     /**
-     * Attribute index for the packed destination x, y, width, and height.
+     * Attribute index for instance position and size.
      */
     public static final int ATTR_XYWH = 2;
 
     /**
-     * Attribute index for the per-instance tint color.
+     * Attribute index for instance color.
      */
     public static final int ATTR_COL = 3;
 
     /**
-     * Attribute index for the per-instance texture unit selector.
+     * Attribute index for instance texture unit selection.
      */
     public static final int ATTR_TEX = 4;
 
     /**
-     * Attribute index for the per-instance UV rectangle.
+     * Attribute index for instance UV rectangle bounds.
      */
     public static final int ATTR_UVRECT = 5;
 
     /**
-     * Attribute index for the per-instance clip rectangle.
+     * Attribute index for instance rotation origin.
      */
-    public static final int ATTR_CLIPRECT = 6;
+    public static final int ATTR_ORIGIN = 6;
 
     /**
-     * Attribute index for the per-instance clip enabled flag.
+     * Attribute index for instance rotation sine and cosine data.
      */
-    public static final int ATTR_CLIPENABLED = 7;
+    public static final int ATTR_ROT = 7;
 
     /**
-     * Attribute name for the local quad position.
+     * Attribute index for instance clip rectangle data.
+     */
+    public static final int ATTR_CLIPRECT = 8;
+
+    /**
+     * Attribute index for instance clip-enabled state.
+     */
+    public static final int ATTR_CLIPENABLED = 9;
+
+    /**
+     * Shader attribute name for the quad's local position.
      */
     public static final String ATTR_NAME_LOCAL = "a_local";
 
     /**
-     * Attribute name for the local quad UV coordinates.
+     * Shader attribute name for the quad's UV coordinate.
      */
     public static final String ATTR_NAME_UV = "a_uv";
 
     /**
-     * Attribute name for the packed destination x, y, width, and height.
+     * Shader attribute name for instance position and size.
      */
     public static final String ATTR_NAME_XYWH = "i_xywh";
 
     /**
-     * Attribute name for the per-instance tint color.
+     * Shader attribute name for instance color.
      */
     public static final String ATTR_NAME_COL = "i_col";
 
     /**
-     * Attribute name for the per-instance texture unit selector.
+     * Shader attribute name for instance texture unit selection.
      */
     public static final String ATTR_NAME_TEX = "i_tex";
 
     /**
-     * Attribute name for the per-instance UV rectangle.
+     * Shader attribute name for instance UV rectangle.
      */
     public static final String ATTR_NAME_UVRECT = "i_uvRect";
 
     /**
-     * Attribute name for the per-instance clip rectangle.
+     * Shader attribute name for instance rotation origin.
+     */
+    public static final String ATTR_NAME_ORIGIN = "i_origin";
+
+    /**
+     * Shader attribute name for instance rotation sine and cosine.
+     */
+    public static final String ATTR_NAME_ROT = "i_rot";
+
+    /**
+     * Shader attribute name for instance clip rectangle.
      */
     public static final String ATTR_NAME_CLIPRECT = "i_clipRect";
 
     /**
-     * Attribute name for the per-instance clip enabled flag.
+     * Shader attribute name for instance clip-enabled flag.
      */
     public static final String ATTR_NAME_CLIPENABLED = "i_clipEnabled";
 
     /**
-     * Prevents construction of this utility contract class.
-     *
-     * <p>
-     * This class only contains constants and helper methods and is not meant to be instantiated.
-     * </p>
+     * Prevents instantiation of this static contract class.
      */
     private TextureBatchContract() {
     }
 
     /**
-     * Returns the default vertex shader source used by the texture batch system.
-     *
      * <p>
-     * The shader expects all attribute names and locations defined by this contract. It transforms the
-     * shared local quad into world space using the per-instance destination rectangle, computes the
-     * final interpolated UV coordinate using the instance UV rectangle, forwards tint color and
-     * texture unit data, and also forwards per-instance clipping data.
+     * Builds and returns the default vertex shader source used by
+     * {@link TextureBatch}.
      * </p>
      *
-     * @return the complete GLSL 120 vertex shader source for batch rendering
+     * <p>
+     * This shader reads the shared quad's local vertex position and UV, applies
+     * per-instance size, origin, rotation, translation, and clip data, then
+     * forwards the computed values to the fragment shader.
+     * </p>
+     *
+     * <p>
+     * The rotation data is passed as precomputed sine and cosine values in
+     * {@code i_rot}, allowing the CPU side to avoid sending raw angles and the
+     * shader to avoid computing trigonometric functions per vertex.
+     * </p>
+     *
+     * @return the default vertex shader source code
      */
     public static String defaultVertexShader() {
         return """
@@ -203,6 +224,8 @@ public final class TextureBatchContract {
                 attribute vec4 i_col;
                 attribute float i_tex;
                 attribute vec4 i_uvRect;
+                attribute vec2 i_origin;
+                attribute vec2 i_rot;
                 attribute vec4 i_clipRect;
                 attribute float i_clipEnabled;
                 
@@ -214,7 +237,16 @@ public final class TextureBatchContract {
                 varying float v_clipEnabled;
                 
                 void main() {
-                    vec2 world = i_xywh.xy + (a_local * i_xywh.zw);
+                    vec2 local = a_local * i_xywh.zw;
+                    local -= i_origin;
+                
+                    vec2 rotated = vec2(
+                        local.x * i_rot.y - local.y * i_rot.x,
+                        local.x * i_rot.x + local.y * i_rot.y
+                    );
+                
+                    vec2 world = i_xywh.xy + i_origin + rotated;
+                
                     gl_Position = gl_ModelViewProjectionMatrix * vec4(world.xy, 0.0, 1.0);
                     v_uv = mix(i_uvRect.xy, i_uvRect.zw, a_uv);
                     v_col = i_col;
@@ -227,16 +259,25 @@ public final class TextureBatchContract {
     }
 
     /**
-     * Builds the standard default fragment shader source for the texture batch.
-     *
      * <p>
-     * The generated shader declares one sampler uniform per supported texture unit, performs optional
-     * clip-rectangle discard testing, selects the correct sampler based on {@code v_tex}, samples the
-     * texture, and multiplies the sampled color by the interpolated tint color.
+     * Builds the default fragment shader source for the batch.
      * </p>
      *
-     * @param maxTextureUnits the number of sampler uniforms to generate
-     * @return the complete GLSL 120 fragment shader source
+     * <p>
+     * The generated shader declares one sampler uniform per supported texture
+     * unit, applies shader-side clipping when a clip rectangle is active, selects
+     * the correct sampler based on the per-instance texture index, samples the
+     * texture, and multiplies the sampled color by the instance tint color.
+     * </p>
+     *
+     * <p>
+     * The sampler selection is generated as a chained sequence of conditional
+     * branches so the shader can work with an arbitrary number of supported
+     * texture units up to the limit provided by the caller.
+     * </p>
+     *
+     * @param maxTextureUnits the number of texture samplers the generated shader should support
+     * @return the default fragment shader source code
      */
     public static String buildDefaultFragmentShader(int maxTextureUnits) {
         StringBuilder sb = new StringBuilder();
@@ -278,26 +319,28 @@ public final class TextureBatchContract {
     }
 
     /**
-     * Builds the reusable fragment preamble used for partial batch fragment shaders.
+     * <p>
+     * Builds a reusable fragment shader preamble for custom batch fragment shaders.
+     * </p>
      *
      * <p>
-     * The returned source includes:
+     * This preamble declares the required sampler uniforms and varyings, and also
+     * injects helper functions for:
      * </p>
+     *
      * <ul>
-     *     <li>The GLSL version declaration</li>
-     *     <li>One sampler uniform per supported texture unit</li>
-     *     <li>All batch varyings needed by fragment effects</li>
-     *     <li>A {@code sampleBatchTexture(vec2)} helper for sampler selection</li>
-     *     <li>A {@code batchClipped()} helper for clip-rectangle testing</li>
+     *     <li>sampling the currently selected batch texture via {@code sampleBatchTexture(vec2 uv)}</li>
+     *     <li>checking whether the current fragment is clipped via {@code batchClipped()}</li>
      * </ul>
      *
      * <p>
-     * This method is useful when you want to write only the custom {@code main()} body while reusing
-     * the standard batch texture selection and clipping logic.
+     * This helper is useful when building custom fragment shaders that should still
+     * participate in the same texture-routing and clipping rules used by the default
+     * batch shader.
      * </p>
      *
-     * @param maxTextureUnits the number of sampler uniforms to generate
-     * @return the GLSL preamble that should appear before a custom fragment shader body
+     * @param maxTextureUnits the number of texture samplers the generated preamble should support
+     * @return a fragment shader preamble string that can be concatenated with custom shader logic
      */
     public static String buildFragmentPreamble(int maxTextureUnits) {
         StringBuilder sb = new StringBuilder();
@@ -339,14 +382,17 @@ public final class TextureBatchContract {
     }
 
     /**
-     * Binds all required batch attribute locations on the supplied shader.
-     *
      * <p>
-     * This method should be called before the shader is reloaded or linked so that the batch and the
-     * shader agree on every attribute index.
+     * Binds all batch attribute locations on the supplied shader.
      * </p>
      *
-     * @param shader the shader that should receive the batch attribute bindings
+     * <p>
+     * The attribute indices defined in this contract must match the VBO layout
+     * written by {@link TextureBatch}. This method ensures that the shader uses
+     * the correct fixed attribute locations before it is linked or reloaded.
+     * </p>
+     *
+     * @param shader the shader whose attributes should be bound to the batch contract
      */
     public static void bindAttributes(Shader shader) {
         shader.bindAttribLocation(ATTR_LOCAL, ATTR_NAME_LOCAL);
@@ -355,20 +401,30 @@ public final class TextureBatchContract {
         shader.bindAttribLocation(ATTR_COL, ATTR_NAME_COL);
         shader.bindAttribLocation(ATTR_TEX, ATTR_NAME_TEX);
         shader.bindAttribLocation(ATTR_UVRECT, ATTR_NAME_UVRECT);
+        shader.bindAttribLocation(ATTR_ORIGIN, ATTR_NAME_ORIGIN);
+        shader.bindAttribLocation(ATTR_ROT, ATTR_NAME_ROT);
         shader.bindAttribLocation(ATTR_CLIPRECT, ATTR_NAME_CLIPRECT);
         shader.bindAttribLocation(ATTR_CLIPENABLED, ATTR_NAME_CLIPENABLED);
     }
 
     /**
-     * Binds the sampler uniforms used by the texture batch on the supplied shader.
-     *
      * <p>
-     * This method binds the shader, assigns each {@code u_texN} uniform to the texture unit index
-     * {@code N}, and then unbinds the shader again.
+     * Binds the batch sampler uniforms on the supplied shader.
      * </p>
      *
-     * @param shader          the shader whose sampler uniforms should be assigned
-     * @param maxTextureUnits the number of texture sampler uniforms to bind
+     * <p>
+     * Each generated sampler uniform is assigned to its matching texture unit
+     * index so that {@code u_tex0} samples from texture unit 0,
+     * {@code u_tex1} samples from texture unit 1, and so on.
+     * </p>
+     *
+     * <p>
+     * The shader is temporarily bound while uniforms are assigned and then unbound
+     * before the method returns.
+     * </p>
+     *
+     * @param shader          the shader whose sampler uniforms should be initialized
+     * @param maxTextureUnits the number of texture-unit sampler uniforms to bind
      */
     public static void bindSamplers(Shader shader, int maxTextureUnits) {
         shader.bind();

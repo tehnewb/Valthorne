@@ -1,6 +1,6 @@
 package valthorne.graphics.shader;
 
-import valthorne.graphics.texture.Texture;
+import valthorne.graphics.Sprite;
 
 /**
  * Simple 3x3 box blur shader (fixed-function friendly) built on top of {@link Shader}.
@@ -89,18 +89,9 @@ public class BlurShader extends Shader {
         super(VERT_SRC, FRAG_SRC);
     }
 
-    /**
-     * Applies the blur shader to the given texture with the specified blur radius.
-     * <p>
-     * This method binds the shader with the texture's width, height, and the desired
-     * blur radius. It then draws the texture and unbinds the shader.
-     *
-     * @param texture  the texture to which the blur effect will be applied
-     * @param radiusPx the radius of the blur effect in pixels
-     */
-    public void apply(Texture texture, float radiusPx) {
-        bind(texture.getData().width(), texture.getData().height(), radiusPx);
-        texture.draw();
+    public void apply(Sprite sprite, float radiusPx) {
+        bind(sprite.getTexture().getData().width(), sprite.getTexture().getData().height(), radiusPx);
+        sprite.draw();
         unbind();
     }
 

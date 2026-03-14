@@ -1,157 +1,241 @@
 package valthorne.graphics.texture;
 
 import org.lwjgl.BufferUtils;
+import valthorne.graphics.Color;
+import valthorne.io.pool.Poolable;
+import valthorne.math.Vector2f;
+import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Nine-patch texture (3x3) that draws all slices in a single draw call.
+ * <p>
+ * {@code NinePatchTexture} represents a drawable nine-patch texture built around a
+ * backing {@link Texture} and a {@link TextureRegion}. It divides a texture into a
+ * 3x3 grid made of fixed-size corners, stretchable edges, and a stretchable center.
+ * This allows UI panels, windows, buttons, and other scalable elements to grow or
+ * shrink without distorting their borders.
+ * </p>
  *
- * <h2>Example</h2>
+ * <p>
+ * Internally, this class precomputes a local nine-patch mesh and a matching UV layout.
+ * When geometry-related properties change, such as size, scale, region, flip state,
+ * or slice thickness, the local mesh is marked dirty and rebuilt on demand. When only
+ * world-space properties change, such as position or rotation, the world buffer is
+ * updated without rebuilding the local mesh. This split keeps rendering efficient while
+ * still supporting dynamic transforms.
+ * </p>
+ *
+ * <p>
+ * The nine-patch is composed of nine quads:
+ * </p>
+ *
+ * <ul>
+ *     <li>bottom-left, bottom-center, bottom-right</li>
+ *     <li>middle-left, middle-center, middle-right</li>
+ *     <li>top-left, top-center, top-right</li>
+ * </ul>
+ *
+ * <p>
+ * Each quad stores local vertex positions and UV coordinates. These are later converted
+ * into world-space positions using the current position, origin, scale, and rotation.
+ * Because of that, the class supports:
+ * </p>
+ *
+ * <ul>
+ *     <li>custom source regions</li>
+ *     <li>custom destination position and size</li>
+ *     <li>scaling</li>
+ *     <li>rotation around a configurable origin</li>
+ *     <li>horizontal and vertical flipping</li>
+ *     <li>runtime color tinting</li>
+ *     <li>pool reset behavior through {@link Poolable}</li>
+ * </ul>
+ *
+ * <p>
+ * This class performs immediate-mode style quad submission using client-side array
+ * pointers and {@code glDrawArrays(GL_QUADS, ...)}. That means it is useful for
+ * standalone drawing and is also compatible with higher-level systems that want to
+ * inspect its nine-patch properties and feed them into a batch renderer such as
+ * {@link TextureBatch}.
+ * </p>
+ *
+ * <h2>Example Usage</h2>
+ *
  * <pre>{@code
- * // Load nine-patch source and define border sizes (in source pixels).
- * NinePatchTexture panel = new NinePatchTexture("assets/ui/panel.png", 6, 6, 6, 6);
- *
- * // Place and size it like a normal texture.
- * panel.setPosition(24, 24);
- * panel.setSize(420, 180);
- *
- * // Optional: set a rotation origin (corners will still remain crisp relative to the source).
+ * NinePatchTexture panel = new NinePatchTexture("panel.png", 8, 8, 8, 8);
+ * panel.setPosition(100, 80);
+ * panel.setSize(320, 180);
  * panel.setRotationOriginCenter();
  * panel.setRotation(5f);
+ * panel.setColor(new Color(1f, 1f, 1f, 0.95f));
  *
- * // Draw in your normal render loop (fixed-function pipeline).
  * panel.draw();
+ *
+ * panel.setFlip(true, false);
+ * panel.setScale(1.25f, 1.25f);
+ * panel.draw();
+ *
+ * panel.reset();
+ * panel.dispose();
  * }</pre>
  *
- * <h2>What this class does</h2>
  * <p>
- * A nine-patch scales UI panels without stretching corners. The texture is divided into 9 rectangles:
- * 4 corners (never stretched), 4 edges (stretched in one axis), and 1 center (stretched in both axes).
- * This class builds the full 3x3 mesh once (or when it becomes "dirty") and draws it using a single
- * {@code glDrawArrays(GL_QUADS, 0, 36)} call.
+ * The example above demonstrates the full lifecycle of the class: construction,
+ * resizing, transforming, tinting, drawing, resetting, and disposal.
  * </p>
- *
- * <h2>How the mesh is generated</h2>
- * <ul>
- *     <li><b>Local mesh</b>: computed from the requested output size/scale and border pixel sizes.</li>
- *     <li><b>Slice UVs</b>: computed from source pixel rectangles and mapped into the current base region.</li>
- *     <li><b>World vertices</b>: local vertices are transformed by rotation + translation using the current rotation origin.</li>
- * </ul>
- *
- * <h2>Region + flip compatibility</h2>
- * <p>
- * This class respects the UV region and flip state managed by {@link Texture}. If you call
- * {@link #setRegion(float, float, float, float)} or flip methods, the nine-patch UVs are regenerated so
- * each slice continues to sample the correct area inside the base region.
- * </p>
- *
- * <h2>Performance rules</h2>
- * <p>
- * Rendering is allocation-free during {@link #draw()}:
- * </p>
- * <ul>
- *     <li>All arrays and native {@link FloatBuffer}s are allocated once in the constructor.</li>
- *     <li>Rebuild work writes into preallocated arrays/buffers only.</li>
- *     <li>Rotation trig is cached and only recomputed when rotation changes.</li>
- * </ul>
  *
  * @author Albert Beaupre
  * @since February 5th, 2026
  */
-public class NinePatchTexture extends Texture {
-
-    private static final int QUADS = 9; // Number of slices in a 3x3 nine-patch.
-    private static final int VERTS_PER_QUAD = 4; // Vertex count per quad when using GL_QUADS.
-    private static final int VERTS = QUADS * VERTS_PER_QUAD; // Total vertex count for all slices (36).
-    private static final int FLOATS_PER_VERT = 2; // Float components per vertex for position/uv (x,y) or (u,v).
-    private static final int FLOATS = VERTS * FLOATS_PER_VERT; // Total float count for a full buffer (72).
-
-    private FloatBuffer nineVertexBuffer = BufferUtils.createFloatBuffer(VERTS * FLOATS_PER_VERT); // World-space x/y buffer (direct, reused).
-    private FloatBuffer nineUvBuffer = BufferUtils.createFloatBuffer(VERTS * FLOATS_PER_VERT); // UV buffer (direct, reused).
-
-    private final float[] nineLocalVertices = new float[FLOATS]; // Local-space x/y vertices for all slices (packed TL,TR,BR,BL order).
-    private final float[] nineLocalUvs = new float[FLOATS]; // Local-space u/v values for all slices (packed TL,TR,BR,BL order).
-
-    private final float[] sliceX = new float[QUADS]; // Slice local x positions for each of the 9 slices.
-    private final float[] sliceY = new float[QUADS]; // Slice local y positions for each of the 9 slices.
-    private final float[] sliceW = new float[QUADS]; // Slice widths for each of the 9 slices.
-    private final float[] sliceH = new float[QUADS]; // Slice heights for each of the 9 slices.
-
-    private final int[] src = new int[QUADS * 4]; // Source rectangles per slice packed as [l,t,r,b] for each slice.
-
-    private int left; // Left border width in source pixels.
-    private int right; // Right border width in source pixels.
-    private int top; // Top border height in source pixels.
-    private int bottom; // Bottom border height in source pixels.
-
-    private boolean dirtyMesh = true; // True when local slice geometry/uvs must be rebuilt.
-    private boolean dirtyWorld = true; // True when world-space vertices must be rebuilt.
-
-    private float baseU0, baseU1, baseV0, baseV1; // Normalized base region bounds derived from Texture UVs.
-    private boolean flipX, flipY; // Base flip flags derived from Texture UV ordering.
-
-    private float cachedRotation = Float.NaN; // Cached rotation value used to avoid recomputing trig each draw.
-    private float sinRot; // Cached sin for the current rotation (radians).
-    private float cosRot = 1f; // Cached cos for the current rotation (radians).
+public class NinePatchTexture implements Poolable {
 
     /**
-     * Creates a nine-patch from an image file and border sizes.
-     *
+     * The number of quads used to represent the nine-patch.
+     */
+    private static final int QUADS = 9;
+
+    /**
+     * The number of vertices contained in each quad.
+     */
+    private static final int VERTS_PER_QUAD = 4;
+
+    /**
+     * The total number of vertices across all quads.
+     */
+    private static final int VERTS = QUADS * VERTS_PER_QUAD;
+
+    /**
+     * The number of float components per vertex.
+     */
+    private static final int FLOATS_PER_VERT = 2;
+
+    /**
+     * The total number of float components required for the full nine-patch mesh.
+     */
+    private static final int FLOATS = VERTS * FLOATS_PER_VERT;
+
+    private final Texture texture; // Backing texture used by the nine-patch
+    private final TextureRegion region; // Source region inside the backing texture
+    private FloatBuffer nineVertexBuffer = BufferUtils.createFloatBuffer(FLOATS); // World-space vertex buffer used for rendering
+    private FloatBuffer nineUvBuffer = BufferUtils.createFloatBuffer(FLOATS); // UV buffer used for rendering
+    private final float[] nineLocalVertices = new float[FLOATS]; // Cached local-space vertex positions for all nine quads
+    private final float[] nineLocalUvs = new float[FLOATS]; // Cached local-space UV coordinates for all nine quads
+    private final float[] sliceX = new float[QUADS]; // Cached local X positions for each patch slice
+    private final float[] sliceY = new float[QUADS]; // Cached local Y positions for each patch slice
+    private final float[] sliceW = new float[QUADS]; // Cached widths for each patch slice
+    private final float[] sliceH = new float[QUADS]; // Cached heights for each patch slice
+    private final int[] src = new int[QUADS * 4]; // Cached source pixel rectangles for each patch slice
+    private final Rectangle bounds; // Destination bounds of the nine-patch in world space
+    private Vector2f origin = new Vector2f(0f, 0f); // Rotation origin used when transforming the mesh
+    private Color color = new Color(1f, 1f, 1f, 1f); // Current tint color applied during drawing
+
+    private int left; // Left border thickness in pixels
+    private int right; // Right border thickness in pixels
+    private int top; // Top border thickness in pixels
+    private int bottom; // Bottom border thickness in pixels
+
+    private boolean flippedX; // Whether the nine-patch is horizontally flipped
+    private boolean flippedY; // Whether the nine-patch is vertically flipped
+    private boolean dirtyMesh = true; // Whether the local mesh and UVs need to be rebuilt
+    private boolean dirtyWorld = true; // Whether world-space transformed vertices need to be updated
+
+    private float scaleX = 1f; // Horizontal scale factor
+    private float scaleY = 1f; // Vertical scale factor
+    private float rotation; // Rotation angle in degrees
+    private float baseU0; // Cached normalized minimum U value of the active region
+    private float baseU1; // Cached normalized maximum U value of the active region
+    private float baseV0; // Cached normalized minimum V value of the active region
+    private float baseV1; // Cached normalized maximum V value of the active region
+    private boolean regionFlipX; // Whether the underlying region is naturally flipped on the X axis
+    private boolean regionFlipY; // Whether the underlying region is naturally flipped on the Y axis
+    private float cachedRotation = Float.NaN; // Last rotation value used to cache sine and cosine
+    private float sinRot; // Cached sine of the current rotation
+    private float cosRot = 1f; // Cached cosine of the current rotation
+
+    /**
      * <p>
-     * The border sizes are expressed in <b>source pixels</b>. Corners are preserved at that pixel size,
-     * while the center/edges stretch to fit the requested output size (via {@link #setSize(float, float)}).
+     * Creates a new {@code NinePatchTexture} from a texture path.
      * </p>
      *
      * <p>
-     * This constructor loads {@link TextureData} and then delegates to {@link #NinePatchTexture(TextureData, int, int, int, int)}.
+     * This constructor creates a new {@link Texture} from the supplied path and then
+     * delegates to the texture-based constructor.
      * </p>
      *
-     * @param path   image file path used by {@link TextureData#load(String)}
-     * @param left   left border width in pixels
-     * @param right  right border width in pixels
-     * @param top    top border height in pixels
-     * @param bottom bottom border height in pixels
-     * @throws NullPointerException if path is null
+     * @param path   the texture path to load
+     * @param left   the left border size in pixels
+     * @param right  the right border size in pixels
+     * @param top    the top border size in pixels
+     * @param bottom the bottom border size in pixels
      */
     public NinePatchTexture(String path, int left, int right, int top, int bottom) {
-        this(TextureData.load(path), left, right, top, bottom);
+        this(new Texture(path), left, right, top, bottom);
     }
 
     /**
-     * Creates a nine-patch from existing CPU-side pixel data and border sizes.
-     *
      * <p>
-     * The initial texture size is set to the source image size so the nine-patch renders as the original
-     * image until you resize it. Any subsequent size/scale/region/flip changes will mark the mesh dirty.
+     * Creates a new {@code NinePatchTexture} from an existing {@link TextureData} instance.
      * </p>
      *
-     * @param data   source texture data (CPU-side pixels) used by {@link Texture}
-     * @param left   left border width in pixels
-     * @param right  right border width in pixels
-     * @param top    top border height in pixels
-     * @param bottom bottom border height in pixels
-     * @throws NullPointerException if data is null
+     * <p>
+     * This constructor creates a new {@link Texture} from the supplied texture data and
+     * then delegates to the texture-based constructor.
+     * </p>
+     *
+     * @param data   the texture data used to construct the backing texture
+     * @param left   the left border size in pixels
+     * @param right  the right border size in pixels
+     * @param top    the top border size in pixels
+     * @param bottom the bottom border size in pixels
      */
     public NinePatchTexture(TextureData data, int left, int right, int top, int bottom) {
-        super(data);
+        this(new Texture(data), left, right, top, bottom);
+    }
+
+    /**
+     * <p>
+     * Creates a new {@code NinePatchTexture} from an existing {@link Texture}.
+     * </p>
+     *
+     * <p>
+     * The full texture is initially used as the source region. The object starts with
+     * bounds matching the texture's native size, a zero origin, no flipping, no rotation,
+     * unit scale, and a white tint. The mesh and world caches are marked dirty so the
+     * buffers are generated lazily on first use.
+     * </p>
+     *
+     * @param texture the backing texture
+     * @param left    the left border size in pixels
+     * @param right   the right border size in pixels
+     * @param top     the top border size in pixels
+     * @param bottom  the bottom border size in pixels
+     * @throws NullPointerException if {@code texture} is {@code null}
+     */
+    public NinePatchTexture(Texture texture, int left, int right, int top, int bottom) {
+        if (texture == null) throw new NullPointerException("Texture cannot be null");
+
+        this.texture = texture;
+        this.region = new TextureRegion(texture);
         this.left = left;
         this.right = right;
         this.top = top;
         this.bottom = bottom;
-
-        setSize(data.width(), data.height());
+        this.bounds = new Rectangle(0f, 0f, texture.getWidth(), texture.getHeight());
         markDirtyAll();
     }
 
     /**
-     * Marks both the local mesh and the world-space vertex buffer as dirty.
+     * <p>
+     * Marks both mesh data and world-space vertex data as dirty.
+     * </p>
      *
      * <p>
-     * Use this when a change affects slice sizes/positions or UV mapping (e.g., borders, size, scale,
-     * region, flip, or rotation origin).
+     * This method should be used when a property change affects slice layout, UVs,
+     * local geometry, or anything that indirectly requires the world-space buffers
+     * to be regenerated as well.
      * </p>
      */
     private void markDirtyAll() {
@@ -160,11 +244,13 @@ public class NinePatchTexture extends Texture {
     }
 
     /**
-     * Marks only the world-space vertex buffer as dirty.
+     * <p>
+     * Marks only the world-space transformed vertex data as dirty.
+     * </p>
      *
      * <p>
-     * Use this when the local mesh and UVs remain correct, but a transform changes how the mesh is placed
-     * in world space (e.g., position or rotation).
+     * This method is used for changes that do not alter the local mesh itself,
+     * such as position or rotation updates.
      * </p>
      */
     private void markDirtyWorld() {
@@ -172,314 +258,497 @@ public class NinePatchTexture extends Texture {
     }
 
     /**
-     * Sets position and marks the world buffer dirty when the position actually changes.
-     *
      * <p>
-     * This avoids rebuilding slice geometry/uvs, because only the final world transform differs.
+     * Returns the backing texture used by this nine-patch.
      * </p>
      *
-     * @param x new x position (bottom-left world coordinate, matching your engine convention)
-     * @param y new y position (bottom-left world coordinate, matching your engine convention)
+     * @return the backing texture
      */
-    @Override
+    public Texture getTexture() {
+        return texture;
+    }
+
+    /**
+     * <p>
+     * Returns the backing texture data.
+     * </p>
+     *
+     * @return the texture data, or whatever is returned by the backing texture
+     */
+    public TextureData getData() {
+        return texture.getData();
+    }
+
+    /**
+     * <p>
+     * Returns the source region used by this nine-patch.
+     * </p>
+     *
+     * @return the source region
+     */
+    public TextureRegion getRegion() {
+        return region;
+    }
+
+    /**
+     * <p>
+     * Updates the active source region and marks all cached mesh data dirty.
+     * </p>
+     *
+     * <p>
+     * Because the UV layout of each slice depends on the region, changing the region
+     * requires the nine-patch mesh and UVs to be rebuilt.
+     * </p>
+     *
+     * @param regionX      the source region X position in pixels
+     * @param regionY      the source region Y position in pixels
+     * @param regionWidth  the source region width in pixels
+     * @param regionHeight the source region height in pixels
+     */
+    public void setRegion(float regionX, float regionY, float regionWidth, float regionHeight) {
+        region.setRegion(regionX, regionY, regionWidth, regionHeight);
+        markDirtyAll();
+    }
+
+    /**
+     * <p>
+     * Returns the source region X position.
+     * </p>
+     *
+     * @return the source region X position
+     */
+    public float getRegionX() {
+        return region.getRegionX();
+    }
+
+    /**
+     * <p>
+     * Returns the source region Y position.
+     * </p>
+     *
+     * @return the source region Y position
+     */
+    public float getRegionY() {
+        return region.getRegionY();
+    }
+
+    /**
+     * <p>
+     * Returns the source region width.
+     * </p>
+     *
+     * @return the source region width
+     */
+    public float getRegionWidth() {
+        return region.getRegionWidth();
+    }
+
+    /**
+     * <p>
+     * Returns the source region height.
+     * </p>
+     *
+     * @return the source region height
+     */
+    public float getRegionHeight() {
+        return region.getRegionHeight();
+    }
+
+    /**
+     * <p>
+     * Sets the world position of the nine-patch.
+     * </p>
+     *
+     * <p>
+     * If the new coordinates match the current position, the method returns early.
+     * Otherwise, the bounds are updated and only the world buffer is marked dirty.
+     * </p>
+     *
+     * @param x the new X position
+     * @param y the new Y position
+     */
     public void setPosition(float x, float y) {
-        float ox = getX();
-        float oy = getY();
-        super.setPosition(x, y);
-        if (ox != x || oy != y) markDirtyWorld();
+        if (bounds.getX() == x && bounds.getY() == y) return;
+
+        bounds.setX(x);
+        bounds.setY(y);
+        markDirtyWorld();
     }
 
     /**
-     * Sets rotation and marks the world buffer dirty when rotation changes.
-     *
      * <p>
-     * Rotation trig is cached, and will only be recomputed on the next draw when the rotation differs.
+     * Returns the current world X position.
      * </p>
      *
-     * @param degrees rotation in degrees (consistent with {@link Texture})
+     * @return the X position
      */
-    @Override
-    public void setRotation(float degrees) {
-        float prev = getRotation();
-        super.setRotation(degrees);
-        if (prev != degrees) markDirtyWorld();
+    public float getX() {
+        return bounds.getX();
     }
 
     /**
-     * Sets rotation origin and marks the mesh/world dirty when the origin changes.
-     *
      * <p>
-     * Origin changes affect how local vertices are transformed (the pivot), so both local and world
-     * computations must be considered dirty.
+     * Returns the current world Y position.
      * </p>
      *
-     * @param ox origin x in local space
-     * @param oy origin y in local space
+     * @return the Y position
      */
-    @Override
-    public void setRotationOrigin(float ox, float oy) {
-        float px = getRotationOrigin().getX();
-        float py = getRotationOrigin().getY();
-        super.setRotationOrigin(ox, oy);
-        if (px != ox || py != oy) markDirtyAll();
+    public float getY() {
+        return bounds.getY();
     }
 
     /**
-     * Sets rotation origin to the local center and marks the mesh/world dirty.
-     *
      * <p>
-     * The center depends on size, so origin-center changes can require local rebuild depending on how
-     * your {@link Texture} computes/updates origin.
+     * Returns the current destination width.
      * </p>
+     *
+     * @return the destination width
      */
-    @Override
-    public void setRotationOriginCenter() {
-        super.setRotationOriginCenter();
+    public float getWidth() {
+        return bounds.getWidth();
+    }
+
+    /**
+     * <p>
+     * Sets the destination width and marks the mesh dirty if the value changes.
+     * </p>
+     *
+     * @param width the new width
+     */
+    public void setWidth(float width) {
+        if (bounds.getWidth() == width) return;
+
+        bounds.setWidth(width);
         markDirtyAll();
     }
 
     /**
-     * Sets width and marks the mesh/world dirty if the width changes.
-     *
      * <p>
-     * Slice widths depend on the final output width, so local slice geometry must be rebuilt.
+     * Returns the current destination height.
      * </p>
      *
-     * @param w new width
+     * @return the destination height
      */
-    @Override
-    public void setWidth(float w) {
-        float prev = getWidth();
-        super.setWidth(w);
-        if (prev != w) markDirtyAll();
+    public float getHeight() {
+        return bounds.getHeight();
     }
 
     /**
-     * Sets height and marks the mesh/world dirty if the height changes.
-     *
      * <p>
-     * Slice heights depend on the final output height, so local slice geometry must be rebuilt.
+     * Sets the destination height and marks the mesh dirty if the value changes.
      * </p>
      *
-     * @param h new height
+     * @param height the new height
      */
-    @Override
-    public void setHeight(float h) {
-        float prev = getHeight();
-        super.setHeight(h);
-        if (prev != h) markDirtyAll();
+    public void setHeight(float height) {
+        if (bounds.getHeight() == height) return;
+
+        bounds.setHeight(height);
+        markDirtyAll();
     }
 
     /**
-     * Sets size and marks the mesh/world dirty when either dimension changes.
-     *
      * <p>
-     * Nine-patch stretching is driven by the output size, so any size change requires recalculating
-     * slice sizes and rebuilding UV mapping.
+     * Sets the destination size and marks the mesh dirty if either dimension changes.
      * </p>
      *
-     * @param w new width
-     * @param h new height
+     * @param width  the new width
+     * @param height the new height
      */
-    @Override
-    public void setSize(float w, float h) {
-        float pw = getWidth();
-        float ph = getHeight();
-        super.setSize(w, h);
-        if (pw != w || ph != h) markDirtyAll();
+    public void setSize(float width, float height) {
+        if (bounds.getWidth() == width && bounds.getHeight() == height) return;
+
+        bounds.setWidth(width);
+        bounds.setHeight(height);
+        markDirtyAll();
     }
 
     /**
-     * Sets scale and marks the mesh/world dirty when either scale changes.
-     *
      * <p>
-     * The local mesh is computed using (size * scale), so scale changes alter slice geometry.
+     * Sets the horizontal and vertical scale of the nine-patch.
      * </p>
      *
-     * @param sx x scale
-     * @param sy y scale
+     * <p>
+     * The rotation origin is adjusted proportionally so that an existing origin stays
+     * visually aligned with the scaled geometry. After the update, the local mesh and
+     * world buffers are marked dirty.
+     * </p>
+     *
+     * @param sx the new horizontal scale
+     * @param sy the new vertical scale
      */
-    @Override
     public void setScale(float sx, float sy) {
-        float psx = getScaleX();
-        float psy = getScaleY();
-        super.setScale(sx, sy);
-        if (psx != sx || psy != sy) markDirtyAll();
-    }
+        float oldScaleX = this.scaleX;
+        float oldScaleY = this.scaleY;
 
-    /**
-     * Sets the base UV region and marks the mesh/world dirty.
-     *
-     * <p>
-     * The nine-patch UVs are mapped into the base region, so any region change requires rebuilding UVs.
-     * </p>
-     *
-     * @param left   left UV
-     * @param top    top UV
-     * @param right  right UV
-     * @param bottom bottom UV
-     */
-    @Override
-    public void setRegion(float left, float top, float right, float bottom) {
-        super.setRegion(left, top, right, bottom);
+        if (oldScaleX != 0f) origin.setX(origin.getX() * (sx / oldScaleX));
+        if (oldScaleY != 0f) origin.setY(origin.getY() * (sy / oldScaleY));
+
+        this.scaleX = sx;
+        this.scaleY = sy;
         markDirtyAll();
     }
 
     /**
-     * Flips the base texture UVs horizontally and rebuilds the nine-patch UV mapping.
+     * <p>
+     * Returns the current horizontal scale.
+     * </p>
+     *
+     * @return the horizontal scale
+     */
+    public float getScaleX() {
+        return scaleX;
+    }
+
+    /**
+     * <p>
+     * Returns the current vertical scale.
+     * </p>
+     *
+     * @return the vertical scale
+     */
+    public float getScaleY() {
+        return scaleY;
+    }
+
+    /**
+     * <p>
+     * Returns the current rotation in degrees.
+     * </p>
+     *
+     * @return the rotation angle in degrees
+     */
+    public float getRotation() {
+        return rotation;
+    }
+
+    /**
+     * <p>
+     * Sets the rotation of the nine-patch in degrees.
+     * </p>
      *
      * <p>
-     * Nine-patch UVs must be regenerated so each slice continues to sample the correct rectangle.
+     * If the value is unchanged, the method returns immediately. Otherwise only the
+     * world-space buffers need to be recomputed.
      * </p>
+     *
+     * @param degrees the new rotation angle in degrees
      */
-    @Override
-    public void flipX() {
-        super.flipX();
+    public void setRotation(float degrees) {
+        if (this.rotation == degrees) return;
+
+        this.rotation = degrees;
+        markDirtyWorld();
+    }
+
+    /**
+     * <p>
+     * Sets the rotation origin used when transforming the local mesh into world space.
+     * </p>
+     *
+     * @param ox the origin X
+     * @param oy the origin Y
+     */
+    public void setRotationOrigin(float ox, float oy) {
+        if (origin.getX() == ox && origin.getY() == oy) return;
+
+        origin.set(ox, oy);
         markDirtyAll();
     }
 
     /**
-     * Flips the base texture UVs vertically and rebuilds the nine-patch UV mapping.
+     * <p>
+     * Sets the rotation origin to the visual center of the scaled destination area.
+     * </p>
      *
      * <p>
-     * Nine-patch UVs must be regenerated so each slice continues to sample the correct rectangle.
+     * Because the origin is stored in local scaled space, this uses the bounds size
+     * multiplied by the current scale.
      * </p>
      */
-    @Override
-    public void flipY() {
-        super.flipY();
+    public void setRotationOriginCenter() {
+        origin.set(bounds.getWidth() * scaleX / 2f, bounds.getHeight() * scaleY / 2f);
         markDirtyAll();
     }
 
     /**
-     * Sets horizontal flip state and rebuilds mesh/world only if the flip state changes.
-     *
      * <p>
-     * This method compares the derived base flip state (from the UV buffer ordering) before and after
-     * applying the change so we only rebuild when necessary.
+     * Returns the current rotation origin vector.
      * </p>
      *
-     * @param flip true to flip horizontally, false to unflip
+     * @return the rotation origin
      */
-    @Override
+    public Vector2f getRotationOrigin() {
+        return origin;
+    }
+
+    /**
+     * <p>
+     * Sets whether the nine-patch should be flipped horizontally.
+     * </p>
+     *
+     * @param flip {@code true} to flip horizontally
+     */
     public void setFlipX(boolean flip) {
-        boolean before = isFlippedX();
-        super.setFlipX(flip);
-        if (before != flip) markDirtyAll();
+        if (this.flippedX == flip) return;
+
+        this.flippedX = flip;
+        markDirtyAll();
     }
 
     /**
-     * Sets vertical flip state and rebuilds mesh/world only if the flip state changes.
-     *
      * <p>
-     * This method compares the derived base flip state (from the UV buffer ordering) before and after
-     * applying the change so we only rebuild when necessary.
+     * Sets whether the nine-patch should be flipped vertically.
      * </p>
      *
-     * @param flip true to flip vertically, false to unflip
+     * @param flip {@code true} to flip vertically
      */
-    @Override
     public void setFlipY(boolean flip) {
-        boolean before = isFlippedY();
-        super.setFlipY(flip);
-        if (before != flip) markDirtyAll();
+        if (this.flippedY == flip) return;
+
+        this.flippedY = flip;
+        markDirtyAll();
     }
 
     /**
-     * Detects whether the current base UV mapping is flipped horizontally.
-     *
      * <p>
-     * This is derived from {@link #getUVBuffer()} ordering and does not allocate or store extra state.
-     * For the default TL/TR/BR/BL UV layout, a flip is indicated when the "left" U exceeds the "right" U.
+     * Sets both horizontal and vertical flip state at once.
      * </p>
      *
-     * @return true if the underlying base region is horizontally flipped
+     * @param flipX {@code true} to flip horizontally
+     * @param flipY {@code true} to flip vertically
      */
-    private boolean isFlippedX() {
-        FloatBuffer uv = getUVBuffer();
-        return uv.get(0) > uv.get(2);
+    public void setFlip(boolean flipX, boolean flipY) {
+        if (this.flippedX == flipX && this.flippedY == flipY) return;
+
+        this.flippedX = flipX;
+        this.flippedY = flipY;
+        markDirtyAll();
     }
 
     /**
-     * Detects whether the current base UV mapping is flipped vertically.
-     *
      * <p>
-     * This is derived from {@link #getUVBuffer()} ordering and does not allocate or store extra state.
-     * For the default TL/TR/BR/BL UV layout, a flip is indicated when the "top" V exceeds the "bottom" V.
+     * Returns whether the nine-patch is currently flipped horizontally.
      * </p>
      *
-     * @return true if the underlying base region is vertically flipped
+     * @return {@code true} if flipped horizontally
      */
-    private boolean isFlippedY() {
-        FloatBuffer uv = getUVBuffer();
-        return uv.get(1) > uv.get(5);
+    public boolean isFlippedX() {
+        return flippedX;
     }
 
     /**
-     * Caches normalized base region bounds and flip flags derived from the base {@link Texture} UV buffer.
+     * <p>
+     * Returns whether the nine-patch is currently flipped vertically.
+     * </p>
+     *
+     * @return {@code true} if flipped vertically
+     */
+    public boolean isFlippedY() {
+        return flippedY;
+    }
+
+    /**
+     * <p>
+     * Returns the current tint color.
+     * </p>
+     *
+     * @return the tint color
+     */
+    public Color getColor() {
+        return color;
+    }
+
+    /**
+     * <p>
+     * Sets the tint color used during rendering.
+     * </p>
      *
      * <p>
-     * The base texture may already have a region applied and may be flipped. This method:
+     * The provided reference is stored directly, so future changes to that color
+     * object will affect this nine-patch as well.
      * </p>
-     * <ul>
-     *     <li>Extracts the logical region extents (min/max U and V) into {@code baseU0/baseU1/baseV0/baseV1}.</li>
-     *     <li>Records whether the base mapping is flipped so nine-patch slice UVs can match it.</li>
-     * </ul>
+     *
+     * @param color the new tint color
+     * @throws NullPointerException if {@code color} is {@code null}
+     */
+    public void setColor(Color color) {
+        if (color == null) throw new NullPointerException("Color cannot be null");
+
+        this.color = color;
+    }
+
+    /**
+     * <p>
+     * Returns the destination bounds rectangle.
+     * </p>
+     *
+     * @return the bounds rectangle
+     */
+    public Rectangle getBounds() {
+        return bounds;
+    }
+
+    /**
+     * <p>
+     * Caches the normalized base region bounds and whether the region itself is flipped.
+     * </p>
+     *
+     * <p>
+     * This method extracts the raw region UVs, normalizes them into ascending ranges,
+     * and records whether the source region is inherently reversed on either axis.
+     * Those flags are later combined with the explicit flip state of the nine-patch.
+     * </p>
      */
     private void cacheBaseRegionAndFlip() {
-        FloatBuffer baseUv = getUVBuffer();
+        float leftU = region.getU();
+        float topV = region.getV();
+        float rightU = region.getU2();
+        float bottomV = region.getV2();
 
-        float leftU = baseUv.get(0);
-        float topV = baseUv.get(1);
-        float rightU = baseUv.get(2);
-        float bottomV = baseUv.get(5);
+        baseU0 = Math.min(leftU, rightU);
+        baseU1 = Math.max(leftU, rightU);
+        baseV0 = Math.min(topV, bottomV);
+        baseV1 = Math.max(topV, bottomV);
 
-        baseU0 = (leftU < rightU) ? leftU : rightU;
-        baseU1 = (leftU < rightU) ? rightU : leftU;
-        baseV0 = (topV < bottomV) ? topV : bottomV;
-        baseV1 = (topV < bottomV) ? bottomV : topV;
-
-        flipX = (leftU > rightU);
-        flipY = (topV > bottomV);
+        regionFlipX = leftU > rightU;
+        regionFlipY = topV > bottomV;
     }
 
     /**
-     * Rebuilds the local mesh (slice rectangles + packed local vertices) and the UV mapping for all slices.
-     *
      * <p>
-     * This method is called only when {@code dirtyMesh} is true. It computes:
+     * Rebuilds the local nine-patch mesh and local UV layout.
      * </p>
-     * <ul>
-     *     <li>Slice destination rectangles based on output size/scale and border pixel sizes.</li>
-     *     <li>Slice source rectangles in source pixel space.</li>
-     *     <li>Per-slice UVs mapped into the base region and adjusted for base flips.</li>
-     * </ul>
      *
      * <p>
-     * All writes go into preallocated arrays and the preallocated {@link FloatBuffer} for UVs.
-     * No objects are allocated.
+     * This method computes the final dimensions of each of the nine slices, determines
+     * their corresponding source rectangles inside the texture, writes all local-space
+     * vertex positions, and writes all local UV coordinates. After the UV data is
+     * generated, it is copied into the reusable UV buffer. The world buffer is then
+     * marked dirty because any local mesh rebuild invalidates previously transformed
+     * world-space vertices.
      * </p>
      */
     private void rebuildLocalMesh() {
-        final TextureData data = getData();
-        final int srcW = data.width();
-        final int srcH = data.height();
+        TextureData data = texture.getData();
+        int srcW = data.width();
+        int srcH = data.height();
 
         cacheBaseRegionAndFlip();
 
-        final float totalW = getWidth() * getScaleX();
-        final float totalH = getHeight() * getScaleY();
+        float totalW = bounds.getWidth() * scaleX;
+        float totalH = bounds.getHeight() * scaleY;
 
-        final float stretchW = Math.max(0f, totalW - left - right);
-        final float stretchH = Math.max(0f, totalH - top - bottom);
+        float stretchW = Math.max(0f, totalW - left - right);
+        float stretchH = Math.max(0f, totalH - top - bottom);
 
-        final float x0 = 0f;
-        final float x1 = left;
-        final float x2 = left + stretchW;
+        float x0 = 0f;
+        float x1 = left;
+        float x2 = left + stretchW;
 
-        final float y0 = 0f;
-        final float y1 = top;
-        final float y2 = top + stretchH;
+        float y0 = 0f;
+        float y1 = bottom;
+        float y2 = bottom + stretchH;
 
         sliceX[0] = x0;
         sliceY[0] = y0;
@@ -503,11 +772,11 @@ public class NinePatchTexture extends Texture {
         sliceY[8] = y2;
 
         sliceW[0] = left;
-        sliceH[0] = top;
+        sliceH[0] = bottom;
         sliceW[1] = stretchW;
-        sliceH[1] = top;
+        sliceH[1] = bottom;
         sliceW[2] = right;
-        sliceH[2] = top;
+        sliceH[2] = bottom;
 
         sliceW[3] = left;
         sliceH[3] = stretchH;
@@ -517,61 +786,62 @@ public class NinePatchTexture extends Texture {
         sliceH[5] = stretchH;
 
         sliceW[6] = left;
-        sliceH[6] = bottom;
+        sliceH[6] = top;
         sliceW[7] = stretchW;
-        sliceH[7] = bottom;
+        sliceH[7] = top;
         sliceW[8] = right;
-        sliceH[8] = bottom;
+        sliceH[8] = top;
 
-        setSrc(0, 0, 0, left, top);
-        setSrc(1, left, 0, srcW - right, top);
-        setSrc(2, srcW - right, 0, srcW, top);
+        setSrc(0, 0, 0, left, bottom);
+        setSrc(1, left, 0, srcW - right, bottom);
+        setSrc(2, srcW - right, 0, srcW, bottom);
 
-        setSrc(3, 0, top, left, srcH - bottom);
-        setSrc(4, left, top, srcW - right, srcH - bottom);
-        setSrc(5, srcW - right, top, srcW, srcH - bottom);
+        setSrc(3, 0, bottom, left, srcH - top);
+        setSrc(4, left, bottom, srcW - right, srcH - top);
+        setSrc(5, srcW - right, bottom, srcW, srcH - top);
 
-        setSrc(6, 0, srcH - bottom, left, srcH);
-        setSrc(7, left, srcH - bottom, srcW - right, srcH);
-        setSrc(8, srcW - right, srcH - bottom, srcW, srcH);
+        setSrc(6, 0, srcH - top, left, srcH);
+        setSrc(7, left, srcH - top, srcW - right, srcH);
+        setSrc(8, srcW - right, srcH - top, srcW, srcH);
 
         int vi = 0;
 
         for (int i = 0; i < QUADS; i++) {
-            final float px = sliceX[i];
-            final float py = sliceY[i];
-            final float w = sliceW[i];
-            final float h = sliceH[i];
+            float px = sliceX[i];
+            float py = sliceY[i];
+            float w = sliceW[i];
+            float h = sliceH[i];
 
-            final float xR = px + w;
-            final float yB = py + h;
+            float xR = px + w;
+            float yT = py + h;
 
             nineLocalVertices[vi] = px;
             nineLocalVertices[vi + 1] = py;
             nineLocalVertices[vi + 2] = xR;
             nineLocalVertices[vi + 3] = py;
             nineLocalVertices[vi + 4] = xR;
-            nineLocalVertices[vi + 5] = yB;
+            nineLocalVertices[vi + 5] = yT;
             nineLocalVertices[vi + 6] = px;
-            nineLocalVertices[vi + 7] = yB;
+            nineLocalVertices[vi + 7] = yT;
 
-            final int si = i * 4;
-            final float u0 = src[si] / (float) srcW;
-            final float v0 = src[si + 1] / (float) srcH;
-            final float u1 = src[si + 2] / (float) srcW;
-            final float v1 = src[si + 3] / (float) srcH;
+            int si = i * 4;
+            float u0 = src[si] / (float) srcW;
+            float v0 = src[si + 1] / (float) srcH;
+            float u1 = src[si + 2] / (float) srcW;
+            float v1 = src[si + 3] / (float) srcH;
 
             float ru0 = baseU0 + (baseU1 - baseU0) * u0;
             float ru1 = baseU0 + (baseU1 - baseU0) * u1;
             float rv0 = baseV0 + (baseV1 - baseV0) * v0;
             float rv1 = baseV0 + (baseV1 - baseV0) * v1;
 
-            if (flipX) {
+            if (regionFlipX ^ flippedX) {
                 float t = ru0;
                 ru0 = ru1;
                 ru1 = t;
             }
-            if (flipY) {
+
+            if (regionFlipY ^ flippedY) {
                 float t = rv0;
                 rv0 = rv1;
                 rv1 = t;
@@ -598,82 +868,80 @@ public class NinePatchTexture extends Texture {
     }
 
     /**
-     * Writes a source rectangle for a specific slice into the packed {@code src} array.
-     *
      * <p>
-     * Rectangles are stored as integer pixel coordinates in the full source texture space:
-     * {@code [left, top, right, bottom]}.
+     * Stores the source rectangle for a given patch slot.
      * </p>
      *
-     * @param quad slice index 0..8
-     * @param l    left pixel (inclusive)
-     * @param t    top pixel (inclusive)
-     * @param r    right pixel (exclusive)
-     * @param b    bottom pixel (exclusive)
+     * <p>
+     * The rectangle is stored as left, bottom, right, and top pixel coordinates inside
+     * the shared {@code src} array.
+     * </p>
+     *
+     * @param quad the patch index
+     * @param l    the source left coordinate
+     * @param b    the source bottom coordinate
+     * @param r    the source right coordinate
+     * @param t    the source top coordinate
      */
-    private void setSrc(int quad, int l, int t, int r, int b) {
-        final int i = quad * 4;
+    private void setSrc(int quad, int l, int b, int r, int t) {
+        int i = quad * 4;
         src[i] = l;
-        src[i + 1] = t;
+        src[i + 1] = b;
         src[i + 2] = r;
-        src[i + 3] = b;
+        src[i + 3] = t;
     }
 
     /**
-     * Updates cached {@code sin/cos} for the current rotation if the rotation value changed.
+     * <p>
+     * Updates cached sine and cosine values if the rotation changed.
+     * </p>
      *
      * <p>
-     * Trig calls are relatively expensive. This method ensures we only compute trig when rotation
-     * changes, not every frame.
+     * Rotation is converted to radians using a negated angle so the resulting transform
+     * matches the rendering convention used by the rest of the class.
      * </p>
      */
     private void cacheRotationTrigIfNeeded() {
-        final float rot = getRotation();
-        if (rot == cachedRotation) return;
+        if (rotation == cachedRotation) return;
 
-        cachedRotation = rot;
+        cachedRotation = rotation;
 
-        final float rad = (float) Math.toRadians(-rot);
+        float rad = (float) Math.toRadians(-rotation);
         sinRot = (float) Math.sin(rad);
         cosRot = (float) Math.cos(rad);
     }
 
     /**
-     * Rebuilds the world-space vertex buffer by transforming the packed local vertices.
-     *
      * <p>
-     * This applies:
+     * Rebuilds the world-space vertex buffer from the cached local mesh.
      * </p>
-     * <ul>
-     *     <li>Translation: {@code (getX(), getY())}</li>
-     *     <li>Pivot: {@code getRotationOrigin()}</li>
-     *     <li>Rotation: {@code getRotation()} using cached trig</li>
-     * </ul>
      *
      * <p>
-     * The world-space positions are written into {@link #nineVertexBuffer} using absolute puts so the
-     * buffer can be reused without changing capacity or allocating.
+     * Each local vertex is translated relative to the rotation origin, rotated using
+     * the cached sine and cosine values, and then translated into world space using
+     * the bounds position plus origin. The final positions are written into the
+     * reusable vertex buffer.
      * </p>
      */
     private void updateWorldBuffers() {
         cacheRotationTrigIfNeeded();
 
-        final float ox = getRotationOrigin().getX();
-        final float oy = getRotationOrigin().getY();
+        float ox = origin.getX();
+        float oy = origin.getY();
 
-        final float px = getX() + ox;
-        final float py = getY() + oy;
+        float px = bounds.getX() + ox;
+        float py = bounds.getY() + oy;
 
         nineVertexBuffer.position(0);
 
         for (int v = 0; v < VERTS; v++) {
-            final int idx = v * 2;
+            int idx = v * 2;
 
-            final float lx = nineLocalVertices[idx] - ox;
-            final float ly = nineLocalVertices[idx + 1] - oy;
+            float lx = nineLocalVertices[idx] - ox;
+            float ly = nineLocalVertices[idx + 1] - oy;
 
-            final float rx = lx * cosRot - ly * sinRot;
-            final float ry = lx * sinRot + ly * cosRot;
+            float rx = lx * cosRot - ly * sinRot;
+            float ry = lx * sinRot + ly * cosRot;
 
             nineVertexBuffer.put(idx, rx + px);
             nineVertexBuffer.put(idx + 1, ry + py);
@@ -684,165 +952,192 @@ public class NinePatchTexture extends Texture {
     }
 
     /**
-     * Draws the nine-patch using one OpenGL draw call.
-     *
      * <p>
-     * This method:
+     * Draws the nine-patch immediately using the current OpenGL client-state arrays.
      * </p>
-     * <ul>
-     *     <li>Rebuilds the local mesh/UVs if needed.</li>
-     *     <li>Rebuilds world-space vertex positions if needed.</li>
-     *     <li>Binds the underlying texture and issues {@code glDrawArrays(GL_QUADS, 0, 36)}.</li>
-     * </ul>
      *
      * <p>
-     * This matches {@link Texture}'s fixed-function usage ({@code glVertexPointer/glTexCoordPointer}).
-     * It assumes required client states are enabled by your renderer (as with your legacy pipeline).
+     * If the local mesh is dirty, it is rebuilt first. If the world-space buffer is
+     * dirty, it is updated next. The current tint color is applied through
+     * {@code glColor4f}, the backing texture is bound, the vertex and UV pointers are
+     * pointed at the cached buffers, and all nine quads are drawn in one
+     * {@code glDrawArrays(GL_QUADS, ...)} call.
      * </p>
      */
-    @Override
     public void draw() {
         if (dirtyMesh) rebuildLocalMesh();
         if (dirtyWorld) updateWorldBuffers();
 
-        glColor4f(getColor().r(), getColor().g(), getColor().b(), getColor().a());
-        glBindTexture(GL_TEXTURE_2D, getTextureID());
-
+        glColor4f(color.r(), color.g(), color.b(), color.a());
+        glBindTexture(GL_TEXTURE_2D, texture.getTextureID());
         glVertexPointer(2, GL_FLOAT, 0, nineVertexBuffer);
         glTexCoordPointer(2, GL_FLOAT, 0, nineUvBuffer);
-
         glDrawArrays(GL_QUADS, 0, VERTS);
     }
 
     /**
-     * Returns the configured left border size in source pixels.
-     *
      * <p>
-     * The left border is preserved (not stretched) and determines the width of the left column slices.
+     * Returns the left border size in pixels.
      * </p>
      *
-     * @return left border width in pixels
+     * @return the left border size
      */
     public int getLeft() {
         return left;
     }
 
     /**
-     * Sets the left border size in source pixels and marks the mesh dirty if it changes.
-     *
      * <p>
-     * Changing border sizes affects slice layout and UV rectangles, so the local mesh and world buffer
-     * must be rebuilt.
+     * Sets the left border size and marks the mesh dirty if the value changes.
      * </p>
      *
-     * @param left new left border width in pixels
+     * @param left the new left border size
      */
     public void setLeft(int left) {
         if (this.left == left) return;
+
         this.left = left;
         markDirtyAll();
     }
 
     /**
-     * Returns the configured right border size in source pixels.
-     *
      * <p>
-     * The right border is preserved (not stretched) and determines the width of the right column slices.
+     * Returns the right border size in pixels.
      * </p>
      *
-     * @return right border width in pixels
+     * @return the right border size
      */
     public int getRight() {
         return right;
     }
 
     /**
-     * Sets the right border size in source pixels and marks the mesh dirty if it changes.
-     *
      * <p>
-     * Changing border sizes affects slice layout and UV rectangles, so the local mesh and world buffer
-     * must be rebuilt.
+     * Sets the right border size and marks the mesh dirty if the value changes.
      * </p>
      *
-     * @param right new right border width in pixels
+     * @param right the new right border size
      */
     public void setRight(int right) {
         if (this.right == right) return;
+
         this.right = right;
         markDirtyAll();
     }
 
     /**
-     * Returns the configured top border size in source pixels.
-     *
      * <p>
-     * The top border is preserved (not stretched) and determines the height of the top row slices.
+     * Returns the top border size in pixels.
      * </p>
      *
-     * @return top border height in pixels
+     * @return the top border size
      */
     public int getTop() {
         return top;
     }
 
     /**
-     * Sets the top border size in source pixels and marks the mesh dirty if it changes.
-     *
      * <p>
-     * Changing border sizes affects slice layout and UV rectangles, so the local mesh and world buffer
-     * must be rebuilt.
+     * Sets the top border size and marks the mesh dirty if the value changes.
      * </p>
      *
-     * @param top new top border height in pixels
+     * @param top the new top border size
      */
     public void setTop(int top) {
         if (this.top == top) return;
+
         this.top = top;
         markDirtyAll();
     }
 
     /**
-     * Returns the configured bottom border size in source pixels.
-     *
      * <p>
-     * The bottom border is preserved (not stretched) and determines the height of the bottom row slices.
+     * Returns the bottom border size in pixels.
      * </p>
      *
-     * @return bottom border height in pixels
+     * @return the bottom border size
      */
     public int getBottom() {
         return bottom;
     }
 
     /**
-     * Sets the bottom border size in source pixels and marks the mesh dirty if it changes.
-     *
      * <p>
-     * Changing border sizes affects slice layout and UV rectangles, so the local mesh and world buffer
-     * must be rebuilt.
+     * Sets the bottom border size and marks the mesh dirty if the value changes.
      * </p>
      *
-     * @param bottom new bottom border height in pixels
+     * @param bottom the new bottom border size
      */
     public void setBottom(int bottom) {
         if (this.bottom == bottom) return;
+
         this.bottom = bottom;
         markDirtyAll();
     }
 
     /**
-     * Disposes the GPU texture and releases native buffer references owned by this instance.
+     * <p>
+     * Resets this nine-patch to its default pooled state.
+     * </p>
      *
      * <p>
-     * This calls {@link Texture#dispose()} first. The nine-patch buffers are direct buffers created once
-     * and held for the lifetime of the object. Setting them to null releases Java references so the JVM
-     * can reclaim them when appropriate.
+     * The position is restored to zero, the bounds size is restored to the backing
+     * texture size, the region is reset to cover the full texture, the origin is reset
+     * to zero, scale is reset to one, rotation is reset to zero, flipping is disabled,
+     * and the cached rotation state is invalidated. The tint is set to
+     * {@link Color#WHITE}. After reset, all cached geometry is marked dirty.
      * </p>
      */
     @Override
+    public void reset() {
+        bounds.setX(0f);
+        bounds.setY(0f);
+        bounds.setWidth(texture.getWidth());
+        bounds.setHeight(texture.getHeight());
+        region.setRegion(0f, 0f, texture.getWidth(), texture.getHeight());
+        origin.set(0f, 0f);
+        scaleX = 1f;
+        scaleY = 1f;
+        rotation = 0f;
+        flippedX = false;
+        flippedY = false;
+        color = Color.WHITE;
+        cachedRotation = Float.NaN;
+        markDirtyAll();
+    }
+
+    /**
+     * <p>
+     * Disposes resources and clears references owned by this nine-patch.
+     * </p>
+     *
+     * <p>
+     * The backing texture is disposed, the region is cleared, the CPU-side buffers are
+     * nulled, and mutable object references such as origin and color are cleared.
+     * After this method is called, the instance should no longer be used.
+     * </p>
+     */
     public void dispose() {
-        super.dispose();
+        texture.dispose();
+        region.setRegion(0f, 0f, 0f, 0f);
         nineVertexBuffer = null;
         nineUvBuffer = null;
+        origin = null;
+        color = null;
+    }
+
+    /**
+     * <p>
+     * Sets the filtering mode of the backing texture.
+     * </p>
+     *
+     * <p>
+     * This delegates directly to the wrapped texture.
+     * </p>
+     *
+     * @param textureFilter the texture filter to apply
+     */
+    public void setFilter(TextureFilter textureFilter) {
+        texture.setFilter(textureFilter);
     }
 }
