@@ -1,5 +1,6 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.Sprite;
 import valthorne.graphics.texture.Texture;
 import valthorne.math.MathUtils;
 
@@ -114,75 +115,35 @@ public class ReflectionShader extends Shader {
         super(VERT_SRC, FRAG_SRC);
     }
 
-    /**
-     * Draws a reflection of {@code texture} directly below it using this shader.
-     *
-     * <p>How this method works:</p>
-     * <ul>
-     *     <li>Reads the texture's current (x,y,width,height).</li>
-     *     <li>Computes the reflection height: {@code reflectionHeight = height * clamp01(amount)}.</li>
-     *     <li>Temporarily moves the texture to {@code (x, y - reflectionHeight)} and sets its size to {@code (width, reflectionHeight)}.</li>
-     *     <li>Binds the shader and uploads all uniforms, including {@code u_texelSize} derived from the backing texture data size.</li>
-     *     <li>Calls {@link Texture#draw()} to render the reflection quad.</li>
-     *     <li>Unbinds the shader and restores the texture's original position/size.</li>
-     * </ul>
-     *
-     * <p>Uniform meanings:</p>
-     * <ul>
-     *     <li>{@code u_alpha}: overall reflection alpha multiplier (0..1 recommended).</li>
-     *     <li>{@code u_tint}: RGB tint (alpha component is ignored in shader; it uses 1.0).</li>
-     *     <li>{@code u_time}: time in seconds used to animate ripples.</li>
-     *     <li>{@code u_rippleAmpPx}: ripple amplitude in pixels (converted to UV by multiplying with {@code u_texelSize}).</li>
-     *     <li>{@code u_rippleFreq}: ripple frequency across X (higher = more waves).</li>
-     *     <li>{@code u_rippleSpeed}: ripple animation speed multiplier.</li>
-     * </ul>
-     *
-     * <p>Early-outs:</p>
-     * <ul>
-     *     <li>If {@code amount <= 0} (after clamping), nothing is drawn and the method returns.</li>
-     * </ul>
-     *
-     * @param texture     the sprite texture to reflect (must be non-null)
-     * @param timeSeconds time in seconds (usually accumulated time) used for animation
-     * @param amount      reflection height as a fraction of the sprite height (clamped to 0..1)
-     * @param alpha       overall reflection alpha multiplier (recommended 0..1)
-     * @param tintR       tint red channel (0..1 recommended)
-     * @param tintG       tint green channel (0..1 recommended)
-     * @param tintB       tint blue channel (0..1 recommended)
-     * @param rippleAmpPx ripple amplitude in pixels (0 disables ripple)
-     * @param rippleFreq  ripple frequency across X (e.g., 12..30 typical)
-     * @param rippleSpeed ripple speed multiplier (e.g., 1..5 typical)
-     * @throws NullPointerException if {@code texture} is null
-     */
-    public void apply(Texture texture, float timeSeconds, float amount, float alpha, float tintR, float tintG, float tintB, float rippleAmpPx, float rippleFreq, float rippleSpeed) {
-        if (texture == null) throw new NullPointerException("Texture cannot be null");
+    public void apply(Sprite sprite, float timeSeconds, float amount, float alpha, float tintR, float tintG, float tintB, float rippleAmpPx, float rippleFreq, float rippleSpeed) {
+        if (sprite == null) throw new NullPointerException("Sprite cannot be null");
 
-        float ox = texture.getX();
-        float oy = texture.getY();
-        float ow = texture.getWidth();
-        float oh = texture.getHeight();
+        float ox = sprite.getX();
+        float oy = sprite.getY();
+        float ow = sprite.getWidth();
+        float oh = sprite.getHeight();
         float a01 = MathUtils.clamp(amount, 0, 1);
 
         if (a01 <= 0f) return;
 
         float rh = oh * a01;
 
-        texture.setPosition(ox, oy - rh);
-        texture.setSize(ow, rh);
+        sprite.setPosition(ox, oy - rh);
+        sprite.setSize(ow, rh);
 
         bind();
         setUniform1i("u_texture", 0);
-        setUniform2f("u_texelSize", 1f / texture.getData().width(), 1f / texture.getData().height());
+        setUniform2f("u_texelSize", 1f / sprite.getTexture().getData().width(), 1f / sprite.getTexture().getData().height());
         setUniform1f("u_alpha", alpha);
         setUniform4f("u_tint", tintR, tintG, tintB, 1.0f);
         setUniform1f("u_time", timeSeconds);
         setUniform1f("u_rippleAmpPx", rippleAmpPx);
         setUniform1f("u_rippleFreq", rippleFreq);
         setUniform1f("u_rippleSpeed", rippleSpeed);
-        texture.draw();
+        sprite.draw();
         unbind();
 
-        texture.setPosition(ox, oy);
-        texture.setSize(ow, oh);
+        sprite.setPosition(ox, oy);
+        sprite.setSize(ow, oh);
     }
 }

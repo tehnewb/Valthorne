@@ -1,5 +1,6 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.Sprite;
 import valthorne.graphics.texture.Texture;
 
 /**
@@ -141,20 +142,9 @@ public class GlowShader extends Shader {
         super(VERT_SRC, FRAG_SRC);
     }
 
-    /**
-     * Binds this shader and sets uniforms required to render a soft glow.
-     *
-     * @param texture   the texture being drawn (used for width/height -> texel size)
-     * @param radiusPx  glow radius in source texture pixels (>= 0)
-     * @param intensity glow strength multiplier (>= 0 recommended)
-     * @param r         glow red
-     * @param g         glow green
-     * @param b         glow blue
-     * @param a         glow alpha (final alpha is {@code a * computedGlow})
-     */
-    public void apply(Texture texture, float radiusPx, float intensity, float r, float g, float b, float a) {
-        bind(texture.getWidth(), texture.getHeight(), radiusPx, intensity, r, g, b, a);
-        texture.draw();
+    public void apply(Sprite sprite, float radiusPx, float intensity, float r, float g, float b, float a) {
+        bind(sprite.getTexture().getData().width(), sprite.getTexture().getData().height(), radiusPx, intensity, r, g, b, a);
+        sprite.draw();
         unbind();
     }
 

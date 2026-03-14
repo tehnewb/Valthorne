@@ -147,7 +147,7 @@ public class TexturePacker {
     public void addRegion(TextureRegion region, int dx, int dy) {
         Objects.requireNonNull(region, "region");
 
-        TextureData data = region.getData();
+        TextureData data = region.getTexture().getData();
 
         int sx = (int) region.getRegionX();
         int sy = (int) region.getRegionY();

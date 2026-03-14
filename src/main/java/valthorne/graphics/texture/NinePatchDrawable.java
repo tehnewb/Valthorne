@@ -1,89 +1,145 @@
 package valthorne.graphics.texture;
 
-import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 
 /**
- * A drawable implementation that supports rendering a nine-patch texture.
- * This class is useful for drawing resizable images with stretchable areas, often used
- * in UI components.
  * <p>
- * The {@code NinePatchDrawable} wraps a {@code NinePatchTexture} to handle the
- * rendering details of the nine-patch image.
- * <p>
- * The nine-patch technique allows specific portions of an image
- * to stretch or repeat, enabling dynamic resizing while maintaining
- * visual integrity of non-stretchable regions.
- * <p>
- * The dimensions and position for drawing the nine-patch texture can
- * be adjusted dynamically via the {@code draw(TextureBatch, float x, float y, float width, float height)}
- * method, in accordance with the {@code Drawable} interface.
+ * {@code NinePatchDrawable} is a small {@link Drawable} adapter that wraps a
+ * {@link NinePatchTexture} so it can be used anywhere a generic drawable object
+ * is expected.
+ * </p>
  *
  * @author Albert Beaupre
  * @since December 22nd, 2025
  */
 public record NinePatchDrawable(NinePatchTexture texture) implements Drawable {
 
-    @Override
-    public void draw(TextureBatch batch, float x, float y, float width, float height) {
-        if (batch == null) throw new NullPointerException("batch");
-
-        TextureData data = texture.getData();
-        if (data == null) return;
-
-        float texW = data.width();
-        float texH = data.height();
-
-        if (texW <= 0f || texH <= 0f) return;
-
-        float left = texture.getLeft();
-        float right = texture.getRight();
-        float top = texture.getTop();
-        float bottom = texture.getBottom();
-
-        float centerW = Math.max(0f, width - left - right);
-        float centerH = Math.max(0f, height - top - bottom);
-
-        float x1 = x + left;
-        float x2 = x + left + centerW;
-        float y1 = y + bottom;
-        float y2 = y + bottom + centerH;
-        float srcX2 = texW - right;
-        float srcY2 = texH - top;
-
-        Color tint = texture.getColor();
-
-        batch.drawRegion(texture, x, y, left, bottom, 0, 0, left, bottom, tint);
-        batch.drawRegion(texture, x1, y, centerW, bottom, left, 0, srcX2 - left, bottom, tint);
-        batch.drawRegion(texture, x2, y, right, bottom, srcX2, 0, right, bottom, tint);
-
-        batch.drawRegion(texture, x, y1, left, centerH, 0, bottom, left, srcY2 - bottom, tint);
-        batch.drawRegion(texture, x1, y1, centerW, centerH, left, bottom, srcX2 - left, srcY2 - bottom, tint);
-        batch.drawRegion(texture, x2, y1, right, centerH, srcX2, bottom, right, srcY2 - bottom, tint);
-
-        batch.drawRegion(texture, x, y2, left, top, 0, srcY2, left, top, tint);
-        batch.drawRegion(texture, x1, y2, centerW, top, left, srcY2, srcX2 - left, top, tint);
-        batch.drawRegion(texture, x2, y2, right, top, srcX2, srcY2, right, top, tint);
+    /**
+     * <p>
+     * Creates a new {@code NinePatchDrawable} by loading a {@link NinePatchTexture}
+     * from a path string.
+     * </p>
+     *
+     * <p>
+     * The supplied border sizes are forwarded into the wrapped
+     * {@link NinePatchTexture} constructor. Note that the constructor parameter order
+     * accepted here is {@code left, top, right, bottom}, while the wrapped texture
+     * constructor is called using {@code left, right, top, bottom}.
+     * </p>
+     *
+     * @param string the texture path
+     * @param left   the left border size
+     * @param top    the top border size
+     * @param right  the right border size
+     * @param bottom the bottom border size
+     */
+    public NinePatchDrawable(String string, int left, int top, int right, int bottom) {
+        this(new NinePatchTexture(string, left, right, top, bottom));
     }
 
+    /**
+     * <p>
+     * Creates a new {@code NinePatchDrawable} from existing {@link TextureData}.
+     * </p>
+     *
+     * <p>
+     * The supplied border sizes are forwarded into the wrapped
+     * {@link NinePatchTexture} constructor. Note that the constructor parameter order
+     * accepted here is {@code left, top, right, bottom}, while the wrapped texture
+     * constructor is called using {@code left, right, top, bottom}.
+     * </p>
+     *
+     * @param data   the source texture data
+     * @param left   the left border size
+     * @param top    the top border size
+     * @param right  the right border size
+     * @param bottom the bottom border size
+     */
+    public NinePatchDrawable(TextureData data, int left, int top, int right, int bottom) {
+        this(new NinePatchTexture(data, left, right, top, bottom));
+    }
+
+    /**
+     * <p>
+     * Creates a new {@code NinePatchDrawable} from an existing {@link Texture}.
+     * </p>
+     *
+     * <p>
+     * The supplied border sizes are forwarded into the wrapped
+     * {@link NinePatchTexture} constructor. Note that the constructor parameter order
+     * accepted here is {@code left, top, right, bottom}, while the wrapped texture
+     * constructor is called using {@code left, right, top, bottom}.
+     * </p>
+     *
+     * @param texture the source texture
+     * @param left    the left border size
+     * @param top     the top border size
+     * @param right   the right border size
+     * @param bottom  the bottom border size
+     */
+    public NinePatchDrawable(Texture texture, int left, int top, int right, int bottom) {
+        this(new NinePatchTexture(texture, left, right, top, bottom));
+    }
+
+    /**
+     * <p>
+     * Draws the wrapped {@link NinePatchTexture} through the provided
+     * {@link TextureBatch} using the supplied destination rectangle.
+     * </p>
+     *
+     * <p>
+     * This delegates directly to {@link TextureBatch#draw(NinePatchTexture, float, float, float, float)}.
+     * </p>
+     *
+     * @param batch  the batch used for drawing
+     * @param x      the destination X position
+     * @param y      the destination Y position
+     * @param width  the destination width
+     * @param height the destination height
+     */
+    @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height) {
+        batch.draw(texture, x, y, width, height);
+    }
+
+    /**
+     * <p>
+     * Returns the current width of the wrapped {@link NinePatchTexture}.
+     * </p>
+     *
+     * @return the wrapped texture width
+     */
     @Override
     public float getWidth() {
         return texture.getWidth();
     }
 
+    /**
+     * <p>
+     * Returns the current height of the wrapped {@link NinePatchTexture}.
+     * </p>
+     *
+     * @return the wrapped texture height
+     */
     @Override
     public float getHeight() {
         return texture.getHeight();
     }
 
     /**
-     * Retrieves the nine-patch texture associated with this drawable.
+     * <p>
+     * Returns the wrapped {@link NinePatchTexture}.
+     * </p>
      *
-     * @return the {@code NinePatchTexture} used by this {@code NinePatchDrawable}.
+     * <p>
+     * This method overrides the record-generated accessor explicitly so it can remain
+     * part of the {@link Drawable} contract with clear documentation.
+     * </p>
+     *
+     * @return the wrapped nine-patch texture
      */
     @Override
     public NinePatchTexture texture() {
         return texture;
     }
-
 }

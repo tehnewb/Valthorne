@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.tehnewb"
-version = "1.2.3"
+version = "1.3.0"
 description = "A 2D game development library"
 
 repositories {
@@ -20,6 +20,7 @@ def lwjglModules = [
         "lwjgl-opengl",
         "lwjgl-stb",
         "lwjgl-openal",
+        "lwjgl-yoga"
 ]
 
 // “All natives” set (common targets).

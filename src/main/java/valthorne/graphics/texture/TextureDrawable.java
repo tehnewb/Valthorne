@@ -14,12 +14,12 @@ import valthorne.graphics.Drawable;
  */
 public record TextureDrawable(Texture texture) implements Drawable {
 
-    /**
-     * Constructs a new {@code TextureDrawable} with the specified texture.
-     *
-     * @param texture the texture to be rendered by this drawable
-     */
-    public TextureDrawable {
+    public TextureDrawable(String path) {
+        this(new Texture(path));
+    }
+
+    public TextureDrawable(TextureData data) {
+        this(new Texture(data));
     }
 
     @Override

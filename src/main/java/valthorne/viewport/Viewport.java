@@ -1,6 +1,6 @@
 package valthorne.viewport;
 
-import valthorne.camera.Camera2D;
+import valthorne.camera.Camera;
 import valthorne.graphics.DrawFunction;
 import valthorne.math.Matrix4f;
 import valthorne.math.Vector2f;
@@ -48,7 +48,7 @@ import static org.lwjgl.opengl.GL11.*;
  *
  * <h2>Camera behavior</h2>
  * <p>
- * When a {@link Camera2D} is assigned, this viewport delegates projection generation to that
+ * When a {@link Camera} is assigned, this viewport delegates projection generation to that
  * camera each time {@link #apply()} is called. If no camera is assigned, the viewport uses its
  * own fallback {@link #projectionMatrix}, which subclasses usually update inside
  * {@link #update(int, int)}.
@@ -121,7 +121,7 @@ public abstract class Viewport {
     protected int height; // Height of this viewport in actual screen pixels.
     protected float worldWidth; // Logical world width visible through this viewport.
     protected float worldHeight; // Logical world height visible through this viewport.
-    protected Camera2D camera; // Optional camera used to build the active projection transform.
+    protected Camera camera; // Optional camera used to build the active projection transform.
     private boolean scissorWasEnabled; // True when a scissor test was already active before beginScissor was called.
     private final Vector2f screenToWorldCoordinates = new Vector2f(); // Reused return vector for screen-to-world conversion.
 
@@ -574,7 +574,7 @@ public abstract class Viewport {
      *
      * @return the current camera, or {@code null} if none is assigned
      */
-    public Camera2D getCamera() {
+    public Camera getCamera() {
         return camera;
     }
 
@@ -589,7 +589,7 @@ public abstract class Viewport {
      *
      * @param camera the camera to assign, or {@code null} to disable camera-based projection
      */
-    public void setCamera(Camera2D camera) {
+    public void setCamera(Camera camera) {
         this.camera = camera;
     }
 }

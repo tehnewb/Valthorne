@@ -1,9 +1,6 @@
 package valthorne;
 
-import org.lwjgl.glfw.GLFWCursorPosCallback;
-import org.lwjgl.glfw.GLFWImage;
-import org.lwjgl.glfw.GLFWMouseButtonCallback;
-import org.lwjgl.glfw.GLFWScrollCallback;
+import org.lwjgl.glfw.*;
 import valthorne.event.events.*;
 import valthorne.event.listeners.MouseListener;
 import valthorne.event.listeners.MouseScrollListener;
@@ -13,24 +10,92 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFWImage.malloc;
 
 /**
- * The {@code Mouse} class provides static utilities for handling mouse input within
- * a GLFW-based application. It tracks cursor movement, button interactions, scroll
- * wheel input, and modifier states (Shift, Ctrl, Alt, Super).
+ * <p>
+ * The {@code Mouse} class is Valthorne's global static mouse input manager for GLFW-based
+ * applications. It centralizes cursor position tracking, mouse button state, scroll wheel
+ * input, cursor mode changes, cursor shape changes, custom cursor creation, and event
+ * publishing through the engine event system.
+ * </p>
  *
- * <p>This class contains only static behavior and cannot be instantiated, serving
- * as a global mouse manager used throughout the JGL framework.</p>
+ * <p>
+ * This class is intentionally non-instantiable and operates entirely through static state.
+ * It is designed to be initialized once for the active window and then queried or listened
+ * to from anywhere in the engine or game code. Internally, it installs GLFW callbacks for:
+ * </p>
  *
- * <p>Primary responsibilities include:</p>
  * <ul>
- *     <li>Tracking the current mouse cursor position.</li>
- *     <li>Tracking which mouse buttons are currently held down.</li>
- *     <li>Receiving scroll wheel input on both X and Y axes.</li>
- *     <li>Publishing corresponding mouse events through the JGL event system.</li>
- *     <li>Updating modifier key states during mouse interactions.</li>
+ *     <li>cursor movement</li>
+ *     <li>mouse button press and release actions</li>
+ *     <li>scroll wheel movement</li>
  * </ul>
  *
- * <p>To use this system, call {@link #init()} during window initialization and
- * {@link #dispose()} during shutdown.</p>
+ * <p>
+ * These callbacks update the cached mouse state and publish reusable event objects such as:
+ * </p>
+ *
+ * <ul>
+ *     <li>{@link MouseMoveEvent}</li>
+ *     <li>{@link MouseDragEvent}</li>
+ *     <li>{@link MousePressEvent}</li>
+ *     <li>{@link MouseReleaseEvent}</li>
+ *     <li>{@link MouseScrollEvent}</li>
+ * </ul>
+ *
+ * <p>
+ * The class also exposes helper methods for:
+ * </p>
+ *
+ * <ul>
+ *     <li>checking whether a mouse button is currently down</li>
+ *     <li>reading the current cursor position</li>
+ *     <li>reading current scroll deltas</li>
+ *     <li>switching between GLFW cursor modes</li>
+ *     <li>setting a standard system cursor</li>
+ *     <li>creating a custom cursor from {@link TextureData}</li>
+ *     <li>registering and unregistering listeners</li>
+ * </ul>
+ *
+ * <p>
+ * One important detail of this class is that it stores the raw GLFW Y coordinate internally
+ * and converts it to Valthorne's bottom-left style coordinate system when reporting public
+ * mouse positions and events. This keeps mouse behavior aligned with the rest of the engine's
+ * rendering conventions.
+ * </p>
+ *
+ * <h2>Example Usage</h2>
+ *
+ * <pre>{@code
+ * Mouse.init();
+ *
+ * Mouse.addMouseListener(event -> {
+ *     if (event instanceof MousePressEvent press && press.getButton() == Mouse.LEFT) {
+ *         System.out.println("Left click at: " + press.getX() + ", " + press.getY());
+ *     }
+ * });
+ *
+ * Mouse.addScrollListener(event -> {
+ *     System.out.println("Scroll: " + event.getXOffset() + ", " + event.getYOffset());
+ * });
+ *
+ * Mouse.setCursor(Mouse.CURSOR_HAND);
+ * Mouse.setCursorMode(Mouse.CURSOR_NORMAL);
+ *
+ * if (Mouse.isButtonDown(Mouse.LEFT)) {
+ *     System.out.println("Holding left mouse button");
+ * }
+ *
+ * short mouseX = Mouse.getX();
+ * short mouseY = Mouse.getY();
+ *
+ * Mouse.resetScroll();
+ * Mouse.dispose();
+ * }</pre>
+ *
+ * <p>
+ * This example demonstrates the full intended use of the class: initialization,
+ * listener registration, cursor changes, polling button state and position, clearing
+ * scroll state, and shutdown cleanup.
+ * </p>
  *
  * @author Albert Beaupre
  * @since October 17th, 2025
@@ -123,70 +188,63 @@ public final class Mouse {
      */
     public static final int CURSOR_VRESIZE = GLFW_VRESIZE_CURSOR;
 
-    /**
-     * Pre-allocated mouse event instances for reuse.
-     */
-    private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0);
-    private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0);
-    private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0);
-    private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0);
-    private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0);
-    /**
-     * GLFW callback for handling mouse movement. This callback updates cursor
-     * coordinates and publishes a {@link MouseMoveEvent} whenever the user moves
-     * the mouse cursor.
-     */
-    private static GLFWCursorPosCallback cursorPosCallback;
-    /**
-     * GLFW callback for handling mouse button interactions. This callback receives
-     * button press and release actions and publishes {@link MousePressEvent} or
-     * {@link MouseReleaseEvent} as appropriate.
-     */
-    private static GLFWMouseButtonCallback mouseButtonCallback;
-    /**
-     * GLFW callback for handling scroll wheel input. Publishes {@link MouseScrollEvent}
-     * whenever vertical or horizontal scrolling occurs.
-     */
-    private static GLFWScrollCallback scrollCallback;
-    /**
-     * The current X position of the mouse cursor relative to the window.
-     */
-    private static short x;
-    /**
-     * The current Y position of the mouse cursor relative to the window.
-     */
-    private static short y;
-    /**
-     * Bitmask of mouse button states, where each bit corresponds to a mouse button.
-     */
-    private static byte buttonState;
-    /**
-     * Bitmask representing the current state of modifier keys (Shift, Control, Alt, Super).
-     */
-    private static byte modifierState;
-    /**
-     * Represents the horizontal scroll offset of the mouse wheel.
-     */
-    private static byte scrollX;
-    private static byte scrollY;
+    private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0); // Reusable mouse press event instance
+    private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0); // Reusable mouse release event instance
+    private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0); // Reusable mouse move event instance
+    private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0); // Reusable mouse drag event instance
+    private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0); // Reusable mouse scroll event instance
+    private static GLFWCursorPosCallback cursorPosCallback; // GLFW callback used to track cursor movement
+    private static GLFWMouseButtonCallback mouseButtonCallback; // GLFW callback used to track mouse button actions
+    private static GLFWScrollCallback scrollCallback; // GLFW callback used to track scroll wheel movement
+    private static short x; // Current raw GLFW cursor X position
+    private static short y; // Current raw GLFW cursor Y position
+    private static byte buttonState; // Bitmask representing currently pressed mouse buttons
+    private static byte modifierState; // Bitmask representing the current modifier key state
+    private static byte scrollX; // Latest horizontal scroll delta
+    private static byte scrollY; // Latest vertical scroll delta
+
+    private static long currentCursor = 0; // Native GLFW cursor handle currently assigned to the window
 
     /**
-     * Tracks the current cursor type being used in the system.
-     */
-    private static long currentCursor = 0;
-
-    /**
-     * Private constructor prevents instantiation. This class is purely static.
+     * <p>
+     * Private constructor to prevent instantiation.
+     * </p>
+     *
+     * <p>
+     * This class is designed to be accessed entirely through static methods and fields.
+     * </p>
      */
     private Mouse() {
         // Inaccessible
     }
 
     /**
-     * Initializes all GLFW mouse callbacks for movement, button input, and scroll wheel
-     * actions. These callbacks publish the appropriate JGL mouse events as input is detected.
+     * <p>
+     * Initializes GLFW mouse callbacks for cursor movement, mouse button input, and
+     * scroll wheel input.
+     * </p>
      *
-     * <p>This method should be called once during window or engine initialization.</p>
+     * <p>
+     * Once initialized, this method installs three callbacks on the active window:
+     * </p>
+     *
+     * <ul>
+     *     <li>a cursor position callback that publishes {@link MouseMoveEvent} or
+     *     {@link MouseDragEvent}</li>
+     *     <li>a mouse button callback that publishes {@link MousePressEvent} and
+     *     {@link MouseReleaseEvent}</li>
+     *     <li>a scroll callback that publishes {@link MouseScrollEvent}</li>
+     * </ul>
+     *
+     * <p>
+     * Cursor movement is tracked in GLFW window coordinates internally, but published
+     * event Y values are converted into Valthorne's coordinate system by subtracting
+     * the raw GLFW Y coordinate from {@link Window#getHeight()}.
+     * </p>
+     *
+     * <p>
+     * This method is intended to be called once during engine or window initialization.
+     * </p>
      */
     static void init() {
         cursorPosCallback = glfwSetCursorPosCallback(Window.getAddress(), (win, xpos, ypos) -> {
@@ -249,33 +307,51 @@ public final class Mouse {
     }
 
     /**
-     * Sets the mouse cursor to a standard system cursor.
+     * <p>
+     * Sets the mouse cursor to one of GLFW's standard system cursor shapes.
+     * </p>
      *
-     * @param shape One of the CURSOR_* constants
+     * <p>
+     * If a custom or previously created cursor is already active, it is destroyed
+     * before the new cursor is created and assigned. If the window address is invalid,
+     * the method returns immediately without doing anything.
+     * </p>
+     *
+     * @param shape one of the supported {@code CURSOR_*} shape constants
      */
     public static void setCursor(int shape) {
         long win = Window.getAddress();
         if (win == 0) return;
 
-        if (currentCursor != 0)
-            glfwDestroyCursor(currentCursor);
+        if (currentCursor != 0) glfwDestroyCursor(currentCursor);
 
         currentCursor = glfwCreateStandardCursor(shape);
         glfwSetCursor(win, currentCursor);
     }
 
     /**
-     * Sets a custom cursor for the current window using the provided texture data and hotspot.
+     * <p>
+     * Creates and assigns a custom cursor from the provided {@link TextureData}.
+     * </p>
      *
-     * @param data The texture data used to create the custom cursor. Must not be {@code null},
-     *             and its buffer must not be {@code null}.
-     * @param hotX The x-coordinate of the cursor's hotspot in pixels, relative to the top-left of the image.
-     *             The value will be clamped to the image's bounds.
-     * @param hotY The y-coordinate of the cursor's hotspot in pixels, relative to the top-left of the image.
-     *             The value will be clamped to the image's bounds.
-     * @throws NullPointerException  If the provided {@code data} is null.
-     * @throws IllegalStateException If {@code data.buffer()} is null.
-     * @throws RuntimeException      If cursor creation fails due to a problem with the provided texture data.
+     * <p>
+     * The supplied image data is wrapped in a temporary {@link GLFWImage}, then used
+     * to create a GLFW cursor. The hotspot coordinates are clamped to the image bounds.
+     * The Y hotspot is converted to match this engine's coordinate convention before
+     * the cursor is created.
+     * </p>
+     *
+     * <p>
+     * Any previously active cursor created by this class is destroyed before the new
+     * one is assigned.
+     * </p>
+     *
+     * @param data the texture data used as the cursor image
+     * @param hotX the hotspot X coordinate relative to the image
+     * @param hotY the hotspot Y coordinate relative to the image
+     * @throws NullPointerException  if {@code data} is {@code null}
+     * @throws IllegalStateException if {@code data.buffer()} is {@code null}
+     * @throws RuntimeException      if GLFW fails to create the cursor from the provided image
      */
     public static void setCursor(TextureData data, int hotX, int hotY) {
         long win = Window.getAddress();
@@ -293,7 +369,7 @@ public final class Mouse {
         img.height(data.height());
         img.pixels(data.buffer());
 
-        hotY = data.height() - hotY - 1; // I'm making the y coordinate how my system is
+        hotY = data.height() - hotY - 1;
 
         if (hotX < 0) hotX = 0;
         if (hotY < 0) hotY = 0;
@@ -303,23 +379,33 @@ public final class Mouse {
         currentCursor = glfwCreateCursor(img, hotX, hotY);
         img.free();
 
-        if (currentCursor == 0)
-            throw new RuntimeException("Failed to create GLFW cursor from TextureData");
+        if (currentCursor == 0) throw new RuntimeException("Failed to create GLFW cursor from TextureData");
 
         glfwSetCursor(win, currentCursor);
     }
 
     /**
-     * Sets the cursor mode for the current window.
+     * <p>
+     * Sets the current GLFW cursor mode for the active window.
+     * </p>
      *
-     * <p>Valid values are:</p>
+     * <p>
+     * Supported values are:
+     * </p>
+     *
      * <ul>
      *     <li>{@link #CURSOR_NORMAL}</li>
      *     <li>{@link #CURSOR_HIDDEN}</li>
      *     <li>{@link #CURSOR_DISABLED}</li>
      * </ul>
      *
+     * <p>
+     * If the window address is invalid, the method returns immediately. Any unsupported
+     * value causes an {@link IllegalArgumentException}.
+     * </p>
+     *
      * @param mode the GLFW cursor mode constant
+     * @throws IllegalArgumentException if the provided mode is not a valid GLFW cursor mode
      */
     public static void setCursorMode(int mode) {
         long win = Window.getAddress();
@@ -332,14 +418,18 @@ public final class Mouse {
     }
 
     /**
-     * Sets the cursor position in window coordinates.
+     * <p>
+     * Sets the cursor position in GLFW window coordinates.
+     * </p>
      *
-     * <p>This sets GLFW's internal cursor position, which will trigger the cursor
-     * position callback (if installed). Coordinates are in GLFW window space
-     * (origin at top-left).</p>
+     * <p>
+     * This delegates directly to {@link GLFW#glfwSetCursorPos(long, double, double)}.
+     * The coordinates use GLFW's window-space convention, where the origin is at the
+     * top-left. Calling this may trigger the installed cursor position callback.
+     * </p>
      *
-     * @param x the X position in window coordinates
-     * @param y the Y position in window coordinates
+     * @param x the X position in GLFW window coordinates
+     * @param y the Y position in GLFW window coordinates
      */
     public static void setCursorPosition(double x, double y) {
         long win = Window.getAddress();
@@ -348,13 +438,18 @@ public final class Mouse {
     }
 
     /**
-     * Adds a {@code MouseListener} to the system to handle mouse-related events.
-     * The listener will be subscribed to receive notifications for various mouse events,
-     * including movement, button presses/releases, and dragging.
+     * <p>
+     * Registers a {@link MouseListener} to receive mouse event notifications.
+     * </p>
      *
-     * @param listener the {@code MouseListener} to be added
-     *                 (must not be {@code null})
-     * @throws NullPointerException if the provided listener is {@code null}
+     * <p>
+     * The listener is subscribed to {@link MouseEvent} and will therefore receive
+     * applicable mouse press, release, move, and drag events published through the
+     * engine event system.
+     * </p>
+     *
+     * @param listener the listener to register
+     * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void addMouseListener(MouseListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseListener cannot be added");
@@ -362,13 +457,16 @@ public final class Mouse {
     }
 
     /**
-     * Removes a {@code MouseListener} from the system to stop handling mouse-related events.
-     * The listener will no longer receive notifications for various mouse events, including
-     * movement, button presses/releases, and dragging.
+     * <p>
+     * Unregisters a previously added {@link MouseListener}.
+     * </p>
      *
-     * @param listener the {@code MouseListener} to be removed.
-     *                 Must not be {@code null}.
-     * @throws NullPointerException if the provided listener is {@code null}.
+     * <p>
+     * After removal, the listener will no longer receive published mouse events.
+     * </p>
+     *
+     * @param listener the listener to remove
+     * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void removeMouseListener(MouseListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseListener cannot be removed");
@@ -376,12 +474,16 @@ public final class Mouse {
     }
 
     /**
-     * Adds a {@code MouseScrollListener} to the system to handle mouse scroll events.
-     * The listener will be subscribed to receive notifications for scroll actions
-     * detected by the mouse.
+     * <p>
+     * Registers a {@link MouseScrollListener} to receive scroll wheel events.
+     * </p>
      *
-     * @param listener the {@code MouseScrollListener} to be added (must not be {@code null})
-     * @throws NullPointerException if the provided listener is {@code null}
+     * <p>
+     * The listener is subscribed to {@link MouseScrollEvent} notifications.
+     * </p>
+     *
+     * @param listener the scroll listener to register
+     * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void addScrollListener(MouseScrollListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be added");
@@ -389,12 +491,12 @@ public final class Mouse {
     }
 
     /**
-     * Removes a {@code MouseScrollListener} from the system to stop handling mouse scroll events.
-     * The listener will no longer receive notifications for scroll actions detected by the mouse.
+     * <p>
+     * Unregisters a previously added {@link MouseScrollListener}.
+     * </p>
      *
-     * @param listener the {@code MouseScrollListener} to be removed
-     *                 (must not be {@code null})
-     * @throws NullPointerException if the provided listener is {@code null}
+     * @param listener the scroll listener to remove
+     * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void removeScrollListener(MouseScrollListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be removed");
@@ -402,8 +504,15 @@ public final class Mouse {
     }
 
     /**
-     * Frees all GLFW mouse-related callbacks. This should be called upon closing
-     * the window or shutting down the engine to avoid native memory leaks.
+     * <p>
+     * Frees all GLFW mouse callbacks and destroys any custom or standard cursor created
+     * through this class.
+     * </p>
+     *
+     * <p>
+     * This method should be called during engine or window shutdown to avoid leaking
+     * native callback or cursor resources.
+     * </p>
      */
     static void dispose() {
         if (cursorPosCallback != null) cursorPosCallback.free();
@@ -416,49 +525,68 @@ public final class Mouse {
     }
 
     /**
-     * Returns the current x-coordinate of the mouse cursor.
+     * <p>
+     * Returns the current raw X cursor position.
+     * </p>
      *
-     * @return the cursor's x position
+     * <p>
+     * This value is stored directly from GLFW cursor callbacks.
+     * </p>
+     *
+     * @return the current cursor X position
      */
     public static short getX() {
         return x;
     }
 
     /**
-     * Returns the current y-coordinate of the mouse cursor.
+     * <p>
+     * Returns the current cursor Y position converted into Valthorne's coordinate system.
+     * </p>
      *
-     * @return the cursor's y position
+     * <p>
+     * Internally, GLFW reports Y using a top-left origin. This method converts it to a
+     * bottom-left origin by subtracting the internal raw Y value from the current window
+     * height.
+     * </p>
+     *
+     * @return the converted cursor Y position
      */
     public static short getY() {
         return (short) (Window.getHeight() - y);
     }
 
     /**
-     * Retrieves the current horizontal scroll value captured by the mouse's scroll wheel.
-     * The value is typically used to represent horizontal scrolling activity detected
-     * by the mouse.
+     * <p>
+     * Returns the most recent horizontal scroll delta.
+     * </p>
      *
-     * @return the horizontal scroll value as a byte
+     * @return the horizontal scroll amount
      */
     public static byte getScrollX() {
         return scrollX;
     }
 
     /**
-     * Retrieves the current vertical scroll value captured by the mouse's scroll wheel.
-     * The value is typically used to represent vertical scrolling activity detected
-     * by the mouse.
+     * <p>
+     * Returns the most recent vertical scroll delta.
+     * </p>
      *
-     * @return the vertical scroll value as a byte
+     * @return the vertical scroll amount
      */
     public static byte getScrollY() {
         return scrollY;
     }
 
     /**
-     * Resets the mouse scroll values to their default states. This method sets
-     * both the horizontal and vertical scroll values to zero. It is typically
-     * used to clear any accumulated scroll buffer to prepare for new scroll input.
+     * <p>
+     * Resets the cached scroll deltas back to zero.
+     * </p>
+     *
+     * <p>
+     * This is useful when scroll input is being consumed per frame and should not
+     * accumulate beyond the current processing step.
+     * </p>
      */
     static void resetScroll() {
         scrollX = 0;
@@ -466,46 +594,69 @@ public final class Mouse {
     }
 
     /**
-     * Determines whether a specific mouse button is currently pressed.
+     * <p>
+     * Returns whether the specified mouse button is currently held down.
+     * </p>
      *
-     * @param button the button index (e.g., {@link #LEFT}, {@link #RIGHT})
-     * @return {@code true} if the button is currently held down
+     * <p>
+     * Button state is tracked using a bitmask where each bit corresponds to a button
+     * index. The method checks whether the requested bit is currently set.
+     * </p>
+     *
+     * @param button the mouse button index
+     * @return {@code true} if the specified button is currently down
      */
     public static boolean isButtonDown(int button) {
         return (buttonState & (1 << button)) != 0;
     }
 
     /**
-     * Returns whether the Shift modifier key is active during mouse interaction.
+     * <p>
+     * Returns whether the Shift modifier key is currently active during mouse interaction.
+     * </p>
      *
-     * @return {@code true} if Shift is pressed
+     * <p>
+     * This method checks the cached modifier bitmask updated by GLFW mouse callbacks.
+     * </p>
+     *
+     * @return {@code true} if Shift is active
      */
     public boolean isShiftDown() {
         return (modifierState & GLFW_MOD_SHIFT) != 0;
     }
 
     /**
-     * Returns whether the Control modifier key is active during mouse interaction.
+     * <p>
+     * Returns whether the Control modifier key is currently active during mouse interaction.
+     * </p>
      *
-     * @return {@code true} if Control is pressed
+     * @return {@code true} if Control is active
      */
     public boolean isCtrlDown() {
         return (modifierState & GLFW_MOD_CONTROL) != 0;
     }
 
     /**
-     * Returns whether the Alt modifier key is active during mouse interaction.
+     * <p>
+     * Returns whether the Alt modifier key is currently active during mouse interaction.
+     * </p>
      *
-     * @return {@code true} if Alt is pressed
+     * @return {@code true} if Alt is active
      */
     public boolean isAltDown() {
         return (modifierState & GLFW_MOD_ALT) != 0;
     }
 
     /**
-     * Returns whether the Super modifier key (Windows key / Command key) is active.
+     * <p>
+     * Returns whether the Super modifier key is currently active during mouse interaction.
+     * </p>
      *
-     * @return {@code true} if Super is pressed
+     * <p>
+     * On most systems, this corresponds to the Windows key or Command key.
+     * </p>
+     *
+     * @return {@code true} if Super is active
      */
     public boolean isSuperDown() {
         return (modifierState & GLFW_MOD_SUPER) != 0;

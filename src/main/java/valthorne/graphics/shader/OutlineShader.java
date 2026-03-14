@@ -1,5 +1,6 @@
 package valthorne.graphics.shader;
 
+import valthorne.graphics.Sprite;
 import valthorne.graphics.texture.Texture;
 
 /**
@@ -103,19 +104,9 @@ public class OutlineShader extends Shader {
         super(VERT_SRC, FRAG_SRC);
     }
 
-    /**
-     * Applies a source-pixel outline.
-     *
-     * @param texture     the texture being drawn (used to get width/height)
-     * @param thicknessPx outline thickness in SOURCE texture pixels (1 = 1 texel)
-     * @param r           outline red
-     * @param g           outline green
-     * @param b           outline blue
-     * @param a           outline alpha
-     */
-    public void apply(Texture texture, float thicknessPx, float r, float g, float b, float a) {
-        bind(texture.getData().width(), texture.getData().height(), thicknessPx, r, g, b, a);
-        texture.draw();
+    public void apply(Sprite sprite, float thicknessPx, float r, float g, float b, float a) {
+        bind(sprite.getTexture().getData().width(), sprite.getTexture().getData().height(), thicknessPx, r, g, b, a);
+        sprite.draw();
         unbind();
     }
 
