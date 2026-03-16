@@ -635,7 +635,10 @@ public class UIRoot extends UIContainer {
 
         if (node instanceof UIContainer container) {
             for (int i = 0; i < container.size(); i++) {
-                traverseNextFocusable(container.get(i), from);
+                UINode child = container.get(i);
+                if (child.isDisabled())
+                    continue;
+                traverseNextFocusable(child, from);
                 if (found != null) return;
             }
         }
@@ -832,6 +835,9 @@ public class UIRoot extends UIContainer {
             if (target.isFocusable()) setFocusTo(target);
             else setFocusTo(null);
 
+            if (target.isDisabled())
+                return;
+
             pressed = target;
             pressed.setPressed(true);
             pressed.onMousePress(event);
@@ -907,6 +913,9 @@ public class UIRoot extends UIContainer {
             hovered = null;
             return;
         }
+
+        if (target.isDisabled())
+            return;
 
         hovered = target;
         hovered.setHovered(true);

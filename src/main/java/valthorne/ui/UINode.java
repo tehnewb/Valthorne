@@ -413,6 +413,29 @@ public abstract class UINode {
     }
 
     /**
+     * Disables the functionality associated with this method.
+     * This method sets a specific bit to false to indicate
+     * the disabled state and triggers a style update.
+     */
+    public void disabled() {
+        bits.set(ENABLED_BIT, false);
+        invalidateStyle();
+    }
+
+    /**
+     * Enables the component by setting the appropriate bit flag to true
+     * and invalidating the style for a visual update.
+     * <p>
+     * The method modifies an internal bit field to reflect the enabled
+     * status of the component and ensures the style is refreshed to stay
+     * in sync with the state change.
+     */
+    public void enable() {
+        bits.set(ENABLED_BIT, true);
+        invalidateStyle();
+    }
+
+    /**
      * Returns whether this node is enabled.
      *
      * @return true if the node is enabled
