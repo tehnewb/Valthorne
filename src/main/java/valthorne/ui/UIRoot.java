@@ -136,7 +136,7 @@ import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
  */
 public class UIRoot extends UIContainer {
 
-    private final long nanoVGHandle;
+    private long nanoVGHandle;
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
@@ -169,7 +169,7 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public UIRoot() {
-        this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+        this.nanoVGHandle = nvgCreate(0);
         if (nanoVGHandle != 0){
             String fontPath;
 
@@ -1199,5 +1199,14 @@ public class UIRoot extends UIContainer {
      */
     public long getNanoVGHandle() {
         return nanoVGHandle;
+    }
+
+    /**
+     * Sets the NanoVG handle.
+     *
+     * @param nanoVGHandle the handle to be assigned, represented as a long value.
+     */
+    public void setNanoVGHandle(long nanoVGHandle) {
+        this.nanoVGHandle = nanoVGHandle;
     }
 }
