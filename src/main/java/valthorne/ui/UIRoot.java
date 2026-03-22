@@ -13,7 +13,14 @@ import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.Vector2f;
 import valthorne.ui.nodes.Panel;
 import valthorne.ui.nodes.Tooltip;
+import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.viewport.Viewport;
+
+import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
+import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
+import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
+import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
+import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
 
 /**
  * <p>
@@ -128,6 +135,7 @@ import valthorne.viewport.Viewport;
  */
 public class UIRoot extends UIContainer {
 
+    private final long nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
@@ -404,42 +412,79 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public void draw() {
-        if (viewport != null) {
+        if (viewport != null)
             viewport.bind();
-            batch.begin();
-            draw(batch);
-            batch.end();
-            viewport.unbind();
-        } else {
-            batch.begin();
-            draw(batch);
-            batch.end();
+
+        batch.begin();
+        draw(batch);
+        batch.end();
+
+        if (nanoVGHandle != 0L) {
+            beginNanoFrame(nanoVGHandle);
+
+            for (int i = 0; i < size(); i++) {
+                UINode child = get(i);
+                if (child == null)
+                    continue;
+                if (!child.isVisible())
+                    continue;
+                if (child == overlayLayer)
+                    continue;
+                if (child instanceof NanoNode nano)
+                    nano.draw(nanoVGHandle);
+            }
+
+            endNanoFrame(nanoVGHandle);
         }
+
+        batch.begin();
+        if (overlayLayer.isVisible())
+            overlayLayer.draw(batch);
+        batch.end();
+
+        if (viewport != null)
+            viewport.unbind();
     }
 
-    /**
-     * <p>
-     * Draws all visible child nodes using the provided batch.
-     * </p>
-     *
-     * <p>
-     * Normal children are drawn first, excluding the overlay layer. The overlay layer
-     * is then drawn last so it always appears above standard UI content.
-     * </p>
-     *
-     * @param batch the batch used for rendering
-     */
     @Override
     public void draw(TextureBatch batch) {
         for (int i = 0; i < size(); i++) {
             UINode child = get(i);
 
-            if (child == overlayLayer) continue;
+            if (child == null)
+                continue;
+            if (!child.isVisible())
+                continue;
+            if (child == overlayLayer)
+                continue;
 
-            if (child.isVisible()) child.draw(batch);
+            child.draw(batch);
         }
+    }
 
-        if (overlayLayer.isVisible()) overlayLayer.draw(batch);
+    private void drawNanoTree(UINode node, long vg) {
+        if (node == null)
+            return;
+        if (!node.isVisible())
+            return;
+
+        if (node instanceof NanoNode nano)
+            nano.draw(vg);
+
+        if (node instanceof UIContainer container) {
+            for (int i = 0; i < container.size(); i++)
+                drawNanoTree(container.get(i), vg);
+        }
+    }
+
+    private void beginNanoFrame(long vg) {
+        float width = viewport != null ? viewport.getWorldWidth() : getWidth();
+        float height = viewport != null ? viewport.getWorldHeight() : getHeight();
+        nvgBeginFrame(vg, width, height, 1f);
+    }
+
+    private void endNanoFrame(long vg) {
+        nvgEndFrame(vg);
     }
 
     /**
@@ -1129,5 +1174,14 @@ public class UIRoot extends UIContainer {
         public void windowResized(WindowResizeEvent event) {
             handleWindowResized(event);
         }
+    }
+
+    /**
+     * Retrieves the handle for the NanoVG context.
+     *
+     * @return the handle corresponding to the NanoVG context as a long.
+     */
+    public long getNanoVGHandle() {
+        return nanoVGHandle;
     }
 }

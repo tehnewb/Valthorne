@@ -6,4 +6,12 @@ public class MouseDragEvent extends MouseMoveEvent {
         super(button, modifiers, fromX, fromY, toX, toY);
     }
 
+    public int getDeltaX() {
+        return this.getToX() - this.getX();
+    }
+
+    public int getDeltaY() {
+        return this.getToY() - this.getY();
+    }
+
 }

@@ -258,7 +258,7 @@ public final class Mouse {
             if (buttonState > 0) {
                 event = dragEvent;
                 event.setX(fromX);
-                event.setY(fromY);
+                event.setY((short) (Window.getHeight() - fromY));
                 event.setToX(x);
                 event.setToY((short) (Window.getHeight() - y));
             } else {

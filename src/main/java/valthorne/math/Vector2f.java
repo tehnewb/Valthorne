@@ -143,6 +143,41 @@ public class Vector2f {
     }
 
     /**
+     * Subtracts the specified values from this vector's coordinates.
+     *
+     * @param x The value to subtract from the x-coordinate.
+     * @param y The value to subtract from the y-coordinate.
+     * @return This vector for chaining.
+     */
+    public Vector2f sub(float x, float y) {
+        this.x -= x;
+        this.y -= y;
+        return this;
+    }
+
+    /**
+     * Subtracts the specified value from the y-coordinate of this vector.
+     *
+     * @param y The value to subtract from the y-coordinate.
+     * @return This vector for chaining.
+     */
+    public Vector2f subY(float y) {
+        this.y -= y;
+        return this;
+    }
+
+    /**
+     * Subtracts the specified value from the x-coordinate of this vector.
+     *
+     * @param x The value to subtract from the x-coordinate.
+     * @return This vector for chaining.
+     */
+    public Vector2f subX(float x) {
+        this.x -= x;
+        return this;
+    }
+
+    /**
      * Subtracts another vector from this vector.
      *
      * @param v The vector to subtract

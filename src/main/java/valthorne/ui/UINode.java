@@ -5,9 +5,11 @@ import valthorne.Window;
 import valthorne.collections.bits.ShortBits;
 import valthorne.event.events.*;
 import valthorne.graphics.texture.TextureBatch;
+import valthorne.math.Vector2f;
 import valthorne.math.geometry.Rectangle;
 import valthorne.ui.nodes.Tooltip;
 import valthorne.ui.theme.*;
+import valthorne.viewport.Viewport;
 
 /**
  * <h1>UINode</h1>
@@ -172,6 +174,8 @@ public abstract class UINode {
      * Bit index used to mark whether the node is currently being dragged.
      */
     public static final int DRAGGING_BIT = 11;
+
+    private static final Vector2f ZERO_VECTOR = new Vector2f();
 
     private final Layout layout = new Layout(); // Layout configuration owned by this node.
     private final ShortBits bits = new ShortBits(); // Compact bitset holding node interaction and state flags.
@@ -1205,6 +1209,23 @@ public abstract class UINode {
         }
 
         return Window.getHeight();
+    }
+
+    /**
+     * Converts screen coordinates to world coordinates based on the current viewport.
+     *
+     * @param x The x-coordinate in screen space.
+     * @param y The y-coordinate in screen space.
+     * @return A Vector2f representing the coordinates in world space. If no viewport is available,
+     * returns a vector with the input screen coordinates adjusted.
+     */
+    public Vector2f screenToWorld(float x, float y) {
+        Viewport viewport = this.root.getViewport();
+        if (viewport != null) {
+            Vector2f translation = viewport.screenToWorld(x, y);
+            return ZERO_VECTOR.set(translation.getX(), getRenderSpaceHeight() - translation.getY());
+        }
+        return ZERO_VECTOR.set(x, y);
     }
 
     /**
