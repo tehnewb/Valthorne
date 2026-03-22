@@ -1,6 +1,7 @@
 package valthorne.ui.nodes;
 
 import valthorne.event.events.MousePressEvent;
+import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NodeAction;
@@ -222,6 +223,10 @@ public class Button extends Panel {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
+    }
+
+    @Override
+    public void onMouseRelease(MouseReleaseEvent event) {
         if (action != null)
             action.perform(this);
     }

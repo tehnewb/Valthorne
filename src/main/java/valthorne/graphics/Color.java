@@ -1,5 +1,7 @@
 package valthorne.graphics;
 
+import org.lwjgl.nanovg.NVGColor;
+
 /**
  * Represents a color in RGBA format. Colors are immutable and stored internally as 32-bit integers
  * in the format 0xAARRGGBB where AA=alpha, RR=red, GG=green, BB=blue.
@@ -799,5 +801,31 @@ public class Color {
      */
     public float b() {
         return getBlue() * INVERSE_DIVISION;
+    }
+
+    /**
+     * Converts the current color to a NanoVG color representation.
+     *
+     * @param color the NVGColor instance to populate with color values
+     * @return the updated NVGColor instance with the current color values
+     */
+    public NVGColor toNanoVGColor(NVGColor color) {
+        color.r(r());
+        color.g(g());
+        color.b(b());
+        color.a(a());
+        return color;
+    }
+
+    /**
+     * Converts the current color instance to an NVGColor object with corresponding
+     * red, green, blue, and alpha channel values.
+     *
+     * @return A new NVGColor instance with the color's RGBA channels mapped
+     *         from this object's properties.
+     */
+    public NVGColor toNanoVGColor() {
+        NVGColor color = NVGColor.create();
+        return toNanoVGColor(color);
     }
 }

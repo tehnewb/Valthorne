@@ -857,25 +857,8 @@ public class Slider extends Panel {
         if (!dragging)
             return;
 
-        float diffX;
-        float diffY;
-
-        Viewport viewport = getViewport();
-        if (viewport != null) {
-            Vector2f world = viewport.screenToWorld(event.getToX(), event.getToY());
-            if (world == null)
-                return;
-
-            diffX = world.getX() - mouseStartX;
-            diffY = world.getY() - mouseStartY;
-            mouseStartX = world.getX();
-            mouseStartY = world.getY();
-        } else {
-            diffX = event.getToX() - mouseStartX;
-            diffY = event.getToY() - mouseStartY;
-            mouseStartX = event.getToX();
-            mouseStartY = event.getToY();
-        }
+        float diffX = event.getDeltaX();
+        float diffY = event.getDeltaY();
 
         float previous = value;
 

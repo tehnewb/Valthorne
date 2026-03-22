@@ -212,7 +212,12 @@ public abstract class UIContainer extends UINode {
     public void draw(TextureBatch batch) {
         for (int i = 0; i < size; i++) {
             UINode child = children[i];
-            if (child.isVisible()) child.draw(batch);
+            if (child == null)
+                continue;
+            if (!child.isVisible())
+                continue;
+
+            child.draw(batch);
         }
     }
 

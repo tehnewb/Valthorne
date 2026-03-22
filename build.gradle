@@ -20,7 +20,8 @@ def lwjglModules = [
         "lwjgl-opengl",
         "lwjgl-stb",
         "lwjgl-openal",
-        "lwjgl-yoga"
+        "lwjgl-yoga",
+        "lwjgl-nanovg"
 ]
 
 // “All natives” set (common targets).
