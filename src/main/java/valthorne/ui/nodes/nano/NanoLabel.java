@@ -70,7 +70,7 @@ public class NanoLabel extends UINode implements NanoNode {
 
     @Override
     public void onCreate() {
-        ensureFontLoaded();
+
     }
 
     @Override
@@ -107,7 +107,6 @@ public class NanoLabel extends UINode implements NanoNode {
         float measuredHeight;
 
         if (vg != 0L) {
-            ensureFontLoaded();
             measuredWidth = NanoUtility.measureTextWidth(vg, fontName, fontSize, text);
             measuredHeight = NanoUtility.measureTextHeight(vg, fontName, fontSize);
         } else {
@@ -126,30 +125,10 @@ public class NanoLabel extends UINode implements NanoNode {
     public void draw(long vg) {
         if (!isVisible() || vg == 0L) return;
 
-        ensureFontLoaded();
-
         nvgFontSize(vg, fontSize);
         nvgFontFace(vg, fontName);
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
         nvgFillColor(vg, NanoUtility.color1(color));
         nvgText(vg, getAbsoluteX(), getAbsoluteY(), text);
-    }
-
-    private void ensureFontLoaded() {
-        UIRoot root = getRoot();
-        if (root == null) return;
-
-        long vg = root.getNanoVGHandle();
-        if (vg == 0L) return;
-
-        if (fontLoaded && nvgFindFont(vg, fontName) != -1) return;
-
-        if (nvgFindFont(vg, fontName) != -1) {
-            fontLoaded = true;
-            return;
-        }
-
-        int handle = nvgCreateFont(vg, fontName, "./assets/ui/font.otf");
-        if (handle != -1) fontLoaded = true;
     }
 }
