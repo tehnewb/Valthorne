@@ -26,12 +26,12 @@ A lightweight 2D Java game engine built on LWJGL and inspired by libGDX
 
 ### Gradle (Groovy)
 ```groovy
-implementation 'io.github.tehnewb:Valthorne:1.3.0'
+implementation 'io.github.tehnewb:Valthorne:1.3.1'
 ```
 
 ### Gradle (Kotlin DSL)
 ```kotlin
-implementation("io.github.tehnewb:Valthorne:1.3.0")
+implementation("io.github.tehnewb:Valthorne:1.3.1")
 ```
 
 ### Maven
@@ -39,6 +39,6 @@ implementation("io.github.tehnewb:Valthorne:1.3.0")
 <dependency>
     <groupId>io.github.tehnewb</groupId>
     <artifactId>Valthorne</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
 </dependency>
 ```
