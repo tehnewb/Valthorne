@@ -7,7 +7,7 @@ A lightweight 2D Java game engine built on LWJGL and inspired by libGDX
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.0-blue">
+  <img src="https://img.shields.io/badge/version-1.3.1-blue">
   &nbsp;&nbsp;&nbsp;
   <img src="https://img.shields.io/github/stars/tehnewb/Valthorne">
   &nbsp;&nbsp;&nbsp;
