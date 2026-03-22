@@ -17,6 +17,7 @@ import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.viewport.Viewport;
 
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
+import static org.lwjgl.nanovg.NanoVG.nvgCreateFont;
 import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
@@ -135,7 +136,7 @@ import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
  */
 public class UIRoot extends UIContainer {
 
-    private final long nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+    private final long nanoVGHandle;
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
@@ -168,7 +169,17 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public UIRoot() {
-        yogaConfig = Yoga.YGConfigNew();
+        this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+        if (nanoVGHandle != 0) {
+            nvgCreateFont(nanoVGHandle, "default", switch (System.getProperty("os.name").toLowerCase()) {
+                case "win" -> "C:/Windows/Fonts/segoeui.ttf";
+                case "mac" -> "/System/Library/Fonts/SFNS.ttf";
+                default -> "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+            });
+        }
+
+        this.yogaConfig = Yoga.YGConfigNew();
+
         Yoga.YGConfigSetUseWebDefaults(yogaConfig, true);
         attachToRoot(yogaConfig);
         setRoot(this);

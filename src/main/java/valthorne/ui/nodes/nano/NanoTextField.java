@@ -21,7 +21,7 @@ import java.awt.datatransfer.StringSelection;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 
-public class NanoTextField  extends UINode implements NanoNode {
+public class NanoTextField extends UINode implements NanoNode {
 
     public static final StyleKey<Color> BACKGROUND_COLOR_KEY = StyleKey.of("nano.textfield.backgroundColor", Color.class, new Color(0xFF2A2A2A));
     public static final StyleKey<Color> HOVER_BACKGROUND_COLOR_KEY = StyleKey.of("nano.textfield.hoverBackgroundColor", Color.class, new Color(0xFF323232));
@@ -495,7 +495,6 @@ public class NanoTextField  extends UINode implements NanoNode {
         if (!isVisible() || vg == 0L)
             return;
 
-        ensureFontLoaded();
 
         String visibleText = getDisplayText();
         boolean empty = visibleText.isEmpty();
