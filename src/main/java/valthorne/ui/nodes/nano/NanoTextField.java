@@ -477,7 +477,7 @@ public class NanoTextField extends UINode implements NanoNode {
             String measured = getDisplayText();
             String fallback = placeholder == null ? "" : placeholder;
             float measuredWidth = Math.max(measureTextWidth(measured), measureTextWidth(fallback)) + padding * 2f;
-            float measuredHeight = NanoUtility.measureTextHeight(getNanoHandle(), fontName, fontSize) + padding * 2f;
+            float measuredHeight = NanoUtility.measureTextHeight(this.getRoot().getNanoVGHandle(), fontName, fontSize) + padding * 2f;
 
             if (getLayout().getWidth().isAuto())
                 getLayout().width(measuredWidth);
@@ -595,38 +595,11 @@ public class NanoTextField extends UINode implements NanoNode {
 
     @Override
     public void onCreate() {
-        ensureFontLoaded();
+
     }
 
     @Override
     public void onDestroy() {
-    }
-
-    private void ensureFontLoaded() {
-        UIRoot root = getRoot();
-        if (root == null)
-            return;
-
-        long vg = root.getNanoVGHandle();
-        if (vg == 0L)
-            return;
-
-        if (fontLoaded && nvgFindFont(vg, fontName) != -1)
-            return;
-
-        if (nvgFindFont(vg, fontName) != -1) {
-            fontLoaded = true;
-            return;
-        }
-
-        int handle = nvgCreateFont(vg, fontName, "./assets/ui/font.otf");
-        if (handle != -1)
-            fontLoaded = true;
-    }
-
-    private long getNanoHandle() {
-        UIRoot root = getRoot();
-        return root == null ? 0L : root.getNanoVGHandle();
     }
 
     private float getEventX(MousePressEvent event) {
@@ -847,12 +820,12 @@ public class NanoTextField extends UINode implements NanoNode {
     }
 
     private float measureTextWidth(String value) {
-        long vg = getNanoHandle();
+        long vg = this.getRoot().getNanoVGHandle();
         return NanoUtility.measureTextWidth(vg, fontName, fontSize, value);
     }
 
     private float measureTextWidth(String value, int start, int end) {
-        long vg = getNanoHandle();
+        long vg = this.getRoot().getNanoVGHandle();
         return NanoUtility.measureTextWidth(vg, fontName, fontSize, value, start, end);
     }
 

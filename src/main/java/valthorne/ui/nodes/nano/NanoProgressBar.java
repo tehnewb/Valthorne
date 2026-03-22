@@ -136,7 +136,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
 
     @Override
     public void onCreate() {
-        ensureFontLoaded();
+
     }
 
     @Override
@@ -198,8 +198,6 @@ public class NanoProgressBar extends UINode implements NanoNode {
         if (!isVisible() || vg == 0L)
             return;
 
-        ensureFontLoaded();
-
         float x = getAbsoluteX();
         float y = getAbsoluteY();
         float width = getWidth();
@@ -252,28 +250,6 @@ public class NanoProgressBar extends UINode implements NanoNode {
             nvgFillColor(vg, NanoUtility.color1(textColor));
             nvgText(vg, textX, textY, text);
         }
-    }
-
-    private void ensureFontLoaded() {
-        UIRoot root = getRoot();
-        if (root == null)
-            return;
-
-        long vg = root.getNanoVGHandle();
-        if (vg == 0L)
-            return;
-
-        if (fontLoaded && nvgFindFont(vg, fontName) != -1)
-            return;
-
-        if (nvgFindFont(vg, fontName) != -1) {
-            fontLoaded = true;
-            return;
-        }
-
-        int handle = nvgCreateFont(vg, fontName, "./assets/ui/font.otf");
-        if (handle != -1)
-            fontLoaded = true;
     }
 
     private float getPercentage() {

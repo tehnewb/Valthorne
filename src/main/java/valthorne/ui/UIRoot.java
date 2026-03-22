@@ -170,12 +170,17 @@ public class UIRoot extends UIContainer {
      */
     public UIRoot() {
         this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
-        if (nanoVGHandle != 0) {
-            nvgCreateFont(nanoVGHandle, "default", switch (System.getProperty("os.name").toLowerCase()) {
-                case "win" -> "C:/Windows/Fonts/segoeui.ttf";
-                case "mac" -> "/System/Library/Fonts/SFNS.ttf";
-                default -> "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-            });
+        if (nanoVGHandle != 0){
+            String fontPath;
+
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                fontPath = "C:/Windows/Fonts/segoeui.ttf";
+            } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+                fontPath = "/System/Library/Fonts/SFNS.ttf";
+            } else {
+                fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+            }
+            nvgCreateFont(nanoVGHandle, "default", fontPath);
         }
 
         this.yogaConfig = Yoga.YGConfigNew();
