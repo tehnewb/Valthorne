@@ -222,7 +222,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
                 float filledWidth = width * percentage;
                 nvgBeginPath(vg);
                 nvgFillColor(vg, NanoUtility.color1(foregroundColor));
-                nvgRoundedRect(vg, x, y, filledWidth, height, cornerRadius);
+                nvgRoundedRect(vg, x + borderWidth, y + borderWidth, filledWidth - borderWidth * 2, height - borderWidth * 2, cornerRadius);
                 nvgFill(vg);
             }
         }
