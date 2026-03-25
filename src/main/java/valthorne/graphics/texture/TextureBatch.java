@@ -950,6 +950,133 @@ public final class TextureBatch {
     }
 
     /**
+     * Draws a nine-patch texture using the specified parameters.
+     *
+     * @param texture      the nine-patch texture to be drawn; cannot be null
+     * @param x            the X-coordinate of the bottom-left corner where the texture will be drawn
+     * @param y            the Y-coordinate of the bottom-left corner where the texture will be drawn
+     * @param width        the total width of the area to be drawn
+     * @param height       the total height of the area to be drawn
+     * @param regionX      the X-coordinate of the source region to be drawn (in region space)
+     * @param regionY      the Y-coordinate of the source region to be drawn (in region space)
+     * @param regionWidth  the width of the source region to be drawn (in region space)
+     * @param regionHeight the height of the source region to be drawn (in region space)
+     * @param originX      the X-coordinate of the origin within the texture space, used for rotations
+     * @param originY      the Y-coordinate of the origin within the texture space, used for rotations
+     * @param rotation     the rotation angle in degrees (counter-clockwise positive)
+     * @param tint         the color tint to be applied to the texture; may be null for default tint
+     */
+    public void draw(NinePatchTexture texture, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        Objects.requireNonNull(texture, "NinePatchTexture cannot be null");
+
+        TextureData data = texture.getData();
+        if (data == null) {
+            return;
+        }
+
+        float texW = data.width();
+        float texH = data.height();
+
+        if (texW <= 0f || texH <= 0f) {
+            return;
+        }
+
+        TextureRegion baseRegion = texture.getRegion();
+
+        float baseU0 = Math.min(baseRegion.getU(), baseRegion.getU2());
+        float baseU1 = Math.max(baseRegion.getU(), baseRegion.getU2());
+        float baseV0 = Math.min(baseRegion.getV(), baseRegion.getV2());
+        float baseV1 = Math.max(baseRegion.getV(), baseRegion.getV2());
+
+        boolean flipX = (baseRegion.getU() > baseRegion.getU2()) ^ texture.isFlippedX();
+        boolean flipY = (baseRegion.getV() > baseRegion.getV2()) ^ texture.isFlippedY();
+
+        float baseRegionWidth = texture.getRegionWidth();
+        float baseRegionHeight = texture.getRegionHeight();
+
+        if (baseRegionWidth <= 0f || baseRegionHeight <= 0f || regionWidth <= 0f || regionHeight <= 0f) return;
+
+        float srcMinX = Math.max(0f, regionX);
+        float srcMinY = Math.max(0f, regionY);
+        float srcMaxX = Math.min(baseRegionWidth, regionX + regionWidth);
+        float srcMaxY = Math.min(baseRegionHeight, regionY + regionHeight);
+
+        float clippedRegionWidth = srcMaxX - srcMinX;
+        float clippedRegionHeight = srcMaxY - srcMinY;
+
+        if (clippedRegionWidth <= 0f || clippedRegionHeight <= 0f) {
+            return;
+        }
+
+        float left = Math.min(texture.getLeft(), clippedRegionWidth);
+        float right = Math.min(texture.getRight(), Math.max(0f, clippedRegionWidth - left));
+        float bottom = Math.min(texture.getBottom(), clippedRegionHeight);
+        float top = Math.min(texture.getTop(), Math.max(0f, clippedRegionHeight - bottom));
+
+        float dstLeft = Math.min(left, width);
+        float dstRight = Math.min(right, Math.max(0f, width - dstLeft));
+        float dstBottom = Math.min(bottom, height);
+        float dstTop = Math.min(top, Math.max(0f, height - dstBottom));
+
+        float dstCenterW = Math.max(0f, width - dstLeft - dstRight);
+        float dstCenterH = Math.max(0f, height - dstBottom - dstTop);
+
+        float[] dstX = {0f, dstLeft, dstLeft + dstCenterW};
+        float[] dstY = {0f, dstBottom, dstBottom + dstCenterH};
+        float[] dstW = {dstLeft, dstCenterW, dstRight};
+        float[] dstH = {dstBottom, dstCenterH, dstTop};
+
+        float[] srcXs = {srcMinX, srcMinX + left, srcMaxX - right, srcMaxX};
+
+        float[] srcYs = {srcMinY, srcMinY + bottom, srcMaxY - top, srcMaxY};
+
+        float rad = (float) Math.toRadians(-rotation);
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        Color drawTint = tint != null ? tint : texture.getColor();
+        Texture base = texture.getTexture();
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                float patchW = dstW[col];
+                float patchH = dstH[row];
+
+                if (patchW <= 0f || patchH <= 0f) {
+                    continue;
+                }
+
+                float localX = dstX[col];
+                float localY = dstY[row];
+
+                float rx0 = srcXs[col] / baseRegionWidth;
+                float rx1 = srcXs[col + 1] / baseRegionWidth;
+                float ry0 = srcYs[row] / baseRegionHeight;
+                float ry1 = srcYs[row + 1] / baseRegionHeight;
+
+                float u0 = baseU0 + (baseU1 - baseU0) * rx0;
+                float u1 = baseU0 + (baseU1 - baseU0) * rx1;
+                float v0 = baseV0 + (baseV1 - baseV0) * ry0;
+                float v1 = baseV0 + (baseV1 - baseV0) * ry1;
+
+                if (flipX) {
+                    float t = u0;
+                    u0 = u1;
+                    u1 = t;
+                }
+
+                if (flipY) {
+                    float t = v0;
+                    v0 = v1;
+                    v1 = t;
+                }
+
+                drawUV(base, x + localX, y + localY, patchW, patchH, u0, v0, u1, v1, originX - localX, originY - localY, sin, cos, drawTint);
+            }
+        }
+    }
+
+    /**
      * <p>
      * Queues a full {@link Texture} for rendering with normalized UVs covering the
      * entire image and no additional tint override.
@@ -984,25 +1111,6 @@ public final class TextureBatch {
 
     /**
      * <p>
-     * Queues a {@link Texture} for rendering using explicit normalized UV bounds.
-     * </p>
-     *
-     * @param tex the texture to draw
-     * @param x   the destination X position
-     * @param y   the destination Y position
-     * @param w   the destination width
-     * @param h   the destination height
-     * @param u0  the starting U coordinate
-     * @param v0  the starting V coordinate
-     * @param u1  the ending U coordinate
-     * @param v1  the ending V coordinate
-     */
-    public void draw(Texture tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
-        drawUV(tex, x, y, w, h, u0, v0, u1, v1, 0f, 0f, 0f, 1f, null);
-    }
-
-    /**
-     * <p>
      * Queues a pixel-space source region from a {@link Texture} for rendering without
      * a tint override.
      * </p>
@@ -1022,8 +1130,8 @@ public final class TextureBatch {
      * @param regionWidth  the source region width in pixels
      * @param regionHeight the source region height in pixels
      */
-    public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight) {
-        drawRegion(tex, x, y, w, h, regionX, regionY, regionWidth, regionHeight, null);
+    public void draw(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight) {
+        draw(tex, x, y, w, h, regionX, regionY, regionWidth, regionHeight, null);
     }
 
     /**
@@ -1050,7 +1158,7 @@ public final class TextureBatch {
      * @param tint         the tint override to apply
      * @throws NullPointerException if {@code tex} is {@code null}
      */
-    public void drawRegion(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, Color tint) {
+    public void draw(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
 
         TextureData d = tex.getData();
@@ -1092,9 +1200,9 @@ public final class TextureBatch {
      * @param h      the destination height
      * @throws NullPointerException if {@code region} is {@code null}
      */
-    public void drawRegion(TextureRegion region, float x, float y, float w, float h) {
+    public void draw(TextureRegion region, float x, float y, float w, float h) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
+        draw(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), null);
     }
 
     /**
@@ -1110,9 +1218,120 @@ public final class TextureBatch {
      * @param tint   the tint override to apply
      * @throws NullPointerException if {@code region} is {@code null}
      */
-    public void drawRegion(TextureRegion region, float x, float y, float w, float h, Color tint) {
+    public void draw(TextureRegion region, float x, float y, float w, float h, Color tint) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
-        drawRegion(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
+        draw(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
+    }
+
+    public void draw(Texture tex, float x, float y, float w, float h, float originX, float originY, float rotation, Color tint) {
+        Objects.requireNonNull(tex, "Texture cannot be null");
+
+        float rad = (float) Math.toRadians(-rotation);
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, originX, originY, sin, cos, tint);
+    }
+
+    public void draw(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        Objects.requireNonNull(tex, "Texture cannot be null");
+
+        TextureData d = tex.getData();
+        if (d == null) {
+            draw(tex, x, y, w, h, originX, originY, rotation, tint);
+            return;
+        }
+
+        float texW = d.width();
+        float texH = d.height();
+
+        if (texW == 0f || texH == 0f) {
+            draw(tex, x, y, w, h, originX, originY, rotation, tint);
+            return;
+        }
+
+        float u0 = regionX / texW;
+        float v0 = regionY / texH;
+        float u1 = (regionX + regionWidth) / texW;
+        float v1 = (regionY + regionHeight) / texH;
+
+        float rad = (float) Math.toRadians(-rotation);
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        drawUV(tex, x, y, w, h, u0, v0, u1, v1, originX, originY, sin, cos, tint);
+    }
+
+    /**
+     * Draws the specified texture region with the given position, size,
+     * rotation, origin, and color tint.
+     *
+     * @param region   the texture region to be drawn; must not be null
+     * @param x        the x-coordinate of the bottom-left corner of the drawing area
+     * @param y        the y-coordinate of the bottom-left corner of the drawing area
+     * @param w        the width of the drawing area
+     * @param h        the height of the drawing area
+     * @param originX  the x-coordinate of the origin for rotation, relative
+     *                 to the bottom-left corner of the drawing area
+     * @param originY  the y-coordinate of the origin for rotation, relative
+     *                 to the bottom-left corner of the drawing area
+     * @param rotation the rotation angle in degrees, applied around the origin
+     * @param tint     the color tint to apply to the texture region during drawing
+     */
+    public void draw(TextureRegion region, float x, float y, float w, float h, float originX, float originY, float rotation, Color tint) {
+        Objects.requireNonNull(region, "TextureRegion cannot be null");
+        draw(region, x, y, w, h, 0f, 0f, region.getRegionWidth(), region.getRegionHeight(), originX, originY, rotation, tint);
+    }
+
+    /**
+     * Draws a textured region with the specified transformation and tint options.
+     *
+     * @param region       the texture region to draw, must not be null
+     * @param x            the x-coordinate of the bottom-left corner of the rectangle in world space
+     * @param y            the y-coordinate of the bottom-left corner of the rectangle in world space
+     * @param w            the width of the rectangle in world space
+     * @param h            the height of the rectangle in world space
+     * @param regionX      the x-coordinate of the starting point in the texture region
+     * @param regionY      the y-coordinate of the starting point in the texture region
+     * @param regionWidth  the width of the region inside the texture
+     * @param regionHeight the height of the region inside the texture
+     * @param originX      the origin's x-coordinate relative to the bottom-left corner of the rectangle
+     * @param originY      the origin's y-coordinate relative to the bottom-left corner of the rectangle
+     * @param rotation     the rotation angle, in degrees, to apply to the texture region
+     * @param tint         the color to tint the texture region
+     */
+    public void draw(TextureRegion region, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        Objects.requireNonNull(region, "TextureRegion cannot be null");
+
+        Texture texture = region.getTexture();
+        TextureData d = texture.getData();
+
+        if (d == null) {
+            draw(texture, x, y, w, h, originX, originY, rotation, tint);
+            return;
+        }
+
+        float texW = d.width();
+        float texH = d.height();
+
+        if (texW == 0f || texH == 0f) {
+            draw(texture, x, y, w, h, originX, originY, rotation, tint);
+            return;
+        }
+
+        float baseX = region.getRegionX();
+        float baseY = region.getRegionY();
+
+        float u0 = (baseX + regionX) / texW;
+        float v0 = (baseY + regionY) / texH;
+        float u1 = (baseX + regionX + regionWidth) / texW;
+        float v1 = (baseY + regionY + regionHeight) / texH;
+
+        float rad = (float) Math.toRadians(-rotation);
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
+
+        drawUV(texture, x, y, w, h, u0, v0, u1, v1, originX, originY, sin, cos, tint);
     }
 
     /**

@@ -1,5 +1,6 @@
 package valthorne.graphics.texture;
 
+import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 
 /**
@@ -15,7 +16,6 @@ import valthorne.graphics.Drawable;
  * @since December 22nd, 2025
  */
 public record TextureRegionDrawable(TextureRegion region) implements Drawable {
-
 
     public TextureRegionDrawable(Texture texture, float regionX, float regionY, float regionWidth, float regionHeight) {
         this(new TextureRegion(texture, regionX, regionY, regionWidth, regionHeight));
@@ -33,8 +33,13 @@ public record TextureRegionDrawable(TextureRegion region) implements Drawable {
     }
 
     @Override
-    public void draw(TextureBatch batch, float x, float y, float width, float height) {
-        batch.drawRegion(region, x, y, width, height);
+    public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        if (region == null) return;
+
+        float drawRegionX = region.getRegionX() + regionX;
+        float drawRegionY = region.getRegionY() + regionY;
+
+        batch.draw(region, x, y, width, height, drawRegionX, drawRegionY, regionWidth, regionHeight, originX, originY, rotation, tint);
     }
 
     @Override

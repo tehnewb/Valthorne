@@ -2,6 +2,7 @@ package valthorne.graphics;
 
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.texture.Texture;
+import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.graphics.texture.TextureRegion;
 import valthorne.io.pool.Poolable;
@@ -87,7 +88,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Albert Beaupre
  * @since March 9th, 2026
  */
-public class Sprite implements Poolable {
+public class Sprite implements Poolable, Drawable {
 
     protected TextureRegion region; // Texture region currently used by this sprite
     protected FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // Cached world-space vertex positions for the four sprite corners
@@ -462,6 +463,26 @@ public class Sprite implements Poolable {
      */
     public float getY() {
         return bounds.getY();
+    }
+
+    @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        TextureRegion spriteRegion = this.region;
+        if (spriteRegion == null) return;
+
+        float baseRegionX = spriteRegion.getRegionX();
+        float baseRegionY = spriteRegion.getRegionY();
+
+        float drawRegionX = flippedX ? baseRegionX + spriteRegion.getRegionWidth() - regionX - regionWidth : baseRegionX + regionX;
+        float drawRegionY = flippedY ? baseRegionY + spriteRegion.getRegionHeight() - regionY - regionHeight : baseRegionY + regionY;
+
+        float drawOriginX = this.origin.getX() + originX;
+        float drawOriginY = this.origin.getY() + originY;
+        float drawRotation = this.rotation + rotation;
+
+        Color drawTint = tint == null ? this.color : new Color(this.color.r() * tint.r(), this.color.g() * tint.g(), this.color.b() * tint.b(), this.color.a() * tint.a());
+
+        batch.draw(spriteRegion.getTexture(), x, y, width * scaleX, height * scaleY, drawRegionX, drawRegionY, regionWidth, regionHeight, drawOriginX, drawOriginY, drawRotation, drawTint);
     }
 
     /**

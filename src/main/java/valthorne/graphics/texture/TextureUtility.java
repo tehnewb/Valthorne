@@ -452,7 +452,7 @@ public class TextureUtility {
         for (int row = 0; row < rows; row++) {
             for (int column = 0; column < columns; column++) {
                 int x = column * regionWidth;
-                int y = row * regionHeight;
+                int y = textureHeight - (row + 1) * regionHeight;
                 regions[row][column] = new TextureRegion(texture, x, y, regionWidth, regionHeight);
             }
         }

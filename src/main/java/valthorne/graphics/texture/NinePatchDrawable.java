@@ -1,5 +1,6 @@
 package valthorne.graphics.texture;
 
+import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 
 /**
@@ -98,8 +99,9 @@ public record NinePatchDrawable(NinePatchTexture texture) implements Drawable {
      * @param height the destination height
      */
     @Override
-    public void draw(TextureBatch batch, float x, float y, float width, float height) {
-        batch.draw(texture, x, y, width, height);
+    public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        if (texture == null) return;
+        batch.draw(texture, x, y, width, height, regionX, regionY, regionWidth, regionHeight, originX, originY, rotation, tint);
     }
 
     /**
