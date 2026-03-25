@@ -36,10 +36,7 @@ public record TextureRegionDrawable(TextureRegion region) implements Drawable {
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
         if (region == null) return;
 
-        float drawRegionX = region.getRegionX() + regionX;
-        float drawRegionY = region.getRegionY() + regionY;
-
-        batch.draw(region, x, y, width, height, drawRegionX, drawRegionY, regionWidth, regionHeight, originX, originY, rotation, tint);
+        batch.draw(region, x, y, width, height, regionX, regionY, regionWidth, regionHeight, originX, originY, rotation, tint);
     }
 
     @Override
