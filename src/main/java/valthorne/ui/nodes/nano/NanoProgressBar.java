@@ -5,7 +5,6 @@ import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.UINode;
-import valthorne.ui.UIRoot;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
@@ -42,8 +41,6 @@ public class NanoProgressBar extends UINode implements NanoNode {
     private float cornerRadius = 6f;
     private float borderWidth = 1f;
     private float textPaddingX = 8f;
-
-    private boolean fontLoaded;
 
     public NanoProgressBar(float min, float max) {
         this.min = min;
@@ -216,7 +213,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
 
                 nvgBeginPath(vg);
                 nvgFillColor(vg, NanoUtility.color1(foregroundColor));
-                nvgRoundedRect(vg, x, filledY, width, filledHeight, cornerRadius);
+                nvgRoundedRect(vg, x + borderWidth, filledY + borderWidth, width - borderWidth * 2, filledHeight - borderWidth * 2, cornerRadius);
                 nvgFill(vg);
             } else {
                 float filledWidth = width * percentage;

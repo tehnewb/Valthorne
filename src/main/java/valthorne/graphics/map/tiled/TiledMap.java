@@ -295,7 +295,7 @@ public final class TiledMap {
                     worldY = (offsetYTiles + (heightTiles - 1 - tileY)) * (float) tilePixelHeight;
                 }
 
-                batch.drawRegion(region, worldX, worldY, tilePixelWidth, tilePixelHeight);
+                batch.draw(region, worldX, worldY, tilePixelWidth, tilePixelHeight);
             }
         }
     }

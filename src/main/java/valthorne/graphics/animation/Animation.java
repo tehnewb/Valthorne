@@ -1,6 +1,7 @@
 package valthorne.graphics.animation;
 
 import valthorne.collections.bits.ByteBits;
+import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
@@ -124,21 +125,31 @@ public class Animation implements Drawable {
         }
     }
 
+
     /**
-     * Draws the current animation frame using the specified texture batch.
+     * Draws the current animation frame using the specified parameters.
      *
-     * @param batch  the texture batch used for rendering the frame
-     * @param x      the x-coordinate where the frame should be drawn
-     * @param y      the y-coordinate where the frame should be drawn
-     * @param width  the width of the frame to be drawn
-     * @param height the height of the frame to be drawn
+     * @param batch        the TextureBatch to draw the frame onto
+     * @param x            the x-coordinate of the bottom left corner where the frame will be drawn
+     * @param y            the y-coordinate of the bottom left corner where the frame will be drawn
+     * @param width        the width of the frame to be drawn
+     * @param height       the height of the frame to be drawn
+     * @param regionX      the x-coordinate of the texture region to draw from
+     * @param regionY      the y-coordinate of the texture region to draw from
+     * @param regionWidth  the width of the texture region to draw
+     * @param regionHeight the height of the texture region to draw
+     * @param originX      the x-coordinate of the rotation origin relative to the frame
+     * @param originY      the y-coordinate of the rotation origin relative to the frame
+     * @param rotation     the rotation angle in degrees
+     * @param tint         the color tint to apply when drawing the frame
      */
-    public void draw(TextureBatch batch, float x, float y, float width, float height) {
+    @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
         AnimationFrame currentFrame = getCurrentFrame();
         if (currentFrame == null) return;
         if (currentFrame.drawable() == null) return;
 
-        currentFrame.drawable().draw(batch, x, y, width, height);
+        currentFrame.drawable().draw(batch, x, y, width, height, regionX, regionY, regionWidth, regionHeight, originX, originY, rotation, tint);
     }
 
     /**
