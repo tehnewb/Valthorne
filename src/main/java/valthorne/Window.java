@@ -13,6 +13,7 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 /**
@@ -124,43 +125,51 @@ public final class Window {
     }
 
     /**
-     * Initializes the GLFW window and creates an OpenGL context.
+     * Initializes the application window with the given configuration parameters.
+     * Configures the OpenGL context and GLFW window hints and creates the application window.
+     * It sets up various callbacks for handling resize, position, focus, and other window events.
+     * The method also ensures proper rendering capabilities, including enabling multisampling and
+     * blending if required, based on the configuration.
      *
-     * <p>This method:</p>
-     * <ul>
-     *     <li>Creates the GLFW window.</li>
-     *     <li>Makes its context current and creates OpenGL capabilities via {@link GL#createCapabilities()}.</li>
-     *     <li>Registers GLFW callbacks (size/pos/focus/etc.).</li>
-     *     <li>Shows and centers the window.</li>
-     *     <li>Configures fixed-function state (client arrays, blending, projection).</li>
-     * </ul>
-     *
-     * @param title  window title
-     * @param width  initial window width (pixels)
-     * @param height initial window height (pixels)
-     * @throws RuntimeException if GLFW fails to create the window handle
+     * @param config the {@link JGLConfiguration} object containing all the configuration parameters
+     *               required for setting up the application window, such as dimensions, fullscreen
+     *               mode, OpenGL settings, and additional hints. This parameter must not be null.
+     *               If null, a {@link NullPointerException} will be thrown.
      */
-    public static void init(String title, int width, int height) {
-        Window.width = (short) width;
-        Window.height = (short) height;
+    public static void init(JGLConfiguration config) {
+        if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
 
-        glfwDefaultWindowHints();
-        glfwWindowHint(GLFW_SAMPLES, 0);
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-        glfwWindowHint(GLFW_CONTEXT_NO_ERROR, GLFW_TRUE);
+        Window.width = (short) config.getWidth();
+        Window.height = (short) config.getHeight();
+        Window.fullscreen = config.isFullscreen();
+        Window.borderless = !config.isDecorated();
+        Window.resizable = config.isResizable();
 
-        address = glfwCreateWindow(width, height, title, NULL, NULL);
+        config.applyWindowHints();
+
+        if (config.getCocoaFrameName() != null) glfwWindowHintString(GLFW_COCOA_FRAME_NAME, config.getCocoaFrameName());
+        if (config.getX11ClassName() != null) glfwWindowHintString(GLFW_X11_CLASS_NAME, config.getX11ClassName());
+        if (config.getX11InstanceName() != null)
+            glfwWindowHintString(GLFW_X11_INSTANCE_NAME, config.getX11InstanceName());
+
+        for (var entry : config.getExtraHints().entrySet()) {
+            glfwWindowHint(entry.getKey(), entry.getValue());
+        }
+
+        long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
+
+        address = glfwCreateWindow(config.getWidth(), config.getHeight(), config.getTitle(), monitor, NULL);
         if (address == NULL) throw new RuntimeException("Failed to create the GLFW window");
 
         glfwMakeContextCurrent(address);
-        glfwSwapInterval(swapInterval.getInterval());
         GL.createCapabilities();
+        glfwSwapInterval(config.getSwapInterval().getValue());
+
+        if (config.getSamples() > 0) {
+            glEnable(GL_MULTISAMPLE);
+        }
 
         fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
-            // Intentionally left empty. Framebuffer size can differ from window size on HiDPI displays.
-            // Use getFramebufferSize() when you need exact framebuffer pixel dimensions.
         });
 
         sizeCallback = glfwSetWindowSizeCallback(address, (win, newW, newH) -> {
@@ -194,32 +203,35 @@ public final class Window {
         });
 
         focusCallback = glfwSetWindowFocusCallback(address, (win, focused) -> {
-            // Hook point if you decide to publish a focus event later.
         });
 
         iconifyCallback = glfwSetWindowIconifyCallback(address, (win, iconified) -> {
-            // Hook point if you decide to publish an iconify/minimize event later.
         });
 
         maximizeCallback = glfwSetWindowMaximizeCallback(address, (win, maximized) -> {
-            // Hook point if you decide to publish a maximize event later.
         });
 
         scaleCallback = glfwSetWindowContentScaleCallback(address, (win, xs, ys) -> {
-            // Hook point for DPI scaling changes; useful for UI scaling if you support it.
         });
 
         closeCallback = glfwSetWindowCloseCallback(address, (win) -> glfwSetWindowShouldClose(win, true));
 
-        GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        if (vid != null) {
-            int centerX = (vid.width() - width) / 2;
-            int centerY = (vid.height() - height) / 2;
-            glfwSetWindowPos(address, centerX, centerY);
+        if (!config.isFullscreen()) {
+            GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
+            if (vid != null) {
+                int centerX = (vid.width() - config.getWidth()) / 2;
+                int centerY = (vid.height() - config.getHeight()) / 2;
+                glfwSetWindowPos(address, centerX, centerY);
+                Window.x = (short) centerX;
+                Window.y = (short) centerY;
+            }
         }
 
-        glfwShowWindow(address);
-        glViewport(0, 0, width, height);
+        if (config.isVisible()) {
+            glfwShowWindow(address);
+        }
+
+        glViewport(0, 0, config.getWidth(), config.getHeight());
 
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -430,7 +442,7 @@ public final class Window {
     public static void setSwapInterval(SwapInterval type) {
         if (type == null) return;
         swapInterval = type;
-        glfwSwapInterval(type.getInterval());
+        glfwSwapInterval(type.getValue());
     }
 
     /**

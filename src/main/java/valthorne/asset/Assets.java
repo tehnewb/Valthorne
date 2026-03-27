@@ -1,11 +1,13 @@
 package valthorne.asset;
 
+import valthorne.audio.sound.SoundLoader;
+import valthorne.audio.sound.SoundParameters;
 import valthorne.graphics.font.FontLoader;
 import valthorne.graphics.font.FontParameters;
+import valthorne.graphics.map.tiled.TiledMapLoader;
+import valthorne.graphics.map.tiled.TiledMapParameters;
 import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
-import valthorne.sound.SoundLoader;
-import valthorne.sound.SoundParameters;
 
 import java.util.Objects;
 import java.util.concurrent.*;
@@ -89,6 +91,7 @@ public final class Assets {
         addLoader(SoundParameters.class, new SoundLoader());
         addLoader(TextureParameters.class, new TextureLoader());
         addLoader(FontParameters.class, new FontLoader());
+        addLoader(TiledMapParameters.class, new TiledMapLoader());
     }
 
     private Assets() {

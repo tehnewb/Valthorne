@@ -43,25 +43,43 @@ public class JGL {
     private static short framesPerSecond;
 
     /**
-     * Initializes the JGL framework and starts the main rendering loop.
-     * This method sets up the application window, input devices, and audio.
-     * It also invokes the lifecycle methods of the provided {@link Application}
-     * implementation.
+     * Initializes the application and configures the window settings such as title and dimensions.
+     * This method delegates to another {@code init} method that accepts a {@code JGLConfiguration}
+     * object with default settings.
      *
-     * @param application the {@link Application} instance that defines the core
-     *                    logic and lifecycle of the application
-     * @param title       the title of the application window
-     * @param width       the width of the application window in pixels
-     * @param height      the height of the application window in pixels
-     * @throws IllegalStateException if the method is not called from the JVM main thread,
-     *                               GLFW initialization fails, or if the JGL framework
-     *                               is already initialized
+     * @param application the {@code Application} instance containing the logic for the application.
+     *                    It must implement the lifecycle methods defined in the {@code Application} interface.
+     * @param title       the title of the application window.
+     * @param width       the width of the application window in pixels.
+     * @param height      the height of the application window in pixels.
+     * @throws NullPointerException if {@code application} is {@code null}.
      */
     public static void init(Application application, String title, int width, int height) {
+        init(application, JGLConfiguration.defaults().title(title).size(width, height));
+    }
+
+    /**
+     * Initializes the application and its associated systems. This method sets up the
+     * necessary components for the application to run, including input devices, audio,
+     * and the rendering window. It also initializes the provided {@code Application}
+     * instance, starts the application's main loop, handles frame updates, and ensures
+     * proper cleanup upon exit.
+     *
+     * @param application the {@code Application} instance containing the logic for the application.
+     *                    It must implement the lifecycle methods defined in the {@code Application} interface.
+     * @param config      the {@code JGLConfiguration} object containing the settings for the application,
+     *                    such as window size, title, and rendering options.
+     * @throws NullPointerException  if {@code application} or {@code config} is {@code null}.
+     * @throws IllegalStateException if the GLFW library could not be initialized.
+     */
+    public static void init(Application application, JGLConfiguration config) {
+        if (application == null) throw new NullPointerException("Application cannot be null");
+        if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
+
         if (!glfwInit())
             throw new IllegalStateException("Unable to initialize GLFW");
 
-        Window.init(title, width, height);
+        Window.init(config);
         Audio.init();
         Mouse.init();
         Keyboard.init();
@@ -88,14 +106,14 @@ public class JGL {
 
             if (fpsTime >= 1) {
                 framesPerSecond = frames;
-
                 fpsTime = 0;
                 frames = 0;
             }
-            glfwSwapBuffers(Window.getAddress());
 
+            glfwSwapBuffers(Window.getAddress());
             Mouse.resetScroll();
         }
+
         application.dispose();
         dispose();
     }

@@ -1223,7 +1223,8 @@ public abstract class UINode {
         Viewport viewport = this.root.getViewport();
         if (viewport != null) {
             Vector2f translation = viewport.screenToWorld(x, y);
-            return ZERO_VECTOR.set(translation.getX(), getRenderSpaceHeight() - translation.getY());
+            if (translation != null)
+                return ZERO_VECTOR.set(translation.getX(), getRenderSpaceHeight() - translation.getY());
         }
         return ZERO_VECTOR.set(x, y);
     }

@@ -35,7 +35,7 @@ public enum SwapInterval {
         this.interval = interval;
     }
 
-    public int getInterval() {
+    public int getValue() {
         return interval;
     }
 }

@@ -487,6 +487,7 @@ public abstract class Scene {
      */
     public void setViewport(Viewport viewport) {
         this.viewport = viewport;
+        this.viewport.update(Window.getWidth(), Window.getHeight());
     }
 
     /**
