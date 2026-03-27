@@ -447,9 +447,12 @@ public class UIRoot extends UIContainer {
                     continue;
                 if (child == overlayLayer)
                     continue;
-                if (child instanceof NanoNode nano)
-                    nano.draw(nanoVGHandle);
+
+                drawNanoTree(child, nanoVGHandle);
             }
+
+            if (overlayLayer.isVisible())
+                drawNanoTree(overlayLayer, nanoVGHandle);
 
             endNanoFrame(nanoVGHandle);
         }
