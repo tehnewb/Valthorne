@@ -171,11 +171,12 @@ public class UIRoot extends UIContainer {
     public UIRoot() {
         this.nanoVGHandle = nvgCreate(0);
         if (nanoVGHandle != 0){
+            String os = System.getProperty("os.name").toLowerCase();
             String fontPath;
 
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            if (os.contains("win")) {
                 fontPath = "C:/Windows/Fonts/segoeui.ttf";
-            } else if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+            } else if (os.contains("mac")) {
                 fontPath = "/System/Library/Fonts/SFNS.ttf";
             } else {
                 fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";

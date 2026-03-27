@@ -397,7 +397,7 @@ public class NanoButton extends UINode implements NanoNode {
 
         if (borderWidth > 0f) {
             nvgBeginPath(vg);
-            nvgRoundedRect(vg, x + borderWidth * 0.5f, y + borderWidth * 0.5f, width - borderWidth, height - borderWidth, cornerRadius);
+            nvgRoundedRect(vg, x, y, width, height, cornerRadius);
             nvgStrokeWidth(vg, borderWidth);
             nvgStrokeColor(vg, NanoUtility.color1(drawBorder));
             nvgStroke(vg);

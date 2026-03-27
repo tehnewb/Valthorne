@@ -1,4 +1,4 @@
-package valthorne.sound;
+package valthorne.audio.sound;
 
 import valthorne.asset.AssetParameters;
 import valthorne.io.file.ValthorneFiles;

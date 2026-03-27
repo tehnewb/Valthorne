@@ -1,5 +1,6 @@
 package valthorne.ui.nodes;
 
+import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
@@ -53,6 +54,7 @@ import valthorne.ui.UINode;
 public class Image extends UINode {
 
     private Texture texture; // Texture currently displayed by this image node
+    private Color color = new Color(1, 1, 1, 1);
 
     /**
      * <p>
@@ -77,7 +79,7 @@ public class Image extends UINode {
      */
     @Override
     public void onCreate() {
-        this.getLayout().width(texture.getWidth()).height(texture.getHeight()).fill();
+
     }
 
     /**
@@ -126,7 +128,7 @@ public class Image extends UINode {
     @Override
     public void draw(TextureBatch batch) {
         if (texture == null) return;
-        batch.draw(texture, getRenderX(), getRenderY(), getWidth(), getHeight());
+        batch.draw(texture, getRenderX(), getRenderY(), getWidth(), getHeight(), color);
     }
 
     /**
@@ -156,5 +158,25 @@ public class Image extends UINode {
     public Image texture(Texture texture) {
         this.texture = texture;
         return this;
+    }
+
+    /**
+     * Sets the color of this image node.
+     *
+     * @param color the color to apply to this image node
+     * @return this image node, allowing for fluent configuration
+     */
+    public Image color(Color color) {
+        this.color = color;
+        return this;
+    }
+
+    /**
+     * Returns the current color assigned to this image node.
+     *
+     * @return the current color
+     */
+    public Color getColor() {
+        return color;
     }
 }
