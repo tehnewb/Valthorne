@@ -159,69 +159,203 @@ public final class TiledMap {
     }
 
     /**
-     * Renders every visible tile layer in this map.
+     * Renders the specified texture batch within the defined dimensions.
      *
-     * <p>
-     * Only {@link TiledTileMapLayer} instances are drawn here. Other layer types remain stored in
-     * {@link #mapLayers}, but they are ignored by this method unless you add separate runtime
-     * rendering paths for them elsewhere.
-     * </p>
-     *
-     * @param batch the texture batch used to queue and draw tile regions
-     * @throws NullPointerException if {@code batch} is null
+     * @param batch the texture batch to be rendered; must not be null
      */
     public void render(TextureBatch batch) {
+        Objects.requireNonNull(batch, "batch");
+        render(batch, 0, 0, width - 1, height - 1);
+    }
+
+    /**
+     * Renders the visible portion of the map layers within the specified tile boundaries.
+     *
+     * @param batch    the TextureBatch used to draw tiles, must not be null
+     * @param minTileX the minimum x-coordinate of the visible tile range
+     * @param minTileY the minimum y-coordinate of the visible tile range
+     * @param maxTileX the maximum x-coordinate of the visible tile range
+     * @param maxTileY the maximum y-coordinate of the visible tile range
+     * @throws NullPointerException if the batch is null
+     */
+    public void render(TextureBatch batch, int minTileX, int minTileY, int maxTileX, int maxTileY) {
         Objects.requireNonNull(batch, "batch");
 
         for (MapLayer mapLayer : mapLayers) {
             if (mapLayer instanceof TiledTileMapLayer tileLayer) {
-                renderTileLayer(batch, tileLayer);
+                renderTileLayer(batch, tileLayer, minTileX, minTileY, maxTileX, maxTileY);
             }
         }
     }
 
     /**
-     * Renders a single named tile layer if it exists and is a {@link TiledTileMapLayer}.
+     * Renders a texture batch within a specified circular area around a given center tile.
      *
-     * <p>
-     * This method is useful when you want to draw only specific layers, such as background,
-     * collision-preview, or foreground layers, instead of rendering the entire map at once.
-     * </p>
-     *
-     * @param batch     the texture batch used to queue and draw tile regions
-     * @param layerName the exact layer name to render
-     * @throws NullPointerException if {@code batch} or {@code layerName} is null
+     * @param batch       The {@code TextureBatch} to render. Must not be null.
+     * @param centerTileX The X-coordinate of the center tile.
+     * @param centerTileY The Y-coordinate of the center tile.
+     * @param radiusTiles The radius, in tiles, defining the circular area to render.
+     *                    Must be a positive integer.
+     * @throws NullPointerException if {@code batch} is null.
      */
-    public void renderLayer(TextureBatch batch, String layerName) {
+    public void render(TextureBatch batch, int centerTileX, int centerTileY, int radiusTiles) {
         Objects.requireNonNull(batch, "batch");
-        Objects.requireNonNull(layerName, "layerName");
 
-        MapLayer layer = getLayer(layerName);
-        if (layer instanceof TiledTileMapLayer tileLayer) {
-            renderTileLayer(batch, tileLayer);
+        int minTileX = centerTileX - radiusTiles;
+        int minTileY = centerTileY - radiusTiles;
+        int maxTileX = centerTileX + radiusTiles;
+        int maxTileY = centerTileY + radiusTiles;
+
+        render(batch, minTileX, minTileY, maxTileX, maxTileY);
+    }
+
+    /**
+     * Renders the specified layers of a tile map using the provided texture batch.
+     *
+     * @param batch        the {@code TextureBatch} used for rendering; must not be null
+     * @param layerIndices the indices of the map layers to render; can be empty or null
+     */
+    public void renderLayers(TextureBatch batch, int... layerIndices) {
+        Objects.requireNonNull(batch, "batch");
+        if (layerIndices == null) return;
+
+        for (int layerIndex : layerIndices) {
+            MapLayer mapLayer = getLayer(layerIndex);
+            if (mapLayer instanceof TiledTileMapLayer tileLayer) {
+                renderTileLayer(batch, tileLayer, 0, 0, width - 1, height - 1);
+            }
         }
     }
 
     /**
-     * Renders one tile layer, handling either chunked infinite maps or regular finite tile grids.
+     * Renders specific layers of a tile map within the specified tile boundaries using the given texture batch.
      *
-     * <p>
-     * Hidden layers are skipped immediately. Infinite layers are rendered chunk-by-chunk using the
-     * chunk origin offsets. Finite layers are rendered from their main GID array starting at
-     * tile origin {@code (0, 0)}.
-     * </p>
-     *
-     * @param batch the batch used for tile rendering
-     * @param layer the tile layer to render
+     * @param batch        the texture batch used for rendering; must not be null
+     * @param minTileX     the minimum x-coordinate of the tile range to render
+     * @param minTileY     the minimum y-coordinate of the tile range to render
+     * @param maxTileX     the maximum x-coordinate of the tile range to render
+     * @param maxTileY     the maximum y-coordinate of the tile range to render
+     * @param layerIndices the indices of the layers to be rendered; can be empty or null
      */
-    private void renderTileLayer(TextureBatch batch, TiledTileMapLayer layer) {
+    public void renderLayers(TextureBatch batch, int minTileX, int minTileY, int maxTileX, int maxTileY, int... layerIndices) {
+        Objects.requireNonNull(batch, "batch");
+        if (layerIndices == null) return;
+
+        for (int layerIndex : layerIndices) {
+            MapLayer mapLayer = getLayer(layerIndex);
+            if (mapLayer instanceof TiledTileMapLayer tileLayer) {
+                renderTileLayer(batch, tileLayer, minTileX, minTileY, maxTileX, maxTileY);
+            }
+        }
+    }
+
+    /**
+     * Renders specified layers within a circular area defined by a central tile and radius.
+     *
+     * @param batch        the TextureBatch used for rendering; must not be null
+     * @param centerTileX  the x-coordinate of the central tile
+     * @param centerTileY  the y-coordinate of the central tile
+     * @param radiusTiles  the radius of tiles around the center tile that defines the rendering area
+     * @param layerIndices the indices of the layers to be rendered
+     */
+    public void renderLayers(TextureBatch batch, int centerTileX, int centerTileY, int radiusTiles, int... layerIndices) {
+        Objects.requireNonNull(batch, "batch");
+
+        int minTileX = centerTileX - radiusTiles;
+        int minTileY = centerTileY - radiusTiles;
+        int maxTileX = centerTileX + radiusTiles;
+        int maxTileY = centerTileY + radiusTiles;
+
+        renderLayers(batch, minTileX, minTileY, maxTileX, maxTileY, layerIndices);
+    }
+
+    /**
+     * Renders specified layers using the provided texture batch.
+     *
+     * @param batch      the texture batch used for rendering, must not be null
+     * @param layerNames the names of the layers to be rendered; can be null
+     */
+    public void renderLayers(TextureBatch batch, String... layerNames) {
+        Objects.requireNonNull(batch, "batch");
+        if (layerNames == null) return;
+
+        for (String layerName : layerNames) {
+            MapLayer mapLayer = getLayer(layerName);
+            if (mapLayer instanceof TiledTileMapLayer tileLayer) {
+                renderTileLayer(batch, tileLayer, 0, 0, width - 1, height - 1);
+            }
+        }
+    }
+
+    /**
+     * Renders specified layers of a tile map within the defined tile boundaries.
+     *
+     * @param batch      the texture batch used for rendering; must not be null
+     * @param minTileX   the minimum X-coordinate (in tiles) for rendering
+     * @param minTileY   the minimum Y-coordinate (in tiles) for rendering
+     * @param maxTileX   the maximum X-coordinate (in tiles) for rendering
+     * @param maxTileY   the maximum Y-coordinate (in tiles) for rendering
+     * @param layerNames the names of the layers to be rendered; if null, no layers are rendered
+     */
+    public void renderLayers(TextureBatch batch, int minTileX, int minTileY, int maxTileX, int maxTileY, String... layerNames) {
+        Objects.requireNonNull(batch, "batch");
+        if (layerNames == null) return;
+
+        for (String layerName : layerNames) {
+            MapLayer mapLayer = getLayer(layerName);
+            if (mapLayer instanceof TiledTileMapLayer tileLayer) {
+                renderTileLayer(batch, tileLayer, minTileX, minTileY, maxTileX, maxTileY);
+            }
+        }
+    }
+
+    /**
+     * Renders multiple layers within a specified radius around a central tile.
+     *
+     * @param batch       the {@link TextureBatch} used to render the layers; must not be null
+     * @param centerTileX the x-coordinate of the central tile
+     * @param centerTileY the y-coordinate of the central tile
+     * @param radiusTiles the radius in tiles around the central tile to include in rendering
+     * @param layerNames  the names of the layers to be rendered
+     */
+    public void renderLayers(TextureBatch batch, int centerTileX, int centerTileY, int radiusTiles, String... layerNames) {
+        Objects.requireNonNull(batch, "batch");
+
+        int minTileX = centerTileX - radiusTiles;
+        int minTileY = centerTileY - radiusTiles;
+        int maxTileX = centerTileX + radiusTiles;
+        int maxTileY = centerTileY + radiusTiles;
+
+        renderLayers(batch, minTileX, minTileY, maxTileX, maxTileY, layerNames);
+    }
+
+    /**
+     * Renders the specified tile layer using the provided texture batch within a defined tile range.
+     *
+     * @param batch    the {@code TextureBatch} used to render the tile graphics
+     * @param layer    the {@code TiledTileMapLayer} to be rendered
+     * @param minTileX the minimum x coordinate of the tile range to render
+     * @param minTileY the minimum y coordinate of the tile range to render
+     * @param maxTileX the maximum x coordinate of the tile range to render
+     * @param maxTileY the maximum y coordinate of the tile range to render
+     */
+    private void renderTileLayer(TextureBatch batch, TiledTileMapLayer layer, int minTileX, int minTileY, int maxTileX, int maxTileY) {
         if (!layer.isVisible()) {
             return;
         }
 
         if (layer.isInfinite() && !layer.getChunks().isEmpty()) {
             for (MapChunk chunk : layer.getChunks().values()) {
-                drawGrid(batch, chunk.width(), chunk.height(), chunk.globalTileIDs(), chunk.x(), chunk.y());
+                int chunkMinX = chunk.x();
+                int chunkMinY = chunk.y();
+                int chunkMaxX = chunk.x() + chunk.width() - 1;
+                int chunkMaxY = chunk.y() + chunk.height() - 1;
+
+                if (chunkMaxX < minTileX || chunkMinX > maxTileX || chunkMaxY < minTileY || chunkMinY > maxTileY) {
+                    continue;
+                }
+
+                drawGrid(batch, chunk.width(), chunk.height(), chunk.globalTileIDs(), chunk.x(), chunk.y(), minTileX, minTileY, maxTileX, maxTileY);
             }
             return;
         }
@@ -230,37 +364,79 @@ public final class TiledMap {
             return;
         }
 
-        drawGrid(batch, layer.getWidth(), layer.getHeight(), layer.getGids(), 0, 0);
+        drawGrid(batch, layer.getWidth(), layer.getHeight(), layer.getGids(), 0, 0, minTileX, minTileY, maxTileX, maxTileY);
     }
 
     /**
-     * Draws a rectangular grid of tile GIDs using the provided tile dimensions and tile offsets.
+     * Renders a specified layer within a defined circular radius around a center tile.
      *
-     * <p>
-     * Each raw tile entry is decoded by stripping transform bits, resolving the owning
-     * {@link TileSet}, resolving animation state, then drawing the resulting {@link TextureRegion}
-     * through the provided {@link TextureBatch}.
-     * </p>
-     *
-     * <p>
-     * Finite maps use a top-to-bottom source row order from Tiled, so they are vertically flipped
-     * into bottom-left world space. Infinite chunk rendering uses chunk-relative row conversion.
-     * </p>
-     *
-     * @param batch         the texture batch used to draw tiles
-     * @param widthTiles    the width of the tile grid in tiles
-     * @param heightTiles   the height of the tile grid in tiles
-     * @param globalTileIDs the raw global tile ID array for the grid
-     * @param offsetXTiles  the horizontal tile offset of the grid origin
-     * @param offsetYTiles  the vertical tile offset of the grid origin
+     * @param batch       The texture batch used for rendering.
+     * @param layerName   The name of the layer to be rendered.
+     * @param centerTileX The x-coordinate of the center tile.
+     * @param centerTileY The y-coordinate of the center tile.
+     * @param radiusTiles The radius, in tiles, around the center tile to be rendered.
      */
-    private void drawGrid(TextureBatch batch, int widthTiles, int heightTiles, int[] globalTileIDs, int offsetXTiles, int offsetYTiles) {
+    public void renderLayer(TextureBatch batch, String layerName, int centerTileX, int centerTileY, int radiusTiles) {
+        renderLayer(batch, layerName, centerTileX - radiusTiles, centerTileY - radiusTiles, centerTileX + radiusTiles, centerTileY + radiusTiles);
+    }
+
+    /**
+     * Renders the specified tile layer within a given rectangular region.
+     *
+     * @param batch     the texture batch used for rendering, must not be null
+     * @param layerName the name of the layer to render, must not be null
+     * @param minTileX  the minimum tile index along the X-axis to render
+     * @param minTileY  the minimum tile index along the Y-axis to render
+     * @param maxTileX  the maximum tile index along the X-axis to render
+     * @param maxTileY  the maximum tile index along the Y-axis to render
+     * @throws NullPointerException if {@code batch} or {@code layerName} is null
+     */
+    public void renderLayer(TextureBatch batch, String layerName, int minTileX, int minTileY, int maxTileX, int maxTileY) {
+        Objects.requireNonNull(batch, "batch");
+        Objects.requireNonNull(layerName, "layerName");
+
+        MapLayer layer = getLayer(layerName);
+        if (layer instanceof TiledTileMapLayer tileLayer) {
+            renderTileLayer(batch, tileLayer, minTileX, minTileY, maxTileX, maxTileY);
+        }
+    }
+
+    /**
+     * Renders a grid of tiles onto the provided texture batch. The grid is defined
+     * by its dimensions, global tile IDs, and other positional parameters. The
+     * method calculates which tiles to draw based on visible tile boundaries
+     * and retrieves the corresponding texture regions before rendering.
+     *
+     * @param batch         the batch used for rendering the tiles
+     * @param widthTiles    the width of the grid in tiles
+     * @param heightTiles   the height of the grid in tiles
+     * @param globalTileIDs an array of global tile IDs representing the grid
+     * @param offsetXTiles  the horizontal offset of the grid in tiles
+     * @param offsetYTiles  the vertical offset of the grid in tiles
+     * @param minTileX      the minimum visible tile index in the X axis
+     * @param minTileY      the minimum visible tile index in the Y axis
+     * @param maxTileX      the maximum visible tile index in the X axis
+     * @param maxTileY      the maximum visible tile index in the Y axis
+     */
+    private void drawGrid(TextureBatch batch, int widthTiles, int heightTiles, int[] globalTileIDs, int offsetXTiles, int offsetYTiles, int minTileX, int minTileY, int maxTileX, int maxTileY) {
         final int tilePixelWidth = this.tileWidth;
         final int tilePixelHeight = this.tileHeight;
 
-        for (int tileY = 0; tileY < heightTiles; tileY++) {
-            for (int tileX = 0; tileX < widthTiles; tileX++) {
-                int index = tileY * widthTiles + tileX;
+        int startLocalX = Math.max(0, minTileX - offsetXTiles);
+        int endLocalX = Math.min(widthTiles - 1, maxTileX - offsetXTiles);
+
+        int startWorldY = Math.max(minTileY, offsetYTiles);
+        int endWorldY = Math.min(maxTileY, offsetYTiles + heightTiles - 1);
+
+        if (startLocalX > endLocalX || startWorldY > endWorldY) {
+            return;
+        }
+
+        for (int worldTileY = startWorldY; worldTileY <= endWorldY; worldTileY++) {
+            int localTileY = heightTiles - 1 - (worldTileY - offsetYTiles);
+
+            for (int localTileX = startLocalX; localTileX <= endLocalX; localTileX++) {
+                int index = localTileY * widthTiles + localTileX;
                 int raw = globalTileIDs[index];
                 if (raw == 0) {
                     continue;
@@ -284,16 +460,8 @@ public final class TiledMap {
                     continue;
                 }
 
-                float worldX = (offsetXTiles + tileX) * (float) tilePixelWidth;
-
-                float worldY;
-                if (!this.infinite && this.height > 0) {
-                    int mapPixelHeight = this.height * tilePixelHeight;
-                    float yTop = (offsetYTiles + tileY) * (float) tilePixelHeight;
-                    worldY = (mapPixelHeight - yTop) - tilePixelHeight;
-                } else {
-                    worldY = (offsetYTiles + (heightTiles - 1 - tileY)) * (float) tilePixelHeight;
-                }
+                float worldX = (offsetXTiles + localTileX) * (float) tilePixelWidth;
+                float worldY = worldTileY * (float) tilePixelHeight;
 
                 batch.draw(region, worldX, worldY, tilePixelWidth, tilePixelHeight);
             }
@@ -444,6 +612,71 @@ public final class TiledMap {
         }
 
         return null;
+    }
+
+    public ResolvedTile getTile(String layerName, int tileX, int tileY) {
+        MapLayer layer = getLayer(layerName);
+        if (!(layer instanceof TiledTileMapLayer tileLayer)) {
+            return null;
+        }
+        return getTile(tileLayer, tileX, tileY);
+    }
+
+    public ResolvedTile getTile(int layerIndex, int tileX, int tileY) {
+        MapLayer layer = getLayer(layerIndex);
+        if (!(layer instanceof TiledTileMapLayer tileLayer)) {
+            return null;
+        }
+        return getTile(tileLayer, tileX, tileY);
+    }
+
+    public TileDefinition getTileDefinition(String layerName, int tileX, int tileY) {
+        ResolvedTile tile = getTile(layerName, tileX, tileY);
+        return tile != null ? tile.definition() : null;
+    }
+
+    public TileDefinition getTileDefinition(int layerIndex, int tileX, int tileY) {
+        ResolvedTile tile = getTile(layerIndex, tileX, tileY);
+        return tile != null ? tile.definition() : null;
+    }
+
+    public int getTileGid(String layerName, int tileX, int tileY) {
+        ResolvedTile tile = getTile(layerName, tileX, tileY);
+        return tile != null ? tile.gid() : 0;
+    }
+
+    public int getTileGid(int layerIndex, int tileX, int tileY) {
+        ResolvedTile tile = getTile(layerIndex, tileX, tileY);
+        return tile != null ? tile.gid() : 0;
+    }
+
+    public ResolvedTile getTile(TiledTileMapLayer layer, int tileX, int tileY) {
+        if (layer == null || layer.getGids() == null) {
+            return null;
+        }
+
+        if (tileX < 0 || tileY < 0 || tileX >= layer.getWidth() || tileY >= layer.getHeight()) {
+            return null;
+        }
+
+        int sourceTileY = layer.getHeight() - 1 - tileY;
+        int index = sourceTileY * layer.getWidth() + tileX;
+
+        int rawGid = layer.getGids()[index];
+        int gid = rawGid & GID_MASK;
+        if (gid == 0) {
+            return null;
+        }
+
+        TileSet tileSet = findTilesetForGID(gid);
+        if (tileSet == null) {
+            return null;
+        }
+
+        int localId = gid - tileSet.getFirstGlobalTileID();
+        TileDefinition definition = tileSet.getDefinition(localId);
+
+        return new ResolvedTile(tileX, tileY, rawGid, gid, localId, tileSet, definition);
     }
 
     /**

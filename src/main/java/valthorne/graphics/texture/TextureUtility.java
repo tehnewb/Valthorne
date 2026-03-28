@@ -60,6 +60,73 @@ public class TextureUtility {
         return result;
     }
 
+    /**
+     * Traces the largest closed contour within the specified texture region, ignoring specified colors,
+     * and returns the points defining the contour as an array of {@code Vector2f} objects.
+     *
+     * @param textureRegion the texture region to be analyzed; must not be null
+     * @param ignore        the colors that should be ignored during the tracing process; optional parameter
+     * @return an array of {@code Vector2f} objects representing the points of the largest closed contour;
+     * returns an empty array if the texture region has invalid data or no valid contours are found
+     * @throws NullPointerException if the provided texture region is null
+     */
+    public static Vector2f[] trace(TextureRegion textureRegion, Color... ignore) {
+        if (textureRegion == null)
+            throw new NullPointerException("TextureRegion cannot be null");
+
+        Texture texture = textureRegion.getTexture();
+        int x = (int) textureRegion.getRegionX();
+        int y = (int) textureRegion.getRegionY();
+        int width = (int) textureRegion.getRegionWidth();
+        int height = (int) textureRegion.getRegionHeight();
+
+        TextureData data = texture.getData();
+        if (data == null)
+            return new Vector2f[0];
+
+        if (width <= 0 || height <= 0)
+            return new Vector2f[0];
+
+        ByteBuffer subBuffer = extractSubBuffer(data.buffer(), x, y, width, height, data.width());
+        boolean[][] solid = buildSolidMask(subBuffer, width, height, ignore);
+        boolean[][] component = extractLargestComponent(solid);
+
+        List<Edge> edges = buildBoundaryEdges(component, width, height);
+        if (edges.isEmpty())
+            return new Vector2f[0];
+
+        List<List<Point>> loops = stitchLoops(edges);
+        if (loops.isEmpty())
+            return new Vector2f[0];
+
+        List<Point> outer = largestLoop(loops);
+        outer = removeDuplicateClosingPoint(outer);
+        outer = simplifyCollinear(outer);
+        outer = simplifyRdpClosed(outer, 0.75f);
+
+        Vector2f[] result = new Vector2f[outer.size()];
+        for (int i = 0; i < outer.size(); i++) {
+            Point p = outer.get(i);
+            result[i] = new Vector2f(p.x, p.y);
+        }
+
+        return result;
+    }
+
+    private static ByteBuffer extractSubBuffer(ByteBuffer buffer, int x, int y, int width, int height, int textureWidth) {
+        ByteBuffer subBuffer = ByteBuffer.allocate(width * height * 4);
+        for (int row = 0; row < height; row++) {
+            int srcPos = (x + (y + row) * textureWidth) * 4;
+            int length = width * 4;
+            int destPos = row * width * 4;
+
+            for (int i = 0; i < length; i++) {
+                subBuffer.put(destPos + i, buffer.get(srcPos + i));
+            }
+        }
+        return subBuffer;
+    }
+
     private static boolean[][] buildSolidMask(ByteBuffer buffer, int width, int height, Color... ignore) {
         boolean[][] solid = new boolean[width][height];
 

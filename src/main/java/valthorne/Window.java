@@ -147,15 +147,6 @@ public final class Window {
 
         config.applyWindowHints();
 
-        if (config.getCocoaFrameName() != null) glfwWindowHintString(GLFW_COCOA_FRAME_NAME, config.getCocoaFrameName());
-        if (config.getX11ClassName() != null) glfwWindowHintString(GLFW_X11_CLASS_NAME, config.getX11ClassName());
-        if (config.getX11InstanceName() != null)
-            glfwWindowHintString(GLFW_X11_INSTANCE_NAME, config.getX11InstanceName());
-
-        for (var entry : config.getExtraHints().entrySet()) {
-            glfwWindowHint(entry.getKey(), entry.getValue());
-        }
-
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
 
         address = glfwCreateWindow(config.getWidth(), config.getHeight(), config.getTitle(), monitor, NULL);
@@ -165,9 +156,8 @@ public final class Window {
         GL.createCapabilities();
         glfwSwapInterval(config.getSwapInterval().getValue());
 
-        if (config.getSamples() > 0) {
+        if (config.getSamples() > 0)
             glEnable(GL_MULTISAMPLE);
-        }
 
         fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
         });
@@ -227,9 +217,8 @@ public final class Window {
             }
         }
 
-        if (config.isVisible()) {
+        if (config.isVisible())
             glfwShowWindow(address);
-        }
 
         glViewport(0, 0, config.getWidth(), config.getHeight());
 

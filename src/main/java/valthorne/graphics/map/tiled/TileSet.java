@@ -4,6 +4,7 @@ import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureRegion;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -115,18 +116,18 @@ public final class TileSet {
      * </p>
      *
      * @param firstGlobalTileID the first global tile ID belonging to this tileset
-     * @param name the tileset name
-     * @param texture the GPU texture atlas for this tileset
-     * @param tileWidth the width of one tile in pixels
-     * @param tileHeight the height of one tile in pixels
-     * @param spacing the spacing in pixels between adjacent tiles
-     * @param margin the outer atlas margin in pixels
-     * @param tileCount the total number of tiles in the tileset
-     * @param columns the number of columns in the atlas
-     * @param imageWidth the width of the atlas image in pixels
-     * @param imageHeight the height of the atlas image in pixels
-     * @param properties custom tileset properties
-     * @param tileDefs per-tile metadata definitions
+     * @param name              the tileset name
+     * @param texture           the GPU texture atlas for this tileset
+     * @param tileWidth         the width of one tile in pixels
+     * @param tileHeight        the height of one tile in pixels
+     * @param spacing           the spacing in pixels between adjacent tiles
+     * @param margin            the outer atlas margin in pixels
+     * @param tileCount         the total number of tiles in the tileset
+     * @param columns           the number of columns in the atlas
+     * @param imageWidth        the width of the atlas image in pixels
+     * @param imageHeight       the height of the atlas image in pixels
+     * @param properties        custom tileset properties
+     * @param tileDefs          per-tile metadata definitions
      * @throws NullPointerException if {@code texture} is null
      */
     public TileSet(int firstGlobalTileID, String name, Texture texture, int tileWidth, int tileHeight, int spacing, int margin, int tileCount, int columns, int imageWidth, int imageHeight, Map<String, String> properties, Map<Integer, TileDefinition> tileDefs) {
@@ -205,7 +206,7 @@ public final class TileSet {
      * {@link #getRegionForLocalId(int)}.
      * </p>
      *
-     * @param localId the original local tile ID
+     * @param localId     the original local tile ID
      * @param timeSeconds the elapsed animation time in seconds
      * @return the local tile ID of the animation frame that should currently be drawn
      */
@@ -416,7 +417,7 @@ public final class TileSet {
      * Tiled semantics directly and simply multiplies the given width by the tileset column count.
      * </p>
      *
-     * @param layerID an unused layer identifier
+     * @param layerID    an unused layer identifier
      * @param layerWidth the layer width used in the calculation
      * @return {@code layerWidth * columns}
      */
@@ -432,12 +433,37 @@ public final class TileSet {
      * width and height by the tileset's column count.
      * </p>
      *
-     * @param layerID an unused layer identifier
-     * @param layerWidth the layer width used in the calculation
+     * @param layerID     an unused layer identifier
+     * @param layerWidth  the layer width used in the calculation
      * @param layerHeight the layer height used in the calculation
      * @return {@code layerWidth * columns * layerHeight}
      */
     public int getTileCountForLayer(int layerID, int layerWidth, int layerHeight) {
         return layerWidth * columns * layerHeight;
+    }
+
+    /**
+     * Retrieves a list of TiledObject instances associated with the specified local ID.
+     *
+     * @param localId the local ID of the tile for which the objects are to be retrieved
+     * @return a list of TiledObject instances associated with the provided local ID,
+     * or an empty list if no objects are found
+     */
+    public List<TiledObject> getObjectsForLocalId(int localId) {
+        TileDefinition def = tileDefs.get(localId);
+        if (def == null || def.objects() == null) {
+            return java.util.Collections.emptyList();
+        }
+        return def.objects();
+    }
+
+    /**
+     * Retrieves the TileDefinition associated with the specified local ID.
+     *
+     * @param localId the local ID of the tile whose definition is to be retrieved
+     * @return the TileDefinition object associated with the given local ID, or null if no definition exists
+     */
+    public TileDefinition getDefinition(int localId) {
+        return tileDefs.get(localId);
     }
 }
