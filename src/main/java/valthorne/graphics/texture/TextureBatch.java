@@ -429,6 +429,32 @@ public final class TextureBatch {
     }
 
     /**
+     * Adjusts the given value based on the size parameter. If the size is greater than 1,
+     * the value is incremented by 0.5. Otherwise, the value remains unchanged.
+     *
+     * @param value the initial float value to be adjusted
+     * @param size the size parameter that determines whether the value should be incremented
+     * @return the adjusted float value based on the size parameter
+     */
+    private static float insetMin(float value, float size) {
+        return size > 1f ? value + 0.5f : value;
+    }
+
+    /**
+     * Adjusts the given value by adding a specified size, with a modification
+     * for sizes greater than 1. If the size is greater than 1, 0.5 is subtracted
+     * from the resulting sum. Otherwise, the size is added directly to the value.
+     *
+     * @param value the initial value to be adjusted
+     * @param size the size to be added to the value
+     * @return the adjusted value after adding the size, with the specific
+     *         modification for sizes greater than 1
+     */
+    private static float insetMax(float value, float size) {
+        return size > 1f ? value + size - 0.5f : value + size;
+    }
+
+    /**
      * <p>
      * Begins a new scissor clip region for subsequently queued draw operations.
      * </p>
@@ -1175,13 +1201,19 @@ public final class TextureBatch {
             return;
         }
 
-        float u0 = regionX / texW;
-        float v0 = regionY / texH;
-        float u1 = (regionX + regionWidth) / texW;
-        float v1 = (regionY + regionHeight) / texH;
+        float x0 = insetMin(regionX, regionWidth);
+        float y0 = insetMin(regionY, regionHeight);
+        float x1 = insetMax(regionX, regionWidth);
+        float y1 = insetMax(regionY, regionHeight);
+
+        float u0 = x0 / texW;
+        float v0 = y0 / texH;
+        float u1 = x1 / texW;
+        float v1 = y1 / texH;
 
         drawUV(tex, x, y, w, h, u0, v0, u1, v1, 0f, 0f, 0f, 1f, tint);
     }
+
 
     /**
      * <p>
@@ -1223,6 +1255,19 @@ public final class TextureBatch {
         draw(region.getTexture(), x, y, w, h, region.getRegionX(), region.getRegionY(), region.getRegionWidth(), region.getRegionHeight(), tint);
     }
 
+    /**
+     * Draws a texture on the screen with specified position, size, origin, rotation, and color tint.
+     *
+     * @param tex the texture to be drawn; must not be null
+     * @param x the x-coordinate where the texture will be drawn
+     * @param y the y-coordinate where the texture will be drawn
+     * @param w the width of the texture
+     * @param h the height of the texture
+     * @param originX the x-coordinate of the origin point for rotation
+     * @param originY the y-coordinate of the origin point for rotation
+     * @param rotation the angle of rotation in degrees, counter-clockwise
+     * @param tint the color tint to be applied to the texture; null for no tint
+     */
     public void draw(Texture tex, float x, float y, float w, float h, float originX, float originY, float rotation, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
 
@@ -1233,6 +1278,23 @@ public final class TextureBatch {
         drawUV(tex, x, y, w, h, 0f, 0f, 1f, 1f, originX, originY, sin, cos, tint);
     }
 
+    /**
+     * Draws a portion of a texture on a specified position with given dimensions, rotation, and color tint.
+     *
+     * @param tex          the texture to be drawn; must not be null
+     * @param x            the x-coordinate of the bottom-left corner where the texture will be drawn
+     * @param y            the y-coordinate of the bottom-left corner where the texture will be drawn
+     * @param w            the width of the texture to be drawn
+     * @param h            the height of the texture to be drawn
+     * @param regionX      the x-coordinate of the region within the texture to use
+     * @param regionY      the y-coordinate of the region within the texture to use
+     * @param regionWidth  the width of the region within the texture to use
+     * @param regionHeight the height of the region within the texture to use
+     * @param originX      the x-coordinate of the rotation origin, relative to the bottom-left corner of the texture
+     * @param originY      the y-coordinate of the rotation origin, relative to the bottom-left corner of the texture
+     * @param rotation     the rotation angle in degrees, where a positive value rotates counter-clockwise
+     * @param tint         the color tint to apply to the texture; must not be null
+     */
     public void draw(Texture tex, float x, float y, float w, float h, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
 
@@ -1250,10 +1312,15 @@ public final class TextureBatch {
             return;
         }
 
-        float u0 = regionX / texW;
-        float v0 = regionY / texH;
-        float u1 = (regionX + regionWidth) / texW;
-        float v1 = (regionY + regionHeight) / texH;
+        float x0 = insetMin(regionX, regionWidth);
+        float y0 = insetMin(regionY, regionHeight);
+        float x1 = insetMax(regionX, regionWidth);
+        float y1 = insetMax(regionY, regionHeight);
+
+        float u0 = x0 / texW;
+        float v0 = y0 / texH;
+        float u1 = x1 / texW;
+        float v1 = y1 / texH;
 
         float rad = (float) Math.toRadians(-rotation);
         float sin = (float) Math.sin(rad);
@@ -1319,13 +1386,18 @@ public final class TextureBatch {
             return;
         }
 
-        float baseX = region.getRegionX();
-        float baseY = region.getRegionY();
+        float baseX = region.getRegionX() + regionX;
+        float baseY = region.getRegionY() + regionY;
 
-        float u0 = (baseX + regionX) / texW;
-        float v0 = (baseY + regionY) / texH;
-        float u1 = (baseX + regionX + regionWidth) / texW;
-        float v1 = (baseY + regionY + regionHeight) / texH;
+        float x0 = insetMin(baseX, regionWidth);
+        float y0 = insetMin(baseY, regionHeight);
+        float x1 = insetMax(baseX, regionWidth);
+        float y1 = insetMax(baseY, regionHeight);
+
+        float u0 = x0 / texW;
+        float v0 = y0 / texH;
+        float u1 = x1 / texW;
+        float v1 = y1 / texH;
 
         float rad = (float) Math.toRadians(-rotation);
         float sin = (float) Math.sin(rad);
