@@ -3,8 +3,12 @@ package valthorne.graphics.map.tiled;
 import valthorne.asset.AssetParameters;
 import valthorne.io.file.ValthorneFiles;
 
-import java.util.HashMap;
-import java.util.Map;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import java.io.ByteArrayInputStream;
+import java.util.*;
 
 /**
  * Asset parameters used for loading a Tiled TMX map through Valthorne's asset system.
@@ -136,28 +140,145 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
     }
 
     /**
-     * Creates byte-based map parameters from classpath resources.
+     * Creates in-memory Tiled map parameters using a resource located on the classpath.
+     * Resolves all dependencies recursively and stores them in-memory.
      *
-     * <p>
-     * The main TMX resource and all dependency resources are loaded immediately into an
-     * in-memory file map using {@link ValthorneFiles#readBytes(String)}.
-     * </p>
-     *
-     * @param tmxResourcePath         the classpath path to the TMX file bytes
-     * @param virtualPath             the logical TMX path used inside the dependency map
-     * @param name                    the custom asset key
-     * @param dependencyResourcePaths the classpath paths of dependency files to preload
-     * @return a new byte-based Tiled map parameter set backed by classpath resource bytes
+     * @param tmxResourcePath the path of the TMX resource file on the classpath
+     * @param name            the custom asset key used to identify the map
+     * @return a TiledMapParameters instance representing the TMX map and its dependencies
      */
-    public static TiledMapParameters fromClasspath(String tmxResourcePath, String virtualPath, String name, String... dependencyResourcePaths) {
+    public static TiledMapParameters fromClasspath(String tmxResourcePath, String name) {
+        String virtualPath = normalize(tmxResourcePath);
         Map<String, byte[]> files = new HashMap<>();
-        files.put(normalize(virtualPath), ValthorneFiles.readBytes(tmxResourcePath));
+        Set<String> visited = new HashSet<>();
 
-        for (String dependency : dependencyResourcePaths) {
-            files.put(normalize(dependency), ValthorneFiles.readBytes(dependency));
+        collectClasspathDependencies(virtualPath, null, files, visited);
+
+        return fromBytes(files.get(virtualPath), virtualPath, files, name);
+    }
+
+    /**
+     * Creates in-memory Tiled map parameters using a resource located on the classpath.
+     * Resolves all dependencies recursively and stores them in-memory.
+     *
+     * @param tmxResourcePath the path of the TMX resource file on the classpath
+     * @return a TiledMapParameters instance representing the TMX map and its dependencies
+     */
+    public static TiledMapParameters fromClasspath(String tmxResourcePath) {
+        return fromClasspath(tmxResourcePath, normalize(tmxResourcePath));
+    }
+
+    private static void collectClasspathDependencies(String resourcePath, String rawReference, Map<String, byte[]> files, Set<String> visited) {
+        String normalizedPath = normalize(resourcePath);
+
+        if (!visited.add(normalizedPath)) {
+            byte[] existing = files.get(normalizedPath);
+            if (existing != null) {
+                addAliases(files, normalizedPath, rawReference, existing);
+            }
+            return;
         }
 
-        return fromBytes(files.get(normalize(virtualPath)), virtualPath, files, name);
+        byte[] bytes = ValthorneFiles.readBytes(normalizedPath);
+        addAliases(files, normalizedPath, rawReference, bytes);
+
+        if (!isXmlDependency(normalizedPath)) {
+            return;
+        }
+
+        for (String dependency : readDependencyPaths(bytes)) {
+            String resolved = resolveRelative(normalizedPath, dependency);
+            collectClasspathDependencies(resolved, dependency, files, visited);
+        }
+    }
+
+    private static void addAliases(Map<String, byte[]> files, String normalizedPath, String rawReference, byte[] bytes) {
+        files.put(normalizedPath, bytes);
+        files.put(toAbsoluteAlias(normalizedPath), bytes);
+
+        if (rawReference != null && !rawReference.isBlank()) {
+            files.putIfAbsent(normalize(rawReference), bytes);
+        }
+    }
+
+    private static boolean isXmlDependency(String path) {
+        String lower = path.toLowerCase();
+        return lower.endsWith(".tmx") || lower.endsWith(".tsx");
+    }
+
+    private static List<String> readDependencyPaths(byte[] bytes) {
+        List<String> dependencies = new ArrayList<>();
+
+        try {
+            XMLInputFactory factory = XMLInputFactory.newFactory();
+            XMLStreamReader reader = factory.createXMLStreamReader(new ByteArrayInputStream(bytes));
+
+            while (reader.hasNext()) {
+                int event = reader.next();
+
+                if (event != XMLStreamConstants.START_ELEMENT) {
+                    continue;
+                }
+
+                String element = reader.getLocalName();
+                if (!"tileset".equals(element) && !"image".equals(element)) {
+                    continue;
+                }
+
+                String source = reader.getAttributeValue(null, "source");
+                if (source != null && !source.isBlank()) {
+                    dependencies.add(source);
+                }
+            }
+
+            reader.close();
+            return dependencies;
+        } catch (XMLStreamException e) {
+            throw new RuntimeException("Failed to parse tiled classpath dependency tree: " + bytes.length + " bytes", e);
+        }
+    }
+
+    private static String resolveRelative(String parentPath, String childPath) {
+        String normalizedChild = normalize(childPath);
+
+        if (normalizedChild.contains(":")) {
+            return normalizedChild;
+        }
+
+        if (normalizedChild.startsWith("/")) {
+            return normalizedChild.substring(1);
+        }
+
+        String parentDir = directoryOf(parentPath);
+        String joined = parentDir.isEmpty() ? normalizedChild : parentDir + "/" + normalizedChild;
+
+        Deque<String> parts = new ArrayDeque<>();
+        for (String part : joined.split("/")) {
+            if (part.isEmpty() || ".".equals(part)) {
+                continue;
+            }
+
+            if ("..".equals(part)) {
+                if (!parts.isEmpty()) {
+                    parts.removeLast();
+                }
+                continue;
+            }
+
+            parts.addLast(part);
+        }
+
+        return String.join("/", parts);
+    }
+
+    private static String directoryOf(String path) {
+        String normalized = normalize(path);
+        int index = normalized.lastIndexOf('/');
+        return index == -1 ? "" : normalized.substring(0, index);
+    }
+
+    private static String toAbsoluteAlias(String path) {
+        return normalize(System.getProperty("user.dir")) + "/" + normalize(path);
     }
 
     /**
