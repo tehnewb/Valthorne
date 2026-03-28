@@ -4,6 +4,7 @@ import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.Window;
 import valthorne.camera.Camera;
+import valthorne.camera.OrthographicCamera;
 import valthorne.event.events.*;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UIRoot;
@@ -127,7 +128,10 @@ public abstract class Scene {
         this.batch = new TextureBatch(4096, 16);
         this.ui = new UIRoot();
         this.viewport = new ScreenViewport(Window.getWidth(), Window.getHeight());
+        this.camera = new OrthographicCamera();
         this.viewport.update(Window.getWidth(), Window.getHeight());
+        this.viewport.setCamera(this.camera);
+        this.camera.setCenter(viewport.getWorldWidth() * 0.5f, viewport.getWorldHeight() * 0.5f);
         this.ui.setViewport(new ScreenViewport(Window.getWidth(), Window.getHeight()));
 
         this.windowResizeListener = new SceneWindowResizeListener(this);
