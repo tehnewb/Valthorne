@@ -4,6 +4,7 @@ import valthorne.graphics.Color;
 import valthorne.graphics.font.Font;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
+import valthorne.ui.enums.Alignment;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
@@ -74,14 +75,21 @@ public class Label extends UINode {
      */
     public static final StyleKey<Color> COLOR_KEY = StyleKey.of("color", Color.class);
 
-    private String text = ""; // Current text displayed by the label
-    private Font font; // Font resolved from the label style
-    private Color color; // Color resolved from the label style
+    /**
+     * Style key used to resolve the alignment for horizontal label coordination
+     */
+    public static final StyleKey<Alignment> ALIGNMENT_KEY = StyleKey.of("alignment", Alignment.class, Alignment.START);
+
+    private String text = "";
+    private Font font;
+    private Color color;
+    private Alignment alignment = Alignment.START;
 
     /**
+     * Constructs a new default instance of the Label class.
      * <p>
-     * Creates a new empty label.
-     * </p>
+     * This constructor creates a Label with default configurations.
+     * Default properties such as text, font, color, and alignment can be set or modified using the respective methods provided in the class.
      */
     public Label() {
     }
@@ -101,55 +109,19 @@ public class Label extends UINode {
         this.text = text == null ? "" : text;
     }
 
-    /**
-     * <p>
-     * Called when this label is created.
-     * </p>
-     *
-     * <p>
-     * This implementation currently performs no creation logic, but the method exists
-     * as part of the UI node lifecycle.
-     * </p>
-     */
     @Override
     public void onCreate() {
+        recalculateSize();
     }
 
-    /**
-     * <p>
-     * Called when this label is destroyed.
-     * </p>
-     *
-     * <p>
-     * This implementation currently performs no destruction logic.
-     * </p>
-     */
     @Override
     public void onDestroy() {
     }
 
-    /**
-     * <p>
-     * Updates this label.
-     * </p>
-     *
-     * <p>
-     * This implementation currently performs no per-frame logic.
-     * </p>
-     *
-     * @param delta the frame delta time
-     */
     @Override
     public void update(float delta) {
     }
 
-    /**
-     * <p>
-     * Returns the current text displayed by this label.
-     * </p>
-     *
-     * @return the current label text
-     */
     public String getText() {
         return text;
     }
@@ -170,6 +142,7 @@ public class Label extends UINode {
      */
     public Label text(String text) {
         this.text = text == null ? "" : text;
+        recalculateSize();
         markLayoutDirty();
         return this;
     }
@@ -186,47 +159,161 @@ public class Label extends UINode {
      * data, the method delegates to the superclass implementation.
      * </p>
      */
+    public Label font(Font font) {
+        this.font = font;
+        recalculateSize();
+        markLayoutDirty();
+        return this;
+    }
+
+    /**
+     * Retrieves the font used by this label.
+     *
+     * @return the font currently assigned to this label
+     */
+    public Font getFont() {
+        return font;
+    }
+
+    /**
+     * Sets the color for this label.
+     *
+     * @param color the new color to be applied to the label
+     * @return this label, allowing for method chaining
+     */
+    public Label color(Color color) {
+        this.color = color;
+        return this;
+    }
+
+    public Color getColor() {
+        return color;
+    }
+
+    /**
+     * Sets the alignment for this label.
+     * <p>
+     * If the specified alignment is not null, it updates the label's alignment to the provided value.
+     *
+     * @param alignment the new alignment to be applied to the label
+     * @return this label, allowing for method chaining
+     */
+    public Label alignment(Alignment alignment) {
+        if (alignment != null)
+            this.alignment = alignment;
+        return this;
+    }
+
+    /**
+     * Retrieves the alignment currently assigned to this label.
+     *
+     * @return the alignment of the label
+     */
+    public Alignment getAlignment() {
+        return alignment;
+    }
+
     @Override
     protected void applyLayout() {
         ResolvedStyle style = getStyle();
 
         if (style != null) {
-            Font font = style.get(FONT_KEY);
-            this.font = font;
+            Font resolvedFont = style.get(FONT_KEY);
+            Color resolvedColor = style.get(COLOR_KEY);
+            Alignment resolvedAlignment = style.get(ALIGNMENT_KEY);
 
-            if (font != null) {
-                getLayout().width(font.getWidth(text));
-                getLayout().height(font.getHeight(text));
-            }
-
-            color = style.get(COLOR_KEY);
+            if (resolvedFont != null)
+                font = resolvedFont;
+            if (resolvedColor != null)
+                color = resolvedColor;
+            if (resolvedAlignment != null)
+                alignment = resolvedAlignment;
         }
 
+        recalculateSize();
         super.applyLayout();
     }
 
-    /**
-     * <p>
-     * Draws this label using the provided {@link TextureBatch}.
-     * </p>
-     *
-     * <p>
-     * If no font has been resolved, rendering is skipped. If a color is available,
-     * the colored font draw overload is used. Otherwise the font is drawn using its
-     * default draw path.
-     * </p>
-     *
-     * @param batch the batch used for rendering
-     */
+    private void recalculateSize() {
+        if (font == null || text == null || text.isEmpty()) {
+            getLayout().width(0f);
+            getLayout().height(0f);
+            return;
+        }
+
+        getLayout().width(measureTextWidth());
+        getLayout().height(measureTextHeight());
+    }
+
+    private String[] getLines() {
+        return text == null ? new String[]{""} : text.split("\n", -1);
+    }
+
+    private float measureTextWidth() {
+        if (font == null)
+            return 0f;
+
+        float width = 0f;
+        String[] lines = getLines();
+
+        for (String line : lines)
+            width = Math.max(width, font.getWidth(line));
+
+        return width;
+    }
+
+    private float measureTextHeight() {
+        if (font == null || text == null || text.isEmpty())
+            return 0f;
+
+        String[] lines = getLines();
+        if (lines.length == 1)
+            return font.getHeight(lines[0]);
+
+        float singleLineHeight = getSingleLineHeight();
+        float lineAdvance = getLineAdvance();
+        return singleLineHeight + (lines.length - 1) * lineAdvance;
+    }
+
+    private float getSingleLineHeight() {
+        return font == null ? 0f : font.getHeight("Ag");
+    }
+
+    private float getLineAdvance() {
+        if (font == null)
+            return 0f;
+
+        float singleLineHeight = getSingleLineHeight();
+        float twoLineHeight = font.getHeight("Ag\nAg");
+        float lineAdvance = twoLineHeight - singleLineHeight;
+        return lineAdvance > 0f ? lineAdvance : singleLineHeight;
+    }
+
     @Override
     public void draw(TextureBatch batch) {
-        if (font == null)
+        if (font == null || text == null || text.isEmpty())
             return;
 
-        if (color != null) {
-            font.draw(batch, text, getRenderX(), getRenderY(), color);
-        } else {
-            font.draw(batch, text, getRenderX(), getRenderY());
+        String[] lines = getLines();
+        float x = getRenderX();
+        float lineAdvance = getLineAdvance();
+        float topY = getRenderY() + measureTextHeight() - lineAdvance;
+        float availableWidth = getWidth();
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            float lineWidth = font.getWidth(line);
+            float lineX = switch (alignment) {
+                case START -> x;
+                case CENTER -> x + (availableWidth - lineWidth) * 0.5f;
+                case END -> x + availableWidth - lineWidth;
+            };
+            float lineY = topY - i * lineAdvance;
+
+            if (color != null)
+                font.draw(batch, line, lineX, lineY, color);
+            else
+                font.draw(batch, line, lineX, lineY);
         }
     }
 }

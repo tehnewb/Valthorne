@@ -113,7 +113,7 @@ import valthorne.viewport.Viewport;
  * @author Albert Beaupre
  * @since March 13th, 2026
  */
-public abstract class UINode {
+public abstract class UINode implements Dimensional{
 
     /**
      * Bit index used to mark whether the node is visible.
@@ -1173,6 +1173,38 @@ public abstract class UINode {
      */
     public final float getAbsoluteY() {
         return parent == null ? getY() : parent.getAbsoluteY() + getY();
+    }
+
+    @Override
+    public void setPosition(float x, float y) {
+        setX(x);
+        setY(y);
+    }
+
+    @Override
+    public void setWidth(float width) {
+        this.getLayout().width(width);
+    }
+
+    @Override
+    public void setHeight(float height) {
+        this.getLayout().height(height);
+    }
+
+    @Override
+    public void setX(float x) {
+        this.getLayout().left(x);
+    }
+
+    @Override
+    public void setY(float y) {
+        this.getLayout().top(y - getHeight());
+    }
+
+    @Override
+    public void setSize(float width, float height) {
+        setWidth(width);
+        setHeight(height);
     }
 
     /**
