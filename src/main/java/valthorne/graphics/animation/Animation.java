@@ -109,7 +109,7 @@ public class Animation implements Drawable {
      * </ul>
      *
      * <p>Note: If frames contain null elements, they are allowed. Null frames act like 0-duration frames for timing,
-     * and {@link #draw(float, float, float, float)} will no-op when the current frame is null.</p>
+     * and {@link #draw(TextureBatch, float, float, float, float)} will no-op when the current frame is null.</p>
      *
      * @param playbackMode playback mode to use
      * @param frames       ordered frames to play
@@ -155,7 +155,7 @@ public class Animation implements Drawable {
     /**
      * Returns the width of the current frame's {@link Drawable}.
      *
-     * <p>This is a convenience method for layout code. It does not reflect the width passed to {@link #draw(float, float, float, float)}.</p>
+     * <p>This is a convenience method for layout code.</p>
      * <p>If there is no current frame (null/empty frames) or drawable is null, returns 0.</p>
      *
      * @return drawable width or 0
@@ -170,7 +170,7 @@ public class Animation implements Drawable {
     /**
      * Returns the height of the current frame's {@link Drawable}.
      *
-     * <p>This is a convenience method for layout code. It does not reflect the height passed to {@link #draw(float, float, float, float)}.</p>
+     * <p>This is a convenience method for layout code.
      * <p>If there is no current frame (null/empty frames) or drawable is null, returns 0.</p>
      *
      * @return drawable height or 0
@@ -363,8 +363,6 @@ public class Animation implements Drawable {
 
     /**
      * Pauses animation updates.
-     *
-     * <p>Calling {@link #draw(float, float, float, float)} still draws the current frame.</p>
      */
     public void pause() {
         this.bits.set(PAUSED);
@@ -489,11 +487,13 @@ public class Animation implements Drawable {
      *
      * @param seconds time in seconds (clamped to >= 0 and into valid range)
      */
-    public void setTime(float seconds) {
-        if (frames == null || frames.length == 0) return;
+    public Animation time(float seconds) {
+        if (frames == null || frames.length == 0)
+            return this;
+
         if (totalDuration <= 0f) {
             setFrame(0);
-            return;
+            return this;
         }
 
         this.bits.clear(FINISHED);
@@ -511,7 +511,7 @@ public class Animation implements Drawable {
                 bits.set(RETURNING);
                 setTimeReverse(t - totalDuration);
             }
-            return;
+            return this;
         }
 
         if (playbackMode == PlaybackMode.FORWARD) {
@@ -519,6 +519,7 @@ public class Animation implements Drawable {
         } else {
             setTimeReverse(t);
         }
+        return this;
     }
 
     /**
@@ -548,8 +549,9 @@ public class Animation implements Drawable {
      *
      * @param animationListener animationListener or null
      */
-    public void setListener(AnimationListener animationListener) {
+    public Animation listener(AnimationListener animationListener) {
         this.animationListener = animationListener;
+        return this;
     }
 
     /**
@@ -587,12 +589,13 @@ public class Animation implements Drawable {
     /**
      * Enables or disables looping.
      *
-     * <p>If you set a loop count with {@link #setLoopCount(int)}, looping is automatically enabled when loops != 0.</p>
+     * <p>If you set a loop count with {@link #loopCount(int)}, looping is automatically enabled when loops != 0.</p>
      *
      * @param looping true to loop, false for one-shot behavior
      */
-    public void setLooping(boolean looping) {
+    public Animation looping(boolean looping) {
         this.bits.set(LOOPING, looping);
+        return this;
     }
 
     /**
@@ -609,9 +612,10 @@ public class Animation implements Drawable {
      *
      * @param loops loop limit (-1, 0, or N)
      */
-    public void setLoopCount(int loops) {
+    public Animation loopCount(int loops) {
         this.loopCountLimit = loops;
         this.bits.set(LOOPING, loops != 0);
+        return this;
     }
 
     /**
@@ -640,8 +644,8 @@ public class Animation implements Drawable {
      * <p>This disables looping and clears any loop limit.</p>
      */
     public void playOnce() {
-        setLoopCount(0);
-        setLooping(false);
+        loopCount(0);
+        looping(false);
     }
 
     /**
