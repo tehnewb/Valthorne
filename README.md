@@ -7,7 +7,7 @@ A lightweight 2D Java game engine built on LWJGL and inspired by libGDX
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.3-blue">
+  <img src="https://img.shields.io/badge/version-1.4.4-blue">
   &nbsp;&nbsp;&nbsp;
   <img src="https://img.shields.io/github/stars/tehnewb/Valthorne">
   &nbsp;&nbsp;&nbsp;
@@ -26,12 +26,12 @@ A lightweight 2D Java game engine built on LWJGL and inspired by libGDX
 
 ### Gradle (Groovy)
 ```groovy
-implementation 'io.github.tehnewb:Valthorne:1.4.3'
+implementation 'io.github.tehnewb:Valthorne:1.4.4'
 ```
 
 ### Gradle (Kotlin DSL)
 ```kotlin
-implementation("io.github.tehnewb:Valthorne:1.4.3")
+implementation("io.github.tehnewb:Valthorne:1.4.4")
 ```
 
 ### Maven
@@ -39,6 +39,6 @@ implementation("io.github.tehnewb:Valthorne:1.4.3")
 <dependency>
     <groupId>io.github.tehnewb</groupId>
     <artifactId>Valthorne</artifactId>
-    <version>1.4.3</version>
+    <version>1.4.4</version>
 </dependency>
 ```
