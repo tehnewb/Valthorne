@@ -17,9 +17,7 @@ import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
 import static org.lwjgl.opengl.GL20.glDisableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
-import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
-import static org.lwjgl.opengl.GL30.glBindFramebuffer;
+import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
 import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
 
@@ -104,6 +102,7 @@ public final class TextureBatch {
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
     private final int quadVBO; // VBO containing the shared quad geometry used by all instances
     private final int instanceVBO; // VBO containing uploaded instance data for the current flush
+    private final int vao;
     private int[] textureIDs; // Cached texture IDs currently bound to the batch's texture units
     private final int[] vp = new int[4]; // Temporary viewport storage used when switching framebuffer targets
     private final int[] previousScissorBox = new int[4]; // Previous OpenGL scissor rectangle restored after batching
@@ -224,7 +223,61 @@ public final class TextureBatch {
         glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
         glBufferData(GL_ARRAY_BUFFER, (long) this.maxSprites * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
 
+        vao = glGenVertexArrays();
+        configureVertexArray();
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
+    private void configureVertexArray() {
+        glBindVertexArray(vao);
+
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+
+        int quadStride = TextureBatchContract.QUAD_FLOATS_PER_VERT * TextureBatchContract.BYTES_PER_FLOAT;
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_LOCAL);
+        glVertexAttribPointer(TextureBatchContract.ATTR_LOCAL, 2, GL_FLOAT, false, quadStride, 0L);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_UV);
+        glVertexAttribPointer(TextureBatchContract.ATTR_UV, 2, GL_FLOAT, false, quadStride, 2L * TextureBatchContract.BYTES_PER_FLOAT);
+
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_XYWH);
+        glVertexAttribPointer(TextureBatchContract.ATTR_XYWH, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 0L);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_XYWH, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_COL);
+        glVertexAttribPointer(TextureBatchContract.ATTR_COL, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 4L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_COL, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_TEX);
+        glVertexAttribPointer(TextureBatchContract.ATTR_TEX, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 8L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_TEX, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_UVRECT);
+        glVertexAttribPointer(TextureBatchContract.ATTR_UVRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 9L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
+        glVertexAttribPointer(TextureBatchContract.ATTR_ORIGIN, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 13L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_ROT);
+        glVertexAttribPointer(TextureBatchContract.ATTR_ROT, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 15L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
+        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 17L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 1);
+
+        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
+        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPENABLED, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 21L * TextureBatchContract.BYTES_PER_FLOAT);
+        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 1);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
     }
 
     /**
@@ -433,7 +486,7 @@ public final class TextureBatch {
      * the value is incremented by 0.5. Otherwise, the value remains unchanged.
      *
      * @param value the initial float value to be adjusted
-     * @param size the size parameter that determines whether the value should be incremented
+     * @param size  the size parameter that determines whether the value should be incremented
      * @return the adjusted float value based on the size parameter
      */
     private static float insetMin(float value, float size) {
@@ -446,9 +499,9 @@ public final class TextureBatch {
      * from the resulting sum. Otherwise, the size is added directly to the value.
      *
      * @param value the initial value to be adjusted
-     * @param size the size to be added to the value
+     * @param size  the size to be added to the value
      * @return the adjusted value after adding the size, with the specific
-     *         modification for sizes greater than 1
+     * modification for sizes greater than 1
      */
     private static float insetMax(float value, float size) {
         return size > 1f ? value + size - 0.5f : value + size;
@@ -1258,15 +1311,15 @@ public final class TextureBatch {
     /**
      * Draws a texture on the screen with specified position, size, origin, rotation, and color tint.
      *
-     * @param tex the texture to be drawn; must not be null
-     * @param x the x-coordinate where the texture will be drawn
-     * @param y the y-coordinate where the texture will be drawn
-     * @param w the width of the texture
-     * @param h the height of the texture
-     * @param originX the x-coordinate of the origin point for rotation
-     * @param originY the y-coordinate of the origin point for rotation
+     * @param tex      the texture to be drawn; must not be null
+     * @param x        the x-coordinate where the texture will be drawn
+     * @param y        the y-coordinate where the texture will be drawn
+     * @param w        the width of the texture
+     * @param h        the height of the texture
+     * @param originX  the x-coordinate of the origin point for rotation
+     * @param originY  the y-coordinate of the origin point for rotation
      * @param rotation the angle of rotation in degrees, counter-clockwise
-     * @param tint the color tint to be applied to the texture; null for no tint
+     * @param tint     the color tint to be applied to the texture; null for no tint
      */
     public void draw(Texture tex, float x, float y, float w, float h, float originX, float originY, float rotation, Color tint) {
         Objects.requireNonNull(tex, "Texture cannot be null");
@@ -1534,30 +1587,11 @@ public final class TextureBatch {
 
         flush();
 
-        glVertexAttribDivisor(TextureBatchContract.ATTR_XYWH, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_COL, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_TEX, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 0);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 0);
-
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_LOCAL);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_UV);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_XYWH);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_COL);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_TEX);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_UVRECT);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_ROT);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
-        glDisableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
-
         activeShader.unbind();
+        glBindVertexArray(0);
         drawing = false;
 
-        for (int i = 0; i < activeTextureCount; i++) {
+        for (int i = 0; i < maxTextureUnits; i++) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
@@ -1641,6 +1675,7 @@ public final class TextureBatch {
      */
     public void dispose() {
         defaultShader.dispose();
+        glDeleteVertexArrays(vao);
         glDeleteBuffers(quadVBO);
         glDeleteBuffers(instanceVBO);
     }
@@ -1659,52 +1694,7 @@ public final class TextureBatch {
      */
     private void bindActiveShaderState() {
         activeShader.bind();
-
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-
-        int quadStride = TextureBatchContract.QUAD_FLOATS_PER_VERT * TextureBatchContract.BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_LOCAL);
-        glVertexAttribPointer(TextureBatchContract.ATTR_LOCAL, 2, GL_FLOAT, false, quadStride, 0L);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_UV);
-        glVertexAttribPointer(TextureBatchContract.ATTR_UV, 2, GL_FLOAT, false, quadStride, 2L * TextureBatchContract.BYTES_PER_FLOAT);
-
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_XYWH);
-        glVertexAttribPointer(TextureBatchContract.ATTR_XYWH, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 0L);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_XYWH, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_COL);
-        glVertexAttribPointer(TextureBatchContract.ATTR_COL, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 4L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_COL, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_TEX);
-        glVertexAttribPointer(TextureBatchContract.ATTR_TEX, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 8L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_TEX, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_UVRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_UVRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 9L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
-        glVertexAttribPointer(TextureBatchContract.ATTR_ORIGIN, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 13L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_ROT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_ROT, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 15L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 17L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPENABLED, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 21L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 1);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(vao);
     }
 
     /**

@@ -93,16 +93,16 @@ public final class TiledMapData {
      * runtime tileset lookup depends on tilesets being ordered from lowest to highest global ID.
      * </p>
      *
-     * @param name the map name, or null to use an empty string
-     * @param width the map width in tiles
-     * @param height the map height in tiles
-     * @param tileWidth the tile width in pixels
-     * @param tileHeight the tile height in pixels
-     * @param infinite true if the map uses Tiled's infinite-map mode
+     * @param name        the map name, or null to use an empty string
+     * @param width       the map width in tiles
+     * @param height      the map height in tiles
+     * @param tileWidth   the tile width in pixels
+     * @param tileHeight  the tile height in pixels
+     * @param infinite    true if the map uses Tiled's infinite-map mode
      * @param orientation the orientation string, or null to default to {@code orthogonal}
-     * @param properties the root property map, or null to use an empty map
+     * @param properties  the root property map, or null to use an empty map
      * @param tileSetData the parsed tileset data list, or null to use an empty list
-     * @param mapLayers the parsed map layers, or null to use an empty list
+     * @param mapLayers   the parsed map layers, or null to use an empty list
      */
     private TiledMapData(String name, int width, int height, int tileWidth, int tileHeight, boolean infinite, String orientation, Map<String, String> properties, List<TileSetData> tileSetData, List<MapLayer> mapLayers) {
         this.name = name != null ? name : "";
@@ -133,7 +133,7 @@ public final class TiledMapData {
      * </p>
      *
      * @param tmxFilePath the file path to the TMX file
-     * @param resolver the dependency resolver used to load referenced TSX files and image bytes
+     * @param resolver    the dependency resolver used to load referenced TSX files and image bytes
      * @return the parsed map data
      * @throws RuntimeException if the file cannot be read or parsing fails
      */
@@ -167,11 +167,11 @@ public final class TiledMapData {
      * </p>
      *
      * @param tmxBytes the raw TMX XML bytes
-     * @param tmxPath the logical or real path of the TMX file for dependency resolution
+     * @param tmxPath  the logical or real path of the TMX file for dependency resolution
      * @param resolver the dependency resolver used to load referenced files
      * @return the parsed map data
      * @throws NullPointerException if {@code tmxBytes} or {@code resolver} is null
-     * @throws RuntimeException if XML parsing or dependency loading fails
+     * @throws RuntimeException     if XML parsing or dependency loading fails
      */
     public static TiledMapData load(byte[] tmxBytes, String tmxPath, TiledDependencyResolver resolver) {
         Objects.requireNonNull(tmxBytes, "tmxBytes");
@@ -204,7 +204,8 @@ public final class TiledMapData {
                         case "tileset" -> tileSets.add(TileSetData.load(tmxBytes, tmxPath, resolver, reader));
                         case "layer" -> layers.add(TiledTileMapLayer.load(tmxBytes, reader));
                         case "objectgroup" -> layers.add(TiledObjectMapLayer.load(reader));
-                        case "imagelayer" -> layers.add(TiledImageMapLayerData.load(tmxBytes, tmxPath, resolver, reader));
+                        case "imagelayer" ->
+                                layers.add(TiledImageMapLayerData.load(tmxBytes, tmxPath, resolver, reader));
                         default -> TiledXML.skipElement(reader);
                     }
                 } else if (event == XMLStreamConstants.END_ELEMENT) {
@@ -218,6 +219,18 @@ public final class TiledMapData {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Converts this {@code TiledMapData} instance into a {@code TiledMap} representation.
+     * <p>
+     * This method creates a new {@code TiledMap} object based on the data contained
+     * in the current {@code TiledMapData} instance, allowing for runtime usage of the map.
+     *
+     * @return a {@code TiledMap} instance created from this {@code TiledMapData}
+     */
+    public TiledMap asTiledMap() {
+        return new TiledMap(this);
     }
 
     /**

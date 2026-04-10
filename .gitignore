@@ -94,3 +94,4 @@ gradle.properties
 sonatype-token.png
 signing-data.png
 /src/test/*
+.claude/settings.local.json

@@ -22,6 +22,7 @@ import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
+import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
 
 /**
  * <p>
@@ -530,6 +531,7 @@ public class UIRoot extends UIContainer {
         detachFromRoot();
         Yoga.YGConfigFree(yogaConfig);
         batch.dispose();
+        nvgDelete(nanoVGHandle);
     }
 
     /**

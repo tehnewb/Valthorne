@@ -36,17 +36,17 @@ import java.nio.file.Path;
  * }
  * }</pre>
  *
- * @param source the original source used for stream reopening, or {@code null} for fully buffered sounds
- * @param data the decoded PCM data for buffered sounds, or {@code null} for streamed sounds
- * @param streamOffset the start offset used when opening a stream from the source
- * @param streamLength the readable stream length in bytes
- * @param duration the sound duration in seconds
- * @param channels the number of audio channels
- * @param sampleRate the sample rate in hertz
+ * @param source        the original source used for stream reopening, or {@code null} for fully buffered sounds
+ * @param data          the decoded PCM data for buffered sounds, or {@code null} for streamed sounds
+ * @param streamOffset  the start offset used when opening a stream from the source
+ * @param streamLength  the readable stream length in bytes
+ * @param duration      the sound duration in seconds
+ * @param channels      the number of audio channels
+ * @param sampleRate    the sample rate in hertz
  * @param bitsPerSample the bits per sample
- * @param streaming whether this sound should be played through a stream
- * @param compressed whether the original format is compressed
- * @param format the detected audio format
+ * @param streaming     whether this sound should be played through a stream
+ * @param compressed    whether the original format is compressed
+ * @param format        the detected audio format
  * @author Albert Beaupre
  * @since March 26th, 2026
  */
@@ -162,7 +162,7 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
     /**
      * Returns whether the sound should be streamed rather than fully buffered.
      *
-     * @param format the detected audio format
+     * @param format   the detected audio format
      * @param metadata the probed metadata
      * @return {@code true} when streaming should be used
      */
@@ -188,6 +188,15 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
     }
 
     /**
+     * Converts the current SoundData object into a SoundPlayer instance.
+     *
+     * @return a new SoundPlayer initialized with the current SoundData
+     */
+    public SoundPlayer asSoundPlayer() {
+        return new SoundPlayer(this);
+    }
+
+    /**
      * Returns whether the detected format should be considered compressed.
      *
      * @param format the detected format
@@ -204,7 +213,7 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
      * Probes metadata from an in-memory sound source.
      *
      * @param format the detected format
-     * @param bytes the encoded sound bytes
+     * @param bytes  the encoded sound bytes
      * @return the probed sound metadata
      * @throws Exception if probing fails
      */
@@ -221,7 +230,7 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
      * Probes metadata from a path-based sound source.
      *
      * @param format the detected format
-     * @param path the file path
+     * @param path   the file path
      * @return the probed sound metadata
      * @throws Exception if probing fails
      */

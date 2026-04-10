@@ -82,10 +82,12 @@ public class EventPublisher {
      * @throws IllegalArgumentException if clazz or listener is null
      */
     public void register(Class<? extends Event> clazz, EventListener listener) {
-        Objects.requireNonNull(clazz, "A null event class cannot be registered.");
-        Objects.requireNonNull(listener, "A null listener cannot be registered for an event class.");
+        synchronized (listeners) {
+            Objects.requireNonNull(clazz, "A null event class cannot be registered.");
+            Objects.requireNonNull(listener, "A null listener cannot be registered for an event class.");
 
-        listeners.computeIfAbsent(clazz, this::createSet).add(listener);
+            listeners.computeIfAbsent(clazz, this::createSet).add(listener);
+        }
     }
 
     /**
@@ -97,11 +99,13 @@ public class EventPublisher {
      * @throws IllegalArgumentException if clazz or listener is null
      */
     public boolean unregister(Class<? extends Event> clazz, EventListener listener) {
-        Objects.requireNonNull(clazz, "A null event class cannot be unregistered from.");
-        Objects.requireNonNull(listener, "A null listener cannot be unregistered from an event class.");
+        synchronized (listeners) {
+            Objects.requireNonNull(clazz, "A null event class cannot be unregistered from.");
+            Objects.requireNonNull(listener, "A null listener cannot be unregistered from an event class.");
 
-        TreeSet<EventListener> set = listeners.get(clazz);
-        return set != null && set.remove(listener);
+            TreeSet<EventListener> set = listeners.get(clazz);
+            return set != null && set.remove(listener);
+        }
     }
 
     /**
@@ -114,30 +118,33 @@ public class EventPublisher {
      * @throws RuntimeException     if an exception occurs while a listener is handling the event
      */
     public void publish(Event event) {
-        Objects.requireNonNull(event, "A null event cannot be published.");
+        synchronized (listeners) {
+            Objects.requireNonNull(event, "A null event cannot be published.");
 
-        Class<?> clazz = event.getClass();
+            Class<?> clazz = event.getClass();
+            event.unconsume();
 
-        while (clazz != null && Event.class.isAssignableFrom(clazz)) {
-            @SuppressWarnings("unchecked")
-            TreeSet<EventListener> set = listeners.get((Class<? extends Event>) clazz);
+            while (clazz != null && Event.class.isAssignableFrom(clazz)) {
+                @SuppressWarnings("unchecked")
+                TreeSet<EventListener> set = listeners.get((Class<? extends Event>) clazz);
 
-            if (set != null) {
-                for (EventListener listener : set) {
-                    if (event.isConsumed())
-                        return;
+                if (set != null) {
+                    for (EventListener listener : set) {
+                        if (event.isConsumed())
+                            return;
 
-                    try {
-                        if (listener.canHandle(event)) {
-                            listener.handle(event);
+                        try {
+                            if (listener.canHandle(event)) {
+                                listener.handle(event);
+                            }
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to handle event", e);
                         }
-                    } catch (Exception e) {
-                        throw new RuntimeException("Failed to handle event", e);
                     }
                 }
-            }
 
-            clazz = clazz.getSuperclass();
+                clazz = clazz.getSuperclass();
+            }
         }
     }
 

@@ -94,7 +94,7 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
         }
         rgba.flip();
 
-        TextureData textureData = new TextureData(rgba, (short) atlasSize, (short) atlasSize);
+        TextureData textureData = new TextureData(rgba, atlasSize, atlasSize);
 
         Glyph[] glyphArray = new Glyph[numChars];
         for (int i = 0; i < numChars; i++) {
@@ -126,6 +126,15 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Converts the current {@code FontData} object into a {@code Font} object.
+     *
+     * @return a new {@code Font} instance created from the current {@code FontData}.
+     */
+    public Font asFont() {
+        return new Font(this);
     }
 
     /**
