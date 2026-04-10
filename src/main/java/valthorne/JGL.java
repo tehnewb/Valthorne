@@ -148,7 +148,7 @@ public class JGL {
         if (listener == null)
             throw new NullPointerException("A null EventListener cannot be registered for " + eventType.getSimpleName() + " events.");
 
-        runTask(() -> events.register(eventType, listener));
+        events.register(eventType, listener);
     }
 
     /**
@@ -166,7 +166,7 @@ public class JGL {
             throw new NullPointerException("A null event type cannot be unregistered for event listeners.");
         if (listener == null)
             throw new NullPointerException("A null EventListener cannot be unregistered for " + eventType.getSimpleName() + " events.");
-        runTask(() -> events.unregister(eventType, listener));
+        events.unregister(eventType, listener);
     }
 
     /**
@@ -179,7 +179,7 @@ public class JGL {
      */
     public static void publish(Event event) {
         if (event == null) throw new NullPointerException("A null event cannot be published to the event bus.");
-        runTask(() -> events.publish(event));
+        events.publish(event);
     }
 
     /**

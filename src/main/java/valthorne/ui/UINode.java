@@ -421,7 +421,7 @@ public abstract class UINode implements Dimensional{
      * This method sets a specific bit to false to indicate
      * the disabled state and triggers a style update.
      */
-    public void disabled() {
+    public void disable() {
         bits.set(ENABLED_BIT, false);
         invalidateStyle();
     }

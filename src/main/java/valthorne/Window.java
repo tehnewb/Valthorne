@@ -63,8 +63,8 @@ public final class Window {
 
     private static SwapInterval swapInterval = SwapInterval.OFF;                             // Current swap interval (vsync mode) cached for init.
     private static long address;                                                             // GLFW window handle (0/NULL means not created).
-    private static short x, y;                                                               // Cached window position in screen coordinates.
-    private static short width, height;                                                      // Cached window size in screen coordinates.
+    private static int x, y;                                                               // Cached window position in screen coordinates.
+    private static int width, height;                                                      // Cached window size in screen coordinates.
     private static boolean fullscreen = false;                                               // Cached fullscreen state.
     private static boolean borderless = false;                                               // Cached borderless/undecorated state.
     private static boolean resizable = true;                                                 // Cached resizable state.
@@ -165,11 +165,11 @@ public final class Window {
         sizeCallback = glfwSetWindowSizeCallback(address, (win, newW, newH) -> {
             if (newW <= 0 || newH <= 0) return;
 
-            short oldWidth = Window.width;
-            short oldHeight = Window.height;
+            int oldWidth = Window.width;
+            int oldHeight = Window.height;
 
-            Window.width = (short) newW;
-            Window.height = (short) newH;
+            Window.width = newW;
+            Window.height = newH;
 
             glViewport(0, 0, newW, newH);
 
@@ -188,8 +188,8 @@ public final class Window {
         });
 
         posCallback = glfwSetWindowPosCallback(address, (win, newX, newY) -> {
-            Window.x = (short) newX;
-            Window.y = (short) newY;
+            Window.x = newX;
+            Window.y = newY;
         });
 
         focusCallback = glfwSetWindowFocusCallback(address, (win, focused) -> {

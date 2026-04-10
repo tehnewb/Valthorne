@@ -255,6 +255,21 @@ public abstract class UIContainer extends UINode {
     }
 
     /**
+     * Adds one or more child nodes to this container.
+     * <p>
+     * The specified child nodes are added sequentially, establishing parent relationships
+     * and integrating them into the container's structure.
+     *
+     * @param children the array of child nodes to add
+     */
+    public void add(UINode... children) {
+        for (UINode child : children) {
+            if (child == null) throw new NullPointerException("Cannot add a null UINode to a UIContainer");
+            add(child);
+        }
+    }
+
+    /**
      * Removes a child node from this container.
      *
      * @param child the node to remove
@@ -286,6 +301,22 @@ public abstract class UIContainer extends UINode {
         children[--size] = null;
 
         markLayoutDirty();
+    }
+
+    /**
+     * Removes one or more child nodes from this container.
+     * <p>
+     * This method iterates through the specified child nodes, ignoring any that
+     * are null, and removes them from the container. If a child is already not
+     * present in the container, it will have no effect.
+     *
+     * @param children the array of child nodes to be removed
+     */
+    public void remove(UINode... children) {
+        for (UINode child : children) {
+            if (child == null) continue;
+            remove(child);
+        }
     }
 
     /**

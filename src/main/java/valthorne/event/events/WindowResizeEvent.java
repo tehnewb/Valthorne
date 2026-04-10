@@ -16,8 +16,8 @@ import valthorne.event.Event;
  */
 public class WindowResizeEvent extends Event {
 
-    private short oldWidth, oldHeight;
-    private short newWidth, newHeight;
+    private int oldWidth, oldHeight;
+    private int newWidth, newHeight;
 
     /**
      * Constructs a new {@code WindowResizeEvent} with information about the
@@ -29,10 +29,10 @@ public class WindowResizeEvent extends Event {
      * @param newHeight the new height of the window after resizing
      */
     public WindowResizeEvent(int oldWidth, int oldHeight, int newWidth, int newHeight) {
-        this.oldWidth = (short) oldWidth;
-        this.oldHeight = (short) oldHeight;
-        this.newWidth = (short) newWidth;
-        this.newHeight = (short) newHeight;
+        this.oldWidth = oldWidth;
+        this.oldHeight = oldHeight;
+        this.newWidth = newWidth;
+        this.newHeight = newHeight;
     }
 
     /**
@@ -49,7 +49,7 @@ public class WindowResizeEvent extends Event {
      *
      * @param oldWidth the previous width of the window, represented as a short value
      */
-    public void setOldWidth(short oldWidth) {
+    public void setOldWidth(int oldWidth) {
         this.oldWidth = oldWidth;
     }
 
@@ -67,7 +67,7 @@ public class WindowResizeEvent extends Event {
      *
      * @param oldHeight the previous height of the window, represented as a short value
      */
-    public void setOldHeight(short oldHeight) {
+    public void setOldHeight(int oldHeight) {
         this.oldHeight = oldHeight;
     }
 
@@ -87,7 +87,7 @@ public class WindowResizeEvent extends Event {
      *
      * @param newWidth the updated width of the window, represented as a short value
      */
-    public void setNewWidth(short newWidth) {
+    public void setNewWidth(int newWidth) {
         this.newWidth = newWidth;
     }
 
@@ -107,7 +107,7 @@ public class WindowResizeEvent extends Event {
      *
      * @param newHeight the updated height of the window, represented as a short value
      */
-    public void setNewHeight(short newHeight) {
+    public void setNewHeight(int newHeight) {
         this.newHeight = newHeight;
     }
 

@@ -1344,7 +1344,7 @@ public class TextField extends Panel {
             buffer.put((byte) 255);
             buffer.put((byte) 255);
             buffer.flip();
-            CARET_PIXEL = new Texture(new TextureData(buffer, (short) 1, (short) 1));
+            CARET_PIXEL = new Texture(new TextureData(buffer, 1, 1));
         }
 
         return CARET_PIXEL;

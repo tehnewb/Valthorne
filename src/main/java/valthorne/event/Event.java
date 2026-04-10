@@ -37,8 +37,21 @@ public abstract class Event {
         this.consumed = true;
     }
 
+    /**
+     * Resets the consumed state of this event, allowing it to be processed by
+     * subsequent {@code EventListener}s if the event is published again.
+     * <p>
+     * This method sets the event's consumed flag to {@code false}, indicating that
+     * the event is no longer marked as consumed. It can be used to reverse the effect
+     * of the {@code consume} method.
+     */
+    public void unconsume() {
+        this.consumed = false;
+    }
+
     @Override
     public String toString() {
         return getClass().getSimpleName() + "[consumed=" + consumed + "]";
     }
+
 }

@@ -108,7 +108,6 @@ public class Modal extends Panel {
 
     private Drawable background; // Resolved backdrop drawable for the modal
     private Drawable dialogBackground; // Resolved background drawable for the dialog panel
-    private boolean parentWasEnabled = true; // Stored parent-enabled state placeholder for modal behavior
 
     /**
      * <p>

@@ -35,7 +35,7 @@ import java.nio.file.Path;
  * @author Albert Beaupre
  * @since November 26th, 2025
  */
-public record TextureData(ByteBuffer buffer, short width, short height) {
+public record TextureData(ByteBuffer buffer, int width, int height) {
 
     /**
      * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
@@ -113,6 +113,28 @@ public record TextureData(ByteBuffer buffer, short width, short height) {
         int height = h.get(0);
 
         return new TextureData(image, (short) width, (short) height);
+    }
+
+    /**
+     * Converts the {@code TextureData} instance into a {@code Texture} object.
+     *
+     * @return a new {@code Texture} instance created from the current {@code TextureData}
+     */
+    public Texture asTexture() {
+        return new Texture(this);
+    }
+
+    /**
+     * Converts the current {@code TextureData} instance into a {@code NinePatchTexture}.
+     *
+     * @param left   the number of pixels to define the left stretchable area
+     * @param right  the number of pixels to define the right stretchable area
+     * @param top    the number of pixels to define the top stretchable area
+     * @param bottom the number of pixels to define the bottom stretchable area
+     * @return a new {@code NinePatchTexture} instance created based on the specified stretchable areas
+     */
+    public NinePatchTexture asNinePatchTexture(int left, int right, int top, int bottom) {
+        return new NinePatchTexture(this, left, right, top, bottom);
     }
 
     /**

@@ -223,6 +223,13 @@ public final class MathUtils {
     /**
      * Returns a random int in [min,max].
      */
+    public static int randomInt(int max) {
+        return RANDOM.nextInt(max + 1);
+    }
+
+    /**
+     * Returns a random int in [min,max].
+     */
     public static int randomInt(int min, int max) {
         return RANDOM.nextInt(max - min + 1) + min;
     }

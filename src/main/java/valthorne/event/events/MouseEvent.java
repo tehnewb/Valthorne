@@ -22,7 +22,7 @@ import static org.lwjgl.glfw.GLFW.GLFW_MOD_SUPER;
  */
 public class MouseEvent extends Event {
 
-    private short x, y;
+    private int x, y;
     private byte button;
     private byte modifiers;
 
@@ -36,8 +36,8 @@ public class MouseEvent extends Event {
      * @param y         the y-coordinate of the mouse cursor during the event
      */
     public MouseEvent(int button, int modifiers, int x, int y) {
-        this.x = (short) x;
-        this.y = (short) y;
+        this.x = x;
+        this.y = y;
         this.button = (byte) button;
         this.modifiers = (byte) modifiers;
     }
@@ -67,7 +67,7 @@ public class MouseEvent extends Event {
      *
      * @param x the new x-coordinate to be set, represented as a {@code short} value
      */
-    public void setX(short x) {
+    public void setX(int x) {
         this.x = x;
     }
 
@@ -85,7 +85,7 @@ public class MouseEvent extends Event {
      *
      * @param y the new y-coordinate to be set, represented as a {@code short} value
      */
-    public void setY(short y) {
+    public void setY(int y) {
         this.y = y;
     }
 
