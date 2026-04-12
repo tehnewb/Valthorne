@@ -4,28 +4,78 @@ import valthorne.math.Vector2f;
 import valthorne.math.geometry.Shape;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-public class DefaultRayCastWorld implements RayCastWorld {
+public class ShapeRaycastWorld implements RayCastWorld {
 
     private static final float EPSILON = 0.00001f;
 
     private final List<Shape> shapes = new ArrayList<>();
+    private final List<LightOccluder> lightOccluders = new ArrayList<>();
     private Shape moving;
 
     public void addShape(Shape shape) {
-        if (shape != null) {
-            shapes.add(shape);
+        addShape(shape, Light.ALL_MASK_BITS);
+    }
+
+    public void addShape(Shape shape, int categoryBits) {
+        if (shape == null) {
+            return;
         }
+
+        shapes.add(shape);
+        lightOccluders.add(new LightOccluder(shape, shape, categoryBits));
+    }
+
+    public void removeShape(Shape shape) {
+        if (shape == null) {
+            return;
+        }
+
+        for (int i = shapes.size() - 1; i >= 0; i--) {
+            if (shapes.get(i) == shape) {
+                shapes.remove(i);
+                lightOccluders.remove(i);
+            }
+        }
+
+        if (moving == shape) {
+            moving = null;
+        }
+    }
+
+    public boolean setShapeCategoryBits(Shape shape, int categoryBits) {
+        boolean updated = false;
+
+        for (int i = 0; i < shapes.size(); i++) {
+            if (shapes.get(i) == shape) {
+                lightOccluders.get(i).setCategoryBits(categoryBits);
+                updated = true;
+            }
+        }
+
+        return updated;
+    }
+
+    public int getShapeCategoryBits(Shape shape) {
+        for (int i = 0; i < shapes.size(); i++) {
+            if (shapes.get(i) == shape) {
+                return lightOccluders.get(i).getCategoryBits();
+            }
+        }
+
+        return 0;
     }
 
     public void clear() {
         shapes.clear();
+        lightOccluders.clear();
         moving = null;
     }
 
     public List<Shape> getShapes() {
-        return shapes;
+        return Collections.unmodifiableList(shapes);
     }
 
     public Shape getMoving() {
@@ -38,20 +88,28 @@ public class DefaultRayCastWorld implements RayCastWorld {
 
     @Override
     public RayCastHit rayCast(float startX, float startY, float endX, float endY) {
+        return rayCast(null, startX, startY, endX, endY);
+    }
+
+    @Override
+    public RayCastHit rayCast(Light light, float startX, float startY, float endX, float endY) {
         float closestFraction = Float.MAX_VALUE;
-        Shape closestShape = null;
+        LightOccluder closestOccluder = null;
 
-        for (int i = 0, n = shapes.size(); i < n; i++) {
-            Shape shape = shapes.get(i);
+        for (int i = 0, n = lightOccluders.size(); i < n; i++) {
+            LightOccluder occluder = lightOccluders.get(i);
+            if (!occluder.blocks(light)) {
+                continue;
+            }
 
-            float hitFraction = rayVsShape(startX, startY, endX, endY, shape, closestFraction);
+            float hitFraction = rayVsPoints(startX, startY, endX, endY, occluder.points(), closestFraction);
             if (hitFraction < closestFraction) {
                 closestFraction = hitFraction;
-                closestShape = shape;
+                closestOccluder = occluder;
             }
         }
 
-        if (closestShape == null) {
+        if (closestOccluder == null) {
             return null;
         }
 
@@ -60,12 +118,16 @@ public class DefaultRayCastWorld implements RayCastWorld {
 
         RayCastHit hit = new RayCastHit(startX + dx * closestFraction, startY + dy * closestFraction);
         hit.setFraction(closestFraction);
-        hit.setCollider(closestShape);
+        hit.setCollider(closestOccluder.getCollider());
         return hit;
     }
 
-    private float rayVsShape(float x1, float y1, float x2, float y2, Shape shape, float maxFraction) {
-        Vector2f[] pts = shape.points();
+    @Override
+    public List<LightOccluder> getLightOccluders() {
+        return Collections.unmodifiableList(lightOccluders);
+    }
+
+    private float rayVsPoints(float x1, float y1, float x2, float y2, Vector2f[] pts, float maxFraction) {
         if (pts == null || pts.length < 2) {
             return Float.MAX_VALUE;
         }

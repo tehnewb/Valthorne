@@ -70,6 +70,10 @@ public final class RayHandler {
     private GISceneBuffer giScene;
     private float giStrength = 1f;
 
+    public static boolean isGISupported() {
+        return RadianceCascadeRenderer.isSupported();
+    }
+
     public RayHandler(int width, int height) {
         this.width = width;
         this.height = height;
@@ -102,9 +106,19 @@ public final class RayHandler {
      */
     public void enableGI(GISceneBuffer sceneBuffer) {
         if (sceneBuffer == null) throw new NullPointerException("sceneBuffer cannot be null");
+        validateGISceneBuffer(sceneBuffer);
         disableGI();
         this.giScene = sceneBuffer;
         this.giRenderer = new RadianceCascadeRenderer(width, height);
+    }
+
+    public void enableGI(GISceneBuffer sceneBuffer, RadianceCascadeConfig config) {
+        if (sceneBuffer == null) throw new NullPointerException("sceneBuffer cannot be null");
+        if (config == null) throw new NullPointerException("config cannot be null");
+        validateGISceneBuffer(sceneBuffer);
+        disableGI();
+        this.giScene = sceneBuffer;
+        this.giRenderer = new RadianceCascadeRenderer(width, height, config);
     }
 
     /**
@@ -119,9 +133,30 @@ public final class RayHandler {
      */
     public void enableGI(GISceneBuffer sceneBuffer, int cascadeCount, int baseRays, float baseSpacing, float baseRange, int steps) {
         if (sceneBuffer == null) throw new NullPointerException("sceneBuffer cannot be null");
-        disableGI();
-        this.giScene = sceneBuffer;
-        this.giRenderer = new RadianceCascadeRenderer(width, height, cascadeCount, baseRays, baseSpacing, baseRange, steps);
+        enableGI(sceneBuffer, new RadianceCascadeConfig(
+                cascadeCount,
+                baseRays,
+                baseSpacing,
+                baseRange,
+                steps,
+                RadianceCascadeRenderer.DEFAULT_EXPOSURE
+        ));
+    }
+
+    public boolean tryEnableGI(GISceneBuffer sceneBuffer) {
+        if (!isGISupported()) {
+            return false;
+        }
+        enableGI(sceneBuffer);
+        return true;
+    }
+
+    public boolean tryEnableGI(GISceneBuffer sceneBuffer, RadianceCascadeConfig config) {
+        if (!isGISupported()) {
+            return false;
+        }
+        enableGI(sceneBuffer, config);
+        return true;
     }
 
     /**
@@ -229,7 +264,7 @@ public final class RayHandler {
 
         // GI: run Radiance Cascades and bake irradiance into the light FBO
         if (giRenderer != null && giScene != null) {
-            giRenderer.render(giScene.getTextureID());
+            giRenderer.render(giScene);
             glBindFramebuffer(GL_FRAMEBUFFER, fboId);
             lightMapRenderer.bake(giRenderer.getIrradianceTextureId(), giStrength);
         }
@@ -285,6 +320,16 @@ public final class RayHandler {
         if (fboId != 0) {
             glDeleteFramebuffers(fboId);
             fboId = 0;
+        }
+    }
+
+    private void validateGISceneBuffer(GISceneBuffer sceneBuffer) {
+        if (sceneBuffer.getWidth() != width || sceneBuffer.getHeight() != height) {
+            throw new IllegalArgumentException(
+                    "GISceneBuffer size must match RayHandler size. Expected "
+                            + width + "x" + height + " but was "
+                            + sceneBuffer.getWidth() + "x" + sceneBuffer.getHeight()
+            );
         }
     }
 }

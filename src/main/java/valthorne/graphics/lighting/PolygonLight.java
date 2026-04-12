@@ -42,28 +42,29 @@ public final class PolygonLight extends Light {
             angles.add((float) (i * (Math.PI * 2.0) / rays));
         }
 
-        RayCastWorld world = rayHandler.getRayCastWorld();
-        if (world instanceof ShapeRayCastWorld shapeWorld) {
-            float maxDist2 = distance * distance;
+        float maxDist2 = distance * distance;
 
-            for (Area area : shapeWorld.getOccluders()) {
-                Vector2f[] pts = area.points();
-                if (pts == null || pts.length == 0) continue;
-                if (!isPotentialOccluder(pts, maxDist2)) continue;
+        for (LightOccluder occluder : getLightOccluders()) {
+            if (occluder == null || !occluder.blocks(this)) {
+                continue;
+            }
 
-                for (Vector2f p : pts) {
-                    if (p == null) continue;
+            Vector2f[] pts = occluder.points();
+            if (pts == null || pts.length == 0) continue;
+            if (!isPotentialOccluder(pts, maxDist2)) continue;
 
-                    float dx = p.getX() - x;
-                    float dy = p.getY() - y;
-                    float dist2 = dx * dx + dy * dy;
-                    if (dist2 > maxDist2) continue;
+            for (Vector2f p : pts) {
+                if (p == null) continue;
 
-                    float angle = (float) Math.atan2(dy, dx);
-                    angles.add(angle - EPSILON);
-                    angles.add(angle);
-                    angles.add(angle + EPSILON);
-                }
+                float dx = p.getX() - x;
+                float dy = p.getY() - y;
+                float dist2 = dx * dx + dy * dy;
+                if (dist2 > maxDist2) continue;
+
+                float angle = (float) Math.atan2(dy, dx);
+                angles.add(angle - EPSILON);
+                angles.add(angle);
+                angles.add(angle + EPSILON);
             }
         }
 
@@ -77,24 +78,10 @@ public final class PolygonLight extends Light {
 
             float targetX = x + (float) Math.cos(angle) * distance;
             float targetY = y + (float) Math.sin(angle) * distance;
-
-            if (xray || rayHandler.getRayCastWorld() == null) {
-                endX[i] = targetX;
-                endY[i] = targetY;
-                fractions[i] = 1f;
-            } else {
-                RayCastHit hit = rayHandler.getRayCastWorld().rayCast(x, y, targetX, targetY);
-                if (hit != null && hit.isHit()) {
-                    endX[i] = hit.getX();
-                    endY[i] = hit.getY();
-                    fractions[i] = hit.getFraction();
-                } else {
-                    endX[i] = targetX;
-                    endY[i] = targetY;
-                    fractions[i] = 1f;
-                }
-            }
+            applyRayResult(i, targetX, targetY);
         }
+
+        buildSegments();
     }
 
     private boolean isPotentialOccluder(Vector2f[] pts, float maxDist2) {

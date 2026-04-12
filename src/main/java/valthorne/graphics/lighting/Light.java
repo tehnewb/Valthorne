@@ -2,7 +2,12 @@ package valthorne.graphics.lighting;
 
 import valthorne.graphics.Color;
 
+import java.util.Collections;
+import java.util.List;
+
 public abstract class Light {
+
+    public static final int ALL_MASK_BITS = ~0;
 
     protected final RayHandler rayHandler;
     protected final Color color;
@@ -18,6 +23,8 @@ public abstract class Light {
     protected float[] endY;
     protected float[] fractions;
     protected float[] segments;
+    protected int categoryBits = ALL_MASK_BITS;
+    protected int occlusionMaskBits = ALL_MASK_BITS;
     protected boolean dirty = true;
 
     protected Light(RayHandler rayHandler, int rays, Color color, float distance, float x, float y) {
@@ -54,23 +61,7 @@ public abstract class Light {
 
             float targetX = temp[0];
             float targetY = temp[1];
-
-            if (xray || rayHandler.getRayCastWorld() == null) {
-                endX[i] = targetX;
-                endY[i] = targetY;
-                fractions[i] = 1f;
-            } else {
-                RayCastHit hit = rayHandler.getRayCastWorld().rayCast(x, y, targetX, targetY);
-                if (hit != null && hit.isHit()) {
-                    endX[i] = hit.getX();
-                    endY[i] = hit.getY();
-                    fractions[i] = hit.getFraction();
-                } else {
-                    endX[i] = targetX;
-                    endY[i] = targetY;
-                    fractions[i] = 1f;
-                }
-            }
+            applyRayResult(i, targetX, targetY);
         }
 
         sortEndpointsByAngle();
@@ -178,6 +169,33 @@ public abstract class Light {
         }
     }
 
+    protected final void applyRayResult(int index, float targetX, float targetY) {
+        RayCastHit hit = rayCast(targetX, targetY);
+        if (hit != null && hit.isHit()) {
+            endX[index] = hit.getX();
+            endY[index] = hit.getY();
+            fractions[index] = hit.getFraction();
+            return;
+        }
+
+        endX[index] = targetX;
+        endY[index] = targetY;
+        fractions[index] = 1f;
+    }
+
+    protected final RayCastHit rayCast(float targetX, float targetY) {
+        RayCastWorld world = rayHandler.getRayCastWorld();
+        if (xray || world == null) {
+            return null;
+        }
+        return world.rayCast(this, x, y, targetX, targetY);
+    }
+
+    protected final List<LightOccluder> getLightOccluders() {
+        RayCastWorld world = rayHandler.getRayCastWorld();
+        return (world == null) ? Collections.emptyList() : world.getLightOccluders();
+    }
+
     public RayHandler getRayHandler() {
         return rayHandler;
     }
@@ -248,6 +266,24 @@ public abstract class Light {
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
+        dirty = true;
+    }
+
+    public int getCategoryBits() {
+        return categoryBits;
+    }
+
+    public void setCategoryBits(int categoryBits) {
+        this.categoryBits = categoryBits;
+    }
+
+    public int getOcclusionMaskBits() {
+        return occlusionMaskBits;
+    }
+
+    public void setOcclusionMaskBits(int occlusionMaskBits) {
+        if (this.occlusionMaskBits == occlusionMaskBits) return;
+        this.occlusionMaskBits = occlusionMaskBits;
         dirty = true;
     }
 
