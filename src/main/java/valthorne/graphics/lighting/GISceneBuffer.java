@@ -74,6 +74,10 @@ public final class GISceneBuffer {
         return texture.getTextureID();
     }
 
+    public int getTextureId() {
+        return getTextureID();
+    }
+
     public int getWidth() {
         return width;
     }

@@ -56,29 +56,11 @@ public final class ConeLight extends Light {
         compactAngles();
         ensureCapacity(angles.size());
 
-        RayCastWorld world = rayHandler.getRayCastWorld();
-
         for (int i = 0; i < angles.size(); i++) {
             float angle = angles.get(i);
             float targetX = x + (float) Math.cos(angle) * distance;
             float targetY = y + (float) Math.sin(angle) * distance;
-
-            if (xray || world == null) {
-                endX[i] = targetX;
-                endY[i] = targetY;
-                fractions[i] = 1f;
-            } else {
-                RayCastHit hit = world.rayCast(x, y, targetX, targetY);
-                if (hit != null && hit.isHit()) {
-                    endX[i] = hit.getX();
-                    endY[i] = hit.getY();
-                    fractions[i] = hit.getFraction();
-                } else {
-                    endX[i] = targetX;
-                    endY[i] = targetY;
-                    fractions[i] = 1f;
-                }
-            }
+            applyRayResult(i, targetX, targetY);
         }
 
         buildSegments();
@@ -101,19 +83,14 @@ public final class ConeLight extends Light {
     }
 
     private void addShapeVertexAngles(float start, float end) {
-        RayCastWorld world = rayHandler.getRayCastWorld();
-        if (!(world instanceof DefaultRayCastWorld shapeWorld)) {
-            return;
-        }
-
         float maxDist2 = distance * distance;
 
-        for (Shape shape : shapeWorld.getShapes()) {
-            if (shape == null) {
+        for (LightOccluder occluder : getLightOccluders()) {
+            if (occluder == null || !occluder.blocks(this)) {
                 continue;
             }
 
-            Vector2f[] pts = shape.points();
+            Vector2f[] pts = occluder.points();
             if (pts == null || pts.length == 0) {
                 continue;
             }
