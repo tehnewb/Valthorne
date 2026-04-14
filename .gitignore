@@ -96,3 +96,5 @@ signing-data.png
 /src/test/*
 .claude/settings.local.json
 /.gradle-local/
+/.codex-temp/
+/.claude/

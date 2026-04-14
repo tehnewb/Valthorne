@@ -6,7 +6,7 @@ import static org.lwjgl.opengl.GL30.GL_RGBA16F;
 
 /**
  * One level in the Radiance Cascades hierarchy.
- *
+ * <p>
  * Texture layout: width = probeCountX * rayGroupsPerProbe, height = probeCountY.
  * Each texel stores the average of four angularly adjacent rays:
  * RGB = radiance, A = remaining no-hit visibility after higher-cascade merging.
@@ -41,9 +41,7 @@ final class CascadeLevel {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F,
-                probeCountX * rayGroupsPerProbe, probeCountY,
-                0, GL_RGBA, GL_FLOAT, 0L);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, probeCountX * rayGroupsPerProbe, probeCountY, 0, GL_RGBA, GL_FLOAT, 0L);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 

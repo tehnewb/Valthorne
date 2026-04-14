@@ -1,21 +1,11 @@
-package valthorne.graphics.lights;
+package valthorne.graphics.lighting;
 
 import valthorne.graphics.Color;
-import valthorne.graphics.lighting.*;
 import valthorne.math.Vector2f;
-import valthorne.math.geometry.Shape;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+public final class ConeLight extends VertexCastLight {
 
-public final class ConeLight extends Light {
-
-    private static final float EPSILON = 0.0002f;
-    private static final float MIN_ANGLE_DELTA = 0.0001f;
     private static final float TWO_PI = (float) (Math.PI * 2.0);
-
-    private final List<Float> angles = new ArrayList<>();
 
     private float directionRadians;
     private float coneRadians;
@@ -28,9 +18,18 @@ public final class ConeLight extends Light {
 
     @Override
     public void update() {
-        if (!active) return;
-        if (!dirty) return;
-        rebuildFromVertices();
+        if (!active || !dirty) {
+            return;
+        }
+
+        float start = directionRadians - coneRadians * 0.5f;
+        float end = directionRadians + coneRadians * 0.5f;
+
+        resetAngles();
+        addBaseAngles(start, end);
+        addBoundaryAngles(start, end);
+        addOccluderVertexAngles(start, end);
+        rebuildFromAngles();
     }
 
     @Override
@@ -42,77 +41,47 @@ public final class ConeLight extends Light {
         output[1] = y + (float) Math.sin(angle) * distance;
     }
 
-    private void rebuildFromVertices() {
-        angles.clear();
-
-        float start = directionRadians - coneRadians * 0.5f;
-        float end = directionRadians + coneRadians * 0.5f;
-
-        addBaseAngles(start, end);
-        addBoundaryAngles(start, end);
-        addShapeVertexAngles(start, end);
-
-        Collections.sort(angles);
-        compactAngles();
-        ensureCapacity(angles.size());
-
-        for (int i = 0; i < angles.size(); i++) {
-            float angle = angles.get(i);
-            float targetX = x + (float) Math.cos(angle) * distance;
-            float targetY = y + (float) Math.sin(angle) * distance;
-            applyRayResult(i, targetX, targetY);
-        }
-
-        buildSegments();
-        dirty = false;
-    }
-
     private void addBaseAngles(float start, float end) {
         int baseCount = Math.max(3, rays);
         for (int i = 0; i < baseCount; i++) {
             float t = baseCount == 1 ? 0.5f : i / (float) (baseCount - 1);
-            angles.add(start + (end - start) * t);
+            addAngle(start + (end - start) * t);
         }
     }
 
     private void addBoundaryAngles(float start, float end) {
-        angles.add(start);
-        angles.add(start + EPSILON);
-        angles.add(end - EPSILON);
-        angles.add(end);
+        addAngle(start);
+        addAngle(start + EPSILON);
+        addAngle(end - EPSILON);
+        addAngle(end);
     }
 
-    private void addShapeVertexAngles(float start, float end) {
-        float maxDist2 = distance * distance;
+    private void addOccluderVertexAngles(float start, float end) {
+        float maxDistanceSquared = distance * distance;
 
         for (LightOccluder occluder : getLightOccluders()) {
             if (occluder == null || !occluder.blocks(this)) {
                 continue;
             }
 
-            Vector2f[] pts = occluder.points();
-            if (pts == null || pts.length == 0) {
+            Vector2f[] points = occluder.points();
+            if (points == null || points.length == 0 || !isPotentialOccluder(points, maxDistanceSquared)) {
                 continue;
             }
 
-            if (!isPotentialOccluder(pts, maxDist2)) {
-                continue;
-            }
-
-            for (Vector2f p : pts) {
-                if (p == null) {
+            for (Vector2f point : points) {
+                if (point == null) {
                     continue;
                 }
 
-                float dx = p.getX() - x;
-                float dy = p.getY() - y;
-                float dist2 = dx * dx + dy * dy;
-                if (dist2 > maxDist2) {
+                float dx = point.getX() - x;
+                float dy = point.getY() - y;
+                float pointDistanceSquared = dx * dx + dy * dy;
+                if (pointDistanceSquared > maxDistanceSquared) {
                     continue;
                 }
 
                 float angle = unwrapNear((float) Math.atan2(dy, dx), directionRadians);
-
                 addAngleIfInside(angle - EPSILON, start, end);
                 addAngleIfInside(angle, start, end);
                 addAngleIfInside(angle + EPSILON, start, end);
@@ -120,27 +89,9 @@ public final class ConeLight extends Light {
         }
     }
 
-    private boolean isPotentialOccluder(Vector2f[] pts, float maxDist2) {
-        for (Vector2f p : pts) {
-            if (p == null) {
-                continue;
-            }
-
-            float dx = p.getX() - x;
-            float dy = p.getY() - y;
-            float dist2 = dx * dx + dy * dy;
-
-            if (dist2 <= maxDist2) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private void addAngleIfInside(float angle, float start, float end) {
         if (angle >= start && angle <= end) {
-            angles.add(angle);
+            addAngle(angle);
         }
     }
 
@@ -152,42 +103,6 @@ public final class ConeLight extends Light {
             angle += TWO_PI;
         }
         return angle;
-    }
-
-    private void compactAngles() {
-        if (angles.isEmpty()) {
-            return;
-        }
-
-        int write = 1;
-        float last = angles.get(0);
-
-        for (int read = 1; read < angles.size(); read++) {
-            float current = angles.get(read);
-            if (Math.abs(current - last) >= MIN_ANGLE_DELTA) {
-                angles.set(write++, current);
-                last = current;
-            }
-        }
-
-        while (angles.size() > write) {
-            angles.remove(angles.size() - 1);
-        }
-    }
-
-    private void ensureCapacity(int count) {
-        if (endX.length == count) {
-            return;
-        }
-
-        endX = new float[count];
-        endY = new float[count];
-        fractions = new float[count];
-        segments = new float[Math.max(18, count * 18)];
-
-        for (int i = 0; i < count; i++) {
-            fractions[i] = 1f;
-        }
     }
 
     public float getDirectionRadians() {

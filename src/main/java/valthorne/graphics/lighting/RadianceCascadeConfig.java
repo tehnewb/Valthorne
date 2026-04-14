@@ -1,7 +1,7 @@
 package valthorne.graphics.lighting;
 
 /**
- * Immutable configuration for radiance cascade global illumination.
+ * Immutable configuration for standalone radiance-cascade lighting.
  *
  * <p>{@code baseRays} is the actual cascade-0 ray count before pre-averaging.
  * The current renderer stores four angularly adjacent rays per texel, so

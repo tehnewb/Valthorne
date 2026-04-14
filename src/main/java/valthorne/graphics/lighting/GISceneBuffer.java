@@ -5,13 +5,14 @@ import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Off-screen buffer the user renders into each frame to describe the scene for
- * global illumination.  The encoding is:
+ * standalone radiance-cascade lighting. The encoding is:
  * <ul>
  *   <li>RGB – emissive colour at each pixel (glowing tiles, lit surfaces, etc.)</li>
  *   <li>A   – transmittance: 1.0 = fully open air, 0.0 = solid occluder</li>
  * </ul>
  * Call {@link #begin()} before rendering scene geometry, then {@link #end()}.
- * Pass this buffer to {@link RayHandler#enableGI(GISceneBuffer)}.
+ * Pass this buffer to {@link RadianceCascades#update(GISceneBuffer)} or
+ * {@link RadianceCascadeRenderer#render(GISceneBuffer)}.
  */
 public final class GISceneBuffer {
 
@@ -66,8 +67,15 @@ public final class GISceneBuffer {
         if (this.width == newWidth && this.height == newHeight) return;
         this.width = newWidth;
         this.height = newHeight;
-        dispose();
-        create(newWidth, newHeight);
+        if (texture == null) {
+            create(newWidth, newHeight);
+            return;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+        texture.resize(newWidth, newHeight);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.getTextureID(), 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     public int getTextureID() {
