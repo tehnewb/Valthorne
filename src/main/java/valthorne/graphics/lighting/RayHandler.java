@@ -56,7 +56,6 @@ public final class RayHandler {
     private final Color ambientLight = new Color(0f, 0f, 0f, 1f);
     private final LightMesh lightMesh;
     private final SoftShadowMesh softShadowMesh;
-    private final QuadMesh quad;
     private final Shader shader;
     private final LightMapRenderer lightMapRenderer;
 
@@ -66,20 +65,11 @@ public final class RayHandler {
     private int fboId;
     private LightTexture lightMap;
 
-    private RadianceCascadeRenderer giRenderer;
-    private GISceneBuffer giScene;
-    private float giStrength = 1f;
-
-    public static boolean isGISupported() {
-        return RadianceCascadeRenderer.isSupported();
-    }
-
     public RayHandler(int width, int height) {
         this.width = width;
         this.height = height;
         this.lightMesh = new LightMesh(8192);
         this.softShadowMesh = new SoftShadowMesh(8192 * 3);
-        this.quad = new QuadMesh();
 
         shader = new Shader(vertexSource, fragmentSource);
         shader.bindAttribLocation(0, "a_position");
@@ -87,112 +77,8 @@ public final class RayHandler {
         shader.bindAttribLocation(2, "a_color");
         shader.reload();
 
-        this.lightMapRenderer = new LightMapRenderer(quad);
+        this.lightMapRenderer = new LightMapRenderer();
         createFramebuffer(width, height);
-    }
-
-    /**
-     * Enables global illumination using Radiance Cascades.
-     *
-     * <p>Each frame, fill {@code sceneBuffer} with the emissive/transmittance
-     * description of your scene before calling {@link #render()}:
-     * <ul>
-     *   <li>RGB – emissive colour (glowing tiles, lit surfaces)</li>
-     *   <li>A   – transmittance: 1.0 = air, 0.0 = solid occluder</li>
-     * </ul>
-     *
-     * @param sceneBuffer the scene description buffer (must remain valid for
-     *                    the lifetime of GI rendering)
-     */
-    public void enableGI(GISceneBuffer sceneBuffer) {
-        if (sceneBuffer == null) throw new NullPointerException("sceneBuffer cannot be null");
-        validateGISceneBuffer(sceneBuffer);
-        disableGI();
-        this.giScene = sceneBuffer;
-        this.giRenderer = new RadianceCascadeRenderer(width, height);
-    }
-
-    public void enableGI(GISceneBuffer sceneBuffer, RadianceCascadeConfig config) {
-        if (sceneBuffer == null) throw new NullPointerException("sceneBuffer cannot be null");
-        if (config == null) throw new NullPointerException("config cannot be null");
-        validateGISceneBuffer(sceneBuffer);
-        disableGI();
-        this.giScene = sceneBuffer;
-        this.giRenderer = new RadianceCascadeRenderer(width, height, config);
-    }
-
-    /**
-     * Enables global illumination with custom cascade parameters.
-     *
-     * @param sceneBuffer  the scene description buffer
-     * @param cascadeCount number of cascade levels (default 8, max range = baseRange × 2^(count-1))
-     * @param baseRays     rays per probe at level 0 (default 4)
-     * @param baseSpacing  probe spacing in pixels at level 0 (default 4)
-     * @param baseRange    ray interval length in pixels at level 0 (default 4)
-     * @param steps        raymarch steps per ray (default 16)
-     */
-    public void enableGI(GISceneBuffer sceneBuffer, int cascadeCount, int baseRays, float baseSpacing, float baseRange, int steps) {
-        if (sceneBuffer == null) throw new NullPointerException("sceneBuffer cannot be null");
-        enableGI(sceneBuffer, new RadianceCascadeConfig(
-                cascadeCount,
-                baseRays,
-                baseSpacing,
-                baseRange,
-                steps,
-                RadianceCascadeRenderer.DEFAULT_EXPOSURE
-        ));
-    }
-
-    public boolean tryEnableGI(GISceneBuffer sceneBuffer) {
-        if (!isGISupported()) {
-            return false;
-        }
-        enableGI(sceneBuffer);
-        return true;
-    }
-
-    public boolean tryEnableGI(GISceneBuffer sceneBuffer, RadianceCascadeConfig config) {
-        if (!isGISupported()) {
-            return false;
-        }
-        enableGI(sceneBuffer, config);
-        return true;
-    }
-
-    /**
-     * Disables and disposes the GI renderer.  The scene buffer is not disposed.
-     */
-    public void disableGI() {
-        if (giRenderer != null) {
-            giRenderer.dispose();
-            giRenderer = null;
-        }
-        giScene = null;
-    }
-
-    /**
-     * Controls how strongly GI irradiance is baked into the light map.
-     * 0.0 = no GI contribution, 1.0 = full (default).
-     */
-    public void setGIStrength(float strength) {
-        this.giStrength = strength;
-    }
-
-    public float getGIStrength() {
-        return giStrength;
-    }
-
-    /**
-     * Reinhard exposure applied to raw cascade irradiance before it is composited
-     * onto the light map.  Lower values = dimmer but cleaner GI; higher = more
-     * saturated bounce light.  Default 1.0.  Has no effect if GI is disabled.
-     */
-    public void setGIExposure(float exposure) {
-        if (giRenderer != null) giRenderer.setExposure(exposure);
-    }
-
-    public float getGIExposure() {
-        return giRenderer != null ? giRenderer.getExposure() : RadianceCascadeRenderer.DEFAULT_EXPOSURE;
     }
 
     public void setRayCastWorld(RayCastWorld rayCastWorld) {
@@ -227,7 +113,15 @@ public final class RayHandler {
     }
 
     public void update() {
-        lights.forEach(Light::update);
+        if (rayCastWorld != null) {
+            rayCastWorld.prepare();
+        }
+        for (Light light : lights) {
+            if (!light.isActive() || !isVisible(light)) {
+                continue;
+            }
+            light.update();
+        }
     }
 
     public void render() {
@@ -244,6 +138,7 @@ public final class RayHandler {
 
         for (Light light : lights) {
             if (!light.isActive()) continue;
+            if (!isVisible(light)) continue;
 
             if (light.isDirty()) {
                 light.update();
@@ -251,23 +146,38 @@ public final class RayHandler {
 
             Color color = light.getColor();
 
-            lightMesh.setFan(light.getX(), light.getY(), light.getDistance(), light.getEndX(), light.getEndY(), color.r(), color.g(), color.b(), color.a());
+            lightMesh.setFan(
+                    light.getX(),
+                    light.getY(),
+                    light.getDistance(),
+                    light.getEndX(),
+                    light.getEndY(),
+                    color.r(),
+                    color.g(),
+                    color.b(),
+                    color.a()
+            );
             lightMesh.render();
 
             if (light.isSoft()) {
-                softShadowMesh.setTriangles(light.getX(), light.getY(), light.getDistance(), light.getSoftnessLength(), light.getEndX(), light.getEndY(), light.getFractions(), color.r(), color.g(), color.b(), color.a());
+                softShadowMesh.setTriangles(
+                        light.getX(),
+                        light.getY(),
+                        light.getDistance(),
+                        light.getSoftnessLength(),
+                        light.getEndX(),
+                        light.getEndY(),
+                        light.getFractions(),
+                        color.r(),
+                        color.g(),
+                        color.b(),
+                        color.a()
+                );
                 softShadowMesh.render();
             }
         }
 
         shader.unbind();
-
-        // GI: run Radiance Cascades and bake irradiance into the light FBO
-        if (giRenderer != null && giScene != null) {
-            giRenderer.render(giScene);
-            glBindFramebuffer(GL_FRAMEBUFFER, fboId);
-            lightMapRenderer.bake(giRenderer.getIrradianceTextureId(), giStrength);
-        }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         lightMapRenderer.render(lightMap.getTextureID());
@@ -279,20 +189,15 @@ public final class RayHandler {
         this.width = width;
         this.height = height;
 
-        deleteFramebuffer();
-        createFramebuffer(width, height);
-
-        if (giRenderer != null) giRenderer.resize(width, height);
+        resizeFramebuffer(width, height);
     }
 
     public void dispose() {
-        disableGI();
         deleteFramebuffer();
         shader.dispose();
         lightMapRenderer.dispose();
         lightMesh.dispose();
         softShadowMesh.dispose();
-        quad.dispose();
     }
 
     private void createFramebuffer(int width, int height) {
@@ -323,13 +228,29 @@ public final class RayHandler {
         }
     }
 
-    private void validateGISceneBuffer(GISceneBuffer sceneBuffer) {
-        if (sceneBuffer.getWidth() != width || sceneBuffer.getHeight() != height) {
-            throw new IllegalArgumentException(
-                    "GISceneBuffer size must match RayHandler size. Expected "
-                            + width + "x" + height + " but was "
-                            + sceneBuffer.getWidth() + "x" + sceneBuffer.getHeight()
-            );
+    private void resizeFramebuffer(int width, int height) {
+        if (lightMap == null || fboId == 0) {
+            createFramebuffer(width, height);
+            return;
         }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+        lightMap.resize(width, height);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, lightMap.getTextureID(), 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    private boolean isVisible(Light light) {
+        float extent = light.getDistance();
+        if (light.isSoft()) {
+            extent += Math.max(0f, light.getSoftnessLength());
+        }
+
+        float minX = light.getX() - extent;
+        float maxX = light.getX() + extent;
+        float minY = light.getY() - extent;
+        float maxY = light.getY() + extent;
+
+        return maxX >= 0f && maxY >= 0f && minX <= width && minY <= height;
     }
 }

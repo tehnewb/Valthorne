@@ -22,10 +22,11 @@ public abstract class Light {
     protected float[] endX;
     protected float[] endY;
     protected float[] fractions;
-    protected float[] segments;
     protected int categoryBits = ALL_MASK_BITS;
     protected int occlusionMaskBits = ALL_MASK_BITS;
     protected boolean dirty = true;
+    private final float[] scratchRayEnd = new float[2];
+    private final RayCastHit scratchHit = new RayCastHit();
 
     protected Light(RayHandler rayHandler, int rays, Color color, float distance, float x, float y) {
         if (rayHandler == null) throw new NullPointerException("rayHandler cannot be null");
@@ -39,14 +40,7 @@ public abstract class Light {
         this.x = x;
         this.y = y;
 
-        this.endX = new float[rays];
-        this.endY = new float[rays];
-        this.fractions = new float[rays];
-        this.segments = new float[rays * 18];
-
-        for (int i = 0; i < rays; i++) {
-            fractions[i] = 1f;
-        }
+        ensureRayCapacity(rays);
     }
 
     public abstract void update();
@@ -54,18 +48,21 @@ public abstract class Light {
     protected abstract void computeRayEnd(int index, float[] output);
 
     protected void rebuild() {
-        float[] temp = new float[2];
+        rebuild(true);
+    }
 
+    protected final void rebuild(boolean sortEndpoints) {
         for (int i = 0; i < rays; i++) {
-            computeRayEnd(i, temp);
+            computeRayEnd(i, scratchRayEnd);
 
-            float targetX = temp[0];
-            float targetY = temp[1];
+            float targetX = scratchRayEnd[0];
+            float targetY = scratchRayEnd[1];
             applyRayResult(i, targetX, targetY);
         }
 
-        sortEndpointsByAngle();
-        buildSegments();
+        if (sortEndpoints) {
+            sortEndpointsByAngle();
+        }
         dirty = false;
     }
 
@@ -133,54 +130,28 @@ public abstract class Light {
         return i + 1;
     }
 
-    protected void buildSegments() {
-        int idx = 0;
-
-        float r = color.r();
-        float g = color.g();
-        float b = color.b();
-        float a = color.a();
-
-        for (int i = 0; i < endX.length; i++) {
-
-            int next = i + 1;
-            if (next == endX.length) next = 0;
-
-            segments[idx++] = x;
-            segments[idx++] = y;
-            segments[idx++] = r;
-            segments[idx++] = g;
-            segments[idx++] = b;
-            segments[idx++] = a;
-
-            segments[idx++] = endX[i];
-            segments[idx++] = endY[i];
-            segments[idx++] = r;
-            segments[idx++] = g;
-            segments[idx++] = b;
-            segments[idx++] = a;
-
-            segments[idx++] = endX[next];
-            segments[idx++] = endY[next];
-            segments[idx++] = r;
-            segments[idx++] = g;
-            segments[idx++] = b;
-            segments[idx++] = a;
-        }
-    }
-
     protected final void applyRayResult(int index, float targetX, float targetY) {
-        RayCastHit hit = rayCast(targetX, targetY);
-        if (hit != null && hit.isHit()) {
-            endX[index] = hit.getX();
-            endY[index] = hit.getY();
-            fractions[index] = hit.getFraction();
+        if (rayCast(targetX, targetY, scratchHit)) {
+            endX[index] = scratchHit.getX();
+            endY[index] = scratchHit.getY();
+            fractions[index] = scratchHit.getFraction();
             return;
         }
 
         endX[index] = targetX;
         endY[index] = targetY;
         fractions[index] = 1f;
+    }
+
+    protected final boolean rayCast(float targetX, float targetY, RayCastHit outHit) {
+        RayCastWorld world = rayHandler.getRayCastWorld();
+        if (xray || world == null) {
+            if (outHit != null) {
+                outHit.clear();
+            }
+            return false;
+        }
+        return world.rayCast(this, x, y, targetX, targetY, outHit);
     }
 
     protected final RayCastHit rayCast(float targetX, float targetY) {
@@ -207,12 +178,10 @@ public abstract class Light {
     public void setColor(Color color) {
         if (color == null) throw new NullPointerException("color cannot be null");
         this.color.set(color);
-        dirty = true;
     }
 
     public void setColor(float r, float g, float b, float a) {
         this.color.set(r, g, b, a);
-        dirty = true;
     }
 
     public int getRays() {
@@ -224,15 +193,7 @@ public abstract class Light {
         if (this.rays == rays) return;
 
         this.rays = rays;
-        this.endX = new float[rays];
-        this.endY = new float[rays];
-        this.fractions = new float[rays];
-        this.segments = new float[rays * 18];
-
-        for (int i = 0; i < rays; i++) {
-            fractions[i] = 1f;
-        }
-
+        ensureRayCapacity(rays);
         dirty = true;
     }
 
@@ -310,7 +271,6 @@ public abstract class Light {
 
     public void setSoft(boolean soft) {
         this.soft = soft;
-        dirty = true;
     }
 
     public float getSoftnessLength() {
@@ -319,7 +279,6 @@ public abstract class Light {
 
     public void setSoftnessLength(float softnessLength) {
         this.softnessLength = softnessLength;
-        dirty = true;
     }
 
     public float[] getEndX() {
@@ -334,8 +293,17 @@ public abstract class Light {
         return fractions;
     }
 
-    public float[] getSegments() {
-        return segments;
+    protected final void ensureRayCapacity(int count) {
+        if (endX != null && endX.length == count) {
+            return;
+        }
+
+        endX = new float[count];
+        endY = new float[count];
+        fractions = new float[count];
+        for (int i = 0; i < count; i++) {
+            fractions[i] = 1f;
+        }
     }
 
     public boolean isDirty() {

@@ -1,12 +1,10 @@
 package valthorne.graphics.lighting;
 
 /**
- * Standalone radiance cascade GI helper for callers that want bounce lighting
- * without going through {@link RayHandler}.
+ * Standalone radiance-cascade lighting helper.
  */
 public final class RadianceCascades {
 
-    private final QuadMesh quad;
     private final LightMapRenderer compositor;
     private final RadianceCascadeRenderer renderer;
 
@@ -15,8 +13,7 @@ public final class RadianceCascades {
     }
 
     public RadianceCascades(int width, int height, RadianceCascadeConfig config) {
-        this.quad = new QuadMesh();
-        this.compositor = new LightMapRenderer(quad);
+        this.compositor = new LightMapRenderer();
         this.renderer = new RadianceCascadeRenderer(width, height, config);
     }
 
@@ -59,6 +56,5 @@ public final class RadianceCascades {
     public void dispose() {
         renderer.dispose();
         compositor.dispose();
-        quad.dispose();
     }
 }

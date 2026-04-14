@@ -5,20 +5,28 @@ import valthorne.graphics.shader.Shader;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
+import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 
 public final class LightMapRenderer {
 
     private static final String vertexSource = """
             #version 330 core
-            layout (location = 0) in vec2 a_position;
-            layout (location = 1) in vec2 a_uv;
-            
             out vec2 v_uv;
             
             void main() {
-                vec2 ndc = a_position * 2.0 - 1.0;
-                gl_Position = vec4(ndc, 0.0, 1.0);
-                v_uv = a_uv;
+                vec2 position;
+                if (gl_VertexID == 0) {
+                    position = vec2(-1.0, -1.0);
+                } else if (gl_VertexID == 1) {
+                    position = vec2(3.0, -1.0);
+                } else {
+                    position = vec2(-1.0, 3.0);
+                }
+
+                gl_Position = vec4(position, 0.0, 1.0);
+                v_uv = position * 0.5 + 0.5;
             }
             """;
 
@@ -51,22 +59,18 @@ public final class LightMapRenderer {
             }
             """;
 
-    private final QuadMesh quad;
     private final Shader shader;
     private final Shader bakeShader;
+    private final int vaoId;
 
-    public LightMapRenderer(QuadMesh quad) {
-        this.quad = quad;
-
+    public LightMapRenderer() {
         shader = new Shader(vertexSource, fragmentSource);
-        shader.bindAttribLocation(0, "a_position");
-        shader.bindAttribLocation(1, "a_uv");
         shader.reload();
 
         bakeShader = new Shader(vertexSource, bakeFragmentSource);
-        bakeShader.bindAttribLocation(0, "a_position");
-        bakeShader.bindAttribLocation(1, "a_uv");
         bakeShader.reload();
+
+        vaoId = glGenVertexArrays();
     }
 
     public void render(int textureId) {
@@ -80,7 +84,7 @@ public final class LightMapRenderer {
 
         shader.bind();
         shader.setUniform1i("u_texture", 0);
-        quad.render();
+        renderFullscreenTriangle();
         shader.unbind();
 
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -103,7 +107,7 @@ public final class LightMapRenderer {
         bakeShader.bind();
         bakeShader.setUniform1i("u_texture", 0);
         bakeShader.setUniform1f("u_strength", strength);
-        quad.render();
+        renderFullscreenTriangle();
         bakeShader.unbind();
 
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -113,5 +117,12 @@ public final class LightMapRenderer {
     public void dispose() {
         shader.dispose();
         bakeShader.dispose();
+        glDeleteVertexArrays(vaoId);
+    }
+
+    private void renderFullscreenTriangle() {
+        glBindVertexArray(vaoId);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
     }
 }

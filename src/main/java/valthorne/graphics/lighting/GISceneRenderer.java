@@ -7,7 +7,13 @@ import valthorne.math.geometry.Shape;
 
 import java.util.Collection;
 
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11.GL_BLEND;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11.GL_ONE;
+import static org.lwjgl.opengl.GL11.GL_ZERO;
+import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL11.glDisable;
+import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
 
 /**
@@ -15,33 +21,53 @@ import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
  */
 public final class GISceneRenderer {
 
+    private static final int DEFAULT_MAX_VERTICES = 12288;
+
     private static final String VERTEX_SOURCE = """
-            #version 120
-            uniform vec4 u_color;
-            varying vec4 v_color;
+            #version 330 core
+            layout (location = 0) in vec2 a_position;
+            layout (location = 2) in vec4 a_color;
+
+            uniform vec2 u_sceneSize;
+
+            out vec4 v_color;
 
             void main() {
-                gl_Position = ftransform();
-                v_color = u_color;
+                vec2 ndc = vec2(
+                    (a_position.x / u_sceneSize.x) * 2.0 - 1.0,
+                    (a_position.y / u_sceneSize.y) * 2.0 - 1.0
+                );
+                gl_Position = vec4(ndc, 0.0, 1.0);
+                v_color = a_color;
             }
             """;
 
     private static final String FRAGMENT_SOURCE = """
-            #version 120
-            varying vec4 v_color;
+            #version 330 core
+            in vec4 v_color;
+
+            out vec4 fragColor;
 
             void main() {
-                gl_FragColor = v_color;
+                fragColor = v_color;
             }
             """;
 
     private final Shader shader;
+    private final ShapeMesh mesh;
     private boolean drawing;
     private boolean additiveBlend;
 
     public GISceneRenderer() {
+        this(DEFAULT_MAX_VERTICES);
+    }
+
+    public GISceneRenderer(int maxVertices) {
         shader = new Shader(VERTEX_SOURCE, FRAGMENT_SOURCE);
+        shader.bindAttribLocation(0, "a_position");
+        shader.bindAttribLocation(2, "a_color");
         shader.reload();
+        mesh = new ShapeMesh(maxVertices);
     }
 
     public void begin(GISceneBuffer buffer) {
@@ -50,31 +76,26 @@ public final class GISceneRenderer {
 
         buffer.begin();
 
-        glDisable(GL_TEXTURE_2D);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_BLEND);
 
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, buffer.getWidth(), 0, buffer.getHeight(), -1, 1);
-
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-
         shader.bind();
+        shader.setUniform2f("u_sceneSize", buffer.getWidth(), buffer.getHeight());
         drawing = true;
         additiveBlend = false;
     }
 
     public void draw(GISceneShape sceneShape) {
-        if (sceneShape == null) return;
+        if (sceneShape == null) {
+            return;
+        }
         draw(sceneShape.shape(), sceneShape.emission(), sceneShape.transmittance(), sceneShape.additive());
     }
 
     public void drawAll(Collection<? extends GISceneShape> sceneShapes) {
-        if (sceneShapes == null || sceneShapes.isEmpty()) return;
+        if (sceneShapes == null || sceneShapes.isEmpty()) {
+            return;
+        }
         for (GISceneShape sceneShape : sceneShapes) {
             draw(sceneShape);
         }
@@ -92,7 +113,8 @@ public final class GISceneRenderer {
         }
 
         setAdditiveBlend(additive);
-        drawShape(shape, emission.r(), emission.g(), emission.b(), transmittance);
+        mesh.setShape(shape, emission.r(), emission.g(), emission.b(), transmittance);
+        mesh.render();
     }
 
     public void end(GISceneBuffer buffer) {
@@ -100,15 +122,7 @@ public final class GISceneRenderer {
         if (buffer == null) throw new NullPointerException("buffer cannot be null");
 
         shader.unbind();
-
         glDisable(GL_BLEND);
-        glEnable(GL_TEXTURE_2D);
-
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-
         buffer.end();
         drawing = false;
         additiveBlend = false;
@@ -121,6 +135,7 @@ public final class GISceneRenderer {
     }
 
     public void dispose() {
+        mesh.dispose();
         shader.dispose();
     }
 
@@ -132,36 +147,44 @@ public final class GISceneRenderer {
         additiveBlend = additive;
         if (additive) {
             glEnable(GL_BLEND);
-            // Add radiance into RGB while preserving the destination transmittance in alpha.
             glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
         } else {
             glDisable(GL_BLEND);
         }
     }
 
-    private void drawShape(Shape shape, float r, float g, float b, float a) {
-        Vector2f[] points = shape.points();
-        if (points == null || points.length < 3) {
-            return;
+    private static final class ShapeMesh extends DynamicMesh2D {
+
+        private ShapeMesh(int maxVertices) {
+            super(maxVertices, GL_TRIANGLES);
         }
 
-        float centerX = 0f;
-        float centerY = 0f;
-        for (Vector2f point : points) {
-            centerX += point.getX();
-            centerY += point.getY();
-        }
-        centerX /= points.length;
-        centerY /= points.length;
+        private void setShape(Shape shape, float r, float g, float b, float a) {
+            Vector2f[] points = shape.points();
+            if (points == null || points.length < 3) {
+                clearVertices();
+                return;
+            }
 
-        shader.setUniform4f("u_color", r, g, b, a);
+            float centerX = 0f;
+            float centerY = 0f;
+            for (Vector2f point : points) {
+                centerX += point.getX();
+                centerY += point.getY();
+            }
+            centerX /= points.length;
+            centerY /= points.length;
 
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(centerX, centerY);
-        for (Vector2f point : points) {
-            glVertex2f(point.getX(), point.getY());
+            beginWrite();
+            for (int i = 0; i < points.length; i++) {
+                Vector2f current = points[i];
+                Vector2f next = points[(i + 1) % points.length];
+
+                putVertex(centerX, centerY, 0f, 0f, r, g, b, a);
+                putVertex(current.getX(), current.getY(), 0f, 0f, r, g, b, a);
+                putVertex(next.getX(), next.getY(), 0f, 0f, r, g, b, a);
+            }
+            finishWrite();
         }
-        glVertex2f(points[0].getX(), points[0].getY());
-        glEnd();
     }
 }
