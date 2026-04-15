@@ -21,8 +21,6 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  *
  * <h2>Example</h2>
  * <pre>{@code
- * // Startup
- * Window.init("Valthorne", 1280, 720);
  *
  * // These are called inside your Application.init() method
  * Window.setSwapInterval(SwapInterval.ON); // vsync
@@ -38,12 +36,6 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * <p>This class is a static utility. It owns the GLFW window handle, registers GLFW callbacks,
  * manages cached window state (size/position/fullscreen/etc.), and publishes engine events such as
  * {@link WindowResizeEvent} through {@link JGL}.</p>
- *
- * <h2>Coordinate system</h2>
- * <p>On resize, this class updates the fixed-function projection to bottom-left origin via:</p>
- * <pre>{@code
- * glOrtho(0, width, 0, height, -1, 1);
- * }</pre>
  *
  * @author Albert Beaupre
  * @since October 17th, 2025
