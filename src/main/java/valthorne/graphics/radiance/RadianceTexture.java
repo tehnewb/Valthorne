@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
 public final class RadianceTexture extends Texture {
 
     private static TextureData placeholder(int width, int height) {
-        ByteBuffer buffer = BufferUtils.createByteBuffer(Math.max(4, width * height * 4));
+        ByteBuffer buffer = BufferUtils.createByteBuffer(4);
         return new TextureData(buffer, width, height);
     }
 

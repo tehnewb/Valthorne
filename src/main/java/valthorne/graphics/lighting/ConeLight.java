@@ -44,7 +44,7 @@ public final class ConeLight extends VertexCastLight {
     private void addBaseAngles(float start, float end) {
         int baseCount = Math.max(3, rays);
         for (int i = 0; i < baseCount; i++) {
-            float t = baseCount == 1 ? 0.5f : i / (float) (baseCount - 1);
+            float t = i / (float) (baseCount - 1);
             addAngle(start + (end - start) * t);
         }
     }

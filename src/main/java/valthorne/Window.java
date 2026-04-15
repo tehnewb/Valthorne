@@ -206,7 +206,7 @@ public final class Window {
 
         closeCallback = glfwSetWindowCloseCallback(address, (win) -> glfwSetWindowShouldClose(win, true));
 
-        if (!config.isFullscreen()) {
+        if (!config.isFullscreen() && !config.isMaximized()) {
             GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
             if (vid != null) {
                 int centerX = (vid.width() - config.getWidth()) / 2;
@@ -220,18 +220,28 @@ public final class Window {
         if (config.isVisible())
             glfwShowWindow(address);
 
-        glViewport(0, 0, config.getWidth(), config.getHeight());
+        if (config.isMaximized())
+            glfwMaximizeWindow(address);
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer w = stack.mallocInt(1);
+            IntBuffer h = stack.mallocInt(1);
+            glfwGetWindowSize(address, w, h);
+            Window.width = w.get(0);
+            Window.height = h.get(0);
+        }
+
+        glViewport(0, 0, Window.width, Window.height);
 
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
         glEnable(GL_TEXTURE_2D);
-
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(0, Window.getWidth(), 0, Window.getHeight(), -1, 1);
+        glOrtho(0, Window.width, 0, Window.height, -1, 1);
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }

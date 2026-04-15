@@ -89,6 +89,10 @@ public class ComputeShader {
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
     }
 
+    public static void memoryBarrierImage() {
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
     public void dispose() {
         if (programID != 0) {
             if (glGetInteger(GL_CURRENT_PROGRAM) == programID) {
