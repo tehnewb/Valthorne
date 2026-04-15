@@ -29,40 +29,44 @@ public final class RadianceCascades {
             layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
             uniform sampler2D u_sceneTexture;
             uniform ivec2 u_sceneSize;
+            uniform ivec2 u_internalSceneSize;
             uniform ivec2 u_localSize;
+            uniform vec2 u_sceneScale;
+            uniform float u_distanceScale;
             uniform int u_probeSpacing;
             uniform int u_traceCount;
             uniform int u_quadrant;
             uniform float u_rayStep;
             uniform float u_cutoff;
 
-            vec2 localToWorld(vec2 localPos) {
+            vec2 localToInternalScene(vec2 localPos) {
                 if (u_quadrant == 0) return localPos;
-                if (u_quadrant == 1) return vec2(float(u_sceneSize.x) - 1.0 - localPos.y, localPos.x);
-                if (u_quadrant == 2) return vec2(float(u_sceneSize.x) - 1.0 - localPos.x, float(u_sceneSize.y) - 1.0 - localPos.y);
-                return vec2(localPos.y, float(u_sceneSize.y) - 1.0 - localPos.x);
+                if (u_quadrant == 1) return vec2(float(u_internalSceneSize.x) - 1.0 - localPos.y, localPos.x);
+                if (u_quadrant == 2) return vec2(float(u_internalSceneSize.x) - 1.0 - localPos.x, float(u_internalSceneSize.y) - 1.0 - localPos.y);
+                return vec2(localPos.y, float(u_internalSceneSize.y) - 1.0 - localPos.x);
             }
 
-            bool insideScene(vec2 worldPos) {
-                return worldPos.x >= 0.0 && worldPos.y >= 0.0 && worldPos.x < float(u_sceneSize.x) && worldPos.y < float(u_sceneSize.y);
+            bool insideInternalScene(vec2 scenePos) {
+                return scenePos.x >= 0.0 && scenePos.y >= 0.0 && scenePos.x < float(u_internalSceneSize.x) && scenePos.y < float(u_internalSceneSize.y);
             }
 
-            vec4 readScene(vec2 worldPos) {
-                if (!insideScene(worldPos)) return vec4(0.0);
-                ivec2 pixel = ivec2(clamp(floor(worldPos), vec2(0.0), vec2(u_sceneSize) - vec2(1.0)));
+            vec4 readScene(vec2 internalScenePos) {
+                if (!insideInternalScene(internalScenePos)) return vec4(0.0);
+                vec2 scenePos = (internalScenePos + vec2(0.5)) * u_sceneScale - vec2(0.5);
+                ivec2 pixel = ivec2(clamp(floor(scenePos), vec2(0.0), vec2(u_sceneSize) - vec2(1.0)));
                 return texelFetch(u_sceneTexture, pixel, 0);
             }
 
-            float applyOpacity(float opacity, float stepLength) {
+            float applyOpacity(float opacity, float sceneStepLength) {
                 opacity = clamp(opacity, 0.0, 1.0);
                 if (opacity <= 0.0) return 1.0;
-                return pow(max(1.0 - opacity, 0.0), stepLength / max(u_rayStep, 0.0001));
+                return pow(max(1.0 - opacity, 0.0), sceneStepLength / max(u_rayStep, 0.0001));
             }
 
             vec4 traceSegment(vec2 localStart, vec2 localEnd) {
-                vec2 worldStart = localToWorld(localStart + vec2(0.5));
-                vec2 worldEnd = localToWorld(localEnd + vec2(0.5));
-                vec2 delta = worldEnd - worldStart;
+                vec2 sceneStart = localToInternalScene(localStart + vec2(0.5));
+                vec2 sceneEnd = localToInternalScene(localEnd + vec2(0.5));
+                vec2 delta = sceneEnd - sceneStart;
                 float distanceToTravel = length(delta);
                 if (distanceToTravel <= 0.0001) return vec4(0.0, 0.0, 0.0, 1.0);
                 vec2 direction = delta / distanceToTravel;
@@ -70,12 +74,15 @@ public final class RadianceCascades {
                 float transmittance = 1.0;
                 vec3 radiance = vec3(0.0);
                 while (travelled < distanceToTravel && transmittance > u_cutoff) {
-                    float stepLength = min(u_rayStep, distanceToTravel - travelled);
-                    vec2 samplePoint = worldStart + direction * (travelled + 0.5 * stepLength);
+                    float stepLength = min(1.0, distanceToTravel - travelled);
+                    float sceneStepLength = stepLength * u_distanceScale;
+                    vec2 samplePoint = sceneStart + direction * (travelled + 0.5 * stepLength);
                     vec4 sceneValue = readScene(samplePoint);
                     float opacity = clamp(sceneValue.a, 0.0, 1.0);
-                    radiance += transmittance * sceneValue.rgb * opacity * stepLength;
-                    transmittance *= applyOpacity(opacity, stepLength);
+                    float stepTransmit = applyOpacity(opacity, sceneStepLength);
+                    float segmentContribution = 1.0 - stepTransmit;
+                    radiance += transmittance * sceneValue.rgb * segmentContribution;
+                    transmittance *= stepTransmit;
                     travelled += stepLength;
                 }
                 return vec4(radiance, transmittance);
@@ -115,7 +122,7 @@ public final class RadianceCascades {
 
             vec4 readPrev(int probeX, int probeY, int kIndex) {
                 probeX = clamp(probeX, 0, u_prevProbeCount.x - 1);
-                probeY = clamp(probeY, 0, u_outputProbeCount.y - 1);
+                probeY = clamp(probeY, 0, u_prevProbeCount.y - 1);
                 kIndex = clamp(kIndex, 0, u_prevTraceCount - 1);
                 return texelFetch(u_prevTraceTexture, ivec2(probeX * u_prevTraceCount + kIndex, probeY), 0);
             }
@@ -207,9 +214,6 @@ public final class RadianceCascades {
                 int rayIndex = texel.x - probeX * u_outputRayCount;
                 if (probeX >= u_outputProbeCount.x || rayIndex >= u_outputRayCount) return;
 
-
-                int edge0 = rayIndex;
-                int edge1 = rayIndex + 1;
                 float childAngle0 = coneAngle(u_levelSpacing * 2, 2 * rayIndex, 2 * rayIndex + 1);
                 float childAngle1 = coneAngle(u_levelSpacing * 2, 2 * rayIndex + 1, 2 * rayIndex + 2);
                 int nextRay0 = 2 * rayIndex;
@@ -221,14 +225,14 @@ public final class RadianceCascades {
                 vec4 fPlus;
 
                 if ((localX & 1) == 1) {
-                    ivec2 off0 = localOffset(u_levelSpacing, edge0);
-                    ivec2 off1 = localOffset(u_levelSpacing, edge1);
+                    ivec2 off0 = localOffset(u_levelSpacing, rayIndex);
+                    ivec2 off1 = localOffset(u_levelSpacing, rayIndex + 1);
                     int qx0 = (localX * u_levelSpacing + off0.x) / (u_levelSpacing * 2);
                     int qx1 = (localX * u_levelSpacing + off1.x) / (u_levelSpacing * 2);
                     int qy0 = localY + off0.y;
                     int qy1 = localY + off1.y;
-                    vec4 near0 = readTrace(u_traceTexture, u_traceCount, localX, localY, edge0, u_outputProbeCount);
-                    vec4 near1 = readTrace(u_traceTexture, u_traceCount, localX, localY, edge1, u_outputProbeCount);
+                    vec4 near0 = readTrace(u_traceTexture, u_traceCount, localX, localY, rayIndex, u_outputProbeCount);
+                    vec4 near1 = readTrace(u_traceTexture, u_traceCount, localX, localY, rayIndex + 1, u_outputProbeCount);
                     fMinus = mergeRay(vec4(near0.rgb * childAngle0, near0.a), readRadiance(qx0, qy0, nextRay0));
                     fPlus = mergeRay(vec4(near1.rgb * childAngle1, near1.a), readRadiance(qx1, qy1, nextRay1));
                 } else {
@@ -261,43 +265,39 @@ public final class RadianceCascades {
             uniform sampler2D u_r0North;
             uniform sampler2D u_r0West;
             uniform sampler2D u_r0South;
-            uniform ivec2 u_sceneSize;
+            uniform ivec2 u_outputSize;
+            uniform int u_baseProbeSpacing;
             uniform ivec2 u_eastProbeCount;
             uniform ivec2 u_northProbeCount;
             uniform ivec2 u_westProbeCount;
             uniform ivec2 u_southProbeCount;
-            uniform int u_eastRayCount;
-            uniform int u_northRayCount;
-            uniform int u_westRayCount;
-            uniform int u_southRayCount;
-            uniform int u_baseResolveOffset;
             uniform float u_intensity;
 
-            vec3 sampleQuadrant(sampler2D textureSampler, ivec2 probeCount, int rayCount, ivec2 localPixel) {
-                int probeX = clamp(localPixel.x + u_baseResolveOffset, 0, probeCount.x - 1);
+            vec3 readProbeLinear(sampler2D textureSampler, ivec2 probeCount, ivec2 localPixel) {
+                float probeX = float(localPixel.x) / float(max(u_baseProbeSpacing, 1)) + 1.0;
                 int probeY = clamp(localPixel.y, 0, probeCount.y - 1);
-                vec3 total = vec3(0.0);
-                for (int ray = 0; ray < 64; ray++) {
-                    if (ray >= rayCount) break;
-                    total += texelFetch(textureSampler, ivec2(probeX * rayCount + ray, probeY), 0).rgb;
-                }
-                return total;
+                int x0 = clamp(int(floor(probeX)), 0, probeCount.x - 1);
+                int x1 = clamp(x0 + 1, 0, probeCount.x - 1);
+                float t = clamp(fract(probeX), 0.0, 1.0);
+                vec3 a = texelFetch(textureSampler, ivec2(x0, probeY), 0).rgb;
+                vec3 b = texelFetch(textureSampler, ivec2(x1, probeY), 0).rgb;
+                return mix(a, b, t);
             }
 
             void main() {
                 ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
-                if (pixel.x >= u_sceneSize.x || pixel.y >= u_sceneSize.y) return;
+                if (pixel.x >= u_outputSize.x || pixel.y >= u_outputSize.y) return;
 
-                ivec2 eastLocal = ivec2(pixel.x, pixel.y);
-                ivec2 northLocal = ivec2(pixel.y, u_sceneSize.x - 1 - pixel.x);
-                ivec2 westLocal = ivec2(u_sceneSize.x - 1 - pixel.x, u_sceneSize.y - 1 - pixel.y);
-                ivec2 southLocal = ivec2(u_sceneSize.y - 1 - pixel.y, pixel.x);
+                ivec2 eastLocal = pixel;
+                ivec2 northLocal = ivec2(pixel.y, u_outputSize.x - 1 - pixel.x);
+                ivec2 westLocal = ivec2(u_outputSize.x - 1 - pixel.x, u_outputSize.y - 1 - pixel.y);
+                ivec2 southLocal = ivec2(u_outputSize.y - 1 - pixel.y, pixel.x);
 
                 vec3 lightSum = vec3(0.0);
-                lightSum += sampleQuadrant(u_r0East, u_eastProbeCount, u_eastRayCount, eastLocal);
-                lightSum += sampleQuadrant(u_r0North, u_northProbeCount, u_northRayCount, northLocal);
-                lightSum += sampleQuadrant(u_r0West, u_westProbeCount, u_westRayCount, westLocal);
-                lightSum += sampleQuadrant(u_r0South, u_southProbeCount, u_southRayCount, southLocal);
+                lightSum += readProbeLinear(u_r0East, u_eastProbeCount, eastLocal);
+                lightSum += readProbeLinear(u_r0North, u_northProbeCount, northLocal);
+                lightSum += readProbeLinear(u_r0West, u_westProbeCount, westLocal);
+                lightSum += readProbeLinear(u_r0South, u_southProbeCount, southLocal);
 
                 imageStore(u_outputImage, pixel, vec4(lightSum * u_intensity, 1.0));
             }
@@ -305,42 +305,59 @@ public final class RadianceCascades {
 
     private static final String BLUR_COMPUTE = """
             #version 430 core
-            layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-
-            layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
-            uniform sampler2D u_inputTexture;
-            uniform sampler2D u_sceneTexture;
-            uniform ivec2 u_sceneSize;
-            uniform float u_opacityThreshold;
-
-            vec4 readLight(ivec2 pixel) {
-                pixel = clamp(pixel, ivec2(0), u_sceneSize - ivec2(1));
-                return texelFetch(u_inputTexture, pixel, 0);
-            }
-
-            float readOpacity(ivec2 pixel) {
-                pixel = clamp(pixel, ivec2(0), u_sceneSize - ivec2(1));
-                return texelFetch(u_sceneTexture, pixel, 0).a;
-            }
-
-            void main() {
-                ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
-                if (pixel.x >= u_sceneSize.x || pixel.y >= u_sceneSize.y) return;
-
-                float centerOpacity = readOpacity(pixel);
-                vec3 total = readLight(pixel).rgb * 4.0;
-                float weight = 4.0;
-                ivec2 offsets[4] = ivec2[4](ivec2(-1, 0), ivec2(1, 0), ivec2(0, -1), ivec2(0, 1));
-                for (int i = 0; i < 4; i++) {
-                    ivec2 neighbor = clamp(pixel + offsets[i], ivec2(0), u_sceneSize - ivec2(1));
-                    float neighborOpacity = readOpacity(neighbor);
-                    if (abs(neighborOpacity - centerOpacity) <= u_opacityThreshold) {
-                        total += readLight(neighbor).rgb;
-                        weight += 1.0;
-                    }
-                }
-                imageStore(u_outputImage, pixel, vec4(total / max(weight, 1.0), 1.0));
-            }
+             layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+            
+             layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
+             uniform sampler2D u_inputTexture;
+             uniform sampler2D u_sceneTexture;
+             uniform ivec2 u_outputSize;
+             uniform ivec2 u_sceneSize;
+             uniform vec2 u_sceneScale;
+             uniform float u_opacityThreshold;
+            
+             vec4 readLight(ivec2 pixel) {
+                 pixel = clamp(pixel, ivec2(0), u_outputSize - ivec2(1));
+                 return texelFetch(u_inputTexture, pixel, 0);
+             }
+            
+             float readOpacity(ivec2 pixel) {
+                 pixel = clamp(pixel, ivec2(0), u_outputSize - ivec2(1));
+                 vec2 scenePos = (vec2(pixel) + vec2(0.5)) * u_sceneScale - vec2(0.5);
+                 ivec2 scenePixel = ivec2(clamp(floor(scenePos), vec2(0.0), vec2(u_sceneSize) - vec2(1.0)));
+                 return texelFetch(u_sceneTexture, scenePixel, 0).a;
+             }
+            
+             void main() {
+                 ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+                 if (pixel.x >= u_outputSize.x || pixel.y >= u_outputSize.y) return;
+            
+                 float centerOpacity = readOpacity(pixel);
+                 vec3 total = readLight(pixel).rgb * 4.0;
+                 float weight = 4.0;
+            
+                 ivec2 offsets[8] = ivec2[8](
+                     ivec2(-1, 0),
+                     ivec2(1, 0),
+                     ivec2(0, -1),
+                     ivec2(0, 1),
+                     ivec2(-1, -1),
+                     ivec2(1, -1),
+                     ivec2(-1, 1),
+                     ivec2(1, 1)
+                 );
+            
+                 for (int i = 0; i < 8; i++) {
+                     ivec2 neighbor = clamp(pixel + offsets[i], ivec2(0), u_outputSize - ivec2(1));
+                     float neighborOpacity = readOpacity(neighbor);
+                     if (abs(neighborOpacity - centerOpacity) <= u_opacityThreshold) {
+                         float w = i < 4 ? 1.0 : 0.70710678;
+                         total += readLight(neighbor).rgb * w;
+                         weight += w;
+                     }
+                 }
+            
+                 imageStore(u_outputImage, pixel, vec4(total / max(weight, 1.0), 1.0));
+             }
             """;
 
     private final RadianceCascadeSettings settings;
@@ -355,6 +372,8 @@ public final class RadianceCascades {
     private RadianceRenderTarget blurredLight;
     private int width;
     private int height;
+    private int solveWidth;
+    private int solveHeight;
 
     public RadianceCascades(int width, int height) {
         this(width, height, new RadianceCascadeSettings());
@@ -364,7 +383,7 @@ public final class RadianceCascades {
         if (width <= 0) throw new IllegalArgumentException("width must be > 0");
         if (height <= 0) throw new IllegalArgumentException("height must be > 0");
         if (settings == null) throw new NullPointerException("settings");
-        validateSettings(settings);
+        settings.validateForHrc();
         this.width = width;
         this.height = height;
         this.settings = settings;
@@ -377,29 +396,30 @@ public final class RadianceCascades {
     }
 
     private void rebuild() {
+        disposeTargets();
+        solveWidth = Math.max(1, (width + settings.getInternalScale() - 1) / settings.getInternalScale());
+        solveHeight = Math.max(1, (height + settings.getInternalScale() - 1) / settings.getInternalScale());
+        quadrants.add(new QuadrantResources(0, solveWidth, solveHeight));
+        quadrants.add(new QuadrantResources(1, solveHeight, solveWidth));
+        quadrants.add(new QuadrantResources(2, solveWidth, solveHeight));
+        quadrants.add(new QuadrantResources(3, solveHeight, solveWidth));
+        levels.addAll(quadrants.get(0).levels);
+        resolvedLight = new RadianceRenderTarget(solveWidth, solveHeight, false, true);
+        blurredLight = new RadianceRenderTarget(solveWidth, solveHeight, false, true);
+    }
+
+    private void disposeTargets() {
         for (QuadrantResources quadrant : quadrants) quadrant.dispose();
         quadrants.clear();
         levels.clear();
-        if (resolvedLight != null) resolvedLight.dispose();
-        if (blurredLight != null) blurredLight.dispose();
-        resolvedLight = new RadianceRenderTarget(width, height, false, true);
-        blurredLight = new RadianceRenderTarget(width, height, false, true);
-
-        quadrants.add(new QuadrantResources(0, width, height));
-        quadrants.add(new QuadrantResources(1, height, width));
-        quadrants.add(new QuadrantResources(2, width, height));
-        quadrants.add(new QuadrantResources(3, height, width));
-        if (!quadrants.isEmpty()) levels.addAll(quadrants.get(0).levels);
-    }
-
-
-    private void validateSettings(RadianceCascadeSettings settings) {
-        if (settings.getBaseProbeSpacing() <= 0) throw new IllegalArgumentException("baseProbeSpacing must be > 0");
-        if (settings.getBaseRayCount() <= 0) throw new IllegalArgumentException("baseRayCount must be > 0");
-        if (settings.getBaseRayCount() > 64) throw new IllegalArgumentException("baseRayCount must be <= 64 for the current resolve shader");
-        if ((settings.getBaseRayCount() & (settings.getBaseRayCount() - 1)) != 0) throw new IllegalArgumentException("baseRayCount must be a power of two");
-        if (settings.getBranchFactor() != 2) throw new IllegalArgumentException("This HRC implementation currently requires branchFactor == 2");
-        if (settings.getBaseIntervalLength() <= 0f) throw new IllegalArgumentException("baseIntervalLength must be > 0");
+        if (resolvedLight != null) {
+            resolvedLight.dispose();
+            resolvedLight = null;
+        }
+        if (blurredLight != null) {
+            blurredLight.dispose();
+            blurredLight = null;
+        }
     }
 
     public void resize(int width, int height) {
@@ -433,6 +453,9 @@ public final class RadianceCascades {
         glBindTexture(GL_TEXTURE_2D, sceneBuffer.getTextureID());
         traceInitShader.setUniform1i("u_sceneTexture", 0);
         traceInitShader.setUniform2i("u_sceneSize", width, height);
+        traceInitShader.setUniform2i("u_internalSceneSize", solveWidth, solveHeight);
+        traceInitShader.setUniform2f("u_sceneScale", width / (float) solveWidth, height / (float) solveHeight);
+        traceInitShader.setUniform1f("u_distanceScale", Math.max(width / (float) solveWidth, height / (float) solveHeight));
         traceInitShader.setUniform1i("u_quadrant", quadrant.index);
         traceInitShader.setUniform1f("u_rayStep", settings.getRayStep());
         traceInitShader.setUniform1f("u_cutoff", settings.getTransmittanceCutoff());
@@ -521,19 +544,15 @@ public final class RadianceCascades {
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, south.levels.get(0).getRadianceTextureID());
         resolveShader.setUniform1i("u_r0South", 3);
-        resolveShader.setUniform2i("u_sceneSize", width, height);
+        resolveShader.setUniform2i("u_outputSize", solveWidth, solveHeight);
+        resolveShader.setUniform1i("u_baseProbeSpacing", settings.getBaseProbeSpacing());
         resolveShader.setUniform2i("u_eastProbeCount", east.levels.get(0).getProbeCountX(), east.levels.get(0).getProbeCountY());
         resolveShader.setUniform2i("u_northProbeCount", north.levels.get(0).getProbeCountX(), north.levels.get(0).getProbeCountY());
         resolveShader.setUniform2i("u_westProbeCount", west.levels.get(0).getProbeCountX(), west.levels.get(0).getProbeCountY());
         resolveShader.setUniform2i("u_southProbeCount", south.levels.get(0).getProbeCountX(), south.levels.get(0).getProbeCountY());
-        resolveShader.setUniform1i("u_eastRayCount", east.levels.get(0).getRayCount());
-        resolveShader.setUniform1i("u_northRayCount", north.levels.get(0).getRayCount());
-        resolveShader.setUniform1i("u_westRayCount", west.levels.get(0).getRayCount());
-        resolveShader.setUniform1i("u_southRayCount", south.levels.get(0).getRayCount());
-        resolveShader.setUniform1i("u_baseResolveOffset", Math.max(1, Math.round(settings.getBaseIntervalLength() / Math.max(1f, settings.getBaseProbeSpacing()))));
         resolveShader.setUniform1f("u_intensity", settings.getIntensity());
         glBindImageTexture(0, resolvedLight.getTextureID(), 0, false, 0, GL_WRITE_ONLY, GL_RGBA16F);
-        resolveShader.dispatch(groupCount(width), groupCount(height), 1);
+        resolveShader.dispatch(groupCount(solveWidth), groupCount(solveHeight), 1);
         ComputeShader.memoryBarrierAll();
         resolveShader.unbind();
     }
@@ -546,10 +565,12 @@ public final class RadianceCascades {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, sceneBuffer.getTextureID());
         blurShader.setUniform1i("u_sceneTexture", 1);
+        blurShader.setUniform2i("u_outputSize", solveWidth, solveHeight);
         blurShader.setUniform2i("u_sceneSize", width, height);
+        blurShader.setUniform2f("u_sceneScale", width / (float) solveWidth, height / (float) solveHeight);
         blurShader.setUniform1f("u_opacityThreshold", settings.getOpacitySimilarityThreshold());
         glBindImageTexture(0, blurredLight.getTextureID(), 0, false, 0, GL_WRITE_ONLY, GL_RGBA16F);
-        blurShader.dispatch(groupCount(width), groupCount(height), 1);
+        blurShader.dispatch(groupCount(solveWidth), groupCount(solveHeight), 1);
         ComputeShader.memoryBarrierAll();
         blurShader.unbind();
     }
@@ -570,18 +591,16 @@ public final class RadianceCascades {
         return settings;
     }
 
+    public int getSolveWidth() {
+        return solveWidth;
+    }
+
+    public int getSolveHeight() {
+        return solveHeight;
+    }
+
     public void dispose() {
-        for (QuadrantResources quadrant : quadrants) quadrant.dispose();
-        quadrants.clear();
-        levels.clear();
-        if (resolvedLight != null) {
-            resolvedLight.dispose();
-            resolvedLight = null;
-        }
-        if (blurredLight != null) {
-            blurredLight.dispose();
-            blurredLight = null;
-        }
+        disposeTargets();
         traceInitShader.dispose();
         traceRecurShader.dispose();
         radianceBuildShader.dispose();
@@ -598,24 +617,24 @@ public final class RadianceCascades {
 
         private QuadrantResources(int index, int localWidth, int localHeight) {
             this.index = index;
-            this.localWidth = localWidth;
-            this.localHeight = localHeight;
-            int computedMaxLevel = 0;
-            float coveredDistance = settings.getBaseIntervalLength();
-            while (coveredDistance < localWidth) {
-                coveredDistance *= 2f;
-                computedMaxLevel++;
-            }
-            if (settings.getMaxLevels() > 0) computedMaxLevel = Math.min(computedMaxLevel, settings.getMaxLevels() - 1);
-            this.maxLevel = computedMaxLevel;
-            for (int n = 0; n <= maxLevel; n++) {
+            this.localWidth = Math.max(1, localWidth);
+            this.localHeight = Math.max(1, localHeight);
+
+            int cap = settings.getMaxCascadeTextureWidth();
+            for (int n = 0; ; n++) {
                 int spacing = settings.getBaseProbeSpacing() << n;
-                int probeCountX = Math.max(1, (int) Math.ceil(localWidth / (double) spacing) + 2);
-                int probeCountY = Math.max(1, localHeight);
+                int probeCountX = Math.max(1, (int) Math.ceil(this.localWidth / (double) spacing) + 2);
+                int probeCountY = this.localHeight;
                 int rayCount = settings.getBaseRayCount() << n;
                 int traceCount = rayCount + 1;
+                int radianceWidth = probeCountX * rayCount;
+                int traceWidth = probeCountX * traceCount;
+                if (n > 1 && (radianceWidth > cap || traceWidth > cap)) break;
                 levels.add(new RadianceCascadeLevel(n, spacing, rayCount, traceCount, probeCountX, probeCountY));
+                if (settings.getMaxLevels() > 0 && levels.size() >= settings.getMaxLevels()) break;
+                if (spacing >= this.localWidth && n >= 1) break;
             }
+            this.maxLevel = levels.size() - 1;
         }
 
         private void dispose() {

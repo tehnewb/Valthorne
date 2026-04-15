@@ -2,17 +2,19 @@ package valthorne.graphics.radiance;
 
 public final class RadianceCascadeSettings {
 
-    private int baseProbeSpacing = 1;
+    private int baseProbeSpacing = 2;
     private int baseRayCount = 1;
-    private float baseIntervalLength = 1f;
+    private float baseIntervalLength = 0.1f;
     private int branchFactor = 2;
+    private boolean bilinearFix = false;
     private int maxLevels = 0;
-    private float rayStep = 1f;
+    private int internalScale = 2;
+    private int maxCascadeTextureWidth = 8192;
+    private float rayStep = 0.1f;
     private float transmittanceCutoff = 0.01f;
     private float intensity = 1f;
     private boolean crossBlur = true;
     private float opacitySimilarityThreshold = 0.1f;
-    private boolean bilinearFix = true;
 
     public int getBaseProbeSpacing() {
         return baseProbeSpacing;
@@ -54,13 +56,42 @@ public final class RadianceCascadeSettings {
         return this;
     }
 
+    public boolean isBilinearFix() {
+        return bilinearFix;
+    }
+
+    public RadianceCascadeSettings setBilinearFix(boolean bilinearFix) {
+        this.bilinearFix = bilinearFix;
+        return this;
+    }
+
     public int getMaxLevels() {
         return maxLevels;
     }
 
     public RadianceCascadeSettings setMaxLevels(int maxLevels) {
-        if (maxLevels < 0) throw new IllegalArgumentException("maxLevels must be >= 0");
+        if (maxLevels < 0 || maxLevels == 1) throw new IllegalArgumentException("maxLevels must be 0 or >= 2");
         this.maxLevels = maxLevels;
+        return this;
+    }
+
+    public int getInternalScale() {
+        return internalScale;
+    }
+
+    public RadianceCascadeSettings setInternalScale(int internalScale) {
+        if (internalScale <= 0) throw new IllegalArgumentException("internalScale must be > 0");
+        this.internalScale = internalScale;
+        return this;
+    }
+
+    public int getMaxCascadeTextureWidth() {
+        return maxCascadeTextureWidth;
+    }
+
+    public RadianceCascadeSettings setMaxCascadeTextureWidth(int maxCascadeTextureWidth) {
+        if (maxCascadeTextureWidth < 64) throw new IllegalArgumentException("maxCascadeTextureWidth must be >= 64");
+        this.maxCascadeTextureWidth = maxCascadeTextureWidth;
         return this;
     }
 
@@ -112,12 +143,9 @@ public final class RadianceCascadeSettings {
         return this;
     }
 
-    public boolean isBilinearFix() {
-        return bilinearFix;
-    }
-
-    public RadianceCascadeSettings setBilinearFix(boolean bilinearFix) {
-        this.bilinearFix = bilinearFix;
-        return this;
+    void validateForHrc() {
+        if (baseRayCount != 1) throw new IllegalArgumentException("Current HRC path requires baseRayCount == 1");
+        if (branchFactor != 2) throw new IllegalArgumentException("Current HRC path requires branchFactor == 2");
+        if (maxLevels == 1) throw new IllegalArgumentException("Current HRC path requires maxLevels to be 0 or >= 2");
     }
 }
