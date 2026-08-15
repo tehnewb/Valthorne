@@ -350,4 +350,26 @@ public final class TiledMapData {
     public List<MapLayer> getMapLayers() {
         return mapLayers;
     }
+
+    /**
+     * Releases decoded CPU-side image data owned by this parsed map.
+     *
+     * <p>
+     * This traverses tileset images and image-layer textures so cached map data can be
+     * unloaded safely after the runtime no longer needs to build GPU resources from it.
+     * </p>
+     */
+    public void dispose() {
+        for (TileSetData tileSet : tileSetData) {
+            if (tileSet != null) {
+                tileSet.dispose();
+            }
+        }
+
+        for (MapLayer layer : mapLayers) {
+            if (layer instanceof TiledImageMapLayerData imageLayer) {
+                imageLayer.dispose();
+            }
+        }
+    }
 }

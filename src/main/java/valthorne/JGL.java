@@ -1,8 +1,10 @@
 package valthorne;
 
+import org.lwjgl.glfw.GLFW;
 import valthorne.event.Event;
-import valthorne.event.EventListener;
+import valthorne.event.EventHandler;
 import valthorne.event.EventPublisher;
+import valthorne.event.EventType;
 
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -41,6 +43,7 @@ public class JGL {
     private static final BlockingDeque<Runnable> tasks = new LinkedBlockingDeque<>();
     private static float deltaTime;
     private static short framesPerSecond;
+    private static boolean running;
 
     /**
      * Initializes the application and configures the window settings such as title and dimensions.
@@ -76,46 +79,82 @@ public class JGL {
         if (application == null) throw new NullPointerException("Application cannot be null");
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
 
-        if (!glfwInit())
-            throw new IllegalStateException("Unable to initialize GLFW");
-
-        Window.init(config);
-        Audio.init();
-        Mouse.init();
-        Keyboard.init();
-
-        float lastTime = (float) glfwGetTime();
-        double fpsTime = 0;
-        short frames = 0;
-
-        application.init();
-        while (!Window.shouldClose()) {
-            while (!tasks.isEmpty()) tasks.poll().run();
-
-            float now = (float) glfwGetTime();
-            deltaTime = now - lastTime;
-            lastTime = now;
-
-            glfwPollEvents();
-
-            application.update(deltaTime);
-            application.render();
-
-            fpsTime += deltaTime;
-            frames++;
-
-            if (fpsTime >= 1) {
-                framesPerSecond = frames;
-                fpsTime = 0;
-                frames = 0;
-            }
-
-            glfwSwapBuffers(Window.getAddress());
-            Mouse.resetScroll();
+        if (running) {
+            throw new IllegalStateException("JGL is already running");
         }
 
-        application.dispose();
-        dispose();
+        running = true;
+
+        boolean glfwInitialized = false;
+        boolean applicationInitialized = false;
+        Throwable failure = null;
+
+        try {
+            if (!glfwInit())
+                throw new IllegalStateException("Unable to initialize GLFW");
+
+            glfwInitialized = true;
+
+            Window.init(config);
+            Audio.init();
+            Mouse.init();
+            Keyboard.init();
+
+            float lastTime = (float) glfwGetTime();
+            double fpsTime = 0;
+            short frames = 0;
+
+            application.init();
+            applicationInitialized = true;
+
+            while (!Window.shouldClose()) {
+                drainTasks();
+
+                float now = (float) glfwGetTime();
+                deltaTime = now - lastTime;
+                lastTime = now;
+
+                glfwPollEvents();
+
+                application.update(deltaTime);
+                application.render();
+
+                fpsTime += deltaTime;
+                frames++;
+
+                if (fpsTime >= 1) {
+                    framesPerSecond = frames;
+                    fpsTime = 0;
+                    frames = 0;
+                }
+
+                glfwSwapBuffers(Window.getAddress());
+                Mouse.resetScroll();
+            }
+        } catch (Throwable throwable) {
+            failure = throwable;
+            throw throwable;
+        } finally {
+            Throwable cleanupFailure = null;
+
+            if (applicationInitialized) {
+                cleanupFailure = appendSuppressed(cleanupFailure, disposeApplication(application));
+            }
+
+            if (glfwInitialized) {
+                cleanupFailure = appendSuppressed(cleanupFailure, dispose());
+            } else {
+                resetState();
+            }
+
+            if (cleanupFailure != null) {
+                if (failure != null) {
+                    failure.addSuppressed(cleanupFailure);
+                } else {
+                    rethrowUnchecked(cleanupFailure);
+                }
+            }
+        }
     }
 
     /**
@@ -133,39 +172,53 @@ public class JGL {
     }
 
     /**
-     * Registers an {@code EventListener} for a specific type of {@code Event}.
-     * The provided {@code listener} will handle events of the given {@code eventType}.
-     * Throws a {@code NullPointerException} if either the {@code eventType} or {@code listener} is null.
+     * Registers an {@code EventHandler} for one numeric event route.
      *
-     * @param <T>       the type of {@code Event} the listener will handle
-     * @param eventType the class object representing the type of event to be handled
-     * @param listener  the {@code EventListener} responsible for handling the specified event type
+     * @param <T>       the event payload type routed by {@code eventType}
+     * @param eventType the concrete event route to subscribe to
+     * @param listener  the handler that should receive publications on that route
      * @throws NullPointerException if {@code eventType} or {@code listener} is null
      */
-    public static <T extends Event> void subscribe(Class<T> eventType, EventListener<T> listener) {
+    public static <T extends Event> void subscribe(EventType<T> eventType, EventHandler<? super T> listener) {
         if (eventType == null)
             throw new NullPointerException("A null event type cannot be registered for event listeners.");
         if (listener == null)
-            throw new NullPointerException("A null EventListener cannot be registered for " + eventType.getSimpleName() + " events.");
+            throw new NullPointerException("A null EventHandler cannot be registered for " + eventType.name() + " events.");
 
         events.register(eventType, listener);
     }
 
     /**
-     * Unregisters an {@code EventListener} for a specific type of {@code Event}.
-     * The provided {@code listener} will no longer handle events of the specified {@code eventType}.
-     * Throws a {@code NullPointerException} if either the {@code eventType} or {@code listener} is null.
+     * Registers an {@code EventHandler} with an explicit priority.
      *
-     * @param <T>       the type of {@code Event} the listener was handling
-     * @param eventType the class object representing the type of event to be unregistered
-     * @param listener  the {@code EventListener} to be unregistered from handling the specified event type
+     * @param <T>       the event payload type routed by {@code eventType}
+     * @param eventType the concrete event route to subscribe to
+     * @param priority  larger values run first
+     * @param listener  the handler that should receive publications on that route
      * @throws NullPointerException if {@code eventType} or {@code listener} is null
      */
-    public static <T extends Event> void unsubscribe(Class<T> eventType, EventListener<T> listener) {
+    public static <T extends Event> void subscribe(EventType<T> eventType, int priority, EventHandler<? super T> listener) {
+        if (eventType == null)
+            throw new NullPointerException("A null event type cannot be registered for event listeners.");
+        if (listener == null)
+            throw new NullPointerException("A null EventHandler cannot be registered for " + eventType.name() + " events.");
+
+        events.register(eventType, priority, listener);
+    }
+
+    /**
+     * Unregisters an {@code EventHandler} from one numeric event route.
+     *
+     * @param <T>       the event payload type routed by {@code eventType}
+     * @param eventType the concrete event route to unsubscribe from
+     * @param listener  the exact handler instance to remove
+     * @throws NullPointerException if {@code eventType} or {@code listener} is null
+     */
+    public static <T extends Event> void unsubscribe(EventType<T> eventType, EventHandler<? super T> listener) {
         if (eventType == null)
             throw new NullPointerException("A null event type cannot be unregistered for event listeners.");
         if (listener == null)
-            throw new NullPointerException("A null EventListener cannot be unregistered for " + eventType.getSimpleName() + " events.");
+            throw new NullPointerException("A null EventHandler cannot be unregistered for " + eventType.name() + " events.");
         events.unregister(eventType, listener);
     }
 
@@ -234,12 +287,70 @@ public class JGL {
      * 3. Disposes of resources associated with the {@code Window}.
      * 4. Terminates GLFW to release any remaining native resources.
      */
-    private static void dispose() {
-        Keyboard.dispose();
-        Mouse.dispose();
-        Window.dispose();
-        Audio.dispose();
+    private static Throwable disposeApplication(Application application) {
+        try {
+            application.dispose();
+            return null;
+        } catch (Throwable throwable) {
+            return throwable;
+        }
+    }
 
-        glfwTerminate();
+    private static Throwable dispose() {
+        Throwable failure = null;
+
+        failure = appendSuppressed(failure, runSafe(Keyboard::dispose));
+        failure = appendSuppressed(failure, runSafe(Mouse::dispose));
+        failure = appendSuppressed(failure, runSafe(Window::dispose));
+        failure = appendSuppressed(failure, runSafe(Audio::dispose));
+        failure = appendSuppressed(failure, runSafe(GLFW::glfwTerminate));
+
+        resetState();
+        return failure;
+    }
+
+    static void resetState() {
+        tasks.clear();
+        events.clear();
+        deltaTime = 0f;
+        framesPerSecond = 0;
+        running = false;
+    }
+
+    private static void drainTasks() {
+        Runnable task;
+        while ((task = tasks.poll()) != null) {
+            task.run();
+        }
+    }
+
+    private static Throwable runSafe(Runnable action) {
+        try {
+            action.run();
+            return null;
+        } catch (Throwable throwable) {
+            return throwable;
+        }
+    }
+
+    private static Throwable appendSuppressed(Throwable primary, Throwable next) {
+        if (next == null) {
+            return primary;
+        }
+        if (primary == null) {
+            return next;
+        }
+        primary.addSuppressed(next);
+        return primary;
+    }
+
+    private static void rethrowUnchecked(Throwable throwable) {
+        if (throwable instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (throwable instanceof Error error) {
+            throw error;
+        }
+        throw new RuntimeException(throwable);
     }
 }

@@ -1,63 +1,91 @@
 package valthorne.event.events;
 
+import valthorne.event.EventType;
+import valthorne.event.EventTypes;
+
 /**
- * The MouseMoveEvent class represents a mouse movement event, encapsulating
- * information about the starting and ending positions of the mouse cursor during
- * the event. It is a subclass of {@code MouseEvent} and adds functionality to
- * handle the ending coordinates of a mouse move action.
+ * Mouse movement event containing starting and ending cursor coordinates.
+ *
+ * <p>
+ * A normal instance routes through {@link EventTypes#MOUSE_MOVE}. The protected constructor allows
+ * {@link MouseDragEvent} to reuse this payload implementation while selecting
+ * {@link EventTypes#MOUSE_DRAG} as its actual route.
+ * </p>
  *
  * @author Albert Beaupre
  * @since December 18th, 2025
  */
 public class MouseMoveEvent extends MouseEvent {
 
-    private short toX, toY;
+    private short toX;
+    private short toY;
 
     /**
-     * Constructs a new MouseMoveEvent with the specified mouse button, modifier flags,
-     * starting coordinates, and ending coordinates of the mouse movement.
+     * Creates a normal mouse-move event.
      *
-     * @param button    the mouse button involved in the event, represented as an integer
-     * @param modifiers the modifier flags active during the event (e.g., Shift, Control)
-     * @param fromX     the starting x-coordinate of the mouse cursor during the event
-     * @param fromY     the starting y-coordinate of the mouse cursor during the event
-     * @param toX       the ending x-coordinate of the mouse cursor during the event
-     * @param toY       the ending y-coordinate of the mouse cursor during the event
+     * @param button mouse button state/code associated with the move
+     * @param modifiers modifier bit mask
+     * @param fromX starting X coordinate
+     * @param fromY starting Y coordinate
+     * @param toX ending X coordinate
+     * @param toY ending Y coordinate
      */
     public MouseMoveEvent(int button, int modifiers, int fromX, int fromY, int toX, int toY) {
-        super(fromX, fromY, button, modifiers);
+        this(EventTypes.MOUSE_MOVE, button, modifiers, fromX, fromY, toX, toY);
+    }
+
+    /**
+     * Constructor used by movement subclasses to supply their concrete route type.
+     */
+    protected MouseMoveEvent(
+            EventType<?> type,
+            int button,
+            int modifiers,
+            int fromX,
+            int fromY,
+            int toX,
+            int toY
+    ) {
+        super(type, button, modifiers, fromX, fromY);
         this.toX = (short) toX;
         this.toY = (short) toY;
     }
 
     /**
-     * @return the ending x-coordinate of the mouse cursor as an integer
+     * Replaces the complete movement payload for reuse.
+     *
+     * @return this event
      */
+    public MouseMoveEvent set(
+            int button,
+            int modifiers,
+            int fromX,
+            int fromY,
+            int toX,
+            int toY
+    ) {
+        super.set(button, modifiers, fromX, fromY);
+        this.toX = (short) toX;
+        this.toY = (short) toY;
+        return this;
+    }
+
+    /** @return ending X coordinate */
     public int getToX() {
         return toX;
     }
 
-    /**
-     * Sets the ending x-coordinate of the mouse cursor for this mouse movement event.
-     *
-     * @param toX the new x-coordinate to set, represented as a {@code short}.
-     */
+    /** @param toX ending X coordinate */
     public void setToX(short toX) {
         this.toX = toX;
     }
 
-    /**
-     * @return the ending y-coordinate of the mouse cursor as an integer
-     */
+    /** @return ending Y coordinate */
     public int getToY() {
         return toY;
     }
 
-    /**
-     * Sets the ending y-coordinate of the mouse cursor for this mouse movement event.
-     *
-     * @param toY the new y-coordinate to set, represented as a {@code short}.
-     */
+    /** @param toY ending Y coordinate */
     public void setToY(short toY) {
         this.toY = toY;
     }

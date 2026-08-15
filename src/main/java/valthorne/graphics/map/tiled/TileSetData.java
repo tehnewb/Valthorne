@@ -387,4 +387,11 @@ public record TileSetData(int firstGlobalTileID, String name, TextureData textur
     public Map<Integer, TileDefinition> tileDefs() {
         return tileDefs;
     }
+
+    /**
+     * Releases the decoded tileset image data owned by this CPU-side tileset.
+     */
+    public void dispose() {
+        textureData.dispose();
+    }
 }

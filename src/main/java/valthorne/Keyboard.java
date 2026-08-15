@@ -1,6 +1,7 @@
 package valthorne;
 
 import org.lwjgl.glfw.GLFWKeyCallback;
+import valthorne.event.EventTypes;
 import valthorne.event.events.KeyEvent;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.KeyReleaseEvent;
@@ -772,6 +773,9 @@ public final class Keyboard {
      * </p>
      */
     static void init() {
+        dispose();
+        resetState();
+
         try {
             capsLockOn = java.awt.Toolkit.getDefaultToolkit().getLockingKeyState(java.awt.event.KeyEvent.VK_CAPS_LOCK);
         } catch (Throwable ignored) {
@@ -814,8 +818,8 @@ public final class Keyboard {
      * </p>
      *
      * <p>
-     * The listener is subscribed through {@link JGL} for all {@link KeyEvent} instances,
-     * which includes both {@link KeyPressEvent} and {@link KeyReleaseEvent}.
+     * The listener is subscribed through {@link JGL} for both concrete key routes:
+     * {@link EventTypes#KEY_PRESS} and {@link EventTypes#KEY_RELEASE}.
      * </p>
      *
      * @param listener the key listener to add
@@ -823,7 +827,8 @@ public final class Keyboard {
      */
     public static void addKeyListener(KeyListener listener) {
         if (listener == null) throw new NullPointerException("A null KeyListener cannot be added");
-        JGL.subscribe(KeyEvent.class, listener);
+        JGL.subscribe(EventTypes.KEY_PRESS, listener);
+        JGL.subscribe(EventTypes.KEY_RELEASE, listener);
     }
 
     /**
@@ -833,7 +838,7 @@ public final class Keyboard {
      *
      * <p>
      * After removal, the listener will no longer receive keyboard events published
-     * through {@link JGL} for the {@link KeyEvent} type.
+     * through {@link JGL} for the concrete key event routes.
      * </p>
      *
      * @param listener the key listener to remove
@@ -841,7 +846,8 @@ public final class Keyboard {
      */
     public static void removeKeyListener(KeyListener listener) {
         if (listener == null) throw new NullPointerException("A null KeyListener cannot be removed");
-        JGL.unsubscribe(KeyEvent.class, listener);
+        JGL.unsubscribe(EventTypes.KEY_PRESS, listener);
+        JGL.unsubscribe(EventTypes.KEY_RELEASE, listener);
     }
 
     /**
@@ -856,7 +862,18 @@ public final class Keyboard {
      * </p>
      */
     static void dispose() {
-        if (keyCallback != null) keyCallback.free();
+        if (keyCallback != null) {
+            keyCallback.free();
+            keyCallback = null;
+        }
+        resetState();
+    }
+
+    static void resetState() {
+        keyDown.clear();
+        currentKey = -1;
+        modifierState = 0;
+        capsLockOn = false;
     }
 
     /**

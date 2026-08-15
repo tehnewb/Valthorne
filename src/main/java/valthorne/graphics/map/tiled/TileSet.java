@@ -466,4 +466,17 @@ public final class TileSet {
     public TileDefinition getDefinition(int localId) {
         return tileDefs.get(localId);
     }
+
+    /**
+     * Releases runtime resources owned by this tileset.
+     *
+     * <p>
+     * The atlas texture is disposed and the lazily-built region cache is cleared so this
+     * tileset can no longer be used for rendering.
+     * </p>
+     */
+    public void dispose() {
+        texture.dispose();
+        regionCache.clear();
+    }
 }

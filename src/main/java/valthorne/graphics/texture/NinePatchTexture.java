@@ -152,6 +152,8 @@ public class NinePatchTexture implements Poolable {
     private float cachedRotation = Float.NaN; // Last rotation value used to cache sine and cosine
     private float sinRot; // Cached sine of the current rotation
     private float cosRot = 1f; // Cached cosine of the current rotation
+    private final boolean ownsTexture; // Whether this nine-patch should dispose the backing texture when released
+    private boolean disposed; // Whether this nine-patch has already released its owned resources
 
     /**
      * <p>
@@ -170,7 +172,7 @@ public class NinePatchTexture implements Poolable {
      * @param bottom the bottom border size in pixels
      */
     public NinePatchTexture(String path, int left, int right, int top, int bottom) {
-        this(new Texture(path), left, right, top, bottom);
+        this(new Texture(path), left, right, top, bottom, true);
     }
 
     /**
@@ -190,7 +192,7 @@ public class NinePatchTexture implements Poolable {
      * @param bottom the bottom border size in pixels
      */
     public NinePatchTexture(TextureData data, int left, int right, int top, int bottom) {
-        this(new Texture(data), left, right, top, bottom);
+        this(new Texture(data), left, right, top, bottom, true);
     }
 
     /**
@@ -213,9 +215,14 @@ public class NinePatchTexture implements Poolable {
      * @throws NullPointerException if {@code texture} is {@code null}
      */
     public NinePatchTexture(Texture texture, int left, int right, int top, int bottom) {
+        this(texture, left, right, top, bottom, false);
+    }
+
+    private NinePatchTexture(Texture texture, int left, int right, int top, int bottom, boolean ownsTexture) {
         if (texture == null) throw new NullPointerException("Texture cannot be null");
 
         this.texture = texture;
+        this.ownsTexture = ownsTexture;
         this.region = new TextureRegion(texture);
         this.left = left;
         this.right = right;
@@ -1110,12 +1117,19 @@ public class NinePatchTexture implements Poolable {
      * </p>
      */
     public void dispose() {
-        texture.dispose();
+        if (disposed) {
+            return;
+        }
+
+        if (ownsTexture) {
+            texture.dispose();
+        }
         region.setRegion(0f, 0f, 0f, 0f);
         nineVertexBuffer = null;
         nineUvBuffer = null;
         origin = null;
         color = null;
+        disposed = true;
     }
 
     /**

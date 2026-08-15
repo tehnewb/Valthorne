@@ -1,37 +1,44 @@
 package valthorne.event.listeners;
 
-import valthorne.event.EventListener;
+import valthorne.event.EventHandler;
+import valthorne.event.EventPublisher;
+import valthorne.event.EventTypes;
 import valthorne.event.events.WindowResizeEvent;
 
 /**
- * The {@code WindowResizeListener} interface defines a specialized {@code EventListener}
- * for handling {@code WindowResizeEvent} instances, which are triggered when the size
- * of a window changes.
+ * Specialized high-throughput handler for {@link WindowResizeEvent}.
+ *
  * <p>
- * This interface provides a default implementation for handling window resize events by
- * overriding the {@code handle} method and forwarding the event to the {@code windowResized}
- * method, which subclasses must implement.
- * <p>
- * Implementors of this interface should define the specific behavior for handling these
- * resize events in their {@code windowResized} method.
+ * The listener registers directly against {@link EventTypes#WINDOW_RESIZE}; no reflective method
+ * inspection or class-based listener lookup is involved.
+ * </p>
  *
  * @author Albert Beaupre
  * @since December 25th, 2025
  */
-public interface WindowResizeListener extends EventListener<WindowResizeEvent> {
+public interface WindowResizeListener extends EventHandler<WindowResizeEvent> {
 
+    /** Delegates the handler entry point to {@link #windowResized(WindowResizeEvent)}. */
     @Override
     default void handle(WindowResizeEvent event) {
-        this.windowResized(event);
+        windowResized(event);
     }
 
-    /**
-     * Handles a window resize event triggered when the size of a window changes.
-     * Implementors should define the behavior that should occur when this event is detected.
-     *
-     * @param event the window resize event to handle, containing details such as
-     *              the old dimensions (oldWidth, oldHeight) and the new dimensions
-     *              (newWidth, newHeight) of the resized window.
-     */
+    /** Registers this listener at normal priority {@code 0}. */
+    default void register(EventPublisher publisher) {
+        publisher.register(EventTypes.WINDOW_RESIZE, this);
+    }
+
+    /** Registers this listener at an explicit priority. */
+    default void register(EventPublisher publisher, int priority) {
+        publisher.register(EventTypes.WINDOW_RESIZE, priority, this);
+    }
+
+    /** Removes this listener from the window-resize route. */
+    default boolean unregister(EventPublisher publisher) {
+        return publisher.unregister(EventTypes.WINDOW_RESIZE, this);
+    }
+
+    /** @param event completed window-resize event */
     void windowResized(WindowResizeEvent event);
 }

@@ -86,6 +86,8 @@ public class Texture implements Poolable {
     protected TextureData data; // CPU-side texture metadata and pixel buffer associated with this texture
     protected final int textureID; // OpenGL texture object ID created for this texture
     protected TextureFilter filter = TextureFilter.NEAREST; // Current filtering mode applied to the texture
+    protected final boolean ownsData; // Whether this texture should dispose the decoded TextureData when the GPU texture is released
+    private boolean disposed; // Whether this texture has already released its owned resources
 
     /**
      * <p>
@@ -101,7 +103,7 @@ public class Texture implements Poolable {
      * @param path the image path to load
      */
     public Texture(String path) {
-        this(TextureData.load(path));
+        this(TextureData.load(path), true);
     }
 
     /**
@@ -118,7 +120,7 @@ public class Texture implements Poolable {
      * @param data the encoded image bytes to load
      */
     public Texture(byte[] data) {
-        this(TextureData.load(data));
+        this(TextureData.load(data), true);
     }
 
     /**
@@ -142,10 +144,15 @@ public class Texture implements Poolable {
      * @throws NullPointerException if {@code data} is {@code null}
      */
     public Texture(TextureData data) {
+        this(data, false);
+    }
+
+    protected Texture(TextureData data, boolean ownsData) {
         if (data == null) throw new NullPointerException("TextureData cannot be null");
 
         this.textureID = glGenTextures();
         this.data = data;
+        this.ownsData = ownsData;
 
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
@@ -173,10 +180,15 @@ public class Texture implements Poolable {
      * @throws NullPointerException if {@code data} is {@code null}
      */
     protected Texture(int textureID, TextureData data) {
+        this(textureID, data, false);
+    }
+
+    protected Texture(int textureID, TextureData data, boolean ownsData) {
         if (data == null) throw new NullPointerException("TextureData cannot be null");
 
         this.textureID = textureID;
         this.data = data;
+        this.ownsData = ownsData;
     }
 
     /**
@@ -306,9 +318,17 @@ public class Texture implements Poolable {
      * </p>
      */
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+
         glDeleteTextures(textureID);
+        if (ownsData && data != null) {
+            data.dispose();
+        }
         this.data = null;
         this.filter = null;
+        this.disposed = true;
     }
 
     /**

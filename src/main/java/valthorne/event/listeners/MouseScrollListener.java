@@ -1,37 +1,45 @@
 package valthorne.event.listeners;
 
-import valthorne.event.EventListener;
+import valthorne.event.EventHandler;
+import valthorne.event.EventPublisher;
+import valthorne.event.EventTypes;
 import valthorne.event.events.MouseScrollEvent;
 
 /**
- * The {@code MouseScrollListener} interface represents a specialized listener for handling
- * {@code MouseScrollEvent} instances, which are triggered when a mouse scroll action is detected.
+ * Specialized high-throughput handler for {@link MouseScrollEvent}.
+ *
  * <p>
- * This interface provides default behavior for processing {@code MouseScrollEvent} by invoking
- * the {@code mouseScrolled} method. Implementations must define the specific behavior that should
- * occur when a mouse scroll event is detected.
- * <p>
- * The {@code handle} method from the {@code EventListener} is overridden to directly delegate
- * the event to the {@code mouseScrolled} method.
+ * This interface is itself an {@link EventHandler}, so it may be registered directly with
+ * {@link EventTypes#MOUSE_SCROLL}. Convenience registration methods are supplied for symmetry with
+ * the multi-route listener interfaces.
+ * </p>
  *
  * @author Albert Beaupre
  * @since December 16th, 2025
  */
-public interface MouseScrollListener extends EventListener<MouseScrollEvent> {
+public interface MouseScrollListener extends EventHandler<MouseScrollEvent> {
 
+    /** Delegates the generic handler entry point to {@link #mouseScrolled(MouseScrollEvent)}. */
     @Override
     default void handle(MouseScrollEvent event) {
-        this.mouseScrolled(event);
+        mouseScrolled(event);
     }
 
-    /**
-     * Handles a mouse scroll event triggered when the scroll wheel moves.
-     * Implementors should define the specific behavior that should occur
-     * when a scroll action is detected.
-     *
-     * @param event the mouse scroll event to handle, containing details
-     *              about the horizontal and vertical scroll offsets
-     *              (such as xOffset and yOffset).
-     */
+    /** Registers this listener at priority {@code 0}. */
+    default void register(EventPublisher publisher) {
+        publisher.register(EventTypes.MOUSE_SCROLL, this);
+    }
+
+    /** Registers this listener at an explicit priority. */
+    default void register(EventPublisher publisher, int priority) {
+        publisher.register(EventTypes.MOUSE_SCROLL, priority, this);
+    }
+
+    /** Removes this listener from the mouse-scroll route. */
+    default boolean unregister(EventPublisher publisher) {
+        return publisher.unregister(EventTypes.MOUSE_SCROLL, this);
+    }
+
+    /** @param event mouse scroll event */
     void mouseScrolled(MouseScrollEvent event);
 }

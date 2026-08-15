@@ -6,35 +6,35 @@ import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 
 /**
- * The {@code MouseAdapter} class is an abstract adapter class for receiving mouse events.
- * This class provides default (empty) implementations for the methods defined in the
- * {@code MouseListener} interface, allowing subclasses to selectively override only
- * the methods they are interested in.
+ * Adapter with no-op implementations for the four callbacks in {@link MouseListener}.
+ *
  * <p>
- * Subclassing {@code MouseAdapter} is useful when creating a listener for mouse events
- * where not all methods from the {@code MouseListener} interface are required to be implemented.
- * <p>
- * The following methods are defined and can be overridden by subclasses:
- * - {@code mousePressed}: Triggered when a mouse button is pressed.
- * - {@code mouseReleased}: Triggered when a mouse button is released.
- * - {@code mouseDragged}: Triggered when the mouse is dragged (moved while a button is held down).
- * - {@code mouseMoved}: Triggered when the mouse is moved.
+ * Subclasses may override only the actions they need, then register the adapter through
+ * {@link MouseListener#register(valthorne.event.EventPublisher)} or the priority overload.
+ * </p>
  *
  * @author Albert Beaupre
  * @since February 7th, 2026
  */
 public class MouseAdapter implements MouseListener {
 
+    /** Default no-op press callback. */
     @Override
-    public void mousePressed(MousePressEvent event) {}
+    public void mousePressed(MousePressEvent event) {
+    }
 
+    /** Default no-op release callback. */
     @Override
-    public void mouseReleased(MouseReleaseEvent event) {}
+    public void mouseReleased(MouseReleaseEvent event) {
+    }
 
+    /** Default no-op drag callback. */
     @Override
-    public void mouseDragged(MouseDragEvent event) {}
+    public void mouseDragged(MouseDragEvent event) {
+    }
 
+    /** Default no-op move callback. */
     @Override
-    public void mouseMoved(MouseMoveEvent event) {}
-
+    public void mouseMoved(MouseMoveEvent event) {
+    }
 }
