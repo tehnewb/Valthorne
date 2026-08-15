@@ -1,6 +1,7 @@
 package valthorne;
 
 import org.lwjgl.glfw.*;
+import valthorne.event.EventTypes;
 import valthorne.event.events.*;
 import valthorne.event.listeners.MouseListener;
 import valthorne.event.listeners.MouseScrollListener;
@@ -247,6 +248,9 @@ public final class Mouse {
      * </p>
      */
     static void init() {
+        dispose();
+        resetState();
+
         cursorPosCallback = glfwSetCursorPosCallback(Window.getAddress(), (win, xpos, ypos) -> {
             short fromX = x;
             short fromY = y;
@@ -443,9 +447,9 @@ public final class Mouse {
      * </p>
      *
      * <p>
-     * The listener is subscribed to {@link MouseEvent} and will therefore receive
-     * applicable mouse press, release, move, and drag events published through the
-     * engine event system.
+     * The listener is subscribed to the concrete mouse action routes and will therefore
+     * receive mouse press, release, move, and drag events published through the engine
+     * event system.
      * </p>
      *
      * @param listener the listener to register
@@ -453,7 +457,10 @@ public final class Mouse {
      */
     public static void addMouseListener(MouseListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseListener cannot be added");
-        JGL.subscribe(MouseEvent.class, listener);
+        JGL.subscribe(EventTypes.MOUSE_MOVE, listener);
+        JGL.subscribe(EventTypes.MOUSE_DRAG, listener);
+        JGL.subscribe(EventTypes.MOUSE_PRESS, listener);
+        JGL.subscribe(EventTypes.MOUSE_RELEASE, listener);
     }
 
     /**
@@ -470,7 +477,10 @@ public final class Mouse {
      */
     public static void removeMouseListener(MouseListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseListener cannot be removed");
-        JGL.unsubscribe(MouseEvent.class, listener);
+        JGL.unsubscribe(EventTypes.MOUSE_MOVE, listener);
+        JGL.unsubscribe(EventTypes.MOUSE_DRAG, listener);
+        JGL.unsubscribe(EventTypes.MOUSE_PRESS, listener);
+        JGL.unsubscribe(EventTypes.MOUSE_RELEASE, listener);
     }
 
     /**
@@ -479,7 +489,7 @@ public final class Mouse {
      * </p>
      *
      * <p>
-     * The listener is subscribed to {@link MouseScrollEvent} notifications.
+     * The listener is subscribed to {@link EventTypes#MOUSE_SCROLL} notifications.
      * </p>
      *
      * @param listener the scroll listener to register
@@ -487,7 +497,7 @@ public final class Mouse {
      */
     public static void addScrollListener(MouseScrollListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be added");
-        JGL.subscribe(MouseScrollEvent.class, listener);
+        JGL.subscribe(EventTypes.MOUSE_SCROLL, listener);
     }
 
     /**
@@ -500,7 +510,7 @@ public final class Mouse {
      */
     public static void removeScrollListener(MouseScrollListener listener) {
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be removed");
-        JGL.unsubscribe(MouseScrollEvent.class, listener);
+        JGL.unsubscribe(EventTypes.MOUSE_SCROLL, listener);
     }
 
     /**
@@ -515,13 +525,32 @@ public final class Mouse {
      * </p>
      */
     static void dispose() {
-        if (cursorPosCallback != null) cursorPosCallback.free();
-        if (mouseButtonCallback != null) mouseButtonCallback.free();
-        if (scrollCallback != null) scrollCallback.free();
+        if (cursorPosCallback != null) {
+            cursorPosCallback.free();
+            cursorPosCallback = null;
+        }
+        if (mouseButtonCallback != null) {
+            mouseButtonCallback.free();
+            mouseButtonCallback = null;
+        }
+        if (scrollCallback != null) {
+            scrollCallback.free();
+            scrollCallback = null;
+        }
         if (currentCursor != 0) {
             glfwDestroyCursor(currentCursor);
             currentCursor = 0;
         }
+        resetState();
+    }
+
+    static void resetState() {
+        x = 0;
+        y = 0;
+        buttonState = 0;
+        modifierState = 0;
+        scrollX = 0;
+        scrollY = 0;
     }
 
     /**

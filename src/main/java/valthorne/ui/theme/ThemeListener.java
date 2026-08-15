@@ -1,19 +1,19 @@
 package valthorne.ui.theme;
 
-import valthorne.event.EventListener;
+import valthorne.event.EventHandler;
 
 /**
  * A {@code ThemeListener} listens for changes in theme data and performs actions upon receiving
  * theme-related events.
  * <p>
- * This interface extends {@code EventListener<ThemeDataChangeEvent>} to define event handling
+ * This interface extends {@code EventHandler<ThemeDataChangeEvent>} to define event handling
  * specific to {@code ThemeDataChangeEvent}. It provides a default method for handling events and
  * delegates the handling logic to {@code onThemeChanged}.
  * <p>
  * Implementing classes should override {@code onThemeChanged} to define custom behavior when
  * a theme change occurs.
  */
-public interface ThemeListener extends EventListener<ThemeDataChangeEvent> {
+public interface ThemeListener extends EventHandler<ThemeDataChangeEvent> {
 
     /**
      * Handles the ThemeDataChangeEvent when published by an {@code EventPublisher}.

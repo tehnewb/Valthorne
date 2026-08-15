@@ -105,6 +105,7 @@ public final class TiledMap {
     private final List<TileSet> tileSets; // Runtime tilesets used for tile resolution and rendering.
     private final List<MapLayer> mapLayers; // All layers contained in the map, including non-tile layers.
     private float animationTimeSeconds; // Accumulated animation time used when resolving animated tiles.
+    private boolean disposed; // Whether this runtime map has already released its owned resources.
 
     /**
      * Creates a runtime map from parsed {@link TiledMapData}.
@@ -713,13 +714,18 @@ public final class TiledMap {
      * </p>
      */
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+
         for (TileSet tileSet : tileSets) {
-            if (tileSet != null && tileSet.getTexture() != null) {
+            if (tileSet != null) {
                 try {
-                    tileSet.getTexture().dispose();
+                    tileSet.dispose();
                 } catch (Throwable ignored) {
                 }
             }
         }
+        disposed = true;
     }
 }

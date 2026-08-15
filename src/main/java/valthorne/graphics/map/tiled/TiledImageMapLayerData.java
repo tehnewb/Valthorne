@@ -155,4 +155,13 @@ public final class TiledImageMapLayerData extends MapLayer {
     public TextureData getImageData() {
         return imageData;
     }
+
+    /**
+     * Releases the decoded image data for this layer when one is present.
+     */
+    public void dispose() {
+        if (imageData != null) {
+            imageData.dispose();
+        }
+    }
 }

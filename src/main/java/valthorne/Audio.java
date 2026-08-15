@@ -8,7 +8,7 @@ import valthorne.audio.sound.SoundPlayer;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -104,7 +104,7 @@ public final class Audio {
     /**
      * Registry of all active sound players that should be updated by the audio thread.
      */
-    private static final List<SoundPlayer> PLAYERS = new CopyOnWriteArrayList<>();
+    private static final Set<SoundPlayer> PLAYERS = ConcurrentHashMap.newKeySet();
 
     /**
      * Flag indicating whether the audio run loop should continue processing.
@@ -197,6 +197,7 @@ public final class Audio {
         synchronized (LOCK) {
             thread = audioThread;
             if (thread == null) {
+                resetState();
                 return;
             }
 
@@ -215,6 +216,8 @@ public final class Audio {
         synchronized (LOCK) {
             audioThread = null;
         }
+
+        resetState();
     }
 
     /**
@@ -685,6 +688,14 @@ public final class Audio {
         } finally {
             TASKS.clear();
         }
+    }
+
+    private static void resetState() {
+        RUNNING.set(false);
+        TASKS.clear();
+        PLAYERS.clear();
+        device = NULL;
+        context = NULL;
     }
 
     /**

@@ -6,6 +6,9 @@ import org.lwjgl.stb.STBImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -38,6 +41,7 @@ import java.nio.file.Path;
 public record TextureData(ByteBuffer buffer, int width, int height) {
 
     private static final Object STB_LOCK = new Object();
+    private static final Set<ByteBuffer> disposedBuffers = Collections.newSetFromMap(new IdentityHashMap<>());
 
     /**
      * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
@@ -149,6 +153,16 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
      * memory leaks. It should be called when the texture data is no longer needed.
      */
     public void dispose() {
+        if (buffer == null) {
+            return;
+        }
+
+        synchronized (disposedBuffers) {
+            if (!disposedBuffers.add(buffer)) {
+                return;
+            }
+        }
+
         STBImage.stbi_image_free(buffer());
     }
 

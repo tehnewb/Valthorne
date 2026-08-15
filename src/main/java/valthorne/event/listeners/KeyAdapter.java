@@ -4,27 +4,26 @@ import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.KeyReleaseEvent;
 
 /**
- * The {@code KeyAdapter} class is an abstract adapter class for receiving key events.
- * This class provides default (empty) implementations for the methods defined in the
- * {@code KeyListener} interface, allowing subclasses to selectively override only
- * the methods they are interested in.
+ * Adapter with no-op key callbacks so subclasses override only the events they need.
+ *
  * <p>
- * Subclassing {@code KeyAdapter} is useful when creating a listener for key press and
- * key release events when not all methods from the {@code KeyListener} interface are
- * required to be implemented.
- * <p>
- * The {@code keyPressed} method is called when a key is pressed, and the
- * {@code keyReleased} method is called when a key is released. By default, these methods
- * are non-operative and can be overridden by a subclass to define specific behavior.
+ * Register an adapter instance through {@link KeyListener#register(valthorne.event.EventPublisher)}
+ * or its priority overload. That helper explicitly attaches the instance to the key-press and
+ * key-release numeric routes.
+ * </p>
  *
  * @author Albert Beaupre
  * @since February 6th, 2026
  */
 public class KeyAdapter implements KeyListener {
 
+    /** Default no-op key-press callback. */
     @Override
-    public void keyPressed(KeyPressEvent event) {}
+    public void keyPressed(KeyPressEvent event) {
+    }
 
+    /** Default no-op key-release callback. */
     @Override
-    public void keyReleased(KeyReleaseEvent event) {}
+    public void keyReleased(KeyReleaseEvent event) {
+    }
 }

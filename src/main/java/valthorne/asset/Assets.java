@@ -9,6 +9,9 @@ import valthorne.graphics.map.tiled.TiledMapParameters;
 import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -81,7 +84,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class Assets {
 
-    private static final ExecutorService service = Executors.newVirtualThreadPerTaskExecutor();
+    private static final Object SERVICE_LOCK = new Object();
+    private static volatile ExecutorService service = createExecutorService();
     private static final ConcurrentMap<Class<?>, AssetLoader<?, ?>> loaders = new ConcurrentHashMap<>();
     private static final ConcurrentMap<String, CompletableFuture<?>> cache = new ConcurrentHashMap<>();
     private static final AtomicInteger completedCount = new AtomicInteger(0);
@@ -169,7 +173,7 @@ public final class Assets {
                         throw new IllegalStateException("No loader for " + parameters.getClass().getName());
 
                     return assetType.cast(loader.load(parameters));
-                }, service)
+                }, ensureService())
         );
     }
 
@@ -197,7 +201,65 @@ public final class Assets {
      * @return {@code true} if a value was removed from the cache, {@code false} if no value was associated with the key.
      */
     public static boolean remove(String key) {
-        return cache.remove(key) != null;
+        return unload(key);
+    }
+
+    /**
+     * Removes the cached value associated with the specified key and disposes it when possible.
+     *
+     * <p>
+     * If the cached future is still in flight it is cancelled and removed. If it has already
+     * completed successfully, the loaded asset is asked to dispose itself before the cache
+     * entry is forgotten.
+     * </p>
+     *
+     * @param key The key of the cached value to unload. Must not be null.
+     * @return {@code true} if a cached entry existed and was removed.
+     */
+    public static boolean unload(String key) {
+        Objects.requireNonNull(key, "key");
+
+        CompletableFuture<?> future = cache.remove(key);
+        if (future == null) {
+            return false;
+        }
+
+        Throwable failure = releaseFuture(future);
+        if (failure != null) {
+            rethrowUnchecked(failure);
+        }
+
+        return true;
+    }
+
+    /**
+     * Clears all cached assets and prepared batch entries.
+     *
+     * <p>
+     * Loaded values are disposed when possible, incomplete futures are cancelled, and
+     * progress counters are reset so a new batch can start cleanly.
+     * </p>
+     *
+     * @return the number of cached entries removed
+     */
+    public static int clear() {
+        ArrayList<CompletableFuture<?>> futures = new ArrayList<>(cache.values());
+        int removed = futures.size();
+
+        cache.clear();
+        prepared.clear();
+        resetProgress();
+
+        Throwable failure = null;
+        for (CompletableFuture<?> future : futures) {
+            failure = appendSuppressed(failure, releaseFuture(future));
+        }
+
+        if (failure != null) {
+            rethrowUnchecked(failure);
+        }
+
+        return removed;
     }
 
     /**
@@ -210,7 +272,12 @@ public final class Assets {
      * or context that relies on the assets, to safely release resources.
      */
     public static void shutdown() {
-        service.shutdown();
+        ExecutorService executor = service;
+        if (executor != null) {
+            executor.shutdownNow();
+        }
+
+        cache.entrySet().removeIf(entry -> cancelIncomplete(entry.getValue()));
     }
 
     /**
@@ -263,6 +330,7 @@ public final class Assets {
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static CompletableFuture<Void> load() {
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
+        ExecutorService executor = ensureService();
 
         for (AssetParameters parameters : prepared) {
             if (!prepared.remove(parameters))
@@ -277,7 +345,7 @@ public final class Assets {
                             throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
 
                         return loader.load(parameters);
-                    }, service)
+                    }, executor)
                     .whenComplete((_, ex) -> {
                         if (ex != null) {
                             ex.printStackTrace();
@@ -296,4 +364,86 @@ public final class Assets {
                 .whenComplete((_, _) -> System.gc());
     }
 
+    private static ExecutorService createExecutorService() {
+        return Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    private static ExecutorService ensureService() {
+        ExecutorService executor = service;
+        if (executor != null && !executor.isShutdown() && !executor.isTerminated()) {
+            return executor;
+        }
+
+        synchronized (SERVICE_LOCK) {
+            executor = service;
+            if (executor == null || executor.isShutdown() || executor.isTerminated()) {
+                service = executor = createExecutorService();
+            }
+            return executor;
+        }
+    }
+
+    private static boolean cancelIncomplete(CompletableFuture<?> future) {
+        return future != null && !future.isDone() && future.cancel(true);
+    }
+
+    private static Throwable releaseFuture(CompletableFuture<?> future) {
+        if (future == null) {
+            return null;
+        }
+
+        if (cancelIncomplete(future) || future.isCancelled() || future.isCompletedExceptionally()) {
+            return null;
+        }
+
+        return disposeAssetValue(future.getNow(null));
+    }
+
+    private static Throwable disposeAssetValue(Object asset) {
+        if (asset == null) {
+            return null;
+        }
+
+        if (asset instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+                return null;
+            } catch (Throwable throwable) {
+                return throwable;
+            }
+        }
+
+        try {
+            Method dispose = asset.getClass().getMethod("dispose");
+            dispose.invoke(asset);
+            return null;
+        } catch (NoSuchMethodException ignored) {
+            return null;
+        } catch (InvocationTargetException e) {
+            return e.getCause() != null ? e.getCause() : e;
+        } catch (Throwable throwable) {
+            return throwable;
+        }
+    }
+
+    private static Throwable appendSuppressed(Throwable primary, Throwable next) {
+        if (next == null) {
+            return primary;
+        }
+        if (primary == null) {
+            return next;
+        }
+        primary.addSuppressed(next);
+        return primary;
+    }
+
+    private static void rethrowUnchecked(Throwable throwable) {
+        if (throwable instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (throwable instanceof Error error) {
+            throw error;
+        }
+        throw new RuntimeException(throwable);
+    }
 }

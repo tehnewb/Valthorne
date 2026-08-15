@@ -102,6 +102,8 @@ public class Sprite implements Poolable, Drawable {
     protected float scaleX = 1f; // Horizontal scale factor
     protected float scaleY = 1f; // Vertical scale factor
     protected Color color = new Color(1, 1, 1, 1); // Tint color used when drawing the sprite
+    protected boolean ownsTexture; // Whether this sprite should dispose its backing texture when released
+    protected boolean disposed; // Whether this sprite has already released its owned resources
 
     /**
      * <p>
@@ -116,7 +118,7 @@ public class Sprite implements Poolable, Drawable {
      * @param path the file path of the texture to load
      */
     public Sprite(String path) {
-        this(new Texture(path));
+        this(new Texture(path), true);
     }
 
     /**
@@ -132,7 +134,7 @@ public class Sprite implements Poolable, Drawable {
      * @param data the encoded image bytes to load
      */
     public Sprite(byte[] data) {
-        this(new Texture(data));
+        this(new Texture(data), true);
     }
 
     /**
@@ -148,7 +150,7 @@ public class Sprite implements Poolable, Drawable {
      * @param data the prepared texture data
      */
     public Sprite(TextureData data) {
-        this(new Texture(data));
+        this(new Texture(data), true);
     }
 
     /**
@@ -164,7 +166,11 @@ public class Sprite implements Poolable, Drawable {
      * @param texture the texture to use
      */
     public Sprite(Texture texture) {
-        this(new TextureRegion(texture));
+        this(texture, false);
+    }
+
+    private Sprite(Texture texture, boolean ownsTexture) {
+        this(new TextureRegion(texture), ownsTexture);
     }
 
     /**
@@ -183,9 +189,14 @@ public class Sprite implements Poolable, Drawable {
      * @throws NullPointerException if {@code region} is {@code null}
      */
     public Sprite(TextureRegion region) {
+        this(region, false);
+    }
+
+    private Sprite(TextureRegion region, boolean ownsTexture) {
         if (region == null) throw new NullPointerException("TextureRegion cannot be null");
 
         this.region = region;
+        this.ownsTexture = ownsTexture;
         this.bounds = new Rectangle(0, 0, region.getRegionWidth(), region.getRegionHeight());
         updateLocalVertices();
         updateUVBuffer();
@@ -894,12 +905,21 @@ public class Sprite implements Poolable, Drawable {
      * </p>
      */
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+
+        if (ownsTexture && region != null && region.getTexture() != null) {
+            region.getTexture().dispose();
+        }
+
         this.region = null;
         this.vertexBuffer = null;
         this.uvBuffer = null;
         this.localVertices = null;
         this.origin = null;
         this.color = null;
+        this.disposed = true;
     }
 
     /**

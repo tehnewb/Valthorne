@@ -103,6 +103,7 @@ public class Font implements Dimensional {
     private static final int TAB_SPACES = 4;
 
     private final float fallbackAdvance; // Fallback horizontal advance used when a glyph is missing from the font.
+    private final boolean ownsData; // Whether this font should dispose the baked FontData it loaded itself.
 
     private Texture texture; // Atlas texture that contains all baked glyph pixels for this font.
     private FontData data; // Font metadata and glyph metrics used for measurement and rendering.
@@ -138,6 +139,7 @@ public class Font implements Dimensional {
     private final GlyphContext tempCtx = new GlyphContext(); // Reusable temporary glyph context used during runtime styling.
     private final Color tempColor = new Color(1f, 1f, 1f, 1f); // Reusable temporary color used during outline rendering.
     private final Color tempGlyphColor = new Color(1f, 1f, 1f, 1f); // Reusable temporary color used when the styler overrides glyph color.
+    private boolean disposed; // Whether this font has already released its owned resources.
 
     /**
      * Creates a new font renderer from existing baked {@link FontData}.
@@ -156,14 +158,25 @@ public class Font implements Dimensional {
      * @throws NullPointerException if {@code data} is null
      */
     public Font(FontData data) {
+        this(data, false);
+    }
+
+    private Font(FontData data, boolean ownsData) {
         if (data == null) {
             throw new NullPointerException("FontData cannot be null");
         }
 
         this.data = data;
+        this.ownsData = ownsData;
         this.texture = new Texture(data.textureData());
         this.spaceGlyph = data.glyph(' ');
         this.fallbackAdvance = data.lineHeight() * 0.25f;
+
+        // Fonts loaded through this instance still need metrics and kerning data, but they no
+        // longer need the baked atlas pixels once the texture upload has completed.
+        if (ownsData) {
+            data.dispose();
+        }
 
         refreshAtlasInv();
         recalcScaleCaches();
@@ -183,7 +196,7 @@ public class Font implements Dimensional {
      * @param fontSize target baked font size
      */
     public Font(String path, int fontSize) {
-        this(FontData.load(path, fontSize, 0, 254));
+        this(FontData.load(path, fontSize, 0, 254), true);
     }
 
     /**
@@ -502,13 +515,23 @@ public class Font implements Dimensional {
      * </p>
      */
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+
+        if (texture != null) {
+            texture.dispose();
+            texture = null;
+        }
+        if (ownsData && data != null) {
+            data.dispose();
+        }
+
         data = null;
         spaceGlyph = null;
         text = null;
         styler = null;
-
-        texture.dispose();
-        texture = null;
+        disposed = true;
     }
 
     /**

@@ -138,6 +138,20 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
     }
 
     /**
+     * Releases native resources owned by this baked font data.
+     *
+     * <p>
+     * This frees the decoded atlas image data while leaving lightweight metric and glyph
+     * metadata available for any callers that still hold references to this object.
+     * </p>
+     */
+    public void dispose() {
+        if (textureData != null) {
+            textureData.dispose();
+        }
+    }
+
+    /**
      * Fast glyph lookup.
      *
      * @param c character

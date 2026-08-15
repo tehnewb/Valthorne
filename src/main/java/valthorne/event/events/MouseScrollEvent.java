@@ -1,80 +1,61 @@
 package valthorne.event.events;
 
 import valthorne.event.Event;
+import valthorne.event.EventTypes;
 
 /**
- * Represents a mouse scroll event that encapsulates the horizontal
- * and vertical scroll offsets generated during a scroll interaction.
- * This class extends the {@code Event} class and provides methods to
- * retrieve and manipulate the x and y scroll offsets for the event.
+ * Mouse scroll event containing horizontal and vertical scroll offsets.
+ *
  * <p>
- * The offsets represent the amount of scrolling that has occurred.
- * Positive values indicate scrolling in one direction (e.g., down or
- * right), while negative values indicate the opposite direction
- * (e.g., up or left).
+ * The event is routed directly through {@link EventTypes#MOUSE_SCROLL}. Payload fields remain
+ * mutable so one exclusively-owned object may be reused to reduce allocation pressure.
+ * </p>
  *
  * @author Albert Beaupre
  * @since December 18th, 2025
  */
 public class MouseScrollEvent extends Event {
 
-    private short xOffset, yOffset;
+    private short xOffset;
+    private short yOffset;
 
     /**
-     * Constructs a new MouseScrollEvent with the specified horizontal
-     * and vertical scroll offsets.
-     * <p>
-     * The scroll offsets represent the amount of scrolling that occurred
-     * along each axis, with positive values indicating scrolling in a
-     * forward direction (e.g., right or down) and negative values
-     * indicating scrolling in the opposite direction (e.g., left or up).
-     *
-     * @param xOffset the horizontal scroll offset for this event. The value is cast to a {@code short}.
-     * @param yOffset the vertical scroll offset for this event. The value is cast to a {@code short}.
+     * @param xOffset horizontal scroll offset
+     * @param yOffset vertical scroll offset
      */
     public MouseScrollEvent(int xOffset, int yOffset) {
+        super(EventTypes.MOUSE_SCROLL);
         this.xOffset = (short) xOffset;
         this.yOffset = (short) yOffset;
     }
 
     /**
-     * Sets the horizontal scroll offset for this event.
+     * Replaces both offsets for object reuse.
      *
-     * @param xOffset the horizontal scroll offset to set, which will be cast to a {@code short}
+     * @return this event
      */
+    public MouseScrollEvent set(int xOffset, int yOffset) {
+        this.xOffset = (short) xOffset;
+        this.yOffset = (short) yOffset;
+        return this;
+    }
+
+    /** @param xOffset horizontal scroll offset */
     public void setXOffset(int xOffset) {
         this.xOffset = (short) xOffset;
     }
 
-    /**
-     * Sets the vertical scroll offset for this event.
-     *
-     * @param yOffset the vertical scroll offset to set, which will be cast to a {@code short}
-     */
+    /** @param yOffset vertical scroll offset */
     public void setYOffset(int yOffset) {
         this.yOffset = (short) yOffset;
     }
 
-    /**
-     * Retrieves the horizontal scroll offset for this event.
-     * The offset represents the amount of horizontal scrolling that
-     * has occurred, with positive values indicating scrolling to the right
-     * and negative values indicating scrolling to the left.
-     *
-     * @return the horizontal scroll offset as an integer
-     */
+    /** @return horizontal scroll offset */
     public int xOffset() {
         return xOffset;
     }
 
-    /**
-     * Retrieves the vertical scroll offset for this event.
-     * The offset represents the amount of vertical scrolling that
-     * has occurred, with positive values indicating scrolling down
-     * and negative values indicating scrolling up.
-     *
-     * @return the vertical scroll offset as an integer
-     */
+    /** @return vertical scroll offset */
     public int yOffset() {
         return yOffset;
     }

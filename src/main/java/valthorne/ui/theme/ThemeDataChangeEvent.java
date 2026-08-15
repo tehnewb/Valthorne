@@ -1,6 +1,7 @@
 package valthorne.ui.theme;
 
 import valthorne.event.Event;
+import valthorne.event.EventTypes;
 
 /**
  * Represents an event that carries {@link ThemeData} as its payload, typically emitted when
@@ -24,6 +25,7 @@ public class ThemeDataChangeEvent extends Event {
      * @param data the {@code ThemeData} object representing the new or updated theme-related data
      */
     public ThemeDataChangeEvent(ThemeData data) {
+        super(EventTypes.THEME_DATA_CHANGE);
         this.data = data;
     }
 

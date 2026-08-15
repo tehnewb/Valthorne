@@ -3,6 +3,7 @@ package valthorne;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
+import valthorne.event.EventTypes;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
@@ -134,12 +135,14 @@ public final class Window {
      */
     public static void init(JGLConfiguration config) {
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
+        if (address != NULL) throw new IllegalStateException("Window is already initialized");
 
         Window.width = config.getWidth();
         Window.height = config.getHeight();
         Window.fullscreen = config.isFullscreen();
         Window.borderless = !config.isDecorated();
         Window.resizable = config.isResizable();
+        Window.swapInterval = config.getSwapInterval();
 
         config.applyWindowHints();
 
@@ -152,8 +155,7 @@ public final class Window {
         GL.createCapabilities();
         glfwSwapInterval(config.getSwapInterval().getValue());
 
-        if (config.getSamples() > 0)
-            glEnable(GL_MULTISAMPLE);
+        if (config.getSamples() > 0) glEnable(GL_MULTISAMPLE);
 
         fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
         });
@@ -208,11 +210,9 @@ public final class Window {
             }
         }
 
-        if (config.isVisible())
-            glfwShowWindow(address);
+        if (config.isVisible()) glfwShowWindow(address);
 
-        if (config.isMaximized())
-            glfwMaximizeWindow(address);
+        if (config.isMaximized()) glfwMaximizeWindow(address);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer w = stack.mallocInt(1);
@@ -250,27 +250,38 @@ public final class Window {
     /**
      * Adds a window resize listener.
      *
-     * <p>This subscribes the listener to {@link WindowResizeEvent} via {@link JGL}'s event bus.</p>
+     * <p>This subscribes the listener directly to {@link EventTypes#WINDOW_RESIZE} via {@link JGL}.</p>
      *
      * @param listener resize listener (must be non-null)
      * @throws NullPointerException if {@code listener} is null
      */
     public static void addWindowResizeListener(WindowResizeListener listener) {
+        addWindowResizeListener(listener, 0);
+    }
+
+    /**
+     * Adds a window resize listener with an explicit execution priority.
+     *
+     * @param listener resize listener (must be non-null)
+     * @param priority execution priority; higher values execute earlier
+     * @throws NullPointerException if {@code listener} is null
+     */
+    public static void addWindowResizeListener(WindowResizeListener listener, int priority) {
         if (listener == null) throw new NullPointerException("A null WindowResizeListener cannot be added");
-        JGL.subscribe(WindowResizeEvent.class, listener);
+        JGL.subscribe(EventTypes.WINDOW_RESIZE, priority, listener);
     }
 
     /**
      * Removes a window resize listener.
      *
-     * <p>This unsubscribes the listener from {@link WindowResizeEvent} via {@link JGL}'s event bus.</p>
+     * <p>This unsubscribes the listener from {@link EventTypes#WINDOW_RESIZE} via {@link JGL}.</p>
      *
      * @param listener resize listener (must be non-null)
      * @throws NullPointerException if {@code listener} is null
      */
     public static void removeWindowResizeListener(WindowResizeListener listener) {
         if (listener == null) throw new NullPointerException("A null WindowResizeListener cannot be removed");
-        JGL.unsubscribe(WindowResizeEvent.class, listener);
+        JGL.unsubscribe(EventTypes.WINDOW_RESIZE, listener);
     }
 
     /**
@@ -279,7 +290,7 @@ public final class Window {
      * @return true if the window should close
      */
     static boolean shouldClose() {
-        return glfwWindowShouldClose(address);
+        return address == NULL || glfwWindowShouldClose(address);
     }
 
     /**
@@ -596,6 +607,8 @@ public final class Window {
         int cx = (vid.width() - getWidth()) / 2;
         int cy = (vid.height() - getHeight()) / 2;
         glfwSetWindowPos(address, cx, cy);
+        x = cx;
+        y = cy;
     }
 
     /**
@@ -619,16 +632,93 @@ public final class Window {
      * <p>This frees all registered GLFW callbacks and destroys the GLFW window handle.</p>
      */
     static void dispose() {
-        ImmediateTextureRenderer.dispose();
-        if (fbCallback != null) fbCallback.free();
-        if (sizeCallback != null) sizeCallback.free();
-        if (posCallback != null) posCallback.free();
-        if (focusCallback != null) focusCallback.free();
-        if (iconifyCallback != null) iconifyCallback.free();
-        if (maximizeCallback != null) maximizeCallback.free();
-        if (scaleCallback != null) scaleCallback.free();
-        if (closeCallback != null) closeCallback.free();
-        if (address != NULL) glfwDestroyWindow(address);
+        Throwable failure = null;
+
+        failure = appendSuppressed(failure, runSafe(ImmediateTextureRenderer::dispose));
+        GLFWFramebufferSizeCallback framebufferCallback = fbCallback;
+        fbCallback = null;
+        if (framebufferCallback != null) {
+            failure = appendSuppressed(failure, runSafe(framebufferCallback::free));
+        }
+
+        GLFWWindowSizeCallback windowSizeCallback = sizeCallback;
+        sizeCallback = null;
+        if (windowSizeCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowSizeCallback::free));
+        }
+
+        GLFWWindowPosCallback windowPosCallback = posCallback;
+        posCallback = null;
+        if (windowPosCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowPosCallback::free));
+        }
+
+        GLFWWindowFocusCallback windowFocusCallback = focusCallback;
+        focusCallback = null;
+        if (windowFocusCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowFocusCallback::free));
+        }
+
+        GLFWWindowIconifyCallback windowIconifyCallback = iconifyCallback;
+        iconifyCallback = null;
+        if (windowIconifyCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowIconifyCallback::free));
+        }
+
+        GLFWWindowMaximizeCallback windowMaximizeCallback = maximizeCallback;
+        maximizeCallback = null;
+        if (windowMaximizeCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowMaximizeCallback::free));
+        }
+
+        GLFWWindowContentScaleCallback windowScaleCallback = scaleCallback;
+        scaleCallback = null;
+        if (windowScaleCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowScaleCallback::free));
+        }
+
+        GLFWWindowCloseCallback windowCloseCallback = closeCallback;
+        closeCallback = null;
+        if (windowCloseCallback != null) {
+            failure = appendSuppressed(failure, runSafe(windowCloseCallback::free));
+        }
+
+        long handle = address;
+        address = NULL;
+        if (handle != NULL) {
+            failure = appendSuppressed(failure, runSafe(() -> {
+                glfwMakeContextCurrent(NULL);
+                GL.setCapabilities(null);
+                glfwDestroyWindow(handle);
+            }));
+        }
+
+        resetState();
+
+        if (failure != null) {
+            rethrowUnchecked(failure);
+        }
+    }
+
+    static void resetState() {
+        fbCallback = null;
+        focusCallback = null;
+        iconifyCallback = null;
+        maximizeCallback = null;
+        closeCallback = null;
+        posCallback = null;
+        sizeCallback = null;
+        scaleCallback = null;
+        address = NULL;
+        x = 0;
+        y = 0;
+        width = 0;
+        height = 0;
+        fullscreen = false;
+        borderless = false;
+        resizable = true;
+        swapInterval = SwapInterval.OFF;
+        projectionMatrix.identity();
     }
 
     /**
@@ -656,7 +746,7 @@ public final class Window {
      * Copies the current engine-managed projection matrix into the supplied destination array.
      *
      * @param destination destination array that must contain room for 16 floats
-     * @throws NullPointerException if {@code destination} is null
+     * @throws NullPointerException     if {@code destination} is null
      * @throws IllegalArgumentException if {@code destination.length < 16}
      */
     public static void copyProjectionMatrix(float[] destination) {
@@ -673,7 +763,7 @@ public final class Window {
      * code while the engine transitions away from implicit OpenGL matrices.</p>
      *
      * @param matrixData projection values in column-major order
-     * @throws NullPointerException if {@code matrixData} is null
+     * @throws NullPointerException     if {@code matrixData} is null
      * @throws IllegalArgumentException if {@code matrixData.length < 16}
      */
     public static void setProjectionMatrix(float[] matrixData) {
@@ -691,5 +781,35 @@ public final class Window {
      */
     public static Dimensional getDimensional() {
         return dimensional;
+    }
+
+    private static Throwable runSafe(Runnable action) {
+        try {
+            action.run();
+            return null;
+        } catch (Throwable throwable) {
+            return throwable;
+        }
+    }
+
+    private static Throwable appendSuppressed(Throwable primary, Throwable next) {
+        if (next == null) {
+            return primary;
+        }
+        if (primary == null) {
+            return next;
+        }
+        primary.addSuppressed(next);
+        return primary;
+    }
+
+    private static void rethrowUnchecked(Throwable throwable) {
+        if (throwable instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (throwable instanceof Error error) {
+            throw error;
+        }
+        throw new RuntimeException(throwable);
     }
 }

@@ -1,6 +1,7 @@
 package valthorne.ui.theme;
 
 import valthorne.JGL;
+import valthorne.event.EventTypes;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -403,13 +404,13 @@ public class ThemeData {
      * </p>
      *
      * <p>
-     * The listener is subscribed to {@link ThemeDataChangeEvent} through {@link JGL}.
+     * The listener is subscribed to {@link EventTypes#THEME_DATA_CHANGE} through {@link JGL}.
      * </p>
      *
      * @param listener the listener to register
      */
     public void addThemeDataChangeListener(ThemeListener listener) {
-        JGL.subscribe(ThemeDataChangeEvent.class, listener);
+        JGL.subscribe(EventTypes.THEME_DATA_CHANGE, listener);
     }
 
     /**
@@ -420,6 +421,6 @@ public class ThemeData {
      * @param listener the listener to remove
      */
     public void removeThemeDataChangeListener(ThemeListener listener) {
-        JGL.unsubscribe(ThemeDataChangeEvent.class, listener);
+        JGL.unsubscribe(EventTypes.THEME_DATA_CHANGE, listener);
     }
 }
