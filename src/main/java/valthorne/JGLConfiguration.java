@@ -38,11 +38,9 @@ import static org.lwjgl.glfw.GLFW.*;
  * </ul>
  *
  * <p>
- * The class also exposes a shared static default instance through {@link #defaults()}.
- * That object can be used as a convenient baseline configuration when callers want a
- * single reusable configuration template. Since that instance is mutable, it should
- * be treated carefully in shared code so one caller does not unexpectedly affect
- * another caller's startup behavior.
+ * The class also exposes a convenience factory through {@link #defaults()}.
+ * That method returns a fresh configuration instance each time so callers can use
+ * it as a safe baseline without accidentally sharing mutable startup state.
  * </p>
  *
  * <p>
@@ -62,7 +60,7 @@ import static org.lwjgl.glfw.GLFW.*;
  *         .samples(4)
  *         .resizable(true)
  *         .visible(true)
- *         .contextVersion(4, 6)
+ *         .contextVersion(3, 3)
  *         .openglProfile(GLFW_OPENGL_CORE_PROFILE)
  *         .openglDebugContext(true)
  *         .swapInterval(SwapInterval.VSYNC)
@@ -91,7 +89,7 @@ public final class JGLConfiguration {
     private boolean visible = true; // Whether the window should start visible
     private boolean resizable = true; // Whether the window can be resized by the user
     private boolean doubleBuffer = true; // Whether double buffering should be enabled
-    private boolean contextNoError = true; // Whether the OpenGL context should use no-error mode when supported
+    private boolean contextNoError = false; // Whether the OpenGL context should use no-error mode when supported
     private boolean fullscreen = false; // Whether the window should be created in fullscreen mode
     private boolean maximized = false; // Whether the window should start maximized
     private boolean focused = true; // Whether the window should start focused
@@ -115,10 +113,10 @@ public final class JGLConfiguration {
     private int accumBlueBits = GLFW_DONT_CARE; // Requested accumulation blue channel precision in bits
     private int accumAlphaBits = GLFW_DONT_CARE; // Requested accumulation alpha channel precision in bits
     private int auxBuffers = GLFW_DONT_CARE; // Requested number of auxiliary buffers
-    private int contextVersionMajor = 4; // Requested OpenGL context major version
-    private int contextVersionMinor = 6; // Requested OpenGL context minor version
-    private int openglProfile = GLFW_OPENGL_COMPAT_PROFILE; // Requested OpenGL profile hint
-    private int openglForwardCompat = GLFW_FALSE; // Whether forward-compatible OpenGL context mode should be requested
+    private int contextVersionMajor = 3; // Requested OpenGL context major version
+    private int contextVersionMinor = 3; // Requested OpenGL context minor version
+    private int openglProfile = GLFW_OPENGL_CORE_PROFILE; // Requested OpenGL profile hint
+    private int openglForwardCompat = isMacOS() ? GLFW_TRUE : GLFW_FALSE; // Whether forward-compatible OpenGL context mode should be requested
     private int openglDebugContext = GLFW_FALSE; // Whether an OpenGL debug context should be requested
     private int openglRobustness = GLFW_NO_ROBUSTNESS; // Requested OpenGL robustness behavior
     private int contextReleaseBehavior = GLFW_ANY_RELEASE_BEHAVIOR; // Requested context release behavior hint
@@ -130,25 +128,19 @@ public final class JGLConfiguration {
     private final Map<Integer, Integer> extraHints = new LinkedHashMap<>(); // Extra raw GLFW integer hints applied after the standard hints
 
     /**
-     * Shared mutable default configuration instance returned by {@link #defaults()}.
-     */
-    private static final JGLConfiguration defaults = new JGLConfiguration();
-
-    /**
      * <p>
-     * Returns the shared default configuration instance.
+     * Returns a fresh default configuration instance.
      * </p>
      *
-     * <p>
-     * This method does not create a new object. It returns the same static instance
-     * every time. Because that instance is mutable, changes made through one caller
-     * will remain visible to future callers unless explicitly reset.
-     * </p>
-     *
-     * @return the shared default configuration instance
+     * @return a new configuration initialized with Valthorne's baseline defaults
      */
     public static JGLConfiguration defaults() {
-        return defaults;
+        return new JGLConfiguration();
+    }
+
+    private static boolean isMacOS() {
+        String os = System.getProperty("os.name", "");
+        return os.toLowerCase().contains("mac");
     }
 
     /**

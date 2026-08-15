@@ -1,7 +1,6 @@
 package valthorne.graphics.shader;
 
 import valthorne.graphics.Sprite;
-import valthorne.graphics.texture.Texture;
 import valthorne.math.MathUtils;
 
 /**
@@ -50,21 +49,10 @@ import valthorne.math.MathUtils;
  * @author Albert Beaupre
  * @since February 22nd, 2026
  */
-public class ReflectionShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """; // GLSL 120 vertex shader source.
+public class ReflectionShader extends TexturedQuadShader {
 
     private static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             
             uniform float u_alpha;
@@ -77,10 +65,11 @@ public class ReflectionShader extends Shader {
             
             uniform vec2  u_texelSize;
             
-            varying vec2 v_uv;
-            varying vec4 v_color;
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
             
-            void main(){
+            void main() {
                 vec2 uv = v_uv;
             
                 // Mirror vertically: top of reflection quad samples bottom of sprite.
@@ -93,7 +82,7 @@ public class ReflectionShader extends Shader {
                     uv.x += w * amp.x;
                 }
             
-                vec4 c = texture2D(u_texture, uv) * v_color;
+                vec4 c = texture(u_texture, uv) * v_color;
             
                 // Fade out as we go downward (top of quad is strongest).
                 float fade = clamp(v_uv.y, 0.0, 1.0);
@@ -102,9 +91,9 @@ public class ReflectionShader extends Shader {
                 vec3 rgb = mix(c.rgb, u_tint.rgb, 0.35);
                 float a = c.a * fade * clamp(u_alpha, 0.0, 1.0);
             
-                gl_FragColor = vec4(rgb, a);
+                fragColor = vec4(rgb, a);
             }
-            """; // GLSL 120 fragment shader source.
+            """;
 
     /**
      * Creates a reflection shader using built-in GLSL 120 sources.
@@ -112,7 +101,7 @@ public class ReflectionShader extends Shader {
      * <p>This compiles and links the shader program immediately via {@link Shader#Shader(String, String)}.</p>
      */
     public ReflectionShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     public void apply(Sprite sprite, float timeSeconds, float amount, float alpha, float tintR, float tintG, float tintB, float rippleAmpPx, float rippleFreq, float rippleSpeed) {
@@ -132,7 +121,7 @@ public class ReflectionShader extends Shader {
         sprite.setSize(ow, rh);
 
         bind();
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
         setUniform2f("u_texelSize", 1f / sprite.getTexture().getData().width(), 1f / sprite.getTexture().getData().height());
         setUniform1f("u_alpha", alpha);
         setUniform4f("u_tint", tintR, tintG, tintB, 1.0f);

@@ -37,6 +37,8 @@ import java.nio.file.Path;
  */
 public record TextureData(ByteBuffer buffer, int width, int height) {
 
+    private static final Object STB_LOCK = new Object();
+
     /**
      * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
      *
@@ -102,9 +104,12 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
         ByteBuffer dataBuffer = BufferUtils.createByteBuffer(data.length);
         dataBuffer.put(data).flip();
 
-        STBImage.stbi_set_flip_vertically_on_load(flipVertically);
+        ByteBuffer image;
 
-        ByteBuffer image = STBImage.stbi_load_from_memory(dataBuffer, w, h, comp, 4);
+        synchronized (STB_LOCK) {
+            STBImage.stbi_set_flip_vertically_on_load(flipVertically);
+            image = STBImage.stbi_load_from_memory(dataBuffer, w, h, comp, 4);
+        }
 
         if (image == null)
             throw new RuntimeException("Failed to load image: " + STBImage.stbi_failure_reason());

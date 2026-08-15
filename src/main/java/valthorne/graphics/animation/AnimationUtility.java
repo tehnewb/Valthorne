@@ -51,27 +51,26 @@ public final class AnimationUtility {
     }
 
     /**
-     * Creates an animation using a grid of texture regions, the specified playback mode, and frame duration.
-     * Each cell in the provided grid is treated as an animation frame.
+     * Creates an animation using the specified playback mode, total duration, and a 2D grid of texture regions.
+     * Each texture region in the grid is treated as a frame in the animation, and all frames
+     * are assigned an equal duration.
      *
-     * @param mode          the playback mode for the animation, which determines the order and repetition of frames.
-     * @param frameDuration the duration of each frame in seconds.
-     * @param grid          a 2D array of {@code TextureRegion} objects representing the animation frames.
-     * @return a new {@code Animation} instance configured with the provided playback mode, frame duration, and frames.
+     * @param mode     the playback mode for the animation, determining how frames are cycled.
+     * @param duration the total duration of the animation in seconds. This is evenly distributed across all frames.
+     * @param grid     a 2D array of texture regions, where each region represents a frame of the animation.
+     * @return a new {@code Animation} instance configured with the provided playback mode, duration, and frames.
      */
-    public static Animation fromGrid(PlaybackMode mode, float frameDuration, TextureRegion[][] grid) {
+    public static Animation fromGrid(PlaybackMode mode, float duration, TextureRegion[][] grid) {
         int rows = grid.length;
         int cols = grid[0].length;
 
         AnimationFrame[] frames = new AnimationFrame[rows * cols];
+        float frameDuration = duration / frames.length;
 
         int index = 0;
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                frames[index++] = new AnimationFrame(
-                        new TextureRegionDrawable(grid[r][c]),
-                        frameDuration
-                );
+                frames[index++] = new AnimationFrame(new TextureRegionDrawable(grid[r][c]), frameDuration);
             }
         }
 

@@ -10,6 +10,7 @@ import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
 
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -84,7 +85,7 @@ public final class Assets {
     private static final ConcurrentMap<Class<?>, AssetLoader<?, ?>> loaders = new ConcurrentHashMap<>();
     private static final ConcurrentMap<String, CompletableFuture<?>> cache = new ConcurrentHashMap<>();
     private static final AtomicInteger completedCount = new AtomicInteger(0);
-    private static final BlockingDeque<AssetParameters> prepared = new LinkedBlockingDeque<>();
+    private static final Set<AssetParameters> prepared = ConcurrentHashMap.newKeySet();
     private static final AtomicInteger preparedCount = new AtomicInteger(0);
 
     static {
@@ -231,12 +232,11 @@ public final class Assets {
      * @param params The asset parameters to prepare. Must not be null.
      * @throws NullPointerException If {@code params} is null.
      */
-    public static synchronized void prepare(AssetParameters params) {
+    public static void prepare(AssetParameters params) {
         Objects.requireNonNull(params);
-        if (prepared.contains(params)) return;
 
-        prepared.add(params);
-        preparedCount.incrementAndGet();
+        if (prepared.add(params))
+            preparedCount.incrementAndGet();
     }
 
     /**
@@ -264,8 +264,10 @@ public final class Assets {
     public static CompletableFuture<Void> load() {
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
 
-        while (!prepared.isEmpty()) {
-            final AssetParameters parameters = prepared.poll();
+        for (AssetParameters parameters : prepared) {
+            if (!prepared.remove(parameters))
+                continue;
+
             final String key = parameters.key();
 
             CompletableFuture<?> future = CompletableFuture
@@ -281,13 +283,17 @@ public final class Assets {
                             ex.printStackTrace();
                             return;
                         }
+
                         completedCount.incrementAndGet();
                     });
 
             cache.put(key, future);
             futures.add(future);
         }
-        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).whenComplete((_, _) -> System.gc());
+
+        return CompletableFuture
+                .allOf(futures.toArray(CompletableFuture[]::new))
+                .whenComplete((_, _) -> System.gc());
     }
 
 }

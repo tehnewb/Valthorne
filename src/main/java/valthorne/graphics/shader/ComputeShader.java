@@ -48,7 +48,8 @@ public class ComputeShader {
 
     public ComputeShader(String computeSource) {
         if (!isComputeSupported()) {
-            throw new IllegalStateException("Compute shaders not supported by current GL context");
+            String version = glGetString(GL_VERSION);
+            throw new IllegalStateException("Compute shaders require an OpenGL 4.3+ context or GL_ARB_compute_shader support. Current GL context: " + (version != null ? version : "unknown"));
         }
         if (computeSource == null) throw new NullPointerException("computeSource");
         buildProgram(computeSource);

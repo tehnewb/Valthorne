@@ -430,6 +430,31 @@ public class Shader {
     }
 
     /**
+     * Sets a {@code mat4} uniform from a column-major float array.
+     *
+     * <p>This is primarily used by renderers that manage projection or transform
+     * matrices on the Java side instead of relying on OpenGL's fixed-function
+     * matrix stack.</p>
+     *
+     * <p>If the uniform is optimized out (location {@code -1}), this method does
+     * nothing.</p>
+     *
+     * @param name   uniform name (must not be null)
+     * @param values matrix values in column-major order (must contain at least 16 floats)
+     * @return this shader for chaining
+     * @throws NullPointerException if {@code name} or {@code values} is null
+     * @throws IllegalArgumentException if {@code values.length < 16}
+     */
+    public Shader setUniformMatrix4(String name, float[] values) {
+        if (values == null) throw new NullPointerException("values");
+        if (values.length < 16) throw new IllegalArgumentException("values must contain at least 16 floats");
+
+        int loc = uniformLocation(name);
+        if (loc != -1) glUniformMatrix4fv(loc, false, values);
+        return this;
+    }
+
+    /**
      * Gets the uniform block index for a named uniform block.
      *
      * <p>This uses an internal cache to avoid repeated {@code glGetUniformBlockIndex} calls.</p>

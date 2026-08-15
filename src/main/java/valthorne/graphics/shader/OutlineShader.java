@@ -1,7 +1,6 @@
 package valthorne.graphics.shader;
 
 import valthorne.graphics.Sprite;
-import valthorne.graphics.texture.Texture;
 
 /**
  * Draws a crisp outline around non-transparent pixels.
@@ -47,36 +46,26 @@ import valthorne.graphics.texture.Texture;
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class OutlineShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """;
+public class OutlineShader extends TexturedQuadShader {
 
     private static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             uniform vec2 u_texelSize;
             uniform float u_thicknessPx;
             uniform vec4 u_outlineColor;
             
-            varying vec2 v_uv;
-            varying vec4 v_color;
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
             
-            void main(){
-                vec4 center = texture2D(u_texture, v_uv);
+            void main() {
+                vec4 center = texture(u_texture, v_uv);
                 float a = center.a;
             
                 // Sprite pixels: draw normally.
                 if (a > 0.001) {
-                    gl_FragColor = center * v_color;
+                    fragColor = center * v_color;
                     return;
                 }
             
@@ -84,24 +73,24 @@ public class OutlineShader extends Shader {
                 vec2 o = u_texelSize * u_thicknessPx;
             
                 float n = 0.0;
-                n = max(n, texture2D(u_texture, v_uv + vec2( o.x, 0.0)).a);
-                n = max(n, texture2D(u_texture, v_uv + vec2(-o.x, 0.0)).a);
-                n = max(n, texture2D(u_texture, v_uv + vec2(0.0,  o.y)).a);
-                n = max(n, texture2D(u_texture, v_uv + vec2(0.0, -o.y)).a);
+                n = max(n, texture(u_texture, v_uv + vec2( o.x, 0.0)).a);
+                n = max(n, texture(u_texture, v_uv + vec2(-o.x, 0.0)).a);
+                n = max(n, texture(u_texture, v_uv + vec2(0.0,  o.y)).a);
+                n = max(n, texture(u_texture, v_uv + vec2(0.0, -o.y)).a);
             
                 // Diagonals
-                n = max(n, texture2D(u_texture, v_uv + vec2( o.x,  o.y)).a);
-                n = max(n, texture2D(u_texture, v_uv + vec2(-o.x,  o.y)).a);
-                n = max(n, texture2D(u_texture, v_uv + vec2( o.x, -o.y)).a);
-                n = max(n, texture2D(u_texture, v_uv + vec2(-o.x, -o.y)).a);
+                n = max(n, texture(u_texture, v_uv + vec2( o.x,  o.y)).a);
+                n = max(n, texture(u_texture, v_uv + vec2(-o.x,  o.y)).a);
+                n = max(n, texture(u_texture, v_uv + vec2( o.x, -o.y)).a);
+                n = max(n, texture(u_texture, v_uv + vec2(-o.x, -o.y)).a);
             
-                if (n > 0.001) gl_FragColor = u_outlineColor;
-                else gl_FragColor = vec4(0.0);
+                if (n > 0.001) fragColor = u_outlineColor;
+                else fragColor = vec4(0.0);
             }
             """;
 
     public OutlineShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     public void apply(Sprite sprite, float thicknessPx, float r, float g, float b, float a) {
@@ -125,7 +114,7 @@ public class OutlineShader extends Shader {
      */
     public void bind(float textureWidth, float textureHeight, float thicknessPx, float r, float g, float b, float a) {
         bind();
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
 
         // Compute texel size internally (no caller math).
         float texelX = 1f / textureWidth;

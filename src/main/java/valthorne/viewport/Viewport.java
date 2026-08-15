@@ -1,5 +1,6 @@
 package valthorne.viewport;
 
+import valthorne.Window;
 import valthorne.camera.Camera;
 import valthorne.graphics.DrawFunction;
 import valthorne.math.Matrix4f;
@@ -9,8 +10,9 @@ import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Base 2D viewport abstraction responsible for mapping a logical world area into a screen-space
- * rectangle, applying the proper OpenGL viewport and projection state, converting screen
- * coordinates into world coordinates, and handling viewport-aware scissor rectangles.
+ * rectangle, applying the proper OpenGL viewport and engine-managed projection state,
+ * converting screen coordinates into world coordinates, and handling viewport-aware
+ * scissor rectangles.
  *
  * <p>
  * A viewport controls two separate concepts:
@@ -39,7 +41,7 @@ import static org.lwjgl.opengl.GL11.*;
  *     <li>Call {@link #update(int, int)} when the window size changes</li>
  *     <li>Call {@link #bind()} before drawing content for this viewport</li>
  *     <li>Draw your world or UI</li>
- *     <li>Call {@link #unbind()} to restore the previous OpenGL viewport and matrices</li>
+ *     <li>Call {@link #unbind()} to restore the previous OpenGL viewport and projection</li>
  * </ol>
  *
  * <p>
@@ -115,6 +117,7 @@ public abstract class Viewport {
 
     private final int[] oldViewport = new int[4]; // Previously active OpenGL viewport restored by unbind or render.
     private final int[] previousScissor = new int[4]; // Previously active OpenGL scissor rectangle restored by endScissor.
+    private final float[] oldProjectionMatrix = new float[16]; // Previously active engine projection restored by unbind or render.
     protected int x; // X position of this viewport in actual screen pixels.
     protected int y; // Y position of this viewport in actual screen pixels.
     protected int width; // Width of this viewport in actual screen pixels.
@@ -165,13 +168,9 @@ public abstract class Viewport {
      *
      * <p>
      * This method updates the current OpenGL viewport to this viewport's screen rectangle and
-     * then loads the active projection matrix. If a camera is present, the camera is rebuilt
-     * using the current world size and its projection matrix is loaded. Otherwise the fallback
-     * viewport projection is loaded.
-     * </p>
-     *
-     * <p>
-     * The model-view matrix is reset to identity after the projection matrix is applied.
+     * then updates the engine-managed projection matrix. If a camera is present, the camera is
+     * rebuilt using the current world size and its projection matrix is applied. Otherwise the
+     * fallback viewport projection is used.
      * </p>
      */
     public void apply() {
@@ -186,19 +185,15 @@ public abstract class Viewport {
             matrixData = projectionMatrix.get();
         }
 
-        glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(matrixData);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        Window.setProjectionMatrix(matrixData);
     }
 
     /**
      * Binds this viewport for scoped rendering.
      *
      * <p>
-     * This method captures the currently active OpenGL viewport, pushes both the projection and
-     * model-view matrices, and then applies this viewport. It is intended to be paired with
+     * This method captures the currently active OpenGL viewport and engine projection, and then
+     * applies this viewport. It is intended to be paired with
      * {@link #unbind()}.
      * </p>
      *
@@ -208,13 +203,7 @@ public abstract class Viewport {
      */
     public void bind() {
         glGetIntegerv(GL_VIEWPORT, oldViewport);
-
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-
+        Window.copyProjectionMatrix(oldProjectionMatrix);
         apply();
     }
 
@@ -222,17 +211,11 @@ public abstract class Viewport {
      * Restores the OpenGL state captured by {@link #bind()}.
      *
      * <p>
-     * This method pops the model-view matrix, pops the projection matrix, and restores the
-     * previously active OpenGL viewport rectangle.
+     * This method restores the previously active engine projection matrix and viewport rectangle.
      * </p>
      */
     public void unbind() {
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-
+        Window.setProjectionMatrix(oldProjectionMatrix);
         glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
     }
 
@@ -254,23 +237,15 @@ public abstract class Viewport {
         }
 
         glGetIntegerv(GL_VIEWPORT, oldViewport);
+        Window.copyProjectionMatrix(oldProjectionMatrix);
 
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-
-        apply();
-        function.draw();
-
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-
-        glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+        try {
+            apply();
+            function.draw();
+        } finally {
+            Window.setProjectionMatrix(oldProjectionMatrix);
+            glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+        }
     }
 
     /**

@@ -43,41 +43,31 @@ package valthorne.graphics.shader;
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class FlashShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """;
+public class FlashShader extends TexturedQuadShader {
 
     private static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             uniform vec4 u_flashColor;
             uniform float u_amount;
 
-            varying vec2 v_uv;
-            varying vec4 v_color;
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
 
-            void main(){
-                vec4 c = texture2D(u_texture, v_uv) * v_color;
+            void main() {
+                vec4 c = texture(u_texture, v_uv) * v_color;
 
                 float amt = clamp(u_amount, 0.0, 1.0);
                 if (amt <= 0.0 || c.a <= 0.001) {
-                    gl_FragColor = c;
+                    fragColor = c;
                     return;
                 }
 
                 vec3 rgb = mix(c.rgb, u_flashColor.rgb, amt);
                 float a = c.a * mix(1.0, clamp(u_flashColor.a, 0.0, 1.0), amt);
 
-                gl_FragColor = vec4(rgb, a);
+                fragColor = vec4(rgb, a);
             }
             """; // GLSL fragment shader source (mixes RGB toward flash color, preserves alpha).
 
@@ -85,7 +75,7 @@ public class FlashShader extends Shader {
      * Creates a new {@code FlashShader} using the built-in GLSL sources.
      */
     public FlashShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     /**
@@ -123,7 +113,7 @@ public class FlashShader extends Shader {
         float amount = 1.0f - phase;                                     // Fade-out curve (1 → 0).
         amount *= amount;                                                // Optional: sharper start (ease-out).
 
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
         setUniform1f("u_amount", amount);
         setUniform4f("u_flashColor", r, g, b, a);
     }

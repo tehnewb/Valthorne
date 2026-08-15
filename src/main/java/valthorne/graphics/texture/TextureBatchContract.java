@@ -64,6 +64,11 @@ import valthorne.graphics.shader.Shader;
 public final class TextureBatchContract {
 
     /**
+     * Uniform name used for the batch projection matrix.
+     */
+    public static final String UNIFORM_MVP = "u_mvp";
+
+    /**
      * The number of vertices used to represent the base quad.
      */
     public static final int QUAD_VERTS = 6;
@@ -216,25 +221,26 @@ public final class TextureBatchContract {
      */
     public static String defaultVertexShader() {
         return """
-                #version 120
+                #version 330 core
                 
-                attribute vec2 a_local;
-                attribute vec2 a_uv;
-                attribute vec4 i_xywh;
-                attribute vec4 i_col;
-                attribute float i_tex;
-                attribute vec4 i_uvRect;
-                attribute vec2 i_origin;
-                attribute vec2 i_rot;
-                attribute vec4 i_clipRect;
-                attribute float i_clipEnabled;
+                uniform mat4 u_mvp;
+                in vec2 a_local;
+                in vec2 a_uv;
+                in vec4 i_xywh;
+                in vec4 i_col;
+                in float i_tex;
+                in vec4 i_uvRect;
+                in vec2 i_origin;
+                in vec2 i_rot;
+                in vec4 i_clipRect;
+                in float i_clipEnabled;
                 
-                varying vec2 v_uv;
-                varying vec4 v_col;
-                varying float v_tex;
-                varying vec2 v_world;
-                varying vec4 v_clipRect;
-                varying float v_clipEnabled;
+                out vec2 v_uv;
+                out vec4 v_col;
+                out float v_tex;
+                out vec2 v_world;
+                out vec4 v_clipRect;
+                out float v_clipEnabled;
                 
                 void main() {
                     vec2 local = a_local * i_xywh.zw;
@@ -247,7 +253,7 @@ public final class TextureBatchContract {
                 
                     vec2 world = i_xywh.xy + i_origin + rotated;
                 
-                    gl_Position = gl_ModelViewProjectionMatrix * vec4(world.xy, 0.0, 1.0);
+                    gl_Position = u_mvp * vec4(world.xy, 0.0, 1.0);
                     v_uv = mix(i_uvRect.xy, i_uvRect.zw, a_uv);
                     v_col = i_col;
                     v_tex = i_tex;
@@ -281,17 +287,19 @@ public final class TextureBatchContract {
      */
     public static String buildDefaultFragmentShader(int maxTextureUnits) {
         StringBuilder sb = new StringBuilder();
-        sb.append("#version 120\n");
+        sb.append("#version 330 core\n");
         for (int i = 0; i < maxTextureUnits; i++) {
             sb.append("uniform sampler2D u_tex").append(i).append(";\n");
         }
         sb.append("""
-                varying vec2 v_uv;
-                varying vec4 v_col;
-                varying float v_tex;
-                varying vec2 v_world;
-                varying vec4 v_clipRect;
-                varying float v_clipEnabled;
+                in vec2 v_uv;
+                in vec4 v_col;
+                in float v_tex;
+                in vec2 v_world;
+                in vec4 v_clipRect;
+                in float v_clipEnabled;
+                
+                out vec4 fragColor;
                 
                 void main() {
                     if (v_clipEnabled > 0.5) {
@@ -306,13 +314,13 @@ public final class TextureBatchContract {
                 """);
 
         sb.append("    float t = v_tex;\n");
-        sb.append("    if (t < 0.5) c = texture2D(u_tex0, v_uv);\n");
+        sb.append("    if (t < 0.5) c = texture(u_tex0, v_uv);\n");
         for (int i = 1; i < maxTextureUnits; i++) {
-            sb.append("    else if (t < ").append(i).append(".5) c = texture2D(u_tex").append(i).append(", v_uv);\n");
+            sb.append("    else if (t < ").append(i).append(".5) c = texture(u_tex").append(i).append(", v_uv);\n");
         }
         sb.append("""
-                    else c = texture2D(u_tex0, v_uv);
-                    gl_FragColor = c * v_col;
+                    else c = texture(u_tex0, v_uv);
+                    fragColor = c * v_col;
                 }
                 """);
         return sb.toString();
@@ -344,29 +352,29 @@ public final class TextureBatchContract {
      */
     public static String buildFragmentPreamble(int maxTextureUnits) {
         StringBuilder sb = new StringBuilder();
-        sb.append("#version 120\n");
+        sb.append("#version 330 core\n");
         for (int i = 0; i < maxTextureUnits; i++) {
             sb.append("uniform sampler2D u_tex").append(i).append(";\n");
         }
         sb.append("""
-                varying vec2 v_uv;
-                varying vec4 v_col;
-                varying float v_tex;
-                varying vec2 v_world;
-                varying vec4 v_clipRect;
-                varying float v_clipEnabled;
+                in vec2 v_uv;
+                in vec4 v_col;
+                in float v_tex;
+                in vec2 v_world;
+                in vec4 v_clipRect;
+                in float v_clipEnabled;
                 
                 vec4 sampleBatchTexture(vec2 uv) {
                     float t = v_tex;
                 """);
 
-        sb.append("    if (t < 0.5) return texture2D(u_tex0, uv);\n");
+        sb.append("    if (t < 0.5) return texture(u_tex0, uv);\n");
         for (int i = 1; i < maxTextureUnits; i++) {
-            sb.append("    else if (t < ").append(i).append(".5) return texture2D(u_tex").append(i).append(", uv);\n");
+            sb.append("    else if (t < ").append(i).append(".5) return texture(u_tex").append(i).append(", uv);\n");
         }
 
         sb.append("""
-                    return texture2D(u_tex0, uv);
+                    return texture(u_tex0, uv);
                 }
                 
                 bool batchClipped() {

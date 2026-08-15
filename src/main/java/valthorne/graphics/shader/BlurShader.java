@@ -45,40 +45,30 @@ import valthorne.graphics.Sprite;
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class BlurShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """; // GLSL vertex shader source (passes through UVs and vertex color).
+public class BlurShader extends TexturedQuadShader {
 
     private static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             uniform vec2 u_texelSize;
             uniform float u_radiusPx;
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
+            void main() {
                 float r = max(0.0, u_radiusPx);
                 vec2 o = u_texelSize * r;
                 vec4 sum = vec4(0.0);
-                sum += texture2D(u_texture, v_uv + vec2(-o.x, -o.y));
-                sum += texture2D(u_texture, v_uv + vec2( 0.0, -o.y));
-                sum += texture2D(u_texture, v_uv + vec2( o.x, -o.y));
-                sum += texture2D(u_texture, v_uv + vec2(-o.x,  0.0));
-                sum += texture2D(u_texture, v_uv);
-                sum += texture2D(u_texture, v_uv + vec2( o.x,  0.0));
-                sum += texture2D(u_texture, v_uv + vec2(-o.x,  o.y));
-                sum += texture2D(u_texture, v_uv + vec2( 0.0,  o.y));
-                sum += texture2D(u_texture, v_uv + vec2( o.x,  o.y));
-                gl_FragColor = (sum / 9.0) * v_color;
+                sum += texture(u_texture, v_uv + vec2(-o.x, -o.y));
+                sum += texture(u_texture, v_uv + vec2( 0.0, -o.y));
+                sum += texture(u_texture, v_uv + vec2( o.x, -o.y));
+                sum += texture(u_texture, v_uv + vec2(-o.x,  0.0));
+                sum += texture(u_texture, v_uv);
+                sum += texture(u_texture, v_uv + vec2( o.x,  0.0));
+                sum += texture(u_texture, v_uv + vec2(-o.x,  o.y));
+                sum += texture(u_texture, v_uv + vec2( 0.0,  o.y));
+                sum += texture(u_texture, v_uv + vec2( o.x,  o.y));
+                fragColor = (sum / 9.0) * v_color;
             }
             """; // GLSL fragment shader source (3x3 box blur around v_uv).
 
@@ -86,7 +76,7 @@ public class BlurShader extends Shader {
      * Creates a new blur shader using the built-in GLSL sources.
      */
     public BlurShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     public void apply(Sprite sprite, float radiusPx) {
@@ -109,7 +99,7 @@ public class BlurShader extends Shader {
         bind();
         float texelX = 1f / textureWidth;
         float texelY = 1f / textureHeight;
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
         setUniform2f("u_texelSize", texelX, texelY);
         setUniform1f("u_radiusPx", radiusPx);
     }
