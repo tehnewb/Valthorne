@@ -1,6 +1,7 @@
 package valthorne.graphics.texture;
 
 import org.lwjgl.BufferUtils;
+import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.Sprite;
 import valthorne.graphics.shader.Shader;
@@ -1645,6 +1646,7 @@ public final class TextureBatch {
             return;
         }
 
+        applyActiveProjection();
         instanceBuffer.flip();
 
         glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
@@ -1694,7 +1696,19 @@ public final class TextureBatch {
      */
     private void bindActiveShaderState() {
         activeShader.bind();
+        applyActiveProjection();
         glBindVertexArray(vao);
+    }
+
+    /**
+     * Pushes the currently active engine-managed projection matrix into the active shader.
+     *
+     * <p>Shaders that do not declare the batch projection uniform simply ignore this update
+     * because {@link Shader#setUniformMatrix4(String, float[])} is a no-op when the uniform
+     * location resolves to {@code -1}.</p>
+     */
+    private void applyActiveProjection() {
+        activeShader.setUniformMatrix4(TextureBatchContract.UNIFORM_MVP, Window.getProjectionMatrix());
     }
 
     /**

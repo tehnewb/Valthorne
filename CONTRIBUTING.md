@@ -1,137 +1,46 @@
-# Contributing to <Your Project Name>
+# Contributing to Valthorne
 
-A big welcome and thank you for considering contributing to this project!
+Thanks for taking the time to contribute.
 
----
+## Getting Started
 
-## Quicklinks
+Please search existing issues and pull requests before opening a new one. If you are not sure whether an idea belongs in an issue yet, start a discussion first.
 
-* [Getting Started](#getting-started)
-* [Issues](#issues)
-* [Pull Requests](#pull-requests)
-* [Reviews](#reviews)
-* [Documentation](#documentation)
-* [Getting Help](#getting-help)
+If you want a place to jump in, look for labels such as `good first issue` and `help wanted`.
 
----
+## Reporting Issues
 
-# Getting Started
+Bug reports and feature requests are both welcome. Helpful reports usually include:
 
-Contributions to this repository are made via **issues** and **pull requests (PRs)**.
-
-Before contributing, please:
-
-* Search for **existing issues and pull requests** before creating a new one.
-* If you just need support, please ask in the **community chat or discussion page** instead of opening an issue.
-* If you're unsure whether something is worth discussing, open a discussion first.
-
-If you're looking for something to contribute to, browse the **issues** section and look for labels like:
-
-* `good first issue`
-* `help wanted`
-
----
-
-# Issues
-
-Issues are used to:
-
-* Report bugs
-* Request features
-* Discuss potential changes
-
-Before opening a new issue:
-
-1. **Verify the problem hasn't already been reported**
-2. **Check that the issue hasn't already been fixed**
-3. Provide a **clear explanation and steps to reproduce**
-
-A good issue report should include:
-
+* A short summary of the problem or request
+* Steps to reproduce
 * Expected behavior
 * Actual behavior
-* Steps to reproduce
-* Screenshots or logs (if applicable)
+* Screenshots, logs, or sample code when they make the issue clearer
 
----
+## Pull Requests
 
-# Pull Requests
+Pull requests are the fastest way to get improvements merged. A good PR usually:
 
-Pull requests are always welcome and are the fastest way to get improvements merged.
+* Focuses on one change or one closely related set of changes
+* Explains what changed and why
+* References related issues when applicable
+* Includes tests or verification notes for behavior changes
 
-General guidelines:
+Before opening a pull request, please run:
 
-* Focus on **one change per pull request**
-* Write **clear commit messages**
-* Provide a **description explaining what the PR does**
-* Mention related issues if applicable
-
-### Before submitting a PR
-
-Please ensure that:
-
-* Your code builds successfully
-* Your change does not break existing functionality
-* You have tested your changes
-
-### Creating a Pull Request
-
-1. Fork the repository
-2. Clone your fork
-3. Create a branch with a descriptive name
-
-```
-git checkout -b feature/my-feature
+```bash
+./gradlew build
 ```
 
-4. Commit your changes
-5. Push your branch
+## Reviews
 
-```
-git push origin feature/my-feature
-```
+Reviews primarily focus on correctness, maintainability, consistency with the rest of the engine, and whether the change is covered well enough by tests or verification.
 
-6. Open a Pull Request on GitHub
+## Documentation
 
----
+Documentation improvements are always useful. Fixes for typos, missing examples, unclear wording, or outdated setup instructions are all welcome.
 
-# Reviews
+## Getting Help
 
-Pull requests may be reviewed before they are merged.
-
-Reviews typically focus on:
-
-1. Code correctness
-2. Code readability
-3. Project consistency
-
-If feedback is given, please update your PR accordingly.
-
----
-
-# Documentation
-
-Documentation improvements are always welcome.
-
-This includes:
-
-* Fixing typos
-* Clarifying instructions
-* Adding examples
-* Improving explanations
-
----
-
-# Getting Help
-
-If you need help with the project:
-
-* Open a **discussion**
-* Ask questions in the **community chat**
-* Reach out through the project’s issue tracker
-
-We’re always happy to help new contributors get started.
-
----
-
-Thank you for helping improve this project!
+If you need help, open a discussion or ask in the community spaces linked from the repository. Questions are welcome.

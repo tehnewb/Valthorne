@@ -593,7 +593,7 @@ public class Animation implements Drawable {
      *
      * @param looping true to loop, false for one-shot behavior
      */
-    public Animation looping(boolean looping) {
+    public Animation setLooping(boolean looping) {
         this.bits.set(LOOPING, looping);
         return this;
     }
@@ -645,7 +645,7 @@ public class Animation implements Drawable {
      */
     public void playOnce() {
         loopCount(0);
-        looping(false);
+        setLooping(false);
     }
 
     /**

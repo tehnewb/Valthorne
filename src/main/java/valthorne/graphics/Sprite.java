@@ -11,8 +11,6 @@ import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
 
-import static org.lwjgl.opengl.GL11.*;
-
 /**
  * <p>
  * {@code Sprite} represents a textured 2D drawable built from a {@link TextureRegion}.
@@ -51,10 +49,10 @@ import static org.lwjgl.opengl.GL11.*;
  * </ul>
  *
  * <p>
- * The sprite supports direct rendering through legacy OpenGL client arrays using
- * {@code glVertexPointer}, {@code glTexCoordPointer}, and {@code glDrawArrays}.
- * It can also be consumed by systems like {@link valthorne.graphics.texture.TextureBatch}
- * which read sprite state and render it in a batched way.
+ * The sprite supports direct rendering through the engine's explicit textured-quad
+ * renderer. It can also be consumed by systems like
+ * {@link valthorne.graphics.texture.TextureBatch} which read sprite state and render
+ * it in a batched way.
  * </p>
  *
  * <h2>Example Usage</h2>
@@ -466,23 +464,89 @@ public class Sprite implements Poolable, Drawable {
     }
 
     @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height) {
+        TextureRegion spriteRegion = this.region;
+        if (spriteRegion == null) return;
+
+        draw(batch, x, y, width, height, 0f, 0f, spriteRegion.getRegionWidth(), spriteRegion.getRegionHeight(), 0f, 0f, 0f, null);
+    }
+
+    @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height, Color tint) {
+        TextureRegion spriteRegion = this.region;
+        if (spriteRegion == null) return;
+
+        draw(batch, x, y, width, height, 0f, 0f, spriteRegion.getRegionWidth(), spriteRegion.getRegionHeight(), 0f, 0f, 0f, tint);
+    }
+
+    @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height, float originX, float originY, float rotation, Color tint) {
+        TextureRegion spriteRegion = this.region;
+        if (spriteRegion == null) return;
+
+        draw(batch, x, y, width, height, 0f, 0f, spriteRegion.getRegionWidth(), spriteRegion.getRegionHeight(), originX, originY, rotation, tint);
+    }
+
+    @Override
+    public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight) {
+        draw(batch, x, y, width, height, regionX, regionY, regionWidth, regionHeight, 0f, 0f, 0f, null);
+    }
+
+    @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
         TextureRegion spriteRegion = this.region;
         if (spriteRegion == null) return;
 
-        float baseRegionX = spriteRegion.getRegionX();
-        float baseRegionY = spriteRegion.getRegionY();
+        Texture texture = spriteRegion.getTexture();
+        if (texture == null) return;
 
-        float drawRegionX = flippedX ? baseRegionX + spriteRegion.getRegionWidth() - regionX - regionWidth : baseRegionX + regionX;
-        float drawRegionY = flippedY ? baseRegionY + spriteRegion.getRegionHeight() - regionY - regionHeight : baseRegionY + regionY;
+        float textureWidth = texture.getWidth();
+        float textureHeight = texture.getHeight();
 
+        if (textureWidth == 0f || textureHeight == 0f) return;
+
+        float sourceX0 = spriteRegion.getRegionX() + regionX;
+        float sourceY0 = spriteRegion.getRegionY() + regionY;
+        float sourceX1 = sourceX0 + regionWidth;
+        float sourceY1 = sourceY0 + regionHeight;
+
+        if (flippedX) {
+            float right = spriteRegion.getRegionX() + spriteRegion.getRegionWidth();
+            sourceX0 = right - regionX;
+            sourceX1 = right - regionX - regionWidth;
+        }
+
+        if (flippedY) {
+            float bottom = spriteRegion.getRegionY() + spriteRegion.getRegionHeight();
+            sourceY0 = bottom - regionY;
+            sourceY1 = bottom - regionY - regionHeight;
+        }
+
+        float u0 = sourceX0 / textureWidth;
+        float v0 = sourceY0 / textureHeight;
+        float u1 = sourceX1 / textureWidth;
+        float v1 = sourceY1 / textureHeight;
+
+        float drawWidth = width * scaleX;
+        float drawHeight = height * scaleY;
         float drawOriginX = this.origin.getX() + originX;
         float drawOriginY = this.origin.getY() + originY;
         float drawRotation = this.rotation + rotation;
 
-        Color drawTint = tint == null ? this.color : new Color(this.color.r() * tint.r(), this.color.g() * tint.g(), this.color.b() * tint.b(), this.color.a() * tint.a());
+        float rad = (float) Math.toRadians(-drawRotation);
+        float sin = (float) Math.sin(rad);
+        float cos = (float) Math.cos(rad);
 
-        batch.draw(spriteRegion.getTexture(), x, y, width * scaleX, height * scaleY, drawRegionX, drawRegionY, regionWidth, regionHeight, drawOriginX, drawOriginY, drawRotation, drawTint);
+        Color drawTint = tint == null
+                ? this.color
+                : new Color(
+                this.color.r() * tint.r(),
+                this.color.g() * tint.g(),
+                this.color.b() * tint.b(),
+                this.color.a() * tint.a()
+        );
+
+        batch.drawUV(texture, x, y, drawWidth, drawHeight, u0, v0, u1, v1, drawOriginX, drawOriginY, sin, cos, drawTint);
     }
 
     /**
@@ -804,21 +868,19 @@ public class Sprite implements Poolable, Drawable {
 
     /**
      * <p>
-     * Draws the sprite immediately using legacy OpenGL client arrays.
+     * Draws the sprite immediately using the shared textured-quad renderer.
      * </p>
      *
      * <p>
-     * The current tint color is applied, the backing texture is bound, the cached
-     * vertex and UV buffers are supplied to OpenGL, and the quad is rendered with
-     * {@code glDrawArrays(GL_QUADS, 0, 4)}.
+     * The current tint color is applied, the backing texture is bound, and the cached
+     * quad data is rendered through an explicit shader-driven path.
      * </p>
      */
     public void draw() {
-        glColor4f(color.r(), color.g(), color.b(), color.a());
-        glBindTexture(GL_TEXTURE_2D, region.getTexture().getTextureID());
-        glVertexPointer(2, GL_FLOAT, 0, vertexBuffer);
-        glTexCoordPointer(2, GL_FLOAT, 0, uvBuffer);
-        glDrawArrays(GL_QUADS, 0, 4);
+        if (region == null) return;
+        if (vertexBuffer == null || uvBuffer == null) return;
+
+        ImmediateTextureRenderer.drawQuads(region.getTexture().getTextureID(), vertexBuffer, uvBuffer, 1, color);
     }
 
     /**

@@ -6,7 +6,9 @@ import org.lwjgl.system.MemoryStack;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
+import valthorne.graphics.ImmediateTextureRenderer;
 import valthorne.graphics.texture.TextureData;
+import valthorne.math.Matrix4f;
 import valthorne.ui.Dimensional;
 
 import java.nio.IntBuffer;
@@ -41,6 +43,8 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * @since October 17th, 2025
  */
 public final class Window {
+
+    private static final Matrix4f projectionMatrix = new Matrix4f();                     // Engine-managed projection used by modern shader paths.
 
     private static final WindowResizeEvent resizeEvent = new WindowResizeEvent(0, 0, 0, 0); // Reused resize event instance to avoid allocations.
 
@@ -131,8 +135,8 @@ public final class Window {
     public static void init(JGLConfiguration config) {
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
 
-        Window.width = (short) config.getWidth();
-        Window.height = (short) config.getHeight();
+        Window.width = config.getWidth();
+        Window.height = config.getHeight();
         Window.fullscreen = config.isFullscreen();
         Window.borderless = !config.isDecorated();
         Window.resizable = config.isResizable();
@@ -165,12 +169,7 @@ public final class Window {
 
             glViewport(0, 0, newW, newH);
 
-            glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();
-            glOrtho(0, newW, 0, newH, -1, 1);
-
-            glMatrixMode(GL_MODELVIEW);
-            glLoadIdentity();
+            updateDefaultProjectionMatrix();
 
             resizeEvent.setOldHeight(oldHeight);
             resizeEvent.setOldWidth(oldWidth);
@@ -204,8 +203,8 @@ public final class Window {
                 int centerX = (vid.width() - config.getWidth()) / 2;
                 int centerY = (vid.height() - config.getHeight()) / 2;
                 glfwSetWindowPos(address, centerX, centerY);
-                Window.x = (short) centerX;
-                Window.y = (short) centerY;
+                Window.x = centerX;
+                Window.y = centerY;
             }
         }
 
@@ -225,17 +224,14 @@ public final class Window {
 
         glViewport(0, 0, Window.width, Window.height);
 
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        glEnable(GL_TEXTURE_2D);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, Window.width, 0, Window.height, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        updateDefaultProjectionMatrix();
+    }
+
+    private static void updateDefaultProjectionMatrix() {
+        projectionMatrix.ortho(0f, Window.width, 0f, Window.height, -1f, 1f);
     }
 
     /**
@@ -448,8 +444,8 @@ public final class Window {
     public static void setPosition(int x, int y) {
         if (address == NULL) return;
         glfwSetWindowPos(address, x, y);
-        Window.x = (short) x;
-        Window.y = (short) y;
+        Window.x = x;
+        Window.y = y;
     }
 
     /**
@@ -623,6 +619,7 @@ public final class Window {
      * <p>This frees all registered GLFW callbacks and destroys the GLFW window handle.</p>
      */
     static void dispose() {
+        ImmediateTextureRenderer.dispose();
         if (fbCallback != null) fbCallback.free();
         if (sizeCallback != null) sizeCallback.free();
         if (posCallback != null) posCallback.free();
@@ -641,6 +638,48 @@ public final class Window {
      */
     public static long getAddress() {
         return address;
+    }
+
+    /**
+     * Returns the engine-managed projection matrix values used by shader-based render paths.
+     *
+     * <p>The returned array is the live backing storage for the current projection state.
+     * Callers should treat it as read-only.</p>
+     *
+     * @return the current projection matrix values in column-major order
+     */
+    public static float[] getProjectionMatrix() {
+        return projectionMatrix.get();
+    }
+
+    /**
+     * Copies the current engine-managed projection matrix into the supplied destination array.
+     *
+     * @param destination destination array that must contain room for 16 floats
+     * @throws NullPointerException if {@code destination} is null
+     * @throws IllegalArgumentException if {@code destination.length < 16}
+     */
+    public static void copyProjectionMatrix(float[] destination) {
+        if (destination == null) throw new NullPointerException("destination");
+        if (destination.length < 16) throw new IllegalArgumentException("destination must contain at least 16 floats");
+        projectionMatrix.get(destination);
+    }
+
+    /**
+     * Replaces the engine-managed projection matrix with the supplied column-major matrix values.
+     *
+     * <p>This does not update OpenGL's fixed-function matrix stack directly. It exists so
+     * shader-driven renderers can follow the same logical viewport/camera state as legacy
+     * code while the engine transitions away from implicit OpenGL matrices.</p>
+     *
+     * @param matrixData projection values in column-major order
+     * @throws NullPointerException if {@code matrixData} is null
+     * @throws IllegalArgumentException if {@code matrixData.length < 16}
+     */
+    public static void setProjectionMatrix(float[] matrixData) {
+        if (matrixData == null) throw new NullPointerException("matrixData");
+        if (matrixData.length < 16) throw new IllegalArgumentException("matrixData must contain at least 16 floats");
+        System.arraycopy(matrixData, 0, projectionMatrix.m, 0, 16);
     }
 
     /**

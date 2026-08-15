@@ -1,6 +1,7 @@
 package valthorne.graphics.texture;
 
 import org.lwjgl.BufferUtils;
+import valthorne.graphics.ImmediateTextureRenderer;
 
 import java.nio.FloatBuffer;
 
@@ -39,14 +40,12 @@ import static org.lwjgl.opengl.GL30.*;
  *     <li>Creates an OpenGL framebuffer object (FBO) with a color texture attachment.</li>
  *     <li>Optionally creates a depth renderbuffer attachment.</li>
  *     <li>Captures and restores the previously bound framebuffer and viewport around {@link #begin()} / {@link #end()}.</li>
- *     <li>Provides {@link #draw(float, float, float, float)} and {@link #drawFlippedY(float, float, float, float)} using fixed-function vertex pointers.</li>
+ *     <li>Provides {@link #draw(float, float, float, float)} and {@link #drawFlippedY(float, float, float, float)} through the shared textured-quad renderer.</li>
  * </ul>
  *
  * <h2>Important notes</h2>
  * <ul>
- *     <li>This uses {@code GL_QUADS}. If you ever move fully to core profiles, you will want to replace this with two triangles.</li>
- *     <li>{@link #draw(float, float, float, float)} and {@link #drawFlippedY(float, float, float, float)} assume your caller has already enabled
- *     {@code GL_TEXTURE_2D} and client states as needed (matching your existing fixed-function pipeline).</li>
+ *     <li>{@link #draw(float, float, float, float)} and {@link #drawFlippedY(float, float, float, float)} use the engine's explicit shader-based quad path.</li>
  *     <li>{@link #resize(int, int)} recreates the underlying OpenGL objects. Call it when your window/viewport size changes.</li>
  * </ul>
  *
@@ -178,8 +177,7 @@ public final class FrameBuffer {
     /**
      * Draws the framebuffer's color texture to the currently bound framebuffer (usually the screen).
      *
-     * <p>This uses fixed-function pointers ({@code glVertexPointer}/{@code glTexCoordPointer}) like your Texture pipeline.
-     * UVs are set so the texture is sampled normally (0,0) bottom-left and (1,1) top-right.</p>
+     * <p>UVs are set so the texture is sampled normally (0,0) bottom-left and (1,1) top-right.</p>
      *
      * <p>Important: This does not bind shaders or change matrices. It assumes your caller has already configured
      * projection/modelview state the way your engine expects.</p>
@@ -191,13 +189,7 @@ public final class FrameBuffer {
      */
     public void draw(float x, float y, float w, float h) {
         updateQuad(x, y, w, h, true);
-
-        glBindTexture(GL_TEXTURE_2D, colorTextureID);
-
-        glVertexPointer(2, GL_FLOAT, 0, quadVerts);
-        glTexCoordPointer(2, GL_FLOAT, 0, quadUvs);
-
-        glDrawArrays(GL_QUADS, 0, 4);
+        ImmediateTextureRenderer.drawQuads(colorTextureID, quadVerts, quadUvs, 1, null);
     }
 
     /**
@@ -213,13 +205,7 @@ public final class FrameBuffer {
      */
     public void drawFlippedY(float x, float y, float w, float h) {
         updateQuad(x, y, w, h, false);
-
-        glBindTexture(GL_TEXTURE_2D, colorTextureID);
-
-        glVertexPointer(2, GL_FLOAT, 0, quadVerts);
-        glTexCoordPointer(2, GL_FLOAT, 0, quadUvs);
-
-        glDrawArrays(GL_QUADS, 0, 4);
+        ImmediateTextureRenderer.drawQuads(colorTextureID, quadVerts, quadUvs, 1, null);
     }
 
     /**

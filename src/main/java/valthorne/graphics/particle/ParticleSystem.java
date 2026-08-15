@@ -1,6 +1,7 @@
 package valthorne.graphics.particle;
 
 import org.lwjgl.BufferUtils;
+import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.texture.Texture;
@@ -13,6 +14,10 @@ import java.util.Random;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
+import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
 
 /**
  * Particle system optimized for rendering speed using point sprites (one vertex per particle) and a single draw call.
@@ -21,7 +26,7 @@ import static org.lwjgl.opengl.GL20.*;
  * <ul>
  *     <li><b>Point sprite rendering</b>: uploads 1 vertex per particle and renders with {@code glDrawArrays(GL_POINTS)}.</li>
  *     <li><b>No per-particle {@link Texture} mutation</b> during drawing (unlike quad-based sprite particles).</li>
- *     <li><b>Fixed-function camera compatibility</b>: uses {@code gl_ModelViewProjectionMatrix} so it works with your existing matrix stack pipeline.</li>
+ *     <li><b>Explicit projection state</b>: uses an engine-managed projection uniform instead of the fixed-function matrix stack.</li>
  *     <li><b>Frame-rate independent continuous emission</b>: uses an accumulator (rate * delta).</li>
  *     <li><b>Frame-rate independent burst emission</b>: burst is released over time using an accumulator (burstRate * delta).</li>
  *     <li><b>Optional render throttling</b>: draw every N seconds and/or cap particles drawn per draw call.</li>
@@ -30,8 +35,7 @@ import static org.lwjgl.opengl.GL20.*;
  * <h2>Required render state</h2>
  * <ul>
  *     <li>Blending should be enabled for typical particles: {@code glEnable(GL_BLEND)}.</li>
- *     <li>Texture 2D should be enabled for this pipeline: {@code glEnable(GL_TEXTURE_2D)}.</li>
- *     <li>The viewport/camera must load matrices into the fixed-function stack before drawing (same approach as your Texture pipeline).</li>
+ *     <li>The active window or viewport projection must be configured through the engine before drawing.</li>
  * </ul>
  *
  * <h2>Example</h2>
@@ -97,20 +101,22 @@ public final class ParticleSystem {
     private static final int ATTR_COL = 4;                                                   // Attribute index for a_col.
 
     private static final String VERT = """
-            #version 120
+            #version 330 core
 
-            attribute vec2 a_pos;
-            attribute float a_size;
-            attribute vec2 a_aspect;
-            attribute float a_rot;
-            attribute vec4 a_col;
+            uniform mat4 u_mvp;
 
-            varying vec4 v_col;
-            varying vec2 v_aspect;
-            varying float v_rot;
+            in vec2 a_pos;
+            in float a_size;
+            in vec2 a_aspect;
+            in float a_rot;
+            in vec4 a_col;
+
+            out vec4 v_col;
+            out vec2 v_aspect;
+            out float v_rot;
 
             void main() {
-                gl_Position = gl_ModelViewProjectionMatrix * vec4(a_pos.xy, 0.0, 1.0);
+                gl_Position = u_mvp * vec4(a_pos.xy, 0.0, 1.0);
                 gl_PointSize = a_size;
 
                 v_col = a_col;
@@ -120,14 +126,16 @@ public final class ParticleSystem {
             """;                                                                              // Vertex shader source.
 
     private static final String FRAG = """
-            #version 120
+            #version 330 core
 
             uniform sampler2D u_texture;
             uniform vec4 u_uvRect; // (u0, v0, u1, v1)
 
-            varying vec4 v_col;
-            varying vec2 v_aspect;
-            varying float v_rot;
+            in vec4 v_col;
+            in vec2 v_aspect;
+            in float v_rot;
+
+            out vec4 fragColor;
 
             vec2 rot2(vec2 p, float radians) {
                 float c = cos(radians);
@@ -153,14 +161,15 @@ public final class ParticleSystem {
                     mix(u_uvRect.y, u_uvRect.w, uv.y)
                 );
 
-                vec4 tex = texture2D(u_texture, atlasUV);
-                gl_FragColor = tex * v_col;
+                vec4 tex = texture(u_texture, atlasUV);
+                fragColor = tex * v_col;
             }
             """;                                                                              // Fragment shader source.
 
     private final int maxParticles;                                                           // Maximum number of simultaneously active particles.
     private final FloatBuffer batch;                                                          // CPU staging buffer for interleaved particle vertex data.
     private final int vbo;                                                                    // OpenGL buffer object storing particle vertex data.
+    private final int vao;                                                                    // Vertex array object storing the particle attribute layout.
 
     private final Shader shader = new Shader(VERT, FRAG);                                     // Shader used to render point sprites.
     private final Random random = new Random();                                               // Random source used only for spawn distributor offsets.
@@ -230,6 +239,9 @@ public final class ParticleSystem {
         shader.bindAttribLocation(ATTR_ROT, "a_rot");
         shader.bindAttribLocation(ATTR_COL, "a_col");
         shader.reload();
+
+        this.vao = glGenVertexArrays();
+        configureVertexArray();
     }
 
     /**
@@ -422,6 +434,7 @@ public final class ParticleSystem {
      */
     public void dispose() {
         shader.dispose();
+        glDeleteVertexArrays(vao);
         glDeleteBuffers(vbo);
     }
 
@@ -585,51 +598,49 @@ public final class ParticleSystem {
      * @param v1     atlas v1 (bottom)
      */
     private void renderPoints(int toDraw, float u0, float v0, float u1, float v1) {
-        glEnable(GL_POINT_SPRITE);
-        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glEnable(GL_PROGRAM_POINT_SIZE);
 
         shader.bind();
+        shader.setUniformMatrix4("u_mvp", Window.getProjectionMatrix());
         shader.setUniform1i("u_texture", 0);
         shader.setUniform4f("u_uvRect", u0, v0, u1, v1);
 
         glBindTexture(GL_TEXTURE_2D, texture.getTextureID());
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-        glEnableVertexAttribArray(ATTR_POS);
-        glEnableVertexAttribArray(ATTR_SIZE);
-        glEnableVertexAttribArray(ATTR_ASPECT);
-        glEnableVertexAttribArray(ATTR_ROT);
-        glEnableVertexAttribArray(ATTR_COL);
-
-        long off = 0L;
-
-        glVertexAttribPointer(ATTR_POS, 2, GL_FLOAT, false, STRIDE_BYTES, off);
-        off += 2L * BYTES_PER_FLOAT;
-
-        glVertexAttribPointer(ATTR_SIZE, 1, GL_FLOAT, false, STRIDE_BYTES, off);
-        off += BYTES_PER_FLOAT;
-
-        glVertexAttribPointer(ATTR_ASPECT, 2, GL_FLOAT, false, STRIDE_BYTES, off);
-        off += 2L * BYTES_PER_FLOAT;
-
-        glVertexAttribPointer(ATTR_ROT, 1, GL_FLOAT, false, STRIDE_BYTES, off);
-        off += BYTES_PER_FLOAT;
-
-        glVertexAttribPointer(ATTR_COL, 4, GL_FLOAT, false, STRIDE_BYTES, off);
-
+        glBindVertexArray(vao);
         glDrawArrays(GL_POINTS, 0, toDraw);
-
-        glDisableVertexAttribArray(ATTR_POS);
-        glDisableVertexAttribArray(ATTR_SIZE);
-        glDisableVertexAttribArray(ATTR_ASPECT);
-        glDisableVertexAttribArray(ATTR_ROT);
-        glDisableVertexAttribArray(ATTR_COL);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
         shader.unbind();
 
-        glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
-        glDisable(GL_POINT_SPRITE);
+        glDisable(GL_PROGRAM_POINT_SIZE);
+    }
+
+    private void configureVertexArray() {
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+        long offset = 0L;
+
+        glEnableVertexAttribArray(ATTR_POS);
+        glVertexAttribPointer(ATTR_POS, 2, GL_FLOAT, false, STRIDE_BYTES, offset);
+        offset += 2L * BYTES_PER_FLOAT;
+
+        glEnableVertexAttribArray(ATTR_SIZE);
+        glVertexAttribPointer(ATTR_SIZE, 1, GL_FLOAT, false, STRIDE_BYTES, offset);
+        offset += BYTES_PER_FLOAT;
+
+        glEnableVertexAttribArray(ATTR_ASPECT);
+        glVertexAttribPointer(ATTR_ASPECT, 2, GL_FLOAT, false, STRIDE_BYTES, offset);
+        offset += 2L * BYTES_PER_FLOAT;
+
+        glEnableVertexAttribArray(ATTR_ROT);
+        glVertexAttribPointer(ATTR_ROT, 1, GL_FLOAT, false, STRIDE_BYTES, offset);
+        offset += BYTES_PER_FLOAT;
+
+        glEnableVertexAttribArray(ATTR_COL);
+        glVertexAttribPointer(ATTR_COL, 4, GL_FLOAT, false, STRIDE_BYTES, offset);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
     }
 
     /**

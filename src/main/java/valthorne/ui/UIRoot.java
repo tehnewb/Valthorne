@@ -16,6 +16,14 @@ import valthorne.ui.nodes.Tooltip;
 import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.viewport.Viewport;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
 import static org.lwjgl.nanovg.NanoVG.nvgCreateFont;
 import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
@@ -137,10 +145,14 @@ import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
  */
 public class UIRoot extends UIContainer {
 
+    private static final String DEFAULT_NANO_FONT_PROPERTY = "valthorne.ui.defaultFont";
+    private static final String[] DEFAULT_NANO_FONT_RESOURCES = {"ui/font.otf"};
+
     private long nanoVGHandle;
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
+    private final List<Path> extractedNanoFonts = new ArrayList<>(); // Temporary font files extracted from bundled resources when NanoVG requires a filesystem path.
 
     private UINode focused; // Node that currently owns keyboard focus
     private UINode pressed; // Node currently being pressed by the mouse
@@ -170,19 +182,9 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public UIRoot() {
-        this.nanoVGHandle = nvgCreate(0);
-        if (nanoVGHandle != 0){
-            String os = System.getProperty("os.name").toLowerCase();
-            String fontPath;
-
-            if (os.contains("win")) {
-                fontPath = "C:/Windows/Fonts/segoeui.ttf";
-            } else if (os.contains("mac")) {
-                fontPath = "/System/Library/Fonts/SFNS.ttf";
-            } else {
-                fontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-            }
-            nvgCreateFont(nanoVGHandle, "default", fontPath);
+        this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+        if (nanoVGHandle != 0L) {
+            registerDefaultNanoFont();
         }
 
         this.yogaConfig = Yoga.YGConfigNew();
@@ -532,6 +534,7 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigFree(yogaConfig);
         batch.dispose();
         nvgDelete(nanoVGHandle);
+        cleanupExtractedNanoFonts();
     }
 
     /**
@@ -1215,5 +1218,59 @@ public class UIRoot extends UIContainer {
      */
     public void setNanoVGHandle(long nanoVGHandle) {
         this.nanoVGHandle = nanoVGHandle;
+    }
+
+    private void registerDefaultNanoFont() {
+        Path overridePath = getOverrideNanoFontPath();
+        if (overridePath != null) {
+            registerNanoFont("default", overridePath.toString());
+            return;
+        }
+
+        for (String resource : DEFAULT_NANO_FONT_RESOURCES) {
+            Path fontPath = extractBundledNanoFont(resource);
+            if (fontPath == null) continue;
+            if (registerNanoFont("default", fontPath.toString())) return;
+        }
+
+        System.err.println("UIRoot could not register a default NanoVG font. Set -D" + DEFAULT_NANO_FONT_PROPERTY + "=<font-path> to override it.");
+    }
+
+    private Path getOverrideNanoFontPath() {
+        String override = System.getProperty(DEFAULT_NANO_FONT_PROPERTY);
+        if (override == null || override.isBlank()) return null;
+
+        Path path = Path.of(override).toAbsolutePath().normalize();
+        return Files.isRegularFile(path) ? path : null;
+    }
+
+    private boolean registerNanoFont(String name, String path) {
+        return nvgCreateFont(nanoVGHandle, name, path) != -1;
+    }
+
+    private Path extractBundledNanoFont(String resourcePath) {
+        try (InputStream stream = UIRoot.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (stream == null) return null;
+
+            String suffix = resourcePath.contains(".") ? resourcePath.substring(resourcePath.lastIndexOf('.')) : ".ttf";
+            Path tempFile = Files.createTempFile("valthorne-nano-font-", suffix);
+            Files.copy(stream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            tempFile.toFile().deleteOnExit();
+            extractedNanoFonts.add(tempFile);
+            return tempFile;
+        } catch (IOException ex) {
+            System.err.println("Failed to extract bundled NanoVG font resource '" + resourcePath + "': " + ex.getMessage());
+            return null;
+        }
+    }
+
+    private void cleanupExtractedNanoFonts() {
+        for (Path extractedNanoFont : extractedNanoFonts) {
+            try {
+                Files.deleteIfExists(extractedNanoFont);
+            } catch (IOException ignored) {
+            }
+        }
+        extractedNanoFonts.clear();
     }
 }

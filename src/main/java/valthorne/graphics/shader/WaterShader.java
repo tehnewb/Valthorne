@@ -55,37 +55,27 @@ import valthorne.graphics.Sprite;
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class WaterShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """;
+public class WaterShader extends TexturedQuadShader {
 
     public static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             uniform vec2 u_texelSize;
             uniform float u_time;
             uniform float u_amp;
             uniform float u_freq;
             uniform float u_speed;
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
+            void main() {
                 vec2 amp = u_texelSize * u_amp;
                 float w1 = sin(v_uv.x * u_freq + u_time * u_speed);
                 float w2 = sin(v_uv.y * (u_freq * 0.8) - u_time * (u_speed * 1.15));
                 vec2 uv = v_uv;
                 uv.y += w1 * amp.y;
                 uv.x += w2 * amp.x;
-                gl_FragColor = texture2D(u_texture, uv) * v_color;
+                fragColor = texture(u_texture, uv) * v_color;
             }
             """;
 
@@ -93,12 +83,12 @@ public class WaterShader extends Shader {
      * Creates a new {@code WaterShader} using the built-in GLSL sources.
      */
     public WaterShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     public void apply(Sprite sprite, float timeSeconds, float ampPx, float freq, float speed) {
         bind();
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
 
         float texelX = 1f / sprite.getTexture().getData().width();
         float texelY = 1f / sprite.getTexture().getData().height();

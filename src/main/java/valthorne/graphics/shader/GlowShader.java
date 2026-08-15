@@ -1,7 +1,6 @@
 package valthorne.graphics.shader;
 
 import valthorne.graphics.Sprite;
-import valthorne.graphics.texture.Texture;
 
 /**
  * Soft glow around a sprite using alpha falloff sampling.
@@ -50,41 +49,31 @@ import valthorne.graphics.texture.Texture;
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class GlowShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """;
+public class GlowShader extends TexturedQuadShader {
 
     private static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             uniform vec2 u_texelSize;
             uniform float u_radiusPx;
             uniform float u_intensity;
             uniform vec4 u_glowColor;
             
-            varying vec2 v_uv;
-            varying vec4 v_color;
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
             
-            float aAt(vec2 uv){
-                return texture2D(u_texture, uv).a;
+            float aAt(vec2 uv) {
+                return texture(u_texture, uv).a;
             }
             
-            void main(){
-                vec4 center = texture2D(u_texture, v_uv);
+            void main() {
+                vec4 center = texture(u_texture, v_uv);
                 float a = center.a;
             
                 // Sprite pixels: draw normally.
                 if (a > 0.001) {
-                    gl_FragColor = center * v_color;
+                    fragColor = center * v_color;
                     return;
                 }
             
@@ -131,7 +120,7 @@ public class GlowShader extends Shader {
                 float glow = clamp(s / 17.6, 0.0, 1.0);
                 glow = pow(glow, 1.8) * u_intensity;
             
-                gl_FragColor = vec4(u_glowColor.rgb, u_glowColor.a * glow);
+                fragColor = vec4(u_glowColor.rgb, u_glowColor.a * glow);
             }
             """;
 
@@ -139,7 +128,7 @@ public class GlowShader extends Shader {
      * Creates a new {@code GlowShader} using the built-in GLSL sources.
      */
     public GlowShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     public void apply(Sprite sprite, float radiusPx, float intensity, float r, float g, float b, float a) {
@@ -162,7 +151,7 @@ public class GlowShader extends Shader {
      */
     public void bind(float textureWidth, float textureHeight, float radiusPx, float intensity, float r, float g, float b, float a) {
         bind();
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
 
         float texelX = 1f / textureWidth;
         float texelY = 1f / textureHeight;

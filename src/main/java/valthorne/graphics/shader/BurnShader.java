@@ -49,31 +49,21 @@ package valthorne.graphics.shader;
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class BurnShader extends Shader {
-
-    private static final String VERT_SRC = """
-            #version 120
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            void main(){
-                gl_Position = ftransform();
-                v_uv = gl_MultiTexCoord0.st;
-                v_color = gl_Color;
-            }
-            """; // GLSL vertex shader source (passes through UVs and vertex color).
+public class BurnShader extends TexturedQuadShader {
 
     private static final String FRAG_SRC = """
-            #version 120
+            #version 330 core
             uniform sampler2D u_texture;
             uniform float u_time;
             uniform float u_threshold;
             uniform vec4 u_burnColor;
-            varying vec2 v_uv;
-            varying vec4 v_color;
-            float hash(vec2 p){
+            in vec2 v_uv;
+            in vec4 v_color;
+            out vec4 fragColor;
+            float hash(vec2 p) {
                 return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
             }
-            float noise(vec2 p){
+            float noise(vec2 p) {
                 vec2 i = floor(p);
                 vec2 f = fract(p);
                 float a = hash(i);
@@ -83,9 +73,9 @@ public class BurnShader extends Shader {
                 vec2 u = f*f*(3.0-2.0*f);
                 return mix(a, b, u.x) + (c - a)*u.y*(1.0 - u.x) + (d - b)*u.x*u.y;
             }
-            void main(){
-                vec4 c = texture2D(u_texture, v_uv) * v_color;
-                if (c.a <= 0.001) { gl_FragColor = c; return; }
+            void main() {
+                vec4 c = texture(u_texture, v_uv) * v_color;
+                if (c.a <= 0.001) { fragColor = c; return; }
                 float n = noise(v_uv * 14.0 + vec2(u_time * 0.15, u_time * 0.10));
                 float th = clamp(u_threshold, 0.0, 1.0);
                 if (n < th) discard;
@@ -94,7 +84,7 @@ public class BurnShader extends Shader {
                 vec3 burnRgb = u_burnColor.rgb;
                 vec3 outRgb = mix(burnRgb, c.rgb, edge);
                 outRgb += burnRgb * hot * 0.65;
-                gl_FragColor = vec4(outRgb, c.a);
+                fragColor = vec4(outRgb, c.a);
             }
             """; // GLSL fragment shader source (animated noise dissolve + burn edge).
 
@@ -102,7 +92,7 @@ public class BurnShader extends Shader {
      * Creates a new burn shader using the built-in GLSL sources.
      */
     public BurnShader() {
-        super(VERT_SRC, FRAG_SRC);
+        super(FRAG_SRC);
     }
 
     /**
@@ -126,7 +116,7 @@ public class BurnShader extends Shader {
      */
     public void bind(float timeSeconds, float threshold, float burnR, float burnG, float burnB, float burnA) {
         bind();
-        setUniform1i("u_texture", 0);
+        setUniform1i(UNIFORM_TEXTURE, 0);
         setUniform1f("u_time", timeSeconds);
         setUniform1f("u_threshold", threshold);
         setUniform4f("u_burnColor", burnR, burnG, burnB, burnA);

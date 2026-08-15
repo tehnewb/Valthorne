@@ -2,13 +2,12 @@ package valthorne.graphics.texture;
 
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
+import valthorne.graphics.ImmediateTextureRenderer;
 import valthorne.io.pool.Poolable;
 import valthorne.math.Vector2f;
 import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * <p>
@@ -55,11 +54,10 @@ import static org.lwjgl.opengl.GL11.*;
  * </ul>
  *
  * <p>
- * This class performs immediate-mode style quad submission using client-side array
- * pointers and {@code glDrawArrays(GL_QUADS, ...)}. That means it is useful for
- * standalone drawing and is also compatible with higher-level systems that want to
- * inspect its nine-patch properties and feed them into a batch renderer such as
- * {@link TextureBatch}.
+ * This class performs immediate textured-quad rendering through the engine's shared
+ * shader-driven quad renderer. That means it is useful for standalone drawing and is
+ * also compatible with higher-level systems that want to inspect its nine-patch
+ * properties and feed them into a batch renderer such as {@link TextureBatch}.
  * </p>
  *
  * <h2>Example Usage</h2>
@@ -953,26 +951,20 @@ public class NinePatchTexture implements Poolable {
 
     /**
      * <p>
-     * Draws the nine-patch immediately using the current OpenGL client-state arrays.
+     * Draws the nine-patch immediately using the shared textured-quad renderer.
      * </p>
      *
      * <p>
      * If the local mesh is dirty, it is rebuilt first. If the world-space buffer is
-     * dirty, it is updated next. The current tint color is applied through
-     * {@code glColor4f}, the backing texture is bound, the vertex and UV pointers are
-     * pointed at the cached buffers, and all nine quads are drawn in one
-     * {@code glDrawArrays(GL_QUADS, ...)} call.
+     * dirty, it is updated next. The backing texture, transformed vertices, and UVs are
+     * then submitted through the engine's explicit quad renderer in a single call.
      * </p>
      */
     public void draw() {
         if (dirtyMesh) rebuildLocalMesh();
         if (dirtyWorld) updateWorldBuffers();
 
-        glColor4f(color.r(), color.g(), color.b(), color.a());
-        glBindTexture(GL_TEXTURE_2D, texture.getTextureID());
-        glVertexPointer(2, GL_FLOAT, 0, nineVertexBuffer);
-        glTexCoordPointer(2, GL_FLOAT, 0, nineUvBuffer);
-        glDrawArrays(GL_QUADS, 0, VERTS);
+        ImmediateTextureRenderer.drawQuads(texture.getTextureID(), nineVertexBuffer, nineUvBuffer, QUADS, color);
     }
 
     /**
