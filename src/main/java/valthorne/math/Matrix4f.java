@@ -53,6 +53,29 @@ public class Matrix4f {
     }
 
     /**
+     * Sets up a perspective projection matrix.
+     *
+     * @param fovYRadians vertical field of view in radians
+     * @param aspect aspect ratio (width / height)
+     * @param near near clipping plane distance
+     * @param far far clipping plane distance
+     * @return this matrix for chaining
+     */
+    public Matrix4f perspective(float fovYRadians, float aspect, float near, float far) {
+        identity();
+
+        float f = 1f / (float) Math.tan(fovYRadians * 0.5f);
+
+        m[0] = f / aspect;
+        m[5] = f;
+        m[10] = (far + near) / (near - far);
+        m[11] = -1f;
+        m[14] = (2f * far * near) / (near - far);
+        m[15] = 0f;
+        return this;
+    }
+
+    /**
      * Applies a translation transformation.
      *
      * @param x Translation in x direction
@@ -100,20 +123,138 @@ public class Matrix4f {
     }
 
     /**
+     * Applies a rotation around the X axis.
+     *
+     * @param radians angle of rotation in radians
+     * @return this matrix for chaining
+     */
+    public Matrix4f rotateX(float radians) {
+        float c = (float) Math.cos(radians);
+        float s = (float) Math.sin(radians);
+        Matrix4f r = new Matrix4f();
+        r.m[5] = c;
+        r.m[6] = s;
+        r.m[9] = -s;
+        r.m[10] = c;
+        return multiply(r);
+    }
+
+    /**
+     * Applies a rotation around the Y axis.
+     *
+     * @param radians angle of rotation in radians
+     * @return this matrix for chaining
+     */
+    public Matrix4f rotateY(float radians) {
+        float c = (float) Math.cos(radians);
+        float s = (float) Math.sin(radians);
+        Matrix4f r = new Matrix4f();
+        r.m[0] = c;
+        r.m[2] = -s;
+        r.m[8] = s;
+        r.m[10] = c;
+        return multiply(r);
+    }
+
+    /**
+     * Sets this matrix to a look-at view transform.
+     *
+     * @param eyeX camera position x
+     * @param eyeY camera position y
+     * @param eyeZ camera position z
+     * @param centerX target position x
+     * @param centerY target position y
+     * @param centerZ target position z
+     * @param upX world up x
+     * @param upY world up y
+     * @param upZ world up z
+     * @return this matrix for chaining
+     */
+    public Matrix4f lookAt(float eyeX, float eyeY, float eyeZ,
+                           float centerX, float centerY, float centerZ,
+                           float upX, float upY, float upZ) {
+        float fx = centerX - eyeX;
+        float fy = centerY - eyeY;
+        float fz = centerZ - eyeZ;
+        float fLen = (float) Math.sqrt(fx * fx + fy * fy + fz * fz);
+        if (fLen == 0f) {
+            return identity();
+        }
+        fx /= fLen;
+        fy /= fLen;
+        fz /= fLen;
+
+        float upLen = (float) Math.sqrt(upX * upX + upY * upY + upZ * upZ);
+        if (upLen == 0f) {
+            upX = 0f;
+            upY = 1f;
+            upZ = 0f;
+            upLen = 1f;
+        }
+        upX /= upLen;
+        upY /= upLen;
+        upZ /= upLen;
+
+        float sx = fy * upZ - fz * upY;
+        float sy = fz * upX - fx * upZ;
+        float sz = fx * upY - fy * upX;
+        float sLen = (float) Math.sqrt(sx * sx + sy * sy + sz * sz);
+        if (sLen == 0f) {
+            return identity();
+        }
+        sx /= sLen;
+        sy /= sLen;
+        sz /= sLen;
+
+        float ux = sy * fz - sz * fy;
+        float uy = sz * fx - sx * fz;
+        float uz = sx * fy - sy * fx;
+
+        identity();
+        m[0] = sx;
+        m[1] = ux;
+        m[2] = -fx;
+
+        m[4] = sy;
+        m[5] = uy;
+        m[6] = -fy;
+
+        m[8] = sz;
+        m[9] = uz;
+        m[10] = -fz;
+
+        m[12] = -(sx * eyeX + sy * eyeY + sz * eyeZ);
+        m[13] = -(ux * eyeX + uy * eyeY + uz * eyeZ);
+        m[14] = fx * eyeX + fy * eyeY + fz * eyeZ;
+        return this;
+    }
+
+    /**
      * Multiplies this matrix with another matrix.
      *
      * @param b Matrix to multiply with
      * @return this matrix for chaining
      */
     public Matrix4f multiply(Matrix4f b) {
-        float[] a = this.m;
-        float[] bb = b.m;
+        if (b == null) throw new NullPointerException("b");
         float[] r = new float[16];
-        for (int row = 0; row < 4; row++) {
-            for (int col = 0; col < 4; col++) {
-                r[col + row * 4] = a[row * 4] * bb[col] + a[row * 4 + 1] * bb[col + 4] + a[row * 4 + 2] * bb[col + 8] + a[row * 4 + 3] * bb[col + 12];
-            }
-        }
+        multiply(this.m, b.m, r);
+        this.m = r;
+        return this;
+    }
+
+    /**
+     * Sets this matrix to the product of {@code left * right}.
+     *
+     * @param left left matrix
+     * @param right right matrix
+     * @return this matrix for chaining
+     */
+    public Matrix4f setToProduct(Matrix4f left, Matrix4f right) {
+        if (left == null) throw new NullPointerException("left");
+        if (right == null) throw new NullPointerException("right");
+        float[] r = new float[16];
+        multiply(left.m, right.m, r);
         this.m = r;
         return this;
     }
@@ -126,6 +267,19 @@ public class Matrix4f {
      */
     public Matrix4f set(Matrix4f other) {
         System.arraycopy(other.m, 0, this.m, 0, 16);
+        return this;
+    }
+
+    /**
+     * Copies values from a raw float array into this matrix.
+     *
+     * @param values source matrix data in column-major order
+     * @return this matrix for chaining
+     */
+    public Matrix4f set(float[] values) {
+        if (values == null) throw new NullPointerException("values");
+        if (values.length < 16) throw new IllegalArgumentException("values must contain at least 16 floats");
+        System.arraycopy(values, 0, this.m, 0, 16);
         return this;
     }
 
@@ -172,5 +326,75 @@ public class Matrix4f {
         t.m[5] = y;
         t.m[10] = z;
         return multiply(t);
+    }
+
+    /**
+     * Inverts this matrix in-place.
+     *
+     * @return this matrix for chaining
+     * @throws IllegalStateException if the matrix is singular and cannot be inverted
+     */
+    public Matrix4f invert() {
+        float[] inv = new float[16];
+        float[] a = this.m;
+
+        inv[0] = a[5] * a[10] * a[15] - a[5] * a[11] * a[14] - a[9] * a[6] * a[15]
+                + a[9] * a[7] * a[14] + a[13] * a[6] * a[11] - a[13] * a[7] * a[10];
+        inv[4] = -a[4] * a[10] * a[15] + a[4] * a[11] * a[14] + a[8] * a[6] * a[15]
+                - a[8] * a[7] * a[14] - a[12] * a[6] * a[11] + a[12] * a[7] * a[10];
+        inv[8] = a[4] * a[9] * a[15] - a[4] * a[11] * a[13] - a[8] * a[5] * a[15]
+                + a[8] * a[7] * a[13] + a[12] * a[5] * a[11] - a[12] * a[7] * a[9];
+        inv[12] = -a[4] * a[9] * a[14] + a[4] * a[10] * a[13] + a[8] * a[5] * a[14]
+                - a[8] * a[6] * a[13] - a[12] * a[5] * a[10] + a[12] * a[6] * a[9];
+        inv[1] = -a[1] * a[10] * a[15] + a[1] * a[11] * a[14] + a[9] * a[2] * a[15]
+                - a[9] * a[3] * a[14] - a[13] * a[2] * a[11] + a[13] * a[3] * a[10];
+        inv[5] = a[0] * a[10] * a[15] - a[0] * a[11] * a[14] - a[8] * a[2] * a[15]
+                + a[8] * a[3] * a[14] + a[12] * a[2] * a[11] - a[12] * a[3] * a[10];
+        inv[9] = -a[0] * a[9] * a[15] + a[0] * a[11] * a[13] + a[8] * a[1] * a[15]
+                - a[8] * a[3] * a[13] - a[12] * a[1] * a[11] + a[12] * a[3] * a[9];
+        inv[13] = a[0] * a[9] * a[14] - a[0] * a[10] * a[13] - a[8] * a[1] * a[14]
+                + a[8] * a[2] * a[13] + a[12] * a[1] * a[10] - a[12] * a[2] * a[9];
+        inv[2] = a[1] * a[6] * a[15] - a[1] * a[7] * a[14] - a[5] * a[2] * a[15]
+                + a[5] * a[3] * a[14] + a[13] * a[2] * a[7] - a[13] * a[3] * a[6];
+        inv[6] = -a[0] * a[6] * a[15] + a[0] * a[7] * a[14] + a[4] * a[2] * a[15]
+                - a[4] * a[3] * a[14] - a[12] * a[2] * a[7] + a[12] * a[3] * a[6];
+        inv[10] = a[0] * a[5] * a[15] - a[0] * a[7] * a[13] - a[4] * a[1] * a[15]
+                + a[4] * a[3] * a[13] + a[12] * a[1] * a[7] - a[12] * a[3] * a[5];
+        inv[14] = -a[0] * a[5] * a[14] + a[0] * a[6] * a[13] + a[4] * a[1] * a[14]
+                - a[4] * a[2] * a[13] - a[12] * a[1] * a[6] + a[12] * a[2] * a[5];
+        inv[3] = -a[1] * a[6] * a[11] + a[1] * a[7] * a[10] + a[5] * a[2] * a[11]
+                - a[5] * a[3] * a[10] - a[9] * a[2] * a[7] + a[9] * a[3] * a[6];
+        inv[7] = a[0] * a[6] * a[11] - a[0] * a[7] * a[10] - a[4] * a[2] * a[11]
+                + a[4] * a[3] * a[10] + a[8] * a[2] * a[7] - a[8] * a[3] * a[6];
+        inv[11] = -a[0] * a[5] * a[11] + a[0] * a[7] * a[9] + a[4] * a[1] * a[11]
+                - a[4] * a[3] * a[9] - a[8] * a[1] * a[7] + a[8] * a[3] * a[5];
+        inv[15] = a[0] * a[5] * a[10] - a[0] * a[6] * a[9] - a[4] * a[1] * a[10]
+                + a[4] * a[2] * a[9] + a[8] * a[1] * a[6] - a[8] * a[2] * a[5];
+
+        float det = a[0] * inv[0] + a[1] * inv[4] + a[2] * inv[8] + a[3] * inv[12];
+        if (Math.abs(det) <= 1e-8f) {
+            throw new IllegalStateException("Matrix is singular and cannot be inverted");
+        }
+
+        det = 1f / det;
+        for (int i = 0; i < 16; i++) {
+            inv[i] *= det;
+        }
+
+        this.m = inv;
+        return this;
+    }
+
+    private static void multiply(float[] a, float[] b, float[] out) {
+        for (int col = 0; col < 4; col++) {
+            int colBase = col * 4;
+            for (int row = 0; row < 4; row++) {
+                out[colBase + row] =
+                        a[row] * b[colBase]
+                                + a[4 + row] * b[colBase + 1]
+                                + a[8 + row] * b[colBase + 2]
+                                + a[12 + row] * b[colBase + 3];
+            }
+        }
     }
 }

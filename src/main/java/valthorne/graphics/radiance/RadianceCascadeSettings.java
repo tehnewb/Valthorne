@@ -2,9 +2,11 @@ package valthorne.graphics.radiance;
 
 public final class RadianceCascadeSettings {
 
+    static final float AUTO_BASE_INTERVAL_LENGTH = -1f;
+
     private int baseProbeSpacing = 2;
-    private int baseRayCount = 1;
-    private float baseIntervalLength = 0.1f;
+    private int baseRayCount = 4;
+    private float baseIntervalLength = AUTO_BASE_INTERVAL_LENGTH;
     private int branchFactor = 2;
     private boolean bilinearFix = false;
     private int maxLevels = 0;
@@ -70,7 +72,7 @@ public final class RadianceCascadeSettings {
     }
 
     public RadianceCascadeSettings setMaxLevels(int maxLevels) {
-        if (maxLevels < 0 || maxLevels == 1) throw new IllegalArgumentException("maxLevels must be 0 or >= 2");
+        if (maxLevels < 0) throw new IllegalArgumentException("maxLevels must be >= 0");
         this.maxLevels = maxLevels;
         return this;
     }
@@ -143,9 +145,17 @@ public final class RadianceCascadeSettings {
         return this;
     }
 
-    void validateForHrc() {
-        if (baseRayCount != 1) throw new IllegalArgumentException("Current HRC path requires baseRayCount == 1");
-        if (branchFactor != 2) throw new IllegalArgumentException("Current HRC path requires branchFactor == 2");
-        if (maxLevels == 1) throw new IllegalArgumentException("Current HRC path requires maxLevels to be 0 or >= 2");
+    float getHitOpacityThreshold() {
+        return Math.max(0.0001f, opacitySimilarityThreshold);
+    }
+
+    void validateForFlatland() {
+        if (baseProbeSpacing <= 0) throw new IllegalArgumentException("baseProbeSpacing must be > 0");
+        if (baseRayCount <= 0) throw new IllegalArgumentException("baseRayCount must be > 0");
+        if (branchFactor != 2) throw new IllegalArgumentException("Flatland radiance cascades require branchFactor == 2");
+        if (maxLevels < 0) throw new IllegalArgumentException("maxLevels must be >= 0");
+        if (internalScale <= 0) throw new IllegalArgumentException("internalScale must be > 0");
+        if (maxCascadeTextureWidth < 64) throw new IllegalArgumentException("maxCascadeTextureWidth must be >= 64");
+        if (transmittanceCutoff < 0f || transmittanceCutoff > 1f) throw new IllegalArgumentException("transmittanceCutoff must be in [0, 1]");
     }
 }
