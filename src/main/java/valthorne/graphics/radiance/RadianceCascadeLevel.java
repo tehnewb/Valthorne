@@ -7,21 +7,37 @@ public final class RadianceCascadeLevel {
     private final int index;
     private final int probeSpacing;
     private final int rayCount;
+    private final int raySide;
     private final int traceCount;
     private final int probeCountX;
     private final int probeCountY;
-    private final RadianceRenderTarget radianceTarget;
-    private final RadianceRenderTarget traceTarget;
+    private final int textureWidth;
+    private final int textureHeight;
+    private final int extensionPassCount;
+    private final float intervalStart;
+    private final float intervalLength;
+    private final RadianceRenderTarget intervalTarget;
+    private final RadianceRenderTarget scratchTarget;
+    private final RadianceRenderTarget mergedTarget;
 
-    RadianceCascadeLevel(int index, int probeSpacing, int rayCount, int traceCount, int probeCountX, int probeCountY) {
+    private boolean intervalUsesScratch;
+
+    RadianceCascadeLevel(int index, int probeSpacing, int rayCount, int probeCountX, int probeCountY, float intervalStart, float intervalLength) {
         this.index = index;
         this.probeSpacing = probeSpacing;
         this.rayCount = rayCount;
-        this.traceCount = traceCount;
+        this.raySide = rayCount;
+        this.traceCount = rayCount;
         this.probeCountX = probeCountX;
         this.probeCountY = probeCountY;
-        this.radianceTarget = new RadianceRenderTarget(Math.max(1, probeCountX * rayCount), Math.max(1, probeCountY), false, false);
-        this.traceTarget = new RadianceRenderTarget(Math.max(1, probeCountX * traceCount), Math.max(1, probeCountY), false, false);
+        this.textureWidth = Math.max(1, probeCountX * rayCount);
+        this.textureHeight = Math.max(1, probeCountY);
+        this.extensionPassCount = index;
+        this.intervalStart = intervalStart;
+        this.intervalLength = intervalLength;
+        this.intervalTarget = new RadianceRenderTarget(textureWidth, textureHeight, false, false);
+        this.scratchTarget = new RadianceRenderTarget(textureWidth, textureHeight, false, false);
+        this.mergedTarget = new RadianceRenderTarget(textureWidth, textureHeight, false, false);
     }
 
     public int getIndex() {
@@ -34,6 +50,10 @@ public final class RadianceCascadeLevel {
 
     public int getRayCount() {
         return rayCount;
+    }
+
+    public int getRaySide() {
+        return raySide;
     }
 
     public int getTraceCount() {
@@ -49,35 +69,56 @@ public final class RadianceCascadeLevel {
     }
 
     public int getTextureWidth() {
-        return radianceTarget.getWidth();
+        return textureWidth;
     }
 
     public int getTextureHeight() {
-        return radianceTarget.getHeight();
+        return textureHeight;
+    }
+
+    public int getExtensionPassCount() {
+        return extensionPassCount;
+    }
+
+    public float getIntervalStart() {
+        return intervalStart;
+    }
+
+    public float getIntervalLength() {
+        return intervalLength;
     }
 
     public int getTextureID() {
-        return radianceTarget.getTextureID();
+        return mergedTarget.getTextureID();
     }
 
     public Texture getTexture() {
-        return radianceTarget.getTexture();
+        return mergedTarget.getTexture();
     }
 
-    int getRadianceTextureID() {
-        return radianceTarget.getTextureID();
+    void resetIntervalBuild() {
+        intervalUsesScratch = false;
     }
 
-    int getTraceTextureID() {
-        return traceTarget.getTextureID();
+    int getCurrentIntervalTextureID() {
+        return (intervalUsesScratch ? scratchTarget : intervalTarget).getTextureID();
     }
 
-    Texture getTraceTexture() {
-        return traceTarget.getTexture();
+    int getAlternateIntervalTextureID() {
+        return (intervalUsesScratch ? intervalTarget : scratchTarget).getTextureID();
+    }
+
+    void swapIntervalTargets() {
+        intervalUsesScratch = !intervalUsesScratch;
+    }
+
+    int getMergedTextureID() {
+        return mergedTarget.getTextureID();
     }
 
     void dispose() {
-        radianceTarget.dispose();
-        traceTarget.dispose();
+        intervalTarget.dispose();
+        scratchTarget.dispose();
+        mergedTarget.dispose();
     }
 }
