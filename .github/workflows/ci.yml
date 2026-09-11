@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, 'codex/release-*']
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     env:
       ALSOFT_DRIVERS: 'null'
@@ -37,7 +37,9 @@ jobs:
         shell: bash
         run: bash ./gradlew verifyRelease --stacktrace --console=plain
       - name: Validate macOS application launch and rendering
-        if: runner.os == 'macOS'
+        # The hosted ARM64 VM cannot supply an NSGL OpenGL pixel format.
+        # Keep its build/native checks; exercise rendering on the Intel runner.
+        if: matrix.os == 'macos-15-intel'
         shell: bash
         run: bash ./gradlew verifyGraphicsConsumer --stacktrace --console=plain
       - name: Retain reports
