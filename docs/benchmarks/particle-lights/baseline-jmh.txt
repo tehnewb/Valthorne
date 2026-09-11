@@ -1,0 +1,663 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire
+# Parameters: (count = 256)
+
+# Run progress: 0.00% complete, ETA 00:01:36
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 4943.334 ns/op
+# Warmup Iteration   2: 4699.472 ns/op
+# Warmup Iteration   3: 4646.605 ns/op
+Iteration   1: 4826.259 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.033 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 4581.730 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.032 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 4869.951 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.034 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 4858.280 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.034 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 4858.079 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.034 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 8.33% complete, ETA 00:01:31
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 4640.279 ns/op
+# Warmup Iteration   2: 4683.478 ns/op
+# Warmup Iteration   3: 4606.216 ns/op
+Iteration   1: 4607.659 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.032 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 4754.564 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.033 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 4754.891 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.033 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 4746.753 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.033 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 4770.435 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.033 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire":
+  4762.860 ±(99.9%) 152.027 ns/op [Average]
+  (min, avg, max) = (4581.730, 4762.860, 4869.951), stdev = 100.556
+  CI (99.9%): [4610.833, 4914.887] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate.norm":
+  0.033 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.032, 0.033, 0.034), stdev = 0.001
+  CI (99.9%): [0.032, 0.034] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire
+# Parameters: (count = 4096)
+
+# Run progress: 16.67% complete, ETA 00:01:22
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 83616.514 ns/op
+# Warmup Iteration   2: 81266.978 ns/op
+# Warmup Iteration   3: 81180.764 ns/op
+Iteration   1: 81084.063 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.562 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 81168.888 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.560 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 83164.865 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.577 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 81536.353 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.566 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 80381.706 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.557 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 25.00% complete, ETA 00:01:14
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 81846.132 ns/op
+# Warmup Iteration   2: 81223.675 ns/op
+# Warmup Iteration   3: 81172.569 ns/op
+Iteration   1: 81094.479 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.563 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 84068.795 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.583 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 81138.979 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.563 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 81227.234 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.564 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 81186.878 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.563 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire":
+  81605.224 ±(99.9%) 1691.174 ns/op [Average]
+  (min, avg, max) = (80381.706, 81605.224, 84068.795), stdev = 1118.607
+  CI (99.9%): [79914.050, 83296.398] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate.norm":
+  0.566 ±(99.9%) 0.012 B/op [Average]
+  (min, avg, max) = (0.557, 0.566, 0.583), stdev = 0.008
+  CI (99.9%): [0.554, 0.578] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.burstAndExpire:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn
+# Parameters: (count = 256)
+
+# Run progress: 33.33% complete, ETA 00:01:06
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 4050.044 ns/op
+# Warmup Iteration   2: 3882.092 ns/op
+# Warmup Iteration   3: 3865.726 ns/op
+Iteration   1: 3867.954 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.027 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 3870.031 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.027 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 3866.069 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.027 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 3908.132 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.027 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 3879.948 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.027 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 41.67% complete, ETA 00:00:58
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 4137.710 ns/op
+# Warmup Iteration   2: 4073.438 ns/op
+# Warmup Iteration   3: 4053.344 ns/op
+Iteration   1: 3935.718 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.027 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 4094.403 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.028 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 4055.217 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.028 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 4057.613 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.028 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 4054.165 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.028 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn":
+  3958.925 ±(99.9%) 143.066 ns/op [Average]
+  (min, avg, max) = (3866.069, 3958.925, 4094.403), stdev = 94.629
+  CI (99.9%): [3815.859, 4101.991] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate.norm":
+  0.027 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.027, 0.027, 0.028), stdev = 0.001
+  CI (99.9%): [0.026, 0.028] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn
+# Parameters: (count = 4096)
+
+# Run progress: 50.00% complete, ETA 00:00:49
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 98983.574 ns/op
+# Warmup Iteration   2: 98500.236 ns/op
+# Warmup Iteration   3: 98479.654 ns/op
+Iteration   1: 98642.627 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.684 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 100359.515 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.696 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 98700.671 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.676 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 101547.578 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.704 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 101218.094 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.703 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 58.33% complete, ETA 00:00:41
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 103216.376 ns/op
+# Warmup Iteration   2: 99888.869 ns/op
+# Warmup Iteration   3: 103020.257 ns/op
+Iteration   1: 99263.513 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.688 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 99254.399 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.689 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 100148.604 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.695 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 98542.420 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.684 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 98157.437 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.681 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn":
+  99583.486 ±(99.9%) 1777.736 ns/op [Average]
+  (min, avg, max) = (98157.437, 99583.486, 101547.578), stdev = 1175.862
+  CI (99.9%): [97805.749, 101361.222] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate.norm":
+  0.690 ±(99.9%) 0.014 B/op [Average]
+  (min, avg, max) = (0.676, 0.690, 0.704), stdev = 0.009
+  CI (99.9%): [0.676, 0.704] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.interleavedChurn:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate
+# Parameters: (count = 256)
+
+# Run progress: 66.67% complete, ETA 00:00:33
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 998.685 ns/op
+# Warmup Iteration   2: 1015.700 ns/op
+# Warmup Iteration   3: 1015.615 ns/op
+Iteration   1: 1012.292 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 1001.692 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 1033.884 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 1003.763 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 1022.863 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 75.00% complete, ETA 00:00:24
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1014.198 ns/op
+# Warmup Iteration   2: 1009.813 ns/op
+# Warmup Iteration   3: 1019.437 ns/op
+Iteration   1: 1019.898 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 1002.034 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 1018.509 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 1011.274 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 1020.158 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.007 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate":
+  1014.637 ±(99.9%) 15.718 ns/op [Average]
+  (min, avg, max) = (1001.692, 1014.637, 1033.884), stdev = 10.396
+  CI (99.9%): [998.919, 1030.354] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate.norm":
+  0.007 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate
+# Parameters: (count = 4096)
+
+# Run progress: 83.33% complete, ETA 00:00:16
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 18129.392 ns/op
+# Warmup Iteration   2: 17962.263 ns/op
+# Warmup Iteration   3: 17812.006 ns/op
+Iteration   1: 17811.149 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.124 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 17677.161 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.123 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 18001.739 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.125 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 18021.818 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.125 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 17670.812 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.122 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 91.67% complete, ETA 00:00:08
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 17746.401 ns/op
+# Warmup Iteration   2: 17333.167 ns/op
+# Warmup Iteration   3: 18027.204 ns/op
+Iteration   1: 17601.761 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.122 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 17333.852 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.120 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 17313.933 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.120 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 17984.669 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.125 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 17322.447 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.120 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate":
+  17673.934 ±(99.9%) 426.991 ns/op [Average]
+  (min, avg, max) = (17313.933, 17673.934, 18021.818), stdev = 282.428
+  CI (99.9%): [17246.943, 18100.925] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate.norm":
+  0.123 ±(99.9%) 0.003 B/op [Average]
+  (min, avg, max) = (0.120, 0.123, 0.125), stdev = 0.002
+  CI (99.9%): [0.119, 0.126] (assumes normal distribution)
+
+Secondary result "valthorne.engine.benchmark.ParticleEmitter3DBenchmark.steadyUpdate:gc.count":
+  ≈ 0 counts
+
+
+# Run complete. Total time: 00:01:39
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                       (count)  Mode  Cnt      Score      Error   Units
+ParticleEmitter3DBenchmark.burstAndExpire                           256  avgt   10   4762.860 ±  152.027   ns/op
+ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate             256  avgt   10      0.007 ±    0.001  MB/sec
+ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate.norm        256  avgt   10      0.033 ±    0.001    B/op
+ParticleEmitter3DBenchmark.burstAndExpire:gc.count                  256  avgt   10        ≈ 0             counts
+ParticleEmitter3DBenchmark.burstAndExpire                          4096  avgt   10  81605.224 ± 1691.174   ns/op
+ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate            4096  avgt   10      0.007 ±    0.001  MB/sec
+ParticleEmitter3DBenchmark.burstAndExpire:gc.alloc.rate.norm       4096  avgt   10      0.566 ±    0.012    B/op
+ParticleEmitter3DBenchmark.burstAndExpire:gc.count                 4096  avgt   10        ≈ 0             counts
+ParticleEmitter3DBenchmark.interleavedChurn                         256  avgt   10   3958.925 ±  143.066   ns/op
+ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate           256  avgt   10      0.007 ±    0.001  MB/sec
+ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate.norm      256  avgt   10      0.027 ±    0.001    B/op
+ParticleEmitter3DBenchmark.interleavedChurn:gc.count                256  avgt   10        ≈ 0             counts
+ParticleEmitter3DBenchmark.interleavedChurn                        4096  avgt   10  99583.486 ± 1777.736   ns/op
+ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate          4096  avgt   10      0.007 ±    0.001  MB/sec
+ParticleEmitter3DBenchmark.interleavedChurn:gc.alloc.rate.norm     4096  avgt   10      0.690 ±    0.014    B/op
+ParticleEmitter3DBenchmark.interleavedChurn:gc.count               4096  avgt   10        ≈ 0             counts
+ParticleEmitter3DBenchmark.steadyUpdate                             256  avgt   10   1014.637 ±   15.718   ns/op
+ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate               256  avgt   10      0.007 ±    0.001  MB/sec
+ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate.norm          256  avgt   10      0.007 ±    0.001    B/op
+ParticleEmitter3DBenchmark.steadyUpdate:gc.count                    256  avgt   10        ≈ 0             counts
+ParticleEmitter3DBenchmark.steadyUpdate                            4096  avgt   10  17673.934 ±  426.991   ns/op
+ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate              4096  avgt   10      0.007 ±    0.001  MB/sec
+ParticleEmitter3DBenchmark.steadyUpdate:gc.alloc.rate.norm         4096  avgt   10      0.123 ±    0.003    B/op
+ParticleEmitter3DBenchmark.steadyUpdate:gc.count                   4096  avgt   10        ≈ 0             counts
+
+Benchmark result is saved to build/particle-lights-baseline/results.json

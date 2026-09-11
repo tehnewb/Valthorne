@@ -1,0 +1,333 @@
+{
+  "description": "Textured CC0 FPS combat assets. Source archives are not required at runtime.",
+  "sources": [
+    {
+      "id": "m4a1",
+      "name": "M4A1 Assault Rifle",
+      "author": "nisu / 3DModelsCC0",
+      "page": "https://opengameart.org/content/m4a1-assault-rifle",
+      "archive": "m4a1_0.zip",
+      "download": "https://opengameart.org/sites/default/files/m4a1_0.zip",
+      "selected": [
+        "M4A1/M4A1.fbx",
+        "M4A1/M4A1_Base_Color.png"
+      ],
+      "outputs": [
+        "m4a1",
+        "m4a1_magazine"
+      ],
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrieved": "2026-09-09",
+      "archive_bytes": 3631284,
+      "archive_sha256": "ed5779ec82718861964227e2aad2a900978ea087081154365d6d86246be62f0d"
+    },
+    {
+      "id": "sentry2",
+      "name": "SENTRY-2 (Sentry Bot Mark 2)",
+      "author": "Quandtum",
+      "page": "https://opengameart.org/content/sentry-2-sentry-bot-mark-2",
+      "archive": "Quandtum_SENTRY-2.zip",
+      "download": "https://opengameart.org/sites/default/files/Quandtum_SENTRY-2.zip",
+      "selected": [
+        "Quandtum_SENTRY-2_v1_0.blend:Sentry-2",
+        "Quandtum_SENTRY-2_v1_0.blend:Sentry-2-Diffuse.jpg"
+      ],
+      "outputs": [
+        "sentry2"
+      ],
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrieved": "2026-09-09",
+      "archive_bytes": 18245986,
+      "archive_sha256": "f7afe1e74beda4c27ee92dc3407ba5d5af9174b031e705425af58e50b6f2ed6c"
+    },
+    {
+      "id": "mk2",
+      "name": "Mk2 Grenade",
+      "author": "LonesomeDucky",
+      "page": "https://opengameart.org/content/mk2-grenade",
+      "archive": "mk2_grenade.zip",
+      "download": "https://opengameart.org/sites/default/files/mk2_grenade.zip",
+      "selected": [
+        "mk2_grenade.glb"
+      ],
+      "outputs": [
+        "mk2"
+      ],
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrieved": "2026-09-09",
+      "archive_bytes": 6058741,
+      "archive_sha256": "e66c037b26d93481fef31b796f80cb84e157ca4cabaaffe44fc34279dff6fee3"
+    },
+    {
+      "id": "fps_arms",
+      "name": "fps arms (rigged only)",
+      "author": "para; MakeHuman team (base mesh and texture)",
+      "page": "https://opengameart.org/content/fps-arms-rigged-only",
+      "archive": "fps_arms.7z",
+      "download": "https://opengameart.org/sites/default/files/fps%20arms.7z",
+      "selected": [
+        "FPS ARMS RIG 1 test anim.blend",
+        "new_diff.png"
+      ],
+      "outputs": [
+        "fps_arms"
+      ],
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrieved": "2026-09-09",
+      "archive_bytes": 1406250,
+      "archive_sha256": "31f6c7bd5caea8856c4aafca8461f38a3c8bfdd3d8f05c898e403b9475e54562"
+    }
+  ],
+  "conversion": {
+    "tool": "Blender 4.5.3 LTS, official Windows portable distribution",
+    "tool_url": "https://mirror.blender.org/release/Blender4.5/blender-4.5.3-windows-x64.zip",
+    "tool_archive_sha256": "6b657c8bdd3a7b65b07b9e1ae17eb4be7dd4aa23121da7f3d3354fc2551330a7",
+    "coordinates": "Z-up, meters, centered XYZ; rifle barrel and sentry front +Y",
+    "textures": "Original base-color texture bytes retained; Blender import/export preserves standard OBJ UV convention",
+    "geometry": "Evaluated object/armature transforms baked; indexed triangle geometry; zero-area M4 faces omitted; original visible geometry retained",
+    "arms": "Author rig posed around rifle pistol grip and handguard; baked static mesh with local attachment offset",
+    "models": [
+      {
+        "id": "m4a1",
+        "triangles": 9213,
+        "vertices": 10498,
+        "source_objects": [
+          "Magazine",
+          "Base",
+          "Charging_Handle",
+          "Sight_2",
+          "Switch1",
+          "Switch2",
+          "Sight",
+          "Firemode_Selector",
+          "Trigger",
+          "Ejector_Lid",
+          "Ejector_2",
+          "Barrel",
+          "Stock"
+        ],
+        "dimensions": [
+          0.06665333360433578,
+          0.9000000357627869,
+          0.2790822386741638
+        ],
+        "source_center": [
+          0.00015535205602645874,
+          0.10644611716270447,
+          -0.0451158732175827
+        ],
+        "scale": 1.0479212675247278,
+        "negative_winding_vs_normals": 0,
+        "omitted_degenerate_triangles": 23,
+        "recomputed_zero_normals": 7
+      },
+      {
+        "id": "m4a1_magazine",
+        "triangles": 716,
+        "vertices": 674,
+        "source_objects": [
+          "Magazine"
+        ],
+        "dimensions": [
+          0.021577276289463043,
+          0.09143946319818497,
+          0.19319532811641693
+        ],
+        "source_center": [
+          -0.0007585659623146057,
+          0.059500738978385925,
+          -0.08609552681446075
+        ],
+        "scale": 1.0479212674888627,
+        "negative_winding_vs_normals": 0,
+        "omitted_degenerate_triangles": 20,
+        "recomputed_zero_normals": 0
+      },
+      {
+        "id": "sentry2",
+        "triangles": 2196,
+        "vertices": 2243,
+        "source_objects": [
+          "Sentry-2"
+        ],
+        "dimensions": [
+          1.2741568088531494,
+          1.2602308988571167,
+          1.7000000476837158
+        ],
+        "source_center": [
+          2.980232238769531e-07,
+          0.0400736927986145,
+          1.996091604232788
+        ],
+        "scale": 0.40393923385217284,
+        "negative_winding_vs_normals": 0,
+        "omitted_degenerate_triangles": 0,
+        "recomputed_zero_normals": 0
+      },
+      {
+        "id": "mk2",
+        "triangles": 2568,
+        "vertices": 1619,
+        "source_objects": [
+          "GrenadeBody",
+          "GrenadeTop",
+          "GrenadePin",
+          "GrenadeRing",
+          "GrenadeSwitch"
+        ],
+        "dimensions": [
+          0.1098511591553688,
+          0.09196833521127701,
+          0.18000000715255737
+        ],
+        "source_center": [
+          0.006958832964301109,
+          0.0,
+          0.009653961285948753
+        ],
+        "scale": 1.2849003827147563,
+        "negative_winding_vs_normals": 7,
+        "omitted_degenerate_triangles": 0,
+        "recomputed_zero_normals": 0
+      },
+      {
+        "id": "fps_arms",
+        "triangles": 8152,
+        "vertices": 4600,
+        "source_objects": [
+          "caucasian_male_1:Body"
+        ],
+        "dimensions": [
+          0.5287020206451416,
+          0.8042678833007812,
+          0.3675523102283478
+        ],
+        "source_center": [
+          -0.12383267283439636,
+          -0.21405737102031708,
+          -0.08080552518367767
+        ],
+        "scale": 1,
+        "negative_winding_vs_normals": 7,
+        "omitted_degenerate_triangles": 0,
+        "rifle_attachment_offset": [
+          -0.12383267283439636,
+          -0.21405737102031708,
+          -0.08080552518367767
+        ]
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "fps_arms.mtl",
+      "bytes": 138,
+      "sha256": "e88de8962b440f959f6fbe2c9b2827b001ce63467b09b4a543b539bfcf9e8186"
+    },
+    {
+      "path": "fps_arms.obj",
+      "bytes": 849549,
+      "sha256": "fe5e82f26d44ecb745401be800ab097d81f6a8b4181a7039fb64a3b27ec7f020"
+    },
+    {
+      "path": "fps_arms_diffuse.png",
+      "bytes": 686627,
+      "sha256": "f7a67f1c8f72294dc54ddea96253522dabdee99838746d6fb695eeef46120b63",
+      "resolution": [
+        1024,
+        1024
+      ],
+      "format": "PNG",
+      "mode": "RGB"
+    },
+    {
+      "path": "licenses/CC0-1.0.txt",
+      "bytes": 7048,
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "path": "licenses/sentry2-readme.txt",
+      "bytes": 959,
+      "sha256": "6664babc06d592ca34f133dd488a720ba9560851f9d153b56e109d0bfd07eb5a"
+    },
+    {
+      "path": "m4a1.mtl",
+      "bytes": 131,
+      "sha256": "2f31b202c726fa16b51ce5d1a6e0504d2011d1907cf93cff556c43efb9ab3509"
+    },
+    {
+      "path": "m4a1.obj",
+      "bytes": 1427242,
+      "sha256": "71b84c7237fb9e080756fa33c106d260a35191f163f879dd8d4c5b0014fdceb7"
+    },
+    {
+      "path": "m4a1_base_color.png",
+      "bytes": 518307,
+      "sha256": "e28fb02a6a1d951ec2d356fad8f267ba04da7d294bfa001eb3995549971e1b34",
+      "resolution": [
+        2048,
+        2048
+      ],
+      "format": "PNG",
+      "mode": "P"
+    },
+    {
+      "path": "m4a1_magazine.mtl",
+      "bytes": 140,
+      "sha256": "d8942e0c5c8c26cfee588b3de3103efe12d547b0e8e965c53ed1c840af518cfa"
+    },
+    {
+      "path": "m4a1_magazine.obj",
+      "bytes": 89060,
+      "sha256": "a74884a03ec29f9ce2ce89d5688fe821cb01098bf57ba729fbe5f19d8c6f2eec"
+    },
+    {
+      "path": "mk2.mtl",
+      "bytes": 122,
+      "sha256": "777a6037a957984499f2cf29f6a92f13dec1b8fb8b33810316adbada782b26e8"
+    },
+    {
+      "path": "mk2.obj",
+      "bytes": 274846,
+      "sha256": "90bd78e311f0e8018eff646d25f99b199db3af96e4310966a75c0f88767198ae"
+    },
+    {
+      "path": "mk2_base_color.png",
+      "bytes": 703372,
+      "sha256": "a460543b648f36f34bdff959c8892af1ddbd099934adc8690f283d2e0f959ef7",
+      "resolution": [
+        1024,
+        1024
+      ],
+      "format": "PNG",
+      "mode": "RGB"
+    },
+    {
+      "path": "sentry2.mtl",
+      "bytes": 142,
+      "sha256": "66ec7a2ca95166a822af3a127652636b2d5cad0548d610688fad558bfd867f99"
+    },
+    {
+      "path": "sentry2.obj",
+      "bytes": 310358,
+      "sha256": "2d08967097030ef6ee4667380a9c03ee13517c992f6e79626758067c6850a17e"
+    },
+    {
+      "path": "sentry2_diffuse.jpg",
+      "bytes": 4008964,
+      "sha256": "2a936d15c1f7683faa71865d9a866eaa673c138d83d0bdcd6ac4f7282b777537",
+      "resolution": [
+        2048,
+        2048
+      ],
+      "format": "JPEG",
+      "mode": "RGB"
+    }
+  ],
+  "total_file_bytes": 8877005
+}

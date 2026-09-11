@@ -30,6 +30,7 @@ public class Mp3SoundStream implements SoundStream {
     private int sampleRate; // Sample rate of the transcoded stream
     private int bitsPerSample; // Bits per sample of the transcoded stream
     private int frameSize; // PCM frame size in bytes
+    private byte[] readScratch = new byte[0]; // Grows only when a larger destination is requested.
 
     /**
      * Creates a new MP3 stream for the supplied sound data.
@@ -106,11 +107,14 @@ public class Mp3SoundStream implements SoundStream {
     public int read(ByteBuffer pcmBuffer) {
         try {
             pcmBuffer.clear();
-            byte[] bytes = new byte[pcmBuffer.remaining()];
+            int requested = pcmBuffer.remaining();
+            requested -= requested % frameSize;
+            if (readScratch.length < requested) readScratch = new byte[requested];
+            byte[] bytes = readScratch;
             int total = 0;
 
-            while (total < bytes.length) {
-                int read = pcmStream.read(bytes, total, bytes.length - total);
+            while (total < requested) {
+                int read = pcmStream.read(bytes, total, requested - total);
                 if (read <= 0) {
                     break;
                 }

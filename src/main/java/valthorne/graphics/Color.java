@@ -12,14 +12,6 @@ import org.lwjgl.nanovg.NVGColor;
 public class Color {
 
     /**
-     * A constant representing the reciprocal of 255 as a float.
-     * It is used to perform inverse division operations, commonly
-     * in scenarios requiring normalization, such as scaling values
-     * to a 0.0 to 1.0 range.
-     */
-    private static final float INVERSE_DIVISION = 1.0f / 255.0f;
-
-    /**
      * Pure white color (0xFFFFFFFF)
      */
     public static final Color WHITE = new Color(0xFFFFFFFF);
@@ -95,7 +87,6 @@ public class Color {
      * Gold color (0xFFFFD700)
      */
     public static final Color GOLD = new Color(0xFFFFD700);
-
     /**
      * Crimson red color (0xFFDC143C)
      */
@@ -124,7 +115,6 @@ public class Color {
      * Tomato red color (0xFFFF6347)
      */
     public static final Color TOMATO = new Color(0xFFFF6347);
-
     /**
      * Coral orange color (0xFFFF7F50)
      */
@@ -141,7 +131,6 @@ public class Color {
      * Tan brown color (0xFFD2B48C)
      */
     public static final Color TAN = new Color(0xFFD2B48C);
-
     /**
      * Khaki yellow color (0xFFF0E68C)
      */
@@ -162,7 +151,6 @@ public class Color {
      * Light yellow color (0xFFFFFFE0)
      */
     public static final Color LIGHT_YELLOW = new Color(0xFFFFFFE0);
-
     /**
      * Dark green color (0xFF006400)
      */
@@ -195,7 +183,6 @@ public class Color {
      * Honeydew green color (0xFFF0FFF0)
      */
     public static final Color HONEYDEW = new Color(0xFFF0FFF0);
-
     /**
      * Sky blue color (0xFF87CEEB)
      */
@@ -224,7 +211,6 @@ public class Color {
      * Dodger blue color (0xFF1E90FF)
      */
     public static final Color DODGER_BLUE = new Color(0xFF1E90FF);
-
     /**
      * Plum purple color (0xFFDDA0DD)
      */
@@ -253,7 +239,6 @@ public class Color {
      * Deep pink color (0xFFFF1493)
      */
     public static final Color DEEP_PINK = new Color(0xFFFF1493);
-
     /**
      * Saddle brown color (0xFF8B4513)
      */
@@ -278,7 +263,6 @@ public class Color {
      * Moccasin color (0xFFFFE4B5)
      */
     public static final Color MOCCASIN = new Color(0xFFFFE4B5);
-
     /**
      * Aquamarine color (0xFF7FFFD4)
      */
@@ -299,7 +283,6 @@ public class Color {
      * Teal blue color (0xFF367588)
      */
     public static final Color TEAL_BLUE = new Color(0xFF367588);
-
     /**
      * Peach puff color (0xFFFFDAB9)
      */
@@ -324,7 +307,6 @@ public class Color {
      * Blush pink color (0xFFDE5D83)
      */
     public static final Color BLUSH = new Color(0xFFDE5D83);
-
     /**
      * Dark goldenrod color (0xFFB8860B)
      */
@@ -353,7 +335,6 @@ public class Color {
      * Papaya whip color (0xFFFFEFD5)
      */
     public static final Color PAPAYA_WHIP = new Color(0xFFFFEFD5);
-
     /**
      * Pale green color (0xFF98FB98)
      */
@@ -374,7 +355,6 @@ public class Color {
      * Pale pink color (0xFFFFCCFF)
      */
     public static final Color PALE_PINK = new Color(0xFFFFCCFF);
-
     /**
      * Silver color (0xFFC0C0C0)
      */
@@ -403,7 +383,6 @@ public class Color {
      * Jet black color (0xFF343434)
      */
     public static final Color JET = new Color(0xFF343434);
-
     /**
      * Alice blue color (0xFFF0F8FF)
      */
@@ -432,7 +411,6 @@ public class Color {
      * Cloud white color (0xFFF7F7FF)
      */
     public static final Color CLOUD_WHITE = new Color(0xFFF7F7FF);
-
     /**
      * Electric lime color (0xFFCCFF00)
      */
@@ -453,7 +431,6 @@ public class Color {
      * Neon purple color (0xFFBC13FE)
      */
     public static final Color NEON_PURPLE = new Color(0xFFBC13FE);
-
     /**
      * Fern green color (0xFF4F7942)
      */
@@ -474,7 +451,6 @@ public class Color {
      * Basil green color (0xFF568203)
      */
     public static final Color BASIL = new Color(0xFF568203);
-
     /**
      * Fully transparent color (0x00000000)
      */
@@ -483,7 +459,13 @@ public class Color {
      * Semi-transparent black color (0x80000000)
      */
     public static final Color TRANSLUCENT = new Color(0x80000000);
-
+    /**
+     * A constant representing the reciprocal of 255 as a float.
+     * It is used to perform inverse division operations, commonly
+     * in scenarios requiring normalization, such as scaling values
+     * to a 0.0 to 1.0 range.
+     */
+    private static final float INVERSE_DIVISION = 1.0f / 255.0f;
     /**
      * The color value stored as RGBA integer (0xAARRGGBB)
      */
@@ -508,87 +490,6 @@ public class Color {
      */
     public Color(float red, float green, float blue, float alpha) { // e.g. 0xFFFF0000 = opaque red
         this.rgba = (int) (alpha * 255) << 24 | (int) (red * 255) << 16 | (int) (green * 255) << 8 | (int) (blue * 255);
-    }
-
-    /**
-     * Sets the current color to the given color by copying its RGBA value.
-     *
-     * @param endColor The color from which to copy the RGBA value.
-     */
-    public void set(Color endColor) {
-        this.rgba = endColor.rgba;
-    }
-
-    /**
-     * Sets the color components of this object using the provided red, green, blue,
-     * and alpha values. Each component should be a normalized float value in the
-     * range [0.0, 1.0]. The specified values are internally converted to an
-     * integer-based RGBA representation.
-     *
-     * @param red   The red component as a normalized float in the range [0.0, 1.0].
-     * @param green The green component as a normalized float in the range [0.0, 1.0].
-     * @param blue  The blue component as a normalized float in the range [0.0, 1.0].
-     * @param alpha The alpha (transparency) component as a normalized float
-     *              in the range [0.0, 1.0].
-     */
-    public void set(float red, float green, float blue, float alpha) {
-        this.rgba = (int) (alpha * 255) << 24 | (int) (red * 255) << 16 | (int) (green * 255) << 8 | (int) (blue * 255);
-    }
-
-
-    /**
-     * Multiplies this color by another color (component-wise), storing the result in this instance.
-     *
-     * @param other other color
-     */
-    public void mul(Color other) {
-        if (other == null) throw new NullPointerException("other cannot be null");
-        set(r() * other.r(), g() * other.g(), b() * other.b(), a() * other.a());
-    }
-
-    /**
-     * Adds another color to this one (component-wise), clamped to [0..1], storing the result in this instance.
-     *
-     * @param other other color
-     */
-    public void add(Color other) {
-        if (other == null) throw new NullPointerException("other cannot be null");
-        set(clamp01(r() + other.r()), clamp01(g() + other.g()), clamp01(b() + other.b()), clamp01(a() + other.a()));
-    }
-
-    /**
-     * Linearly interpolates this color towards {@code target} by {@code t} and stores the result in this instance.
-     *
-     * @param target target color
-     * @param t      interpolation factor in [0..1]
-     */
-    public void lerp(Color target, float t) {
-        if (target == null) throw new NullPointerException("target cannot be null");
-        t = clamp01(t);
-        set(r() + (target.r() - r()) * t, g() + (target.g() - g()) * t, b() + (target.b() - b()) * t, a() + (target.a() - a()) * t);
-    }
-
-    /**
-     * Sets this color to opaque (alpha = 1).
-     */
-    public void opaque() {
-        rgba = (rgba & 0x00FFFFFF) | 0xFF000000;
-    }
-
-    /**
-     * Sets this color to fully transparent (alpha = 0).
-     */
-    public void transparent() {
-        rgba = (rgba & 0x00FFFFFF);
-    }
-
-    /**
-     * @param alpha normalized alpha in [0..1]
-     * @return a new Color with the same RGB but a different alpha.
-     */
-    public Color withAlpha(float alpha) {
-        int aa = ((int) (clamp01(alpha) * 255) & 0xFF) << 24;
-        return new Color((rgba & 0x00FFFFFF) | aa);
     }
 
     /**
@@ -654,6 +555,86 @@ public class Color {
         int value = (int) Long.parseLong(s, 16);
         if (s.length() == 6) value |= 0xFF000000;
         return new Color(value);
+    }
+
+    /**
+     * Sets the current color to the given color by copying its RGBA value.
+     *
+     * @param endColor The color from which to copy the RGBA value.
+     */
+    public void set(Color endColor) {
+        this.rgba = endColor.rgba;
+    }
+
+    /**
+     * Sets the color components of this object using the provided red, green, blue,
+     * and alpha values. Each component should be a normalized float value in the
+     * range [0.0, 1.0]. The specified values are internally converted to an
+     * integer-based RGBA representation.
+     *
+     * @param red   The red component as a normalized float in the range [0.0, 1.0].
+     * @param green The green component as a normalized float in the range [0.0, 1.0].
+     * @param blue  The blue component as a normalized float in the range [0.0, 1.0].
+     * @param alpha The alpha (transparency) component as a normalized float
+     *              in the range [0.0, 1.0].
+     */
+    public void set(float red, float green, float blue, float alpha) {
+        this.rgba = (int) (alpha * 255) << 24 | (int) (red * 255) << 16 | (int) (green * 255) << 8 | (int) (blue * 255);
+    }
+
+    /**
+     * Multiplies this color by another color (component-wise), storing the result in this instance.
+     *
+     * @param other other color
+     */
+    public void mul(Color other) {
+        if (other == null) throw new NullPointerException("other cannot be null");
+        set(r() * other.r(), g() * other.g(), b() * other.b(), a() * other.a());
+    }
+
+    /**
+     * Adds another color to this one (component-wise), clamped to [0..1], storing the result in this instance.
+     *
+     * @param other other color
+     */
+    public void add(Color other) {
+        if (other == null) throw new NullPointerException("other cannot be null");
+        set(clamp01(r() + other.r()), clamp01(g() + other.g()), clamp01(b() + other.b()), clamp01(a() + other.a()));
+    }
+
+    /**
+     * Linearly interpolates this color towards {@code target} by {@code t} and stores the result in this instance.
+     *
+     * @param target target color
+     * @param t      interpolation factor in [0..1]
+     */
+    public void lerp(Color target, float t) {
+        if (target == null) throw new NullPointerException("target cannot be null");
+        t = clamp01(t);
+        set(r() + (target.r() - r()) * t, g() + (target.g() - g()) * t, b() + (target.b() - b()) * t, a() + (target.a() - a()) * t);
+    }
+
+    /**
+     * Sets this color to opaque (alpha = 1).
+     */
+    public void opaque() {
+        rgba = (rgba & 0x00FFFFFF) | 0xFF000000;
+    }
+
+    /**
+     * Sets this color to fully transparent (alpha = 0).
+     */
+    public void transparent() {
+        rgba = (rgba & 0x00FFFFFF);
+    }
+
+    /**
+     * @param alpha normalized alpha in [0..1]
+     * @return a new Color with the same RGB but a different alpha.
+     */
+    public Color withAlpha(float alpha) {
+        int aa = ((int) (clamp01(alpha) * 255) & 0xFF) << 24;
+        return new Color((rgba & 0x00FFFFFF) | aa);
     }
 
     /**
@@ -822,7 +803,7 @@ public class Color {
      * red, green, blue, and alpha channel values.
      *
      * @return A new NVGColor instance with the color's RGBA channels mapped
-     *         from this object's properties.
+     * from this object's properties.
      */
     public NVGColor toNanoVGColor() {
         NVGColor color = NVGColor.create();

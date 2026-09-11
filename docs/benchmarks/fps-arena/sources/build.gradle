@@ -1,0 +1,418 @@
+plugins {
+    id 'java-library'
+    id 'com.vanniktech.maven.publish' version '0.36.0'
+}
+
+group = "io.github.tehnewb"
+version = "1.4.6"
+description = "A 2D and 3D game development library"
+
+repositories {
+    mavenCentral()
+}
+
+def lwjglVersion = "3.4.1"
+def joltVersion = "6.0.0"
+
+// If you want more modules, add them to both lists below.
+def lwjglModules = [
+        "lwjgl",
+        "lwjgl-glfw",
+        "lwjgl-opengl",
+        "lwjgl-stb",
+        "lwjgl-openal",
+        "lwjgl-yoga",
+        "lwjgl-nanovg"
+]
+
+// “All natives” set (common targets).
+def lwjglNativeClassifiers = [
+        "natives-windows",
+        "natives-windows-arm64",
+        "natives-macos",
+        "natives-macos-arm64",
+        "natives-linux",
+        "natives-linux-arm64",
+        "natives-linux-arm32",
+]
+
+dependencies {
+    api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    api 'org.joml:joml:1.10.8'
+    api 'org.joml:joml-primitives:1.10.0'
+
+    // API (what consumers compile against)
+    lwjglModules.each { m ->
+        api "org.lwjgl:${m}"
+    }
+
+    implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
+    implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
+    implementation "org.apache.commons:commons-compress:1.28.0"
+    implementation "org.dyn4j:dyn4j:5.0.2"
+    // Desktop Filament C/FFM bindings, including published native runtimes.
+    implementation "io.github.erkko68.filament-ffm:filament-ffm-runtime-windows-x64:0.4.0"
+    // Platform-independent Jolt JNI classes; platform suffix is the upstream publication name.
+    implementation "com.github.stephengold:jolt-jni-Windows64:$joltVersion"
+    ["Windows64", "Windows_ARM64", "Linux64", "Linux_ARM64", "Linux_ARM32hf", "MacOSX64", "MacOSX_ARM64"].each { platform ->
+        runtimeOnly "com.github.stephengold:jolt-jni-${platform}:$joltVersion:ReleaseSp"
+    }
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
+
+    // Runtime natives for ALL supported OS/arch combos.
+    // These will be published so consumers get them transitively at runtime.
+    lwjglModules.each { m ->
+        lwjglNativeClassifiers.each { c ->
+            runtimeOnly "org.lwjgl:${m}::$c"
+        }
+    }
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+// Run the committed 3D regressions independently of local, ignored demo/test sources.
+sourceSets {
+    audioExamples {
+        java.srcDir 'src/examples/java'
+        java.include 'valthorne/examples/AudioStudio.java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    uiExamples {
+        java.srcDir 'src/examples/java'
+        java.include 'valthorne/examples/UIShowcase.java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    uiBenchmark {
+        java.srcDir 'src/benchmark/java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    verificationUI {
+        java.srcDir 'src/test/java'
+        java.include 'valthorne/ui/**'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    verificationPhysics3D {
+        java.srcDir 'src/test/java'
+        java.include 'valthorne/physics3d/**'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    verification3D {
+        java.srcDir 'src/test/java'
+        java.include 'valthorne/model3d/**'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    examples {
+        java.srcDir 'src/examples/java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    audioExamplesImplementation.extendsFrom implementation, api
+    audioExamplesRuntimeOnly.extendsFrom runtimeOnly
+    uiExamplesImplementation.extendsFrom implementation, api
+    uiExamplesRuntimeOnly.extendsFrom runtimeOnly
+    uiBenchmarkImplementation.extendsFrom implementation, api
+    uiBenchmarkRuntimeOnly.extendsFrom runtimeOnly
+    verificationUIImplementation.extendsFrom testImplementation
+    verificationUIRuntimeOnly.extendsFrom testRuntimeOnly, runtimeOnly
+    verificationPhysics3DImplementation.extendsFrom testImplementation
+    verificationPhysics3DRuntimeOnly.extendsFrom testRuntimeOnly, runtimeOnly
+    verification3DImplementation.extendsFrom testImplementation
+    verification3DRuntimeOnly.extendsFrom testRuntimeOnly, runtimeOnly
+    examplesImplementation.extendsFrom implementation, api
+    examplesRuntimeOnly.extendsFrom runtimeOnly
+}
+dependencies {
+    uiBenchmarkImplementation 'org.openjdk.jmh:jmh-core:1.37'
+    uiBenchmarkAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+}
+tasks.register('benchmarkUI', JavaExec) {
+    description = 'Runs forked UI microbenchmarks with allocation profiling and JSON output.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('uiBenchmarkReport').orElse('build/reports/ui-benchmark/results.json')
+    args 'valthorne.ui.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+tasks.register('verifyUIBenchmark') {
+    description = 'Runs the complete UI benchmark suite and checks Java allocation budgets (not hardware-specific timing).'
+    group = 'verification'
+    dependsOn 'benchmarkUI'
+    doLast {
+        def report = file(providers.gradleProperty('uiBenchmarkReport').orElse('build/reports/ui-benchmark/results.json').get())
+        def results = new groovy.json.JsonSlurper().parse(report)
+        def expected = [
+            'UIHotPathBenchmark.childrenView:': 1d,
+            'UIHotPathBenchmark.cursorMovement:': 1d,
+            'UIHotPathBenchmark.replaceText:': 1d,
+            'UIHotPathBenchmark.sanitizeCleanText:': 1d
+        ]
+        ['100', '1000'].each { count ->
+            expected["UIFrameBenchmark.idleUpdate:${count}".toString()] = 1d
+            expected["UIFrameBenchmark.changedLayout:${count}".toString()] = 256d
+            expected["UIFrameBenchmark.mixedDraw:${count}".toString()] = 1024d
+        }
+        ['1000', '1000000'].each { count ->
+            ['pixelLookup', 'updateHeight', 'toggleSelection'].each { method ->
+                expected["UIDataBenchmark.${method}:${count}".toString()] = 1d
+            }
+        }
+        results.each { result ->
+            def name = result.benchmark.replace('valthorne.ui.benchmark.', '')
+            def key = name + ':' + (result.params?.nodeCount ?: result.params?.count ?: '')
+            def limit = expected.remove(key)
+            if (limit == null) throw new GradleException("Unexpected or duplicate UI benchmark: ${key}")
+            def metric = result.secondaryMetrics['gc.alloc.rate.norm']
+            def score = metric?.score
+            if (!(score instanceof Number) || !Double.isFinite(score.doubleValue()) || score.doubleValue() > limit)
+                throw new GradleException("${key}: allocation ${score} B/op exceeds ${limit} B/op (or profiler data is missing)")
+        }
+        if (!expected.isEmpty()) throw new GradleException("Missing UI benchmarks: ${expected.keySet()}")
+        logger.lifecycle('All 16 UI benchmark allocation budgets passed. See JSON for timing and uncertainty.')
+    }
+}
+tasks.register('benchmarkEngine', JavaExec) {
+    description = 'Runs forked engine CPU benchmarks with allocation profiling.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('engineBenchmarkReport').orElse('build/reports/engine-benchmark/results.json')
+    args 'valthorne.engine.benchmark.*', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('benchmarkAudio', JavaExec) {
+    description = 'Measures ambient-zone geometry with JMH allocation profiling.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    args 'valthorne.audio.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', 'build/reports/audio-benchmark/results.json'
+    doFirst { file('build/reports/audio-benchmark').mkdirs() }
+}
+tasks.register('verifyPhysics3D', Test) {
+    description = 'Runs native Jolt physics regression tests without a graphics context.'
+    group = 'verification'
+    testClassesDirs = sourceSets.verificationPhysics3D.output.classesDirs
+    classpath = sourceSets.verificationPhysics3D.runtimeClasspath
+}
+tasks.register('runPhysics3DExample', JavaExec) {
+    description = 'Runs the Jolt rigid-body playground.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.Physics3DExample'
+}
+tasks.register('runPhysicsStudio', JavaExec) {
+    description = 'Runs the interactive Jolt and Filament physics laboratory.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.PhysicsStudio'
+}
+
+tasks.register('runLighting2DExample', JavaExec) {
+    description = 'Runs the cached 2D lighting and soft-shadow playground.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.Lighting2DExample'
+}
+tasks.register('runPathTracingExample', JavaExec) {
+    description = 'Runs the progressive GPU path-traced material studio (OpenGL 4.3).'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.PathTracingExample'
+}
+tasks.register('runLightingStudio', JavaExec) {
+    description = 'Runs the editable lighting workbench; --smoke verifies the UI and --benchmark records frame times.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.LightingStudio'
+}
+
+tasks.register('runFpsArena', JavaExec) {
+    description = 'Runs the first-person combat arena; --smoke checks controls, --benchmark measures combat workloads.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.FpsArena'
+}
+
+tasks.register('verifyFpsArena', JavaExec) {
+    description = 'Checks native player movement, combat, waves and gameplay resource ownership without a window.'
+    group = 'verification'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.FpsArenaValidation'
+}
+
+// Material packages are committed so consumers do not need a native compiler.
+// Binding 0.4.0 uses Filament material ABI 75, not the newer SDK ABI 76.
+def filamentMaterialTasks = ['surface', 'glass'].collect { materialName ->
+    tasks.register("compileFilament${materialName.capitalize()}Material", Exec) {
+        group = 'build'
+        def source = file("src/main/resources/valthorne/filament/${materialName}.mat")
+        def output = file("src/main/resources/valthorne/filament/${materialName}.filamat")
+        def compiler = providers.gradleProperty('filamentMatc').orElse(file('build/filament-sdk-1.75/bin/matc.exe').absolutePath)
+        inputs.file(source)
+        outputs.file(output)
+        doFirst {
+            if (!file(compiler.get()).isFile()) throw new GradleException('Set -PfilamentMatc to matc from Filament 1.75.0.')
+            def abi = providers.exec { commandLine compiler.get(), '--version' }.standardOutput.asText.get().trim()
+            if (abi != '75') throw new GradleException("Filament material ABI must be 75, received ${abi}.")
+            commandLine compiler.get(), '-p', 'desktop', '-a', 'opengl', '-o', output.absolutePath, source.absolutePath
+        }
+    }
+}
+tasks.register('compileFilamentMaterials') {
+    group = 'build'
+    description = 'Rebuilds Filament material packages using the pinned SDK material ABI.'
+    dependsOn filamentMaterialTasks
+}
+tasks.named('processResources') { mustRunAfter filamentMaterialTasks }
+tasks.register('verifyLighting', Test) {
+    description = 'Runs CPU and actual OpenGL lighting regression tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.verification3D.output.classesDirs
+    classpath = sourceSets.verification3D.runtimeClasspath
+    filter { includeTestsMatching 'valthorne.model3d.Lighting*Test' }
+}
+tasks.register('verify3D', Test) {
+    description = 'Runs the 3D geometry, asset and offscreen OpenGL regression tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.verification3D.output.classesDirs
+    classpath = sourceSets.verification3D.runtimeClasspath
+}
+tasks.register('verifyPhysicsStudioAssets', JavaExec) {
+    description = 'Validates packaged gallery geometry and materials without a graphics context.'
+    group = 'verification'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.PhysicsStudioModels'
+}
+tasks.register('verifyStudioLightRig', JavaExec) {
+    description = 'Validates light editing and persistence using isolated temporary files.'
+    group = 'verification'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.StudioLightRigValidation'
+}
+tasks.register('verifyPhysicsStudio') {
+    description = 'Runs the headless physics studio asset and light editor validations.'
+    group = 'verification'
+    dependsOn 'verifyPhysicsStudioAssets', 'verifyStudioLightRig'
+}
+tasks.register('run3DExample', JavaExec) {
+    description = 'Runs the interactive 3D scene example.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.Scene3DExample'
+}
+
+// UI assets are versioned in src/main/resources/ui, including their font license.
+tasks.register('benchmarkUITable', JavaExec) {
+    description = 'Measures table projection read, stable sorting and filtering costs.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    args 'valthorne.ui.tablebenchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', 'build/reports/ui-benchmark/table.json'
+    doFirst { file('build/reports/ui-benchmark').mkdirs() }
+}
+tasks.register('runUIShowcase', JavaExec) {
+    description = 'Runs the mixed-renderer UI gallery and inspector.'
+    group = 'application'
+    classpath = sourceSets.uiExamples.runtimeClasspath
+    mainClass = 'valthorne.examples.UIShowcase'
+}
+
+tasks.register('runAudioStudio', JavaExec) {
+    description = 'Runs the interactive 3D sound-zone laboratory; --smoke validates and captures it.'
+    group = 'application'
+    classpath = sourceSets.audioExamples.runtimeClasspath
+    mainClass = 'valthorne.examples.AudioStudio'
+}
+tasks.register('verifyUI', Test) {
+    description = 'Runs headless UI models and native mixed-renderer regressions.'
+    group = 'verification'
+    testClassesDirs = sourceSets.verificationUI.output.classesDirs
+    classpath = sourceSets.verificationUI.runtimeClasspath
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.compilerArgs += ["-parameters"]
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.addStringOption("Xdoclint:none", "-quiet")
+    options.addStringOption("encoding", "UTF-8")
+    options.addBooleanOption("html5", true)
+    failOnError = false
+}
+
+tasks.matching { it.name == "plainJavadocJar" }.configureEach {
+    enabled = false
+}
+
+// ---- Java 25 LWJGL warning suppression / compatibility JVM args ----
+def lwjglJvmArgs = [
+        // Required for Java 21+ restricted native access warnings
+        "--enable-native-access=ALL-UNNAMED",
+
+        // Opens commonly needed by LWJGL / Unsafe / internal buffers
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+
+        // Silences many "illegal access" warning prints on newer JDKs (best-effort)
+        "-Djdk.module.illegalAccess.silent=true"
+]
+
+// Apply to any JavaExec tasks (e.g., application plugin's run task, custom runners)
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += lwjglJvmArgs
+}
+
+// Apply to all tests
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    jvmArgs += lwjglJvmArgs
+}
+
+mavenPublishing {
+    coordinates(group.toString(), project.name.toString(), version.toString())
+    pom {
+        name = "Valthorne"
+        description = "2D and 3D game library"
+        inceptionYear = "2025"
+        url = "https://github.com/tehnewb/Valthorne"
+
+        licenses {
+            license {
+                name = "The Apache License, Version 2.0"
+                url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                distribution = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+            }
+        }
+
+        developers {
+            developer {
+                id = "tehnewb"
+                name = "Albert Beaupre"
+                url = "https://github.com/tehnewb/"
+            }
+        }
+
+        scm {
+            url = "https://github.com/tehnewb/Valthorne"
+            connection = "scm:git:https://github.com/tehnewb/Valthorne.git"
+            developerConnection = "scm:git:ssh://git@github.com/tehnewb/Valthorne.git"
+        }
+    }
+}

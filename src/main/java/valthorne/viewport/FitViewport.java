@@ -36,7 +36,7 @@ public class FitViewport extends Viewport {
     /**
      * Creates a fit viewport with the specified logical world size.
      *
-     * @param worldWidth the logical world width
+     * @param worldWidth  the logical world width
      * @param worldHeight the logical world height
      */
     public FitViewport(float worldWidth, float worldHeight) {
@@ -51,7 +51,7 @@ public class FitViewport extends Viewport {
      * orthographic projection is then rebuilt for the current world size.
      * </p>
      *
-     * @param screenWidth the window width in pixels
+     * @param screenWidth  the window width in pixels
      * @param screenHeight the window height in pixels
      */
     @Override
@@ -71,6 +71,6 @@ public class FitViewport extends Viewport {
             this.y = (screenHeight - this.height) / 2;
         }
 
-        projectionMatrix.ortho(0, worldWidth, 0, worldHeight, -1f, 1f);
+        projectionMatrix.setOrtho(0, worldWidth, 0, worldHeight, -1f, 1f);
     }
 }

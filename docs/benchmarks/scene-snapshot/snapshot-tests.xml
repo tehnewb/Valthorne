@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="valthorne.graphics.model.PathTracingSceneSnapshotTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-09-10T23:51:29.398Z" hostname="DESKTOP-HM4E53R" time="0.104">
+  <properties/>
+  <testcase name="consumerCompactionDoesNotChangeTheNextCollectedOrderOrTransforms()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.068"/>
+  <testcase name="hierarchyVisibilityOrderingAndReparentingMatchFreshSnapshots()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.005"/>
+  <testcase name="hiddenUnsupportedRenderablesAreSkippedAndFailureDoesNotPoisonLaterCaptures()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.001"/>
+  <testcase name="directMutableValuesAndTransformsMatchFreshSnapshots()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.004"/>
+  <testcase name="independentConstructorSnapshotsRetainCapturedTransformsAcrossCollectorUse()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.001"/>
+  <testcase name="objExpansionPreservesColorsPassesAndBorrowedSourceMaterialsAcrossSlotChanges()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.007"/>
+  <testcase name="releasingPackedUploadDataPreservesCapturedGeometry()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.0"/>
+  <testcase name="aPartiallyBuiltSingularSnapshotDoesNotContaminateTheNextCapture()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.001"/>
+  <testcase name="shrinkingEmptyGeometryAndRegrowingDoNotReuseStaleInstancesOrBuildData()" classname="valthorne.graphics.model.PathTracingSceneSnapshotTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

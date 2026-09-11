@@ -61,38 +61,14 @@ import java.util.Objects;
  */
 public class DynamicByteBuffer {
 
-    /**
-     * The underlying byte array used to store data.
-     */
-    private byte[] buffer;
-    /**
-     * The current position for reading from the buffer.
-     */
-    private int readPosition;
-    /**
-     * The current position for writing to the buffer.
-     */
-    private int writePosition;
-    /**
-     * Accumulates bits for reading, holding up to one byte (8 bits) at a time.
-     */
-    private int bitReadBuffer;
-    /**
-     * Accumulates bits for writing, holding up to one byte (8 bits) before flushing to the buffer.
-     */
-    private int bitWriteBuffer;
-    /**
-     * The number of bits remaining to be read from {@code bitReadBuffer}.
-     */
-    private int bitReadCount;
-    /**
-     * The number of bits accumulated in {@code bitWriteBuffer} for writing.
-     */
-    private int bitWriteCount;
-    /**
-     * The byte order used for multibyte data types (default is big-endian).
-     */
-    private ByteOrder byteOrder = ByteOrder.BIG_ENDIAN;
+    private byte[] buffer; // Growable byte storage shared by byte and bit operations.
+    private int readPosition; // Byte index from which the next byte read advances.
+    private int writePosition; // Byte index at which the next byte write occurs.
+    private int bitReadBuffer; // Current byte supplying pending bit reads.
+    private int bitWriteBuffer; // Pending output bits accumulated before a byte is flushed.
+    private int bitReadCount; // Number of unread bits remaining in bitReadBuffer.
+    private int bitWriteCount; // Number of pending bits accumulated in bitWriteBuffer.
+    private ByteOrder byteOrder = ByteOrder.BIG_ENDIAN; // Byte order for multibyte values, initially big-endian.
 
     /**
      * Constructs a new instance of DynamicByteBuffer with an initial capacity of 16 bytes.

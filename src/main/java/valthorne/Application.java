@@ -1,8 +1,12 @@
 package valthorne;
 
 /**
- * The Application interface defines the core lifecycle methods that must be
- * implemented by any OpenGL application using the JGL framework.
+ * Defines the initialization, frame update, rendering, and cleanup callbacks of a
+ * Valthorne application. Implementations keep application state between callbacks
+ * and own the resources they allocate. Separate state advancement from drawing so
+ * elapsed time is applied once by {@link #update(float)} rather than per draw call.
+ *
+ * @author Albert Beaupre
  */
 public interface Application {
 

@@ -7,12 +7,11 @@ import valthorne.event.events.MouseScrollEvent;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.ui.UIContainer;
 import valthorne.ui.UINode;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
-import valthorne.viewport.Viewport;
 
 /**
  * <p>
@@ -145,15 +144,12 @@ public class ScrollPanel extends UIContainer {
      * Style key used to resolve the minimum size of scrollbar thumbs.
      */
     public static final StyleKey<Float> MIN_THUMB_SIZE_KEY = StyleKey.of("minThumbSize", Float.class, 18f);
-
+    private final ScrollMetrics metrics = new ScrollMetrics(); // Cached metrics object reused when computing scrollbar geometry
     private UINode content = new Panel(); // The single content node rendered inside the scrollable clipped region
-
     private boolean horizontal = true; // Whether horizontal scrolling is enabled
     private boolean vertical = true; // Whether vertical scrolling is enabled
     private boolean drawHorizontalBar = true; // Whether the horizontal scrollbar is allowed to be drawn
     private boolean drawVerticalBar = true; // Whether the vertical scrollbar is allowed to be drawn
-    private final ScrollMetrics metrics = new ScrollMetrics(); // Cached metrics object reused when computing scrollbar geometry
-
     private float scrollX; // Current horizontal scroll offset
     private float scrollY; // Current vertical scroll offset
     private float targetScrollX; // Target horizontal scroll offset used for clamping and updates
@@ -201,6 +197,29 @@ public class ScrollPanel extends UIContainer {
      */
     public UINode getContent() {
         return content;
+    }
+
+    /**
+     * <p>
+     * Replaces the current content node with the supplied child node.
+     * </p>
+     *
+     * <p>
+     * The existing content node is removed first. If the supplied child is
+     * {@code null}, the method returns after removing the old content. Otherwise the
+     * new child becomes the active content node and is added as a child of the panel.
+     * </p>
+     *
+     * @param child the new content node
+     */
+    public void setContent(UINode child) {
+        if (child == content) return;
+        if (child != null && child.getParent() != null)
+            throw new IllegalStateException("Content already has a parent.");
+        super.remove(this.content);
+        this.content = child;
+        if (child != null) super.add(child);
+        markLayoutDirty();
     }
 
     /**
@@ -458,6 +477,7 @@ public class ScrollPanel extends UIContainer {
      * @return the maximum horizontal scroll amount
      */
     public float getMaxScrollX() {
+        if (content == null) return 0f;
         return Math.max(0f, (content.getWidth() - getWidth()) + metrics.verticalBarWidth);
     }
 
@@ -470,27 +490,8 @@ public class ScrollPanel extends UIContainer {
      * @return the maximum vertical scroll amount
      */
     public float getMaxScrollY() {
+        if (content == null) return 0f;
         return Math.max(0f, (content.getHeight() - getHeight()) + metrics.horizontalBarHeight);
-    }
-
-    /**
-     * <p>
-     * Replaces the current content node with the supplied child node.
-     * </p>
-     *
-     * <p>
-     * The existing content node is removed first. If the supplied child is
-     * {@code null}, the method returns after removing the old content. Otherwise the
-     * new child becomes the active content node and is added as a child of the panel.
-     * </p>
-     *
-     * @param child the new content node
-     */
-    public void setContent(UINode child) {
-        super.remove(this.content);
-        if (child == null)
-            return;
-        super.add(this.content = child);
     }
 
     /**
@@ -555,8 +556,8 @@ public class ScrollPanel extends UIContainer {
      * scrollbar bars and thumbs.
      * </p>
      *
-     * @param x the X coordinate to test
-     * @param y the Y coordinate to test
+     * @param x           the X coordinate to test
+     * @param y           the Y coordinate to test
      * @param requiredBit the required interaction bit
      * @return the matched node, or {@code null} if no match exists
      */
@@ -580,25 +581,27 @@ public class ScrollPanel extends UIContainer {
     }
 
     /**
-     * <p>
-     * Handles mouse wheel scrolling for this panel.
-     * </p>
+     * Cancel scrollbar dragging without a synthetic release.
+     */
+    @Override
+    public void onPointerCancel() {
+        super.onPointerCancel();
+        draggingHorizontalBar = false;
+        draggingVerticalBar = false;
+    }
+
+    /**
+     * Computes clamped offsets using the enabled axes, scroll ranges, and speed,
+     * then applies them to the panel. The shared wheel policy consumes events only
+     * when an offset changes, allowing boundary scrolling to propagate to ancestors.
      *
-     * <p>
-     * Vertical scrolling is preferred when vertical scrolling is enabled and needed.
-     * Otherwise, horizontal scrolling is used when enabled and needed. Scroll deltas
-     * are scaled by the configured scroll speed.
-     * </p>
-     *
-     * @param event the mouse scroll event
+     * @param event routed wheel event with precise fractional deltas
      */
     @Override
     public void onMouseScroll(MouseScrollEvent event) {
-        if (vertical && getMaxScrollY() > 0f) {
-            scrollBy(0f, -event.yOffset() * scrollSpeed);
-        } else if (horizontal && getMaxScrollX() > 0f) {
-            scrollBy(-event.xOffset() * scrollSpeed, 0f);
-        }
+        Vector2f next = valthorne.ui.behavior.ScrollBehavior.wheel(event, horizontal, vertical,
+                getScrollX(), getScrollY(), getMaxScrollX(), getMaxScrollY(), scrollSpeed);
+        scroll(next.x(), next.y());
     }
 
     /**
@@ -616,18 +619,13 @@ public class ScrollPanel extends UIContainer {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        float mouseX = event.getX();
-        float mouseY = event.getY();
+        if (event.getButton() != valthorne.Mouse.LEFT) return;
+        Vector2f position = screenToContent(event.getX(), event.getY());
+        float mouseX = position.x();
+        float mouseY = position.y();
 
         ScrollMetrics metrics = getScrollMetrics();
 
-        Viewport viewport = getRoot().getViewport();
-        if (viewport != null) {
-            Vector2f world = viewport.screenToWorld(event.getX(), event.getY());
-            if (world == null) return;
-            mouseX = world.getX();
-            mouseY = world.getY();
-        }
 
         draggingHorizontalBar = false;
         draggingVerticalBar = false;
@@ -661,23 +659,11 @@ public class ScrollPanel extends UIContainer {
      */
     @Override
     public void onMouseDrag(MouseDragEvent event) {
-        float diffX, diffY;
-
-        Viewport viewport = getRoot().getViewport();
-        if (viewport != null) {
-            Vector2f world = viewport.screenToWorld(event.getToX(), event.getToY());
-            if (world == null) return;
-            diffX = world.getX() - mouseStartX;
-            diffY = world.getY() - mouseStartY;
-
-            mouseStartX = world.getX();
-            mouseStartY = world.getY();
-        } else {
-            diffX = event.getToX() - mouseStartX;
-            diffY = event.getToY() - mouseStartY;
-            mouseStartX = event.getToX();
-            mouseStartY = event.getToY();
-        }
+        Vector2f position = screenToContent(event.getToX(), event.getToY());
+        float diffX = position.x() - mouseStartX;
+        float diffY = position.y() - mouseStartY;
+        mouseStartX = position.x();
+        mouseStartY = position.y();
 
         ScrollMetrics metrics = getScrollMetrics();
 
@@ -733,11 +719,14 @@ public class ScrollPanel extends UIContainer {
 
         if (background != null) background.draw(batch, getRenderX(), getRenderY(), getWidth(), getHeight());
 
-        batch.beginScissor(getRenderX(), getRenderY() + metrics.horizontalBarHeight, getWidth() - metrics.verticalBarWidth, getHeight() - metrics.horizontalBarHeight);
+        batch.beginScissor(getRenderX() + batch.getTranslationX(), getRenderY() + batch.getTranslationY() + metrics.horizontalBarHeight, getWidth() - metrics.verticalBarWidth, getHeight() - metrics.horizontalBarHeight);
         batch.pushTranslation(-scrollX, scrollY);
-        content.draw(batch);
-        batch.popTranslation();
-        batch.endScissor();
+        try {
+            if (content != null) content.render(batch);
+        } finally {
+            batch.popTranslation();
+            batch.endScissor();
+        }
 
         if (metrics.showHorizontalBar && metrics.horizontalBarWidth > 0f) {
             if (horizontalBarBackground != null)

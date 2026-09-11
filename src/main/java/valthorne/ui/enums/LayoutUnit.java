@@ -29,7 +29,16 @@ package valthorne.ui.enums;
  * @since March 11th, 2026
  */
 public enum LayoutUnit {
+    /**
+     * Delegates dimension selection to automatic layout sizing.
+     */
     AUTO,
+    /**
+     * Interprets the value as an absolute number of layout points.
+     */
     POINT,
+    /**
+     * Interprets the value as a percentage of the applicable reference dimension.
+     */
     PERCENT
 }

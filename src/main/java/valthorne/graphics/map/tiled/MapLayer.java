@@ -8,17 +8,24 @@ import java.util.Map;
  * It provides a common structure and functionality for handling map layers,
  * including properties such as name, visibility, opacity, and offsets.
  * This class is abstract and is intended to be extended by specific map layer types.
+ * Scalar metadata is retained without range validation. Custom properties remain a
+ * shared mutable map when supplied by the caller; the getter exposes that same map.
+ * This base class allocates no rendering resources and does not draw layer contents.
+ *
+ * @author Albert Beaupre
  */
 public abstract class MapLayer {
-    private final String name;                     // MapLayer name.
     protected final boolean visible;                // Visible flag.
-    protected final float opacity;                  // Opacity (0..1).
+    protected final float opacity;                  // Supplied opacity, conventionally 0..1 but not clamped.
     protected final float offsetX;                  // Pixel offset X.
     protected final float offsetY;                  // Pixel offset Y.
-    protected final Map<String, String> properties; // Custom properties.
+    protected final Map<String, String> properties; // Shared mutable custom properties, exposed by the getter.
+    private final String name;                     // MapLayer name.
 
     /**
      * Constructs a new MapLayer instance with the specified parameters.
+     * Null names become empty strings and null properties allocate an empty mutable
+     * map. Non-null properties are retained directly; opacity and offsets are not checked.
      *
      * @param name       the name of the map layer. If null, an empty string is assigned.
      * @param visible    a boolean indicating whether the map layer is visible.
@@ -54,7 +61,8 @@ public abstract class MapLayer {
     /**
      * Retrieves the opacity of the map layer.
      * The opacity is a value between 0 and 1, where 0 represents full transparency
-     * and 1 represents full opacity.
+     * and 1 represents full opacity by convention; the constructor does not enforce
+     * this range, so direct construction may return other values.
      *
      * @return the opacity of the map layer as a float.
      */
@@ -76,6 +84,8 @@ public abstract class MapLayer {
 
     /**
      * Retrieves the custom properties associated with the map layer.
+     * This is the live map, not a defensive snapshot. Mutations are visible to this
+     * layer and to any caller that supplied the original map.
      *
      * @return a map containing the custom properties of the map layer,
      * where the keys and values are strings. If no properties are defined,

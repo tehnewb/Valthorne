@@ -1,0 +1,170 @@
+SOURCE: build/noise-fix-moving-before.log
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :compileExamplesJava
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses
+
+> Task :runLightingStudio
+STUDIO: mean 10.446 ms, median 10.226 ms, p95 12.113 ms
+
+BUILD SUCCESSFUL in 3s
+4 actionable tasks: 2 executed, 2 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+SOURCE: build/noise-fix-temporal-v1.log
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava
+> Task :processResources
+> Task :classes
+> Task :compileVerification3DJava
+> Task :processVerification3DResources NO-SOURCE
+> Task :verification3DClasses
+> Task :verify3D
+> Task :compileExamplesJava
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses
+
+> Task :runLightingStudio
+STUDIO: mean 42.012 ms, median 41.748 ms, p95 46.894 ms
+
+BUILD SUCCESSFUL in 10s
+6 actionable tasks: 6 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+SOURCE: build/noise-fix-final-validation.log
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :jar
+
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\animation\Animation.java:419: warning: invalid input: '<'
+> Task :javadoc
+     * <p>Values <= 0 are clamped to a tiny positive value to avoid freezing or division edge cases.</p>
+                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\font\FontParameters.java:17: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+ * @throws IllegalArgumentException if any argument is invalid
+   ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\font\FontSource.java:16: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided path is null or blank
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\FrameBuffer.java:81: warning: invalid input: '<'
+     * @throws IllegalArgumentException if width or height are <= 0
+                                                               ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\FrameBuffer.java:163: warning: invalid input: '<'
+     * @throws IllegalArgumentException if newWidth or newHeight are <= 0
+                                                                     ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\shader\ReflectionShader.java:11: warning: reference not found: Texture
+ *     <li>Draws a second copy of a {@link Texture} directly below its current position.</li>
+                                    ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\shader\ReflectionShader.java:20: warning: reference not found: Texture
+ *     <li>This temporarily changes the {@link Texture}'s position and size to draw the reflection quad,
+                                        ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\shader\ReflectionShader.java:22: warning: reference not found: Texture#draw()
+ *     <li>This assumes texture unit 0 is active (or at least the {@link Texture#draw()} call binds appropriately).</li>
+                                                                  ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:65: warning: invalid input: '<'
+     * @throws IllegalArgumentException if width or height is <= 0
+                                                              ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:89: warning: invalid input: '<'
+     * @throws IllegalArgumentException if sw/sh <= 0
+                                                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:111: warning: invalid input: '<'
+     * @throws IllegalArgumentException if sw/sh <= 0
+                                                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:30: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided byte array is null or empty
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:31: warning: unknown tag. Unregistered custom tag?
+     * @implSpec This class ensures that the byte array provided is immutable by copying it in the constructor.
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:16: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided path is null or blank
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\utility\TimeUtility.java:99: warning: invalid input: '<'
+     * @return fps, or 0 if dt <= 0
+                               ^
+15 warnings
+
+> Task :javadocJar
+> Task :sourcesJar
+> Task :assemble
+> Task :compileTestJava
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses
+> Task :test
+> Task :check
+> Task :build
+> Task :compileVerification3DJava
+> Task :processVerification3DResources NO-SOURCE
+> Task :verification3DClasses
+> Task :verify3D
+> Task :compileVerificationPhysics3DJava UP-TO-DATE
+> Task :processVerificationPhysics3DResources NO-SOURCE
+> Task :verificationPhysics3DClasses UP-TO-DATE
+> Task :verifyPhysics3D
+> Task :compileVerificationUIJava UP-TO-DATE
+> Task :processVerificationUIResources NO-SOURCE
+> Task :verificationUIClasses UP-TO-DATE
+> Task :verifyUI
+> Task :compileExamplesJava
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses
+
+> Task :runLightingStudio
+STUDIO: mean 17.744 ms, median 17.655 ms, p95 19.491 ms
+
+BUILD SUCCESSFUL in 16s
+17 actionable tasks: 13 executed, 4 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+SOURCE: build/noise-fix-static-final.log
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :compileExamplesJava UP-TO-DATE
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses UP-TO-DATE
+
+> Task :runLightingStudio
+STUDIO: mean 18.604 ms, median 18.553 ms, p95 19.481 ms
+
+BUILD SUCCESSFUL in 4s
+4 actionable tasks: 1 executed, 3 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+SOURCE: build/noise-fix-progressive-final.log
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :compileExamplesJava UP-TO-DATE
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses UP-TO-DATE
+
+> Task :runLightingStudio
+STUDIO: mean 5.554 ms, median 5.663 ms, p95 6.724 ms
+
+BUILD SUCCESSFUL in 2s
+4 actionable tasks: 1 executed, 3 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

@@ -1,6 +1,6 @@
 package valthorne.ui.enums;
 
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.ui.Dimensional;
 import valthorne.ui.Sizeable;
 
@@ -56,10 +56,10 @@ import valthorne.ui.Sizeable;
  * label.setText("Play");
  *
  * Vector2f pos = Alignment.align(panel, label, Alignment.CENTER, Alignment.CENTER);
- * label.setPosition(pos.getX(), pos.getY());
+ * label.setPosition(pos.x(), pos.y());
  *
  * Vector2f bottomLeft = Alignment.align(panel, label, Alignment.START, Alignment.START);
- * label.setPosition(bottomLeft.getX(), bottomLeft.getY());
+ * label.setPosition(bottomLeft.x(), bottomLeft.y());
  *
  * float rightX = Alignment.alignHorizontally(panel, label, Alignment.END);
  * float centerY = Alignment.alignVertically(panel, label, Alignment.CENTER);
@@ -70,9 +70,23 @@ import valthorne.ui.Sizeable;
  * @since March 7th, 2026
  */
 public enum Alignment {
-    START, CENTER, END;
+    /**
+     * Places the object at the beginning of the available alignment span.
+     */
+    START,
+    /**
+     * Centers the object within the available alignment span.
+     */
+    CENTER,
+    /**
+     * Places the object at the end of the available alignment span.
+     */
+    END;
 
-    private static final Vector2f reused = new Vector2f(); // Reused result vector to avoid creating a new object for every alignment call.
+    /**
+     * Shared mutable alignment result to avoid per-call allocation; callers must copy retained results.
+     */
+    private static final Vector2f reused = new Vector2f();
 
     /**
      * Computes a full 2D alignment position for a target relative to a source using separate

@@ -294,8 +294,7 @@ public class Modal extends Panel {
     public Modal open() {
         UIRoot root = parentNode.getRoot();
         if (root != null) {
-            root.showOverlay(this);
-            root.setFocusTo(this);
+            root.showModal(this);
         } else {
             setVisible(true);
         }
@@ -319,10 +318,7 @@ public class Modal extends Panel {
     public Modal close() {
         UIRoot root = getRoot();
         if (root != null) {
-            if (root.getFocused() == this)
-                root.setFocusTo(null);
-
-            root.hideOverlay(this);
+            root.hideModal(this);
         } else {
             setVisible(false);
         }
@@ -363,8 +359,8 @@ public class Modal extends Panel {
      * satisfied, allowing the backdrop to participate in input handling.
      * </p>
      *
-     * @param x the X coordinate
-     * @param y the Y coordinate
+     * @param x           the X coordinate
+     * @param y           the Y coordinate
      * @param requiredBit the required interaction bit
      * @return the matched node, or {@code null} if none is found
      */
@@ -408,8 +404,8 @@ public class Modal extends Panel {
         if (getRoot() != null && getRoot().getViewport() != null) {
             var world = getRoot().getViewport().screenToWorld(x, y);
             if (world != null) {
-                x = world.getX();
-                y = world.getY();
+                x = world.x();
+                y = world.y();
             }
         }
 
@@ -431,8 +427,10 @@ public class Modal extends Panel {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        if (closeOnEscape && event.getKey() == Keyboard.ESCAPE)
+        if (closeOnEscape && event.getKey() == Keyboard.ESCAPE) {
             close();
+            event.consume();
+        }
     }
 
     /**
@@ -485,6 +483,6 @@ public class Modal extends Panel {
         if (dialogBackground != null)
             dialogBackground.draw(batch, dialog.getRenderX(), dialog.getRenderY(), dialog.getWidth(), dialog.getHeight());
 
-        dialog.draw(batch);
+        dialog.render(batch);
     }
 }

@@ -12,10 +12,14 @@ import valthorne.event.EventTypes;
  * associated information about the theme that has been modified, updated, or changed.
  * <p>
  * This class provides methods to retrieve and modify the contained {@code ThemeData}.
+ * The payload is a shared reference, not a snapshot; replacing it does not itself
+ * publish another event. Null payloads are accepted by both the constructor and setter.
+ *
+ * @author Albert Beaupre
  */
 public class ThemeDataChangeEvent extends Event {
 
-    private ThemeData data;
+    private ThemeData data; // Shared theme payload, or null when no theme is supplied.
 
     /**
      * Constructs a new {@code ThemeDataChangeEvent} with the specified {@code ThemeData}.

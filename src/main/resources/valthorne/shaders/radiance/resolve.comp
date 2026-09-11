@@ -1,0 +1,168 @@
+#version 430 core
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
+uniform sampler2D u_baseMergedTexture;
+uniform sampler2D u_sceneTexture;
+uniform ivec2 u_outputSize;
+uniform ivec2 u_solveSize;
+uniform ivec2 u_probeCount;
+uniform int u_probeSpacing;
+uniform int u_rayCount;
+uniform int u_linearSpatial;
+uniform float u_intensity;
+uniform float u_surfaceThreshold;
+
+vec4 emptyInterval() {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+float luminance(vec3 value) {
+    return dot(value, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 toneMap(vec3 radiance) {
+    vec3 linear = max(radiance, vec3(0.0));
+    return vec3(1.0) - (vec3(1.0) / pow(vec3(1.0) + linear, vec3(2.5)));
+}
+
+vec2 directionForRay(int rayIndex, int rayCount) {
+    const float PI = 3.14159265358979323846;
+    const float TAU = PI * 2.0;
+    float angle = (float(rayIndex) + 0.5) * (TAU / float(max(rayCount, 1)));
+    return vec2(cos(angle), sin(angle));
+}
+
+vec4 readScene(ivec2 pixel) {
+    pixel = clamp(pixel, ivec2(0), u_outputSize - ivec2(1));
+    return texelFetch(u_sceneTexture, pixel, 0);
+}
+
+float occupancyAt(ivec2 pixel) {
+    return readScene(pixel).a > u_surfaceThreshold ? 1.0 : 0.0;
+}
+
+float geometryPresence(ivec2 pixel) {
+    float center = occupancyAt(pixel);
+
+    float ring1 = 0.0;
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(-1, 0)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(1, 0)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(0, -1)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(0, 1)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(-1, -1)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(1, -1)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(-1, 1)));
+    ring1 = max(ring1, occupancyAt(pixel + ivec2(1, 1)));
+
+    float ring2 = 0.0;
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(-2, 0)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(2, 0)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(0, -2)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(0, 2)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(-2, -2)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(2, -2)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(-2, 2)));
+    ring2 = max(ring2, occupancyAt(pixel + ivec2(2, 2)));
+
+    return clamp(max(center, max(ring1 * 0.82, ring2 * 0.46)), 0.0, 1.0);
+}
+
+vec2 estimateNormal(ivec2 pixel, out float edgeStrength) {
+    float left = occupancyAt(pixel + ivec2(-1, 0));
+    float right = occupancyAt(pixel + ivec2(1, 0));
+    float down = occupancyAt(pixel + ivec2(0, -1));
+    float up = occupancyAt(pixel + ivec2(0, 1));
+
+    float downLeft = occupancyAt(pixel + ivec2(-1, -1));
+    float downRight = occupancyAt(pixel + ivec2(1, -1));
+    float upLeft = occupancyAt(pixel + ivec2(-1, 1));
+    float upRight = occupancyAt(pixel + ivec2(1, 1));
+
+    vec2 gradient = vec2(
+            (right - left) + 0.5 * ((upRight + downRight) - (upLeft + downLeft)),
+            (up - down) + 0.5 * ((upLeft + upRight) - (downLeft + downRight))
+    );
+
+    edgeStrength = length(gradient);
+    if (edgeStrength <= 0.0001) {
+        return vec2(0.0, 0.0);
+    }
+    return -gradient / edgeStrength;
+}
+
+vec4 fetchBase(ivec2 probe, int rayIndex) {
+    if (probe.x < 0 || probe.y < 0 || probe.x >= u_probeCount.x || probe.y >= u_probeCount.y) {
+        return emptyInterval();
+    }
+    rayIndex = clamp(rayIndex, 0, u_rayCount - 1);
+    return texelFetch(u_baseMergedTexture, ivec2(probe.x * u_rayCount + rayIndex, probe.y), 0);
+}
+
+vec4 sampleBase(vec2 solvePos, int rayIndex) {
+    vec2 probeCoord = solvePos / float(u_probeSpacing) - vec2(0.5);
+    if (u_linearSpatial == 0) {
+        ivec2 probe = ivec2(floor(probeCoord + vec2(0.5)));
+        return fetchBase(probe, rayIndex);
+    }
+
+    ivec2 base = ivec2(floor(probeCoord));
+    vec2 frac = fract(probeCoord);
+
+    vec4 s00 = fetchBase(base + ivec2(0, 0), rayIndex);
+    vec4 s10 = fetchBase(base + ivec2(1, 0), rayIndex);
+    vec4 s01 = fetchBase(base + ivec2(0, 1), rayIndex);
+    vec4 s11 = fetchBase(base + ivec2(1, 1), rayIndex);
+
+    vec4 top = mix(s00, s10, frac.x);
+    vec4 bottom = mix(s01, s11, frac.x);
+    return mix(top, bottom, frac.y);
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= u_outputSize.x || pixel.y >= u_outputSize.y) return;
+
+    vec2 solvePos = (vec2(pixel) + vec2(0.5)) * vec2(u_solveSize) / vec2(u_outputSize);
+    vec4 sceneValue = readScene(pixel);
+    float emissiveStrength = smoothstep(0.015, 0.18, luminance(sceneValue.rgb) * sceneValue.a);
+    float nearGeometry = geometryPresence(pixel);
+    float edgeStrength;
+    vec2 normal = estimateNormal(pixel, edgeStrength);
+    float directionalMix = smoothstep(0.08, 0.9, edgeStrength) * (1.0 - emissiveStrength * 0.65);
+
+    vec3 total = vec3(0.0);
+    float totalWeight = 0.0;
+    float visibleWeight = 0.0;
+
+    for (int rayIndex = 0; rayIndex < u_rayCount; rayIndex++) {
+        vec4 sampleValue = sampleBase(solvePos, rayIndex);
+        vec2 dir = directionForRay(rayIndex, u_rayCount);
+        float hemisphereWeight = max(dot(dir, normal), 0.0);
+        float weight = mix(1.0, hemisphereWeight, directionalMix);
+        total += sampleValue.rgb * weight;
+        totalWeight += weight;
+        visibleWeight += weight * (1.0 - sampleValue.a);
+    }
+
+    vec3 resolved = total * (u_intensity / max(totalWeight, 0.0001));
+    vec3 mapped = toneMap(resolved);
+
+    float rawLuma = luminance(resolved);
+    float mappedLuma = luminance(mapped);
+    float visibleRatio = visibleWeight / max(totalWeight, 0.0001);
+    float localLight = smoothstep(0.0025, 0.085, rawLuma);
+    float bloomLight = smoothstep(0.014, 0.18, rawLuma);
+    float transmittancePresence = smoothstep(0.015, 0.40, visibleRatio);
+    float surfaceMask = clamp(max(nearGeometry, emissiveStrength), 0.0, 1.0);
+    float airLift = localLight * (0.18 + 0.40 * transmittancePresence);
+
+    float alpha = max(emissiveStrength, localLight * mix(0.26, 0.98, surfaceMask));
+    alpha = max(alpha, airLift);
+    alpha = max(alpha, bloomLight * 0.12);
+    alpha *= mix(0.55, 1.0, surfaceMask);
+    alpha *= smoothstep(0.01, 0.16, mappedLuma + transmittancePresence * 0.55);
+    alpha = clamp(alpha, 0.0, 1.0);
+
+    imageStore(u_outputImage, pixel, vec4(mapped, alpha));
+}

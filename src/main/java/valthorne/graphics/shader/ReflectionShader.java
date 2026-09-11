@@ -1,99 +1,36 @@
 package valthorne.graphics.shader;
 
 import valthorne.graphics.Sprite;
+import valthorne.graphics.texture.Texture;
 import valthorne.math.MathUtils;
 
 /**
- * Reflection shader for drawing a vertically mirrored "water reflection" under a sprite.
- *
- * <h2>What it does</h2>
- * <ul>
- *     <li>Draws a second copy of a {@link Texture} directly below its current position.</li>
- *     <li>Mirrors the sampled UVs vertically so the reflection is an inverted version of the sprite.</li>
- *     <li>Applies an optional horizontal sine-wave ripple in UV space (amplitude is specified in pixels).</li>
- *     <li>Fades alpha out toward the bottom of the reflection quad.</li>
- *     <li>Applies a subtle tint mix to push the reflection toward a desired color.</li>
- * </ul>
- *
- * <h2>Important behavior</h2>
- * <ul>
- *     <li>This temporarily changes the {@link Texture}'s position and size to draw the reflection quad,
- *     then restores the original values before returning.</li>
- *     <li>This assumes texture unit 0 is active (or at least the {@link Texture#draw()} call binds appropriately).</li>
- *     <li>This shader is GLSL 120 and uses fixed-function varyings so it matches your current pipeline.</li>
- * </ul>
- *
- * <h2>Example</h2>
+ * Renders a vertically mirrored, tinted sprite reflection with a fading alpha
+ * and optional horizontal ripple. Sampling parameters use backing-texture pixels.
+ * The shader owns its OpenGL program and requires a current context for creation,
+ * drawing, and disposal.
+ * <p>Applying the effect temporarily moves and resizes the sprite below its original
+ * bounds, then restores those bounds after successful drawing. Failures can leave
+ * bounds changed or this program bound. Texture unit zero is used, and the previous
+ * shader program is not restored.
  * <pre>{@code
  * ReflectionShader reflection = new ReflectionShader();
- *
- * // In your render loop:
- * float time = (float) (System.nanoTime() * 1e-9);
- *
- * // Draw the sprite normally.
- * playerTexture.draw();
- *
- * // Draw a reflection under it (35% height, slightly bluish, with small ripple).
- * reflection.apply(
- *         playerTexture,
- *         time,
- *         0.35f,          // amount: reflection height as a fraction of sprite height
- *         0.65f,          // alpha: overall reflection strength
- *         0.60f, 0.75f, 1.00f, // tint RGB
- *         2.0f,           // rippleAmpPx: ripple amplitude in pixels
- *         18.0f,          // rippleFreq: frequency across X
- *         2.5f            // rippleSpeed: speed multiplier
- * );
+ * // During rendering, with playerSprite already initialized:
+ * playerSprite.draw();
+ * reflection.apply(playerSprite, elapsedSeconds, 0.35f, 0.65f,
+ *         0.6f, 0.75f, 1f, 2f, 18f, 2.5f);
+ * // During graphics shutdown:
+ * reflection.dispose();
  * }</pre>
  *
  * @author Albert Beaupre
- * @since February 22nd, 2026
  */
 public class ReflectionShader extends TexturedQuadShader {
 
-    private static final String FRAG_SRC = """
-            #version 330 core
-            uniform sampler2D u_texture;
-            
-            uniform float u_alpha;
-            uniform vec4  u_tint;
-            uniform float u_time;
-            
-            uniform float u_rippleAmpPx;
-            uniform float u_rippleFreq;
-            uniform float u_rippleSpeed;
-            
-            uniform vec2  u_texelSize;
-            
-            in vec2 v_uv;
-            in vec4 v_color;
-            out vec4 fragColor;
-            
-            void main() {
-                vec2 uv = v_uv;
-            
-                // Mirror vertically: top of reflection quad samples bottom of sprite.
-                uv.y = 1.0 - uv.y;
-            
-                float ampPx = max(0.0, u_rippleAmpPx);
-                if (ampPx > 0.0) {
-                    vec2 amp = u_texelSize * ampPx;
-                    float w = sin(uv.x * u_rippleFreq + u_time * u_rippleSpeed);
-                    uv.x += w * amp.x;
-                }
-            
-                vec4 c = texture(u_texture, uv) * v_color;
-            
-                // Fade out as we go downward (top of quad is strongest).
-                float fade = clamp(v_uv.y, 0.0, 1.0);
-                fade = fade * fade;
-            
-                vec3 rgb = mix(c.rgb, u_tint.rgb, 0.35);
-                float a = c.a * fade * clamp(u_alpha, 0.0, 1.0);
-            
-                fragColor = vec4(rgb, a);
-            }
-            """;
+    /**
+     * Fragment source loaded from the packaged reflection effect shader resource.
+     */
+    private static final String FRAG_SRC = ShaderSources.load("effects/reflection.frag");
 
     /**
      * Creates a reflection shader using built-in GLSL 120 sources.
@@ -104,6 +41,25 @@ public class ReflectionShader extends TexturedQuadShader {
         super(FRAG_SRC);
     }
 
+    /**
+     * Draws a vertically reflected copy directly below the sprite using a clamped
+     * fraction of its height. Temporarily changes sprite bounds and restores them
+     * only after successful drawing. A nonpositive clamped amount skips drawing;
+     * exceptions can leave the bounds changed or the shader bound. The prior shader
+     * program is not restored.
+     *
+     * @param sprite sprite with a valid texture
+     * @param timeSeconds animation time in seconds
+     * @param amount fraction of sprite height to reflect, clamped to zero through one
+     * @param alpha reflection opacity multiplier
+     * @param tintR red reflection tint
+     * @param tintG green reflection tint
+     * @param tintB blue reflection tint
+     * @param rippleAmpPx ripple displacement amplitude in texture pixels
+     * @param rippleFreq spatial ripple frequency supplied to the shader
+     * @param rippleSpeed temporal ripple speed supplied to the shader
+     * @throws NullPointerException if sprite is null
+     */
     public void apply(Sprite sprite, float timeSeconds, float amount, float alpha, float tintR, float tintG, float tintB, float rippleAmpPx, float rippleFreq, float rippleSpeed) {
         if (sprite == null) throw new NullPointerException("Sprite cannot be null");
 

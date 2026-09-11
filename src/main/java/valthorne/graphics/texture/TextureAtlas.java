@@ -5,158 +5,54 @@ import valthorne.math.MathUtils;
 import java.util.*;
 
 /**
- * Builds a GPU {@link Texture} atlas and {@link TextureRegion} mappings using {@link TexturePacker}.
- *
- * <h2>What this class does</h2>
- * <ul>
- *     <li>Accepts {@link Texture}, {@link TextureData}, or {@link TextureRegion} inputs.</li>
- *     <li>Determines an atlas size that can fit all regions.</li>
- *     <li>Finds (x,y) placements and then copies pixels via {@link TexturePacker}.</li>
- *     <li>Creates a final atlas {@link Texture} and returns atlas {@link TextureRegion}s by key.</li>
- * </ul>
- *
- * <h2>Packing algorithm</h2>
- * <ul>
- *     <li>Uses a simple "shelf" packer.</li>
- *     <li>Sorts by height descending.</li>
- *     <li>Places left-to-right in rows.</li>
- *     <li>Starts a new row when needed.</li>
- * </ul>
- *
- * <h2>Coordinates</h2>
- * <ul>
- *     <li>All placements are expressed in <b>top-left</b> origin pixel coordinates.</li>
- *     <li>This matches {@link TexturePacker}'s expectations.</li>
- *     <li>{@link TexturePacker} internally handles bottom-up buffer conversion.</li>
- * </ul>
- *
- * <h2>Requirements</h2>
- * <ul>
- *     <li>{@link Texture} inputs must have CPU-side pixels available via {@link Texture#getData()}.</li>
- *     <li>{@link TextureRegion} inputs require a non-null backing {@link Texture} with CPU pixels.</li>
- * </ul>
- *
- * <h2>Example</h2>
+ * Builds a square GPU texture atlas and keyed region views from borrowed CPU
+ * image data. Inputs may be complete textures, decoded images, or rectangular
+ * regions, but source pixels must remain readable until build. Adding inputs
+ * does not copy pixels or transfer ownership.
+ * <p>
+ * Build sorts inputs by descending height and packs unrotated shelves from left
+ * to right, adding configured region padding and an outer border. It estimates
+ * a square size, doubles until packing succeeds, and optionally rounds dimensions
+ * to powers of two. Placement and source rectangles follow TexturePacker's
+ * top-left pixel convention. Padding is empty space, not edge-pixel extrusion.
+ * </p>
+ * <p>
+ * Each build allocates a separate TextureData and GPU texture and requires a current
+ * OpenGL context. The builder retains pending inputs for subsequent builds.
+ * The caller owns result cleanup; regions share the result texture. Duplicate
+ * keys are accepted during collection and rejected at build time.
+ * </p>
  * <pre>{@code
- * TextureAtlas atlas = new TextureAtlas()
- *     .setPadding(2)
- *     .setBorder(2)
- *     .setPowerOfTwo(true)
- *     .setMaxSize(4096);
- *
- * atlas.add("player", new Texture("assets/player.png"));
- * atlas.add("ui_button", new TextureRegion(new Texture("assets/ui.png"), 16, 16, 64, 32));
- *
+ * TextureAtlas atlas = new TextureAtlas().setPadding(2).setBorder(2);
+ * atlas.add("icon", sourceData);
  * TextureAtlas.Result result = atlas.build();
- *
- * Texture atlasTexture = result.getAtlasTexture();
- * TextureRegion player = result.getRegion("player");
+ * try {
+ *     TextureRegion icon = result.getRegion("icon");
+ *     // Use icon while the result texture remains alive.
+ * } finally {
+ *     result.getAtlasTexture().dispose();
+ *     result.getAtlasData().dispose();
+ * }
  * }</pre>
- *
  * @author Albert Beaupre
  * @since February 14th, 2026
  */
 public final class TextureAtlas {
 
-    /**
-     * One pending input to pack.
-     * This stores the source rectangle to copy and its final packed location.
-     */
-    private static final class Item {
-        final String key;
-
-        // Source can be TextureData directly or derived from Texture or TextureRegion.
-        final TextureData src;
-
-        // Source rectangle (top-left origin).
-        final int sx;
-        final int sy;
-        final int sw;
-        final int sh;
-
-        // Packed destination rectangle (top-left origin).
-        int dx;
-        int dy;
-
-        Item(String key, TextureData src, int sx, int sy, int sw, int sh) {
-            this.key = Objects.requireNonNull(key, "key");
-            this.src = Objects.requireNonNull(src, "src");
-            this.sx = sx;
-            this.sy = sy;
-            this.sw = sw;
-            this.sh = sh;
-        }
-    }
-
-    /**
-     * Final build output.
-     * Holds the atlas texture and a stable mapping of keys to atlas regions.
-     */
-    public static final class Result {
-        private final TextureData atlasData;
-        private final Texture atlasTexture;
-        private final Map<String, TextureRegion> regions;
-
-        private Result(TextureData atlasData, Texture atlasTexture, Map<String, TextureRegion> regions) {
-            this.atlasData = atlasData;
-            this.atlasTexture = atlasTexture;
-            this.regions = regions;
-        }
-
-        /**
-         * Returns the atlas CPU data.
-         *
-         * @return atlas CPU pixels
-         */
-        public TextureData getAtlasData() {
-            return atlasData;
-        }
-
-        /**
-         * Returns the atlas GPU texture.
-         *
-         * @return atlas texture
-         */
-        public Texture getAtlasTexture() {
-            return atlasTexture;
-        }
-
-        /**
-         * Gets a region by key.
-         *
-         * @param key key used in {@link TextureAtlas#add(String, Texture)},
-         *            {@link TextureAtlas#add(String, TextureData)},
-         *            or {@link TextureAtlas#add(String, TextureRegion)}
-         * @return region, or null if missing
-         */
-        public TextureRegion getRegion(String key) {
-            return regions.get(key);
-        }
-
-        /**
-         * Returns all regions.
-         * This map is unmodifiable.
-         *
-         * @return map of key -> atlas region
-         */
-        public Map<String, TextureRegion> getRegions() {
-            return regions;
-        }
-    }
-
-    private final List<Item> items = new ArrayList<>();
-
+    private final List<Item> items = new ArrayList<>(); // Borrowed pending source rectangles retained across builds.
     private int padding = 0;       // Space between regions.
     private int border = 0;        // Space around the entire atlas content.
-    private boolean powerOfTwo = false;
-    private int maxSize = 4096;
-    private int startSize = 256;
+    private boolean powerOfTwo = false; // Whether attempted square dimensions are rounded to powers of two.
+    private int maxSize = 4096; // Maximum attempted dimension for nonempty builds.
+    private int startSize = 256; // Minimum initial square dimension before optional rounding.
 
     /**
-     * Sets padding between packed regions.
+     * Sets empty pixel spacing between neighboring shelf items and between shelves.
+     * Does not extrude edge colors into the padding.
      *
-     * @param padding pixels (>= 0)
-     * @return this
+     * @param padding nonnegative spacing in pixels
+     * @return this builder
+     * @throws IllegalArgumentException if padding is negative
      */
     public TextureAtlas setPadding(int padding) {
         if (padding < 0) throw new IllegalArgumentException("padding must be >= 0");
@@ -165,10 +61,11 @@ public final class TextureAtlas {
     }
 
     /**
-     * Sets border padding around packed content.
+     * Sets the empty border reserved on every side of packed content.
      *
-     * @param border pixels (>= 0)
-     * @return this
+     * @param border nonnegative border width in pixels
+     * @return this builder
+     * @throws IllegalArgumentException if border is negative
      */
     public TextureAtlas setBorder(int border) {
         if (border < 0) throw new IllegalArgumentException("border must be >= 0");
@@ -177,10 +74,11 @@ public final class TextureAtlas {
     }
 
     /**
-     * Enables or disables power-of-two atlas sizing.
+     * Controls rounding of attempted square sizes to the next power of two.
+     * The result remains square even when this option is disabled.
      *
-     * @param powerOfTwo true to round up width/height to next power-of-two
-     * @return this
+     * @param powerOfTwo whether to round attempted dimensions
+     * @return this builder
      */
     public TextureAtlas setPowerOfTwo(boolean powerOfTwo) {
         this.powerOfTwo = powerOfTwo;
@@ -188,10 +86,13 @@ public final class TextureAtlas {
     }
 
     /**
-     * Sets the maximum atlas size.
+     * Sets the maximum attempted dimension for nonempty builds. This is an application
+     * limit rather than a query of the GPU texture limit. The empty-atlas path uses
+     * the sanitized start size without checking this bound.
      *
-     * @param maxSize pixels (must be > 0)
-     * @return this
+     * @param maxSize positive dimension limit in pixels
+     * @return this builder
+     * @throws IllegalArgumentException if maxSize is nonpositive
      */
     public TextureAtlas setMaxSize(int maxSize) {
         if (maxSize <= 0) throw new IllegalArgumentException("maxSize must be > 0");
@@ -200,11 +101,13 @@ public final class TextureAtlas {
     }
 
     /**
-     * Sets the starting size to attempt when auto-sizing.
-     * This value will be increased until all items fit.
+     * Sets the minimum starting dimension before optional power-of-two rounding.
+     * Nonempty builds may start larger according to content estimates and grow by
+     * doubling when packing fails.
      *
-     * @param startSize pixels (must be > 0)
-     * @return this
+     * @param startSize positive initial dimension in pixels
+     * @return this builder
+     * @throws IllegalArgumentException if startSize is nonpositive
      */
     public TextureAtlas setStartSize(int startSize) {
         if (startSize <= 0) throw new IllegalArgumentException("startSize must be > 0");
@@ -213,11 +116,14 @@ public final class TextureAtlas {
     }
 
     /**
-     * Adds an entire {@link Texture} by key.
+     * Collects the complete retained CPU image of a texture. The texture is not read
+     * back from the GPU; keep its data alive until build.
      *
-     * @param key     unique key
-     * @param texture source texture (must have CPU data)
-     * @return this
+     * @param key nonnull key, validated for uniqueness during build
+     * @param texture nonnull texture with retained CPU data
+     * @return this builder
+     * @throws NullPointerException if key, texture, or retained data is null
+     * @throws IllegalArgumentException if image dimensions are nonpositive
      */
     public TextureAtlas add(String key, Texture texture) {
         Objects.requireNonNull(texture, "texture");
@@ -227,11 +133,13 @@ public final class TextureAtlas {
     }
 
     /**
-     * Adds an entire {@link TextureData} by key.
+     * Collects a complete borrowed decoded image without copying its pixels.
      *
-     * @param key  unique key
-     * @param data source CPU pixels
-     * @return this
+     * @param key nonnull key, validated for uniqueness during build
+     * @param data nonnull source image retained until build
+     * @return this builder
+     * @throws NullPointerException if key or data is null
+     * @throws IllegalArgumentException if dimensions are nonpositive
      */
     public TextureAtlas add(String key, TextureData data) {
         Objects.requireNonNull(data, "data");
@@ -239,11 +147,14 @@ public final class TextureAtlas {
     }
 
     /**
-     * Adds a {@link TextureRegion} by key.
+     * Collects a source region from its backing texture's retained pixels, truncating
+     * region coordinates and dimensions to integers. Does not bake UV transformations.
      *
-     * @param key    unique key
-     * @param region source region
-     * @return this
+     * @param key nonnull key, validated for uniqueness during build
+     * @param region nonnull source region with retained CPU pixels
+     * @return this builder
+     * @throws NullPointerException if a required source reference or key is null
+     * @throws IllegalArgumentException if truncated dimensions are nonpositive
      */
     public TextureAtlas add(String key, TextureRegion region) {
         Objects.requireNonNull(region, "TextureRegion cannot be null");
@@ -258,15 +169,19 @@ public final class TextureAtlas {
     }
 
     /**
-     * Adds a source rectangle from {@link TextureData} by key.
+     * Stores a borrowed source rectangle. Validates references and positive dimensions
+     * now; source-coordinate validity and duplicate keys are handled during building
+     * and pixel copying.
      *
-     * @param key unique key
-     * @param src source data
-     * @param sx  source X (top-left origin)
-     * @param sy  source Y (top-left origin)
-     * @param sw  width (must be > 0)
-     * @param sh  height (must be > 0)
-     * @return this
+     * @param key nonnull result key
+     * @param src source image that must remain readable
+     * @param sx source X in the packer's top-left convention
+     * @param sy source Y in the packer's top-left convention
+     * @param sw positive source width
+     * @param sh positive source height
+     * @return this builder
+     * @throws NullPointerException if key or src is null
+     * @throws IllegalArgumentException if sw or sh is nonpositive
      */
     public TextureAtlas add(String key, TextureData src, int sx, int sy, int sw, int sh) {
         Objects.requireNonNull(key, "key");
@@ -279,9 +194,10 @@ public final class TextureAtlas {
     }
 
     /**
-     * Clears all pending items.
+     * Drops pending source references without disposing them or any previously built
+     * result. Packing configuration is retained.
      *
-     * @return this
+     * @return this builder
      */
     public TextureAtlas clear() {
         items.clear();
@@ -289,18 +205,14 @@ public final class TextureAtlas {
     }
 
     /**
-     * Builds the atlas.
+     * Packs pending images and creates a new CPU/GPU atlas pair without clearing the
+     * builder. Empty input creates a blank atlas at the sanitized start size.
+     * Nonempty input validates keys, sorts by descending height, and grows square
+     * attempts until they fit or exceed maxSize. Result map iteration follows that
+     * height-sorted order.
      *
-     * <p>This method:</p>
-     * <ul>
-     *     <li>Chooses an atlas size (auto-growing until it fits).</li>
-     *     <li>Packs items using the shelf algorithm.</li>
-     *     <li>Copies pixels via {@link TexturePacker}.</li>
-     *     <li>Creates a new atlas {@link Texture} from the baked {@link TextureData}.</li>
-     *     <li>Creates atlas {@link TextureRegion}s for each key.</li>
-     * </ul>
-     *
-     * @return build result
+     * @return newly owned atlas resources and borrowed region views
+     * @throws IllegalStateException if keys repeat or content cannot fit within the size limit
      */
     public Result build() {
         if (items.isEmpty()) {
@@ -369,13 +281,14 @@ public final class TextureAtlas {
     }
 
     /**
-     * Attempts to pack all items into width/height using shelves.
-     * Writes packed positions into each {@link Item}.
+     * Attempts unrotated left-to-right shelf placement with configured border and
+     * padding. Mutates each item's destination as it proceeds; a failed attempt may
+     * leave partial placements that the next attempt overwrites.
      *
-     * @param sorted sorted items
-     * @param width  atlas width
-     * @param height atlas height
-     * @return true if all items fit
+     * @param sorted inputs ordered by descending height
+     * @param width attempted atlas width
+     * @param height attempted atlas height
+     * @return true if all rectangles fit
      */
     private boolean tryPackShelf(List<Item> sorted, int width, int height) {
         int x = border;
@@ -417,10 +330,12 @@ public final class TextureAtlas {
     }
 
     /**
-     * Guesses a good starting size to reduce growth iterations.
+     * Estimates a square side from total pixel area and rough padding overhead,
+     * then accounts for the largest dimensions plus borders and caps at maxSize.
+     * This is a heuristic, not a guarantee that shelf packing will succeed.
      *
-     * @param sorted items
-     * @return suggested size
+     * @param sorted pending items
+     * @return initial side-length estimate
      */
     private int guessStartSize(List<Item> sorted) {
         long area = 0;
@@ -452,14 +367,124 @@ public final class TextureAtlas {
     }
 
     /**
-     * Applies power-of-two rules if enabled.
+     * Raises nonpositive sizes to one and optionally rounds up to a power of two.
+     * Does not enforce maxSize.
      *
-     * @param size requested size
-     * @return sanitized size
+     * @param size requested dimension
+     * @return adjusted dimension
      */
     private int sanitizeSize(int size) {
         if (size <= 0) size = 1;
         if (!powerOfTwo) return size;
         return MathUtils.nextPowerOfTwo(size);
+    }
+
+    /**
+     * One borrowed source rectangle and its mutable shelf-packing destination.
+     * Failed placement attempts may overwrite only a prefix of the item list; every
+     * successful build assigns all final destinations before copying pixels.
+     * @author Albert Beaupre
+     */
+    private static final class Item {
+        final String key; // Result-map key, checked for uniqueness during build.
+
+        // Source can be TextureData directly or derived from Texture or TextureRegion.
+        final TextureData src; // Borrowed CPU image that must remain readable until copying completes.
+
+        // Source rectangle (top-left origin).
+        final int sx; // Source rectangle left coordinate.
+        final int sy; // Source rectangle top coordinate.
+        final int sw; // Positive source rectangle width.
+        final int sh; // Positive source rectangle height.
+
+        // Packed destination rectangle (top-left origin).
+        int dx; // Destination left coordinate assigned by the latest packing attempt.
+        int dy; // Destination top coordinate assigned by the latest packing attempt.
+
+        /**
+         * Retains a keyed source rectangle without copying or validating source bounds.
+         *
+         * @param key nonnull result key
+         * @param src nonnull borrowed CPU pixels
+         * @param sx source left coordinate
+         * @param sy source top coordinate
+         * @param sw source width
+         * @param sh source height
+         * @throws NullPointerException if key or src is null
+         */
+        Item(String key, TextureData src, int sx, int sy, int sw, int sh) {
+            this.key = Objects.requireNonNull(key, "key");
+            this.src = Objects.requireNonNull(src, "src");
+            this.sx = sx;
+            this.sy = sy;
+            this.sw = sw;
+            this.sh = sh;
+        }
+    }
+
+    /**
+     * Holds one built atlas's CPU data, GPU texture, and unmodifiable key mapping.
+     * Region and pixel objects remain mutable; the wrapper supplies no automatic
+     * cleanup. Dispose the atlas texture and its separately owned CPU data after
+     * all returned regions are no longer needed; this texture borrows the data.
+     * @author Albert Beaupre
+     */
+    public static final class Result {
+        private final TextureData atlasData; // Baked CPU pixels associated with the result texture.
+        private final Texture atlasTexture; // Result GPU texture whose lifetime is managed by the caller.
+        private final Map<String, TextureRegion> regions; // Unmodifiable mapping of keys to mutable atlas-region views.
+
+        /**
+         * Stores the resources and mapping produced by one build without copying them.
+         *
+         * @param atlasData baked CPU pixels
+         * @param atlasTexture uploaded texture using those pixels
+         * @param regions unmodifiable key mapping
+         */
+        private Result(TextureData atlasData, Texture atlasTexture, Map<String, TextureRegion> regions) {
+            this.atlasData = atlasData;
+            this.atlasTexture = atlasTexture;
+            this.regions = regions;
+        }
+
+        /**
+         * Returns the live baked CPU image associated with the result texture.
+         * Changing it does not itself upload replacement GPU pixels.
+         *
+         * @return result CPU data
+         */
+        public TextureData getAtlasData() {
+            return atlasData;
+        }
+
+        /**
+         * Returns the result's GPU texture, shared by every region. The caller is
+         * responsible for disposing it after the atlas is no longer used.
+         *
+         * @return result texture
+         */
+        public Texture getAtlasTexture() {
+            return atlasTexture;
+        }
+
+        /**
+         * Looks up a borrowed region by its original input key.
+         *
+         * @param key atlas input key
+         * @return live region, or null when missing
+         */
+        public TextureRegion getRegion(String key) {
+            return regions.get(key);
+        }
+
+        /**
+         * Returns the unmodifiable key mapping. Its region values remain mutable and
+         * share the atlas texture.
+         *
+         * @return stable key-to-region map
+         */
+        public Map<String, TextureRegion> getRegions() {
+            return regions;
+        }
     }
 }

@@ -54,21 +54,17 @@ import static org.lwjgl.opengl.GL30.*;
  */
 public final class FrameBuffer {
 
-    private int fboID; // OpenGL framebuffer object id.
-    private int colorTextureID; // OpenGL texture id used as the color attachment.
-    private int depthRBOID; // OpenGL renderbuffer id used as the optional depth attachment.
-
-    private int width; // Current framebuffer width in pixels.
-    private int height; // Current framebuffer height in pixels.
-
     private final boolean hasDepth; // True to allocate and attach a depth renderbuffer.
-
-    private int previousFBO; // Previously bound framebuffer id (captured by begin()).
-    private int prevViewportX, prevViewportY, prevViewportW, prevViewportH; // Previously active viewport (captured by begin()).
-
     private final FloatBuffer quadVerts = BufferUtils.createFloatBuffer(8); // Quad vertex positions (x,y) * 4 in draw order.
     private final FloatBuffer quadUvs = BufferUtils.createFloatBuffer(8); // Quad UV coordinates (u,v) * 4 matching quadVerts.
     private final int[] vp = new int[4]; // Temporary buffer for GL_VIEWPORT queries.
+    private int fboID; // OpenGL framebuffer object id.
+    private int colorTextureID; // OpenGL texture id used as the color attachment.
+    private int depthRBOID; // OpenGL renderbuffer id used as the optional depth attachment.
+    private int width; // Current framebuffer width in pixels.
+    private int height; // Current framebuffer height in pixels.
+    private int previousFBO; // Previously bound framebuffer id (captured by begin()).
+    private int prevViewportX, prevViewportY, prevViewportW, prevViewportH; // Previously active viewport (captured by begin()).
 
     /**
      * Creates a framebuffer with a color texture attachment and optional depth attachment.
@@ -78,7 +74,7 @@ public final class FrameBuffer {
      * @param width    framebuffer width in pixels (must be > 0)
      * @param height   framebuffer height in pixels (must be > 0)
      * @param hasDepth true to attach a depth renderbuffer, false for color-only
-     * @throws IllegalArgumentException if width or height are <= 0
+     * @throws IllegalArgumentException if width or height are &lt;= 0
      * @throws IllegalStateException    if OpenGL reports the framebuffer is incomplete
      */
     public FrameBuffer(int width, int height, boolean hasDepth) {
@@ -160,7 +156,7 @@ public final class FrameBuffer {
      *
      * @param newWidth  new framebuffer width in pixels (must be > 0)
      * @param newHeight new framebuffer height in pixels (must be > 0)
-     * @throws IllegalArgumentException if newWidth or newHeight are <= 0
+     * @throws IllegalArgumentException if newWidth or newHeight are &lt;= 0
      */
     public void resize(int newWidth, int newHeight) {
         if (newWidth <= 0) throw new IllegalArgumentException("newWidth must be > 0");

@@ -4,17 +4,20 @@ import valthorne.asset.AssetParameters;
 import valthorne.io.file.ValthorneFiles;
 
 /**
- * Represents the parameters required to define and load a font asset.
- * The parameters include the source of the font data, font name, font size,
- * the index of the first character, and the number of characters available.
- * This record ensures all essential font attributes are immutable and verified.
+ * Describes an encoded font source, asset name, bake size, and character range.
+ * Construction validates a non-null source, nonblank name, positive font size, and
+ * positive character count; the first character index is retained unchecked.
+ * Default-range factories start at character 30 and include 254 characters.
+ * <p>Only name supplies the shared asset-cache key. Use distinct names for source,
+ * size, or range variants that must coexist. Path factories defer file reads,
+ * byte factories copy input, and classpath factories read resources immediately.
  *
- * @param source              the source from which the font is loaded, must not be null
- * @param name                the name of the font, must not be null or blank
- * @param fontSize            the size of the font, must be greater than 0
- * @param firstCharacterIndex the index of the first character in the font
- * @param characterCount      the number of characters in the font, must be greater than 0
- * @throws IllegalArgumentException if any argument is invalid
+ * @param source encoded font source
+ * @param name nonblank shared asset-cache key
+ * @param fontSize positive bake size
+ * @param firstCharacterIndex first character in the baked range
+ * @param characterCount positive number of baked characters
+ * @author Albert Beaupre
  */
 public record FontParameters(FontSource source, String name, int fontSize, int firstCharacterIndex, int characterCount) implements AssetParameters {
 
@@ -112,6 +115,8 @@ public record FontParameters(FontSource source, String name, int fontSize, int f
      * @return a new {@code FontParameters} instance representing the font configuration
      * @throws IllegalArgumentException if resourcePath is null or blank, if name is null or blank,
      *                                  or if fontSize is less than or equal to 0
+     * @throws valthorne.io.file.ValthorneFileException if the classpath resource
+     *         is missing or cannot be read; resource bytes are read synchronously
      */
     public static FontParameters fromClasspath(String resourcePath, String name, int fontSize) {
         return fromBytes(ValthorneFiles.readBytes(resourcePath), name, fontSize);
@@ -129,11 +134,20 @@ public record FontParameters(FontSource source, String name, int fontSize, int f
      * @return a new {@code FontParameters} instance representing the font configuration
      * @throws IllegalArgumentException if resourcePath is null or blank, if name is null or blank,
      *                                  if fontSize is less than or equal to 0, or if count is less than or equal to 0
+     * @throws valthorne.io.file.ValthorneFileException if the classpath resource
+     *         is missing or cannot be read; resource bytes are read synchronously
      */
     public static FontParameters fromClasspath(String resourcePath, String name, int fontSize, int firstChar, int count) {
         return fromBytes(ValthorneFiles.readBytes(resourcePath), name, fontSize, firstChar, count);
     }
 
+    /**
+     * Returns name as the asset-cache identity without including source contents
+     * or loading options. Equal names can therefore reuse an existing cached load
+     * even when other parameters differ.
+     *
+     * @return nonblank cache key supplied at construction
+     */
     @Override
     public String key() {
         return name;

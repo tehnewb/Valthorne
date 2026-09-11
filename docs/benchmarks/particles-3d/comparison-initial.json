@@ -1,0 +1,68 @@
+[
+  {
+    "workload": "burstAndExpire",
+    "count": "256",
+    "baselineNs": 6030.7369213169395,
+    "baselineError": 704.200232090207,
+    "candidateNs": 5054.280785230802,
+    "candidateError": 63.025684599961465,
+    "timeChangePercent": -16.191323694367142,
+    "baselineBOp": 26624.04212184935,
+    "candidateBOp": 0.035016901675873124
+  },
+  {
+    "workload": "burstAndExpire",
+    "count": "4096",
+    "baselineNs": 89318.7204334408,
+    "baselineError": 2182.293258005356,
+    "candidateNs": 88020.16417016412,
+    "candidateError": 7146.4944574795445,
+    "timeChangePercent": -1.4538455734420697,
+    "baselineBOp": 425984.6244998669,
+    "candidateBOp": 0.6100768504556633
+  },
+  {
+    "workload": "interleavedChurn",
+    "count": "256",
+    "baselineNs": 7113.123965692139,
+    "baselineError": 543.9552565448614,
+    "candidateNs": 4755.465604385648,
+    "candidateError": 196.05686479198343,
+    "timeChangePercent": -33.145188705804884,
+    "baselineBOp": 17749.382957874433,
+    "candidateBOp": 0.032962240610979424
+  },
+  {
+    "workload": "interleavedChurn",
+    "count": "4096",
+    "baselineNs": 218454.28476695827,
+    "baselineError": 5915.231703855585,
+    "candidateNs": 113836.02477883808,
+    "candidateError": 7972.484068910105,
+    "timeChangePercent": -47.8902302601775,
+    "baselineBOp": 283990.8618290783,
+    "candidateBOp": 0.7895851476873674
+  },
+  {
+    "workload": "steadyUpdate",
+    "count": "256",
+    "baselineNs": 1021.2387165581334,
+    "baselineError": 84.46777083700871,
+    "candidateNs": 1850.6195030367817,
+    "candidateError": 227.0211653243696,
+    "timeChangePercent": 81.21321421047361,
+    "baselineBOp": 0.00707955095429072,
+    "candidateBOp": 0.01278756124797611
+  },
+  {
+    "workload": "steadyUpdate",
+    "count": "4096",
+    "baselineNs": 31420.436595722025,
+    "baselineError": 892.6833770703247,
+    "candidateNs": 27693.423620773865,
+    "candidateError": 533.6216173879063,
+    "timeChangePercent": -11.861747890083752,
+    "baselineBOp": 0.21822868823966163,
+    "candidateBOp": 0.19219978514391925
+  }
+]

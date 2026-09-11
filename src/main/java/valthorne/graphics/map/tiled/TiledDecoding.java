@@ -10,27 +10,33 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 
 /**
- * The TiledDecoding class provides utility methods for decoding layer data from the
- * TMX (Tile Map XML) file format used in tiled map editors. It supports decoding
- * data encoded in CSV or Base64 formats, with optional compression mechanisms such as
- * GZIP and ZLIB.
+ * Decodes TMX tile-layer payloads into raw global-ID bit patterns, including Tiled's
+ * flip flags. CSV and MIME Base64 are supported; Base64 may additionally use gzip
+ * or zlib compression. XML tile elements are not supported.
+ * <p>CSV can pad a requested result length with empty tiles. Binary decoding instead
+ * returns only complete four-byte IDs that are actually present. Callers must not
+ * assume every encoding produces exactly the requested count.
+ *
+ * @author Albert Beaupre
  */
 public class TiledDecoding {
 
     /**
-     * Decodes layer data from the provided textual input using the specified encoding and compression methods.
-     * <p>
-     * This method supports encoding modes such as "csv" and "base64", and optional compression
-     * methods including "gzip" and "zlib". If the input data cannot be decoded due to unsupported
-     * encoding or other reasons, an appropriate exception will be thrown.
+     * Decodes a layer or chunk payload without clearing the flip bits in its IDs.
+     * Empty or null text produces {@code max(0, expectedCount)} zero IDs before encoding
+     * validation. CSV ignores the compression argument; Base64 uses optional gzip or
+     * zlib decompression. Neither path validates IDs against a tileset.
      *
-     * @param text          the text data representing the layer information; may include encoded or compressed data.
-     * @param encoding      the type of encoding used for the input text (e.g., "csv", "base64").
-     * @param compression   the type of compression applied to the encoded input (e.g., "gzip", "zlib"), or may be null.
-     * @param expectedCount the number of expected integers in the output array; used to validate and pad decoded results.
-     * @return an array of integers representing the decoded layer data. If the input is empty or null, a zero-filled array is returned.
-     * @throws java.io.IOException   if an I/O error occurs during the decoding process.
-     * @throws IllegalStateException if an unsupported encoding or compression type is specified.
+     * @param text encoded payload, or null for an empty layer
+     *
+     * @param encoding case-insensitive CSV or Base64 encoding name
+     * @param compression Base64 compression name, or null/blank for uncompressed bytes
+     * @param expectedCount positive output limit; CSV pads to this length, while binary
+     *        data may return fewer IDs; nonpositive values retain all available IDs
+     * @return newly allocated array containing signed Java representations of ID bits
+     * @throws java.io.IOException if decompression or reading fails
+     * @throws IllegalStateException if nonempty data uses an unsupported encoding or compression
+     * @throws IllegalArgumentException if numeric CSV or Base64 data is malformed
      */
     public static int[] decodeLayerData(String text, String encoding, String compression, int expectedCount) throws java.io.IOException {
         if (text == null) return new int[Math.max(0, expectedCount)];
@@ -66,6 +72,18 @@ public class TiledDecoding {
         throw new IllegalStateException("Unsupported TMX encoding: " + encoding);
     }
 
+    /**
+     * Parses comma- or whitespace-separated decimal IDs into a new array.
+     * Positive expected counts truncate excess values or pad missing values with zero.
+     * Numbers are parsed as longs and narrowed to int, retaining their low 32 bits;
+     * this preserves unsigned TMX IDs but does not enforce an unsigned 32-bit range.
+     *
+     * @param csv non-null payload text
+     *
+     * @param expectedCount requested length, or a nonpositive value to use the token count
+     * @return newly allocated array of raw ID bits
+     * @throws NumberFormatException if a consumed token is not a valid decimal long
+     */
     private static int[] decodeCsv(String csv, int expectedCount) {
         String[] parts = csv.split("[,\\s]+");
         int n = expectedCount > 0 ? expectedCount : parts.length;
@@ -85,6 +103,16 @@ public class TiledDecoding {
         return out;
     }
 
+    /**
+     * Reads complete little-endian 32-bit IDs without changing the input bytes.
+     * Trailing one to three bytes are ignored. A positive expected count limits the
+     * result but never pads it when the byte payload contains fewer complete IDs.
+     *
+     * @param bytes uncompressed ID bytes
+     *
+     * @param expectedCount positive maximum ID count, or nonpositive for all complete IDs
+     * @return newly allocated array preserving all 32 bits of each consumed ID
+     */
     private static int[] decodeLittleEndianU32(byte[] bytes, int expectedCount) {
         int count = (bytes.length / 4);
         int n = expectedCount > 0 ? Math.min(expectedCount, count) : count;
@@ -95,6 +123,16 @@ public class TiledDecoding {
         return out;
     }
 
+    /**
+     * Consumes the stream from its current position through end of input.
+     * The stream remains open; this helper neither resets it nor limits the amount
+     * of memory needed for the accumulated payload.
+     *
+     * @param in stream supplying decoded bytes
+     *
+     * @return newly allocated array containing all remaining bytes
+     * @throws java.io.IOException if a stream read fails
+     */
     private static byte[] readAllBytes(InputStream in) throws java.io.IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream(4096);
         byte[] buf = new byte[8192];

@@ -60,13 +60,13 @@ public final class TiledImageMapLayerData extends MapLayer {
      * though a valid Tiled image layer will normally provide one.
      * </p>
      *
-     * @param name the name of the layer
-     * @param visible whether the layer is visible
-     * @param opacity the layer opacity
-     * @param offsetX the horizontal pixel offset
-     * @param offsetY the vertical pixel offset
+     * @param name       the name of the layer
+     * @param visible    whether the layer is visible
+     * @param opacity    the layer opacity
+     * @param offsetX    the horizontal pixel offset
+     * @param offsetY    the vertical pixel offset
      * @param properties the custom layer properties
-     * @param imageData the decoded image data for this layer
+     * @param imageData  the decoded image data for this layer
      */
     public TiledImageMapLayerData(String name, boolean visible, float opacity, float offsetX, float offsetY, Map<String, String> properties, TextureData imageData) {
         super(name, visible, opacity, offsetX, offsetY, properties);
@@ -98,9 +98,9 @@ public final class TiledImageMapLayerData extends MapLayer {
      * </p>
      *
      * @param tmxBytes the raw TMX bytes of the parent map
-     * @param tmxPath the logical or physical path of the parent TMX file
+     * @param tmxPath  the logical or physical path of the parent TMX file
      * @param resolver the dependency resolver used to load the referenced image
-     * @param reader the XML reader positioned at the start of an {@code <imagelayer>} element
+     * @param reader   the XML reader positioned at the start of an {@code <imagelayer>} element
      * @return the parsed image-layer data object
      * @throws Exception if parsing fails or the image dependency cannot be resolved or decoded
      */

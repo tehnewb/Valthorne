@@ -1,0 +1,6 @@
+Antique ceramic vase convex hull drop passed: (-2.267E-3  6.018E-3 -1.600E-2)
+Weathered military crate convex hull drop passed: (-3.229E-5 -2.915E-5 -2.003E-2)
+Marble bust convex hull drop passed: (-8.588E-1 -6.203E-1  8.108E-1)
+Design sofa convex hull drop passed: (-1.249E-5  9.619E-5 -2.000E-2)
+Lounge chair convex hull drop passed: ( 3.336E-5 -2.269E-5 -2.000E-2)
+Desk chair convex hull drop passed: (-4.465E-3  5.891E-4 -1.764E-2)

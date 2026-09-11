@@ -1,0 +1,5 @@
+C0E3EE4EEBD7CFBBF8811BD76FCB5DF6BED3A26028FCF1F04146C15A68FD509D  C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\PhysicsStudio.java
+BE2CE01E7A5DD43856B17835A3F00A09F3AFBCE4350E2D80246D7C139F30C45D  C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\PhysicsStudioModels.java
+AC3651A893A6718B1BA3FC2CF92860368B3F05A2D866150E31A80E68DF44A8C1  C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\model\FilamentRenderer3D.java
+2BC061BE35F731741C3FA37B6DAB4A7B5833C12C6126C33040241911B1AEE688  C:\Users\albert\Documents\GitHub\Valthorne\src\main\resources\valthorne\filament\surface.filamat
+2F871B1C0B5D8BD0689C6E6CD12AC8A785AB7B3A955B71AC842A40ABC3BE2273  C:\Users\albert\Documents\GitHub\Valthorne\src\main\resources\valthorne\filament\glass.filamat

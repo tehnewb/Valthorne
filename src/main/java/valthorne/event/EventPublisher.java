@@ -84,27 +84,13 @@ public final class EventPublisher {
      */
     private static final Comparator<Registration> REGISTRATION_ORDER = Comparator.comparingInt((Registration registration) -> registration.priority).reversed().thenComparingLong(registration -> registration.sequence);
 
-    /**
-     * Serializes listener topology changes. Never touched by {@link #publish(Event)}.
-     */
-    private final Object mutationLock = new Object();
+    private final Object mutationLock = new Object(); // Serializes registration changes; event publication does not acquire this lock.
 
-    /**
-     * Cold-path mutable registration metadata, one list per numeric event type.
-     */
-    private final ArrayList<Registration>[] registrations;
+    private final ArrayList<Registration>[] registrations; // Mutable registration metadata grouped by numeric event type.
 
-    /**
-     * Immutable routing snapshot visible to publishing threads.
-     *
-     * <p>The outer table and each inner route are never mutated in place after publication.</p>
-     */
-    private volatile EventHandler<Event>[][] routes;
+    private volatile EventHandler<Event>[][] routes; // Published immutable routing snapshot; outer and inner arrays are never changed in place.
 
-    /**
-     * Monotonic same-priority ordering sequence.
-     */
-    private long registrationSequence;
+    private long registrationSequence; // Increasing sequence used to preserve insertion order among equal priorities.
 
     /**
      * Creates a publisher sized for the built-in {@link EventTypes} registry.
@@ -390,6 +376,11 @@ public final class EventPublisher {
 
     /**
      * Cold-path registration metadata. These objects are never traversed by {@link #publish(Event)}.
+     *
+     * <p>Priority and sequence determine the order used when rebuilding immutable routes.
+     * The handler is a borrowed reference; this record does not invoke it or manage its lifetime.</p>
+     *
+     * @author Albert Beaupre
      */
     private record Registration(EventHandler<Event> handler, int priority, long sequence) {
 

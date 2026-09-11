@@ -20,11 +20,12 @@ package valthorne.audio.sound;
 public sealed interface SoundSource permits SoundSource.PathSource, SoundSource.BytesSource {
 
     /**
-     * <p>
-     * {@code PathSource} stores a filesystem path to the sound data.
-     * </p>
+     * Immutable filesystem-path description for deferred sound loading or streaming.
+     * Construction validates only that the string is nonblank; it does not open the
+     * file or verify its audio format. The original path string is retained unchanged.
      *
-     * @param path the non-blank file path
+     * @param path nonblank filesystem path
+     * @author Albert Beaupre
      */
     record PathSource(String path) implements SoundSource {
 
@@ -39,11 +40,13 @@ public sealed interface SoundSource permits SoundSource.PathSource, SoundSource.
     }
 
     /**
-     * <p>
-     * {@code BytesSource} stores sound data entirely in memory.
-     * </p>
+     * In-memory encoded audio source that retains the supplied nonempty byte array.
+     * Unlike a defensive-copy value object, the array is shared and the generated
+     * accessor returns that same array. Callers must keep its contents stable while
+     * loaders or streams use it; construction does not validate the audio format.
      *
-     * @param bytes the non-empty encoded audio bytes
+     * @param bytes nonempty encoded audio array retained by reference
+     * @author Albert Beaupre
      */
     record BytesSource(byte[] bytes) implements SoundSource {
 

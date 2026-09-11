@@ -1,0 +1,210 @@
+#version 430 core
+layout(local_size_x=8,local_size_y=8) in;
+layout(rgba32f,binding=0) uniform image2D accumulation;
+layout(rgba32f,binding=1) uniform writeonly image2D guide;
+layout(rgba32f,binding=2) uniform image2D specularImage;
+layout(rgba32f,binding=5) uniform readonly image2D historySpecular;
+layout(rgba32f,binding=6) uniform image2D materialImage;
+layout(std430,binding=0) readonly buffer Geometry { vec4 triangles[]; };
+layout(std430,binding=1) readonly buffer Acceleration { vec4 nodes[]; };
+layout(std430,binding=2) readonly buffer Emitters { vec2 emitters[]; };
+uniform sampler2DArray atlas;
+uniform mat4 inverseCamera;
+uniform vec3 cameraPosition, sky;
+uniform int perspective, triangleCount, emitterCount, sampleOffset, samplesPerFrame, maxBounces;
+layout(rgba32f,binding=3) uniform readonly image2D historyImage;
+layout(rgba32f,binding=4) uniform readonly image2D historyGuide;
+uniform int realtime, historyValid, sequence, previousPerspective, cameraMoving, maxHistory;
+uniform mat4 previousCamera, previousInverse;
+uniform vec3 previousPosition;
+uniform vec2 pixelJitter,previousJitter;
+const float PI=3.14159265359;
+uint rng;
+float random(){rng=rng*747796405u+2891336453u;uint w=((rng>>((rng>>28u)+4u))^rng)*277803737u;return float((w>>22u)^w)/4294967296.;}
+vec3 linearColor(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
+vec3 localDirection(vec3 n,vec3 v){vec3 t=normalize(cross(abs(n.z)<.999?vec3(0,0,1):vec3(0,1,0),n));return t*v.x+cross(n,t)*v.y+n*v.z;}
+vec3 cosineDirection(vec3 n){float u=random(),v=random()*2*PI;return localDirection(n,vec3(sqrt(u)*cos(v),sqrt(u)*sin(v),sqrt(1-u)));}
+bool boxHit(vec3 o,vec3 inverseDirection,bvec3 parallel,vec3 lo,vec3 hi,float limit){
+    if(any(bvec3(parallel.x&&(o.x<lo.x-1e-5||o.x>hi.x+1e-5),parallel.y&&(o.y<lo.y-1e-5||o.y>hi.y+1e-5),parallel.z&&(o.z<lo.z-1e-5||o.z>hi.z+1e-5))))return false;
+    vec3 a=(lo-o)*inverseDirection,b=(hi-o)*inverseDirection;
+    vec3 nearT=mix(min(a,b),vec3(-1e30),parallel),farT=mix(max(a,b),vec3(1e30),parallel);
+    return min(limit,min(farT.x,min(farT.y,farT.z)))>=max(0,max(nearT.x,max(nearT.y,nearT.z)));
+}
+vec4 baseColor(int id,vec2 bary){int k=id*12;vec4 color=triangles[k+6];int layer=int(triangles[k+10].z);
+    if(layer>=0){vec2 uv=triangles[k+9].xy*(1-bary.x-bary.y)+triangles[k+9].zw*bary.x+triangles[k+10].xy*bary.y;color*=textureLod(atlas,vec3(uv,layer),0);}
+    return vec4(linearColor(color.rgb),color.a);
+}
+bool traceQuery(vec3 o,vec3 d,float limit,bool anyHit,out int hit,out vec2 bary,out float distance){
+    hit=-1;distance=limit;if(triangleCount==0)return false;
+    // CPU surface-area construction caps internal depth at 28, so 32 stack slots suffice.
+    bvec3 parallel=lessThan(abs(d),vec3(1e-12));vec3 inverseDirection=1/mix(d,vec3(1),parallel);
+    int stack[32];int size=1;stack[0]=0;
+    while(size>0){int node=stack[--size];vec4 lo=nodes[node*2],hi=nodes[node*2+1];if(!boxHit(o,inverseDirection,parallel,lo.xyz,hi.xyz,distance))continue;
+        int count=int(hi.w);if(count<0){int left=node+1,right=int(lo.w);bool reverse=d[-count-1]<0;stack[size++]=reverse?left:right;stack[size++]=reverse?right:left;continue;}
+        for(int j=0;j<count;j++){int id=int(lo.w)+j,k=id*12;vec3 e1=triangles[k+1].xyz,e2=triangles[k+2].xyz;
+            vec3 p=cross(d,e2);float det=dot(e1,p);if(abs(det)<1e-9)continue;
+            vec3 s=o-triangles[k].xyz;float u=dot(s,p)/det;if(u<0||u>1)continue;
+            vec3 q=cross(s,e1);float v=dot(d,q)/det;if(v<0||u+v>1)continue;
+            float t=dot(e2,q)/det;if(t<=.00005||t>=distance)continue;
+            if(baseColor(id,vec2(u,v)).a<triangles[k+10].w)continue;
+            hit=id;bary=vec2(u,v);distance=t;
+            if(anyHit)return true;
+        }
+    }
+    return hit>=0;
+}
+bool trace(vec3 o,vec3 d,float limit,out int hit,out vec2 bary,out float distance){return traceQuery(o,d,limit,false,hit,bary,distance);}
+float powerWeight(float a,float b){return a*a/max(a*a+b*b,1e-20);}
+float distribution(float nh,float a){float x=nh*nh*(a*a-1)+1;return a*a/(PI*x*x);}
+float smith(float n,float a){return 2*n/max(n+sqrt(a*a+(1-a*a)*n*n),1e-8);}
+vec3 bsdfParts(vec3 n,vec3 v,vec3 l,vec3 base,float rough,float metal,out float pdf,out vec3 diffuse){
+    diffuse=vec3(0);
+    float nv=max(dot(n,v),0),nl=max(dot(n,l),0);pdf=0;if(nv<=0||nl<=0)return vec3(0);
+    vec3 h=normalize(v+l);float nh=max(dot(n,h),0),vh=max(dot(v,h),1e-6),a=max(.025,rough*rough);
+    float D=distribution(nh,a),specChance=mix(.35,.85,metal);
+    vec3 f0=mix(vec3(.04),base,metal),F=f0+(1-f0)*pow(1-vh,5);
+    pdf=mix(nl/PI,D*nh/(4*vh),specChance);
+    diffuse=(1-F)*(1-metal)*base/PI;
+    return diffuse+F*D*smith(nv,a)*smith(nl,a)/max(4*nv*nl,1e-7);
+}
+vec3 bsdf(vec3 n,vec3 v,vec3 l,vec3 base,float rough,float metal,out float pdf){vec3 diffuse;return bsdfParts(n,v,l,base,rough,metal,pdf,diffuse);}
+vec3 sampleBsdf(vec3 n,vec3 v,float rough,float metal){
+    if(random()>mix(.35,.85,metal))return cosineDirection(n);
+    float a=max(.025,rough*rough),u=random(),phi=2*PI*random();float ct=sqrt((1-u)/(1+(a*a-1)*u));
+    vec3 h=localDirection(n,vec3(sqrt(max(0,1-ct*ct))*cos(phi),sqrt(max(0,1-ct*ct))*sin(phi),ct));return reflect(-v,h);
+}
+vec3 emission(int id){vec4 e=triangles[id*12+7];return linearColor(e.rgb)*e.a;}
+int chooseEmitter(){float u=random();int lo=0,hi=emitterCount-1;while(lo<hi){int mid=(lo+hi)/2;if(u>emitters[mid].y)lo=mid+1;else hi=mid;}return int(emitters[lo].x);}
+void integrate(vec3 o,vec3 d,int glassBranch,out vec3 diffuseRadiance,out vec3 specularRadiance){
+    diffuseRadiance=vec3(0);specularRadiance=vec3(0);
+    vec3 throughput=vec3(1),diffuseWeight=vec3(0),specularWeight=vec3(1);float previousPdf=0,etaScale=1;bool delta=true;
+    int glassEvents=0;
+    for(int bounce=0;bounce<maxBounces;bounce++){
+        int id;vec2 bary;float distance;
+        bool collect=glassBranch<=1||(glassBranch==2&&glassEvents>=1)||(glassBranch==3&&glassEvents>=2);
+        if(!trace(o,d,1e30,id,bary,distance)){if(collect){diffuseRadiance+=throughput*diffuseWeight*sky;specularRadiance+=throughput*specularWeight*sky;}break;}
+        int k=id*12;vec3 p=o+d*distance;vec3 geometric=normalize(cross(triangles[k+1].xyz,triangles[k+2].xyz));
+        vec3 n=normalize(triangles[k+3].xyz*(1-bary.x-bary.y)+triangles[k+4].xyz*bary.x+triangles[k+5].xyz*bary.y);
+        if(dot(n,geometric)<0)geometric=-geometric;bool front=dot(d,geometric)<0;if(!front){n=-n;geometric=-geometric;}
+        if(dot(n,-d)<=0)n=geometric;
+        vec3 e=emission(id);float weight=1;
+        if(!delta&&emitterCount>0){float lightPdf=distance*distance*triangles[k+11].x/max(abs(dot(geometric,-d))*triangles[k].w,1e-12);weight=powerWeight(previousPdf,lightPdf);}
+        if(collect){diffuseRadiance+=throughput*diffuseWeight*e*weight;specularRadiance+=throughput*specularWeight*e*weight;}
+        vec3 base=baseColor(id,bary).rgb;vec4 surface=triangles[k+8];vec3 v=-d;
+        if(bounce==0&&glassBranch>0&&surface.z<.999){if(glassBranch!=1)break;glassBranch=0;}
+        float epsilon=max(.0002,.00002*max(abs(p.x),max(abs(p.y),abs(p.z))));
+        if(random()<surface.z){
+            float eta=front?1/surface.w:surface.w,cosI=clamp(dot(v,n),0,1),sinT2=eta*eta*(1-cosI*cosI);
+            float fresnel=1;
+            if(sinT2<1){float cosT=sqrt(1-sinT2);float rs=(eta*cosI-cosT)/(eta*cosI+cosT),rp=(cosI-eta*cosT)/(cosI+eta*cosT);fresnel=.5*(rs*rs+rp*rp);}
+            bool reflection=random()<fresnel;
+            if(glassBranch>0&&(glassEvents==0||(glassBranch!=2&&glassEvents==1))){
+                reflection=glassEvents==0?glassBranch==2:glassBranch==3;
+                throughput*=reflection?fresnel:1-fresnel;
+                if(max(throughput.r,max(throughput.g,throughput.b))<=0)break;
+            }
+            glassEvents++;
+            if(reflection)d=reflect(d,n);else{d=refract(d,n,eta);throughput*=base*eta*eta;etaScale/=eta*eta;}
+            delta=true;previousPdf=0;
+        }else{
+            // Explicit area-light sampling and power-heuristic MIS avoid double counting emitter hits.
+            if(emitterCount>0){int light=chooseEmitter(),lk=light*12;
+                float u=sqrt(random()),b=random();vec3 lp=triangles[lk].xyz+triangles[lk+1].xyz*(u*(1-b))+triangles[lk+2].xyz*(u*b);
+                vec3 toLight=lp-p;float dist2=dot(toLight,toLight),dist=sqrt(dist2);vec3 l=toLight/max(dist,1e-8);
+                vec3 ln=normalize(cross(triangles[lk+1].xyz,triangles[lk+2].xyz));float lightPdf=dist2*triangles[lk+11].x/max(abs(dot(ln,-l))*triangles[lk].w,1e-12);
+                float pdf;vec3 fd;vec3 f=bsdfParts(n,v,l,base,surface.x,surface.y,pdf,fd);int blocker;vec2 q;float t;
+                if(baseColor(light,vec2(u*(1-b),u*b)).a>=triangles[lk+10].w&&dot(geometric,l)>0&&!traceQuery(p+geometric*epsilon,l,max(0,dist-epsilon*2),true,blocker,q,t)){
+                    vec3 factor=throughput*max(dot(n,l),0)*emission(light)*powerWeight(lightPdf,pdf*(1-surface.z))/max(lightPdf,1e-12);
+                    if(collect){diffuseRadiance+=factor*(bounce==0?fd:f*diffuseWeight);specularRadiance+=factor*(bounce==0?f-fd:f*specularWeight);}
+                }
+            }
+            d=sampleBsdf(n,v,surface.x,surface.y);float pdf;vec3 fd;vec3 f=bsdfParts(n,v,d,base,surface.x,surface.y,pdf,fd);
+            if(pdf<=1e-10||dot(geometric,d)<=0)break;
+            if(bounce==0){diffuseWeight=fd/max(f,vec3(1e-20));specularWeight=1-diffuseWeight;}
+            throughput*=f*max(dot(n,d),0)/pdf;previousPdf=pdf*(1-surface.z);delta=false;
+        }
+        o=p+geometric*(dot(d,geometric)>0?epsilon:-epsilon);
+        if(bounce>=3){float survival=clamp(max(throughput.r,max(throughput.g,throughput.b))*etaScale,.05,.95);if(random()>survival)break;throughput/=survival;}
+    }
+}
+// Reproject only matching surfaces. Bilinear taps are validated independently so
+// foreground lighting cannot leak across a newly revealed silhouette.
+vec2 octEncode(vec3 n){n/=abs(n.x)+abs(n.y)+abs(n.z);return n.z>=0?n.xy:(1-abs(n.yx))*mix(vec2(-1),vec2(1),greaterThanEqual(n.xy,vec2(0)));}
+vec3 octDecode(vec2 p){vec3 n=vec3(p,1-abs(p.x)-abs(p.y));n.xy+=mix(vec2(1),vec2(-1),greaterThanEqual(n.xy,vec2(0)))*clamp(-n.z,0,1);return normalize(n);}
+vec4 reproject(vec3 p,vec3 normal,float surfaceId,bool specular){
+    if(historyValid==0)return vec4(0);
+    vec4 clip=previousCamera*vec4(p,1);
+    if(clip.w<=0)return vec4(0);
+    vec3 ndc=clip.xyz/clip.w;
+    if(any(greaterThan(abs(ndc),vec3(1))))return vec4(0);
+    ivec2 size=imageSize(historyImage);
+    vec2 location=(ndc.xy*.5+.5)*vec2(size)-previousJitter;
+    // A stationary camera averages subpixel samples in the same output pixel.
+    // Resampling that history every jitter step progressively blurs reflections.
+    if(cameraMoving==0)location=vec2(gl_GlobalInvocationID.xy);
+    ivec2 base=ivec2(floor(location));vec2 f=fract(location);
+    vec4 sum=vec4(0);float weights=0;
+    for(int y=0;y<2;y++)for(int x=0;x<2;x++){
+        ivec2 q=base+ivec2(x,y);
+        if(any(lessThan(q,ivec2(0)))||any(greaterThanEqual(q,size)))continue;
+        vec4 g=imageLoad(historyGuide,q);
+        if(g.z<=0||g.w!=surfaceId||dot(normal,octDecode(g.xy))<.95)continue;
+        vec2 uv=(vec2(q)+previousJitter)/vec2(size)*2-1;
+        vec4 a=previousInverse*vec4(uv,-1,1),b=previousInverse*vec4(uv,1,1);a/=a.w;b/=b.w;
+        vec3 o=previousPerspective!=0?previousPosition:a.xyz;
+        vec3 oldPoint=o+normalize(b.xyz-o)*g.z;
+        // Tangential differences are normal pixel footprints; normal-plane error
+        // detects disocclusion without rejecting sloping floors during navigation.
+        float tolerance=max(.002,g.z*.002);
+        if(abs(dot(oldPoint-p,normal))>tolerance||length(oldPoint-p)>max(.03,g.z*.03))continue;
+        float w=(x==0?1-f.x:f.x)*(y==0?1-f.y:f.y);
+        sum+=(specular?imageLoad(historySpecular,q):imageLoad(historyImage,q))*w;weights+=w;
+    }
+    return weights>.01?sum/weights:vec4(0);
+}
+void main(){
+    ivec2 pixel=ivec2(gl_GlobalInvocationID.xy),size=imageSize(accumulation);if(any(greaterThanEqual(pixel,size)))return;
+    vec3 point=vec3(0),normal=vec3(0);int centerId=-1;
+    vec4 material=vec4(1);
+    if(realtime!=0||sampleOffset==0){
+        vec2 uv=(vec2(pixel)+pixelJitter)/vec2(size)*2-1;vec4 a=inverseCamera*vec4(uv,-1,1),b=inverseCamera*vec4(uv,1,1);a/=a.w;b/=b.w;
+        vec3 origin=perspective!=0?cameraPosition:a.xyz,direction=normalize(b.xyz-origin);vec2 bary;float distance;
+        if(trace(origin,direction,1e30,centerId,bary,distance)){
+            normal=normalize(triangles[centerId*12+3].xyz*(1-bary.x-bary.y)+triangles[centerId*12+4].xyz*bary.x+triangles[centerId*12+5].xyz*bary.y);
+            point=origin+direction*distance;imageStore(guide,pixel,vec4(octEncode(normal),distance,triangles[centerId*12+11].y+1));
+            vec4 surface=triangles[centerId*12+8];material=vec4(max(baseColor(centerId,bary).rgb,vec3(.01)),surface.z>.5?-1:surface.x);
+        }else imageStore(guide,pixel,vec4(0));
+        imageStore(materialImage,pixel,material);
+    }else material=imageLoad(materialImage,pixel);
+    int pathCount=samplesPerFrame;
+    bool splitGlass=realtime!=0&&centerId>=0&&triangles[centerId*12+8].z>=.999;
+    if(realtime!=0&&centerId>=0){vec4 surface=triangles[centerId*12+8];if(splitGlass)pathCount*=2;else if(surface.y>.5&&surface.x<.3)pathCount*=4;}
+    vec3 diffuseSum=vec3(0),specularSum=vec3(0);
+    for(int sampleIndex=0;sampleIndex<pathCount;sampleIndex++){
+        rng=uint(pixel.x+pixel.y*size.x)*9781u+uint((realtime!=0?sequence*32:sampleOffset)+sampleIndex+1)*6271u;
+        vec2 uv=(vec2(pixel)+(realtime!=0?pixelJitter:vec2(random(),random())))/vec2(size)*2-1;
+        vec4 a=inverseCamera*vec4(uv,-1,1),b=inverseCamera*vec4(uv,1,1);a/=a.w;b/=b.w;
+        vec3 o=perspective!=0?cameraPosition:a.xyz,d=normalize(b.xyz-o),diffuse,specular;
+        // One integrator call site avoids triplicating BVH traversal code and its
+        // register pressure in the compiled shader for deterministic glass paths.
+        for(int branch=1;branch<=(splitGlass?3:1);branch++){
+            integrate(o,d,splitGlass?branch:0,diffuse,specular);
+            if(!any(isnan(diffuse))&&!any(isinf(diffuse)))diffuseSum+=diffuse/material.rgb;
+            if(!any(isnan(specular))&&!any(isinf(specular)))specularSum+=specular;
+        }
+    }
+    if(realtime!=0){
+        vec4 old=centerId>=0?reproject(point,normal,triangles[centerId*12+11].y+1,false):vec4(0);
+        vec4 oldSpec=centerId>=0?reproject(point,normal,triangles[centerId*12+11].y+1,true):vec4(0);
+        float diffuseLimit=float(maxHistory),specularLimit=float(maxHistory);
+        if(cameraMoving!=0){diffuseLimit=min(diffuseLimit,64);specularLimit=min(specularLimit,material.a<0?8:mix(8,32,material.a));}
+        float count=min(old.a,max(0,diffuseLimit-float(pathCount))),specCount=min(oldSpec.a,max(0,specularLimit-float(pathCount)));
+        imageStore(accumulation,pixel,vec4((old.rgb*count+diffuseSum)/(count+float(pathCount)),count+float(pathCount)));
+        imageStore(specularImage,pixel,vec4((oldSpec.rgb*specCount+specularSum)/(specCount+float(pathCount)),specCount+float(pathCount)));
+    }else{
+        vec3 old=sampleOffset==0?vec3(0):imageLoad(accumulation,pixel).rgb;
+        vec3 oldSpec=sampleOffset==0?vec3(0):imageLoad(specularImage,pixel).rgb;
+        imageStore(accumulation,pixel,vec4((old*float(sampleOffset)+diffuseSum)/float(sampleOffset+pathCount),float(sampleOffset+pathCount)));
+        imageStore(specularImage,pixel,vec4((oldSpec*float(sampleOffset)+specularSum)/float(sampleOffset+pathCount),float(sampleOffset+pathCount)));
+    }
+}

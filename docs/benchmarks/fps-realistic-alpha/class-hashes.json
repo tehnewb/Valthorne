@@ -1,0 +1,134 @@
+[
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArena.class",
+    "sha256": "cdcb606dd3d356808a05a2b8367fa686fab70b13d65151179bd8defb55cbcfec"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArena$1.class",
+    "sha256": "b47e061ff47a0252a9d8e5c2a2c90d64e08e31d8817fd1d385d44eec299a1a70"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArena$2.class",
+    "sha256": "9e0b0ddfb1ae24d399075c384b32aa763f9be68c03d7ffef7fed1cc7dbc8fab5"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArena$3.class",
+    "sha256": "dae0fbd0e049602c9dc279dea29b56c3ba11a636572f5c10163a3b982a629761"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArena$Hud.class",
+    "sha256": "a7fbda99d99c8e9dcf1ff394e6dab02aa84fc4ed6048b4bd172ac77ef0000616"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaEffects.class",
+    "sha256": "ef0638e59b575bad70c7d4668baf79e628ef35551ffcc056f81d03783c2ea5d3"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaWorld.class",
+    "sha256": "50df0bfc7488054b3d03d9b3e740103211d63e806b9d035ee89893849aadd7f5"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaWorld$Drone.class",
+    "sha256": "366b4faa30b38197519fc81f92b3742c0fd454aba2624f43c69f8b7c800cefec"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaWorld$Grenade.class",
+    "sha256": "e77070a3b9864359f9b2af5e72296eb1d56ad1bfcf0faaa6bb5a78c9318a80e6"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaWorld$Impact.class",
+    "sha256": "7dbbafa2f36167e47bdeda0c5a742b94e1f5663a46d9946db283cf3ddca52151"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaWorld$Prop.class",
+    "sha256": "b99cd0b3f75a4cddfd292ce7cd267d1e17832e0e9e0ce88ff7c8db561a43ee93"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsArenaValidation.class",
+    "sha256": "f1614563ea37ff6b5aa2f5ee44b0d0c960f1f35413b5ef2282567f15a78fd4bf"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsCombatModels.class",
+    "sha256": "261b70f250e6cd2c2c56a9f45c1125f5d893f145f11808c1615c337712d52a4c"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsCombatModels$Entry.class",
+    "sha256": "69cc6f91ec14aa9767b10c83f5b547d72622a17fcacb0510c725d4e2505b2536"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsEnvironmentModels.class",
+    "sha256": "5c141312782f156ff81ad4d47db7760372c6ab2f000abe6c4148300c04c334c2"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsEnvironmentModels$Category.class",
+    "sha256": "120261dd8e73073fe60d1f6d24339c75bb6db2afa318ce858df0d5aafc4ab474"
+  },
+  {
+    "path": "build/classes/java/examples/valthorne/examples/FpsEnvironmentModels$Entry.class",
+    "sha256": "14c3e39dae28832dba189dadd2168221c2474e08f69f91baa966dec2d443a173"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/FilamentRenderer3D.class",
+    "sha256": "45ee67ee97169747b23c778ef4e5329ced13fffe7bdbd2aad2f50d5b405ff637"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/FilamentRenderer3D$Entry.class",
+    "sha256": "d60b4430dc8e365328d7c928007e1881fb3b210dcef9c79e446b781b7153a04b"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/FilamentRenderer3D$ExplicitLight.class",
+    "sha256": "7f2fd0998ea2f9bd81528173a6d7a95a8c06f994b1996f537bc4f3584014b9d4"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/FilamentRenderer3D$Mesh.class",
+    "sha256": "cb476b60739c0d0efe0763f44a6daab90ff488001bf4f1e4884eb9484b16357a"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/FilamentRenderer3D$Quality.class",
+    "sha256": "1c5e55fe52744b545d7a4e7df358e0010e3236722d7ef863ac4597eb7ccfe13d"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/Material3D.class",
+    "sha256": "e25ffc07ebcc6cd4cee35b06cd93b4c653a91f65d71844d9712c19a14fcedb66"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/PathTracingScene.class",
+    "sha256": "3f8be9f00c98c9b29746d3a2553be3f77f6b204f80ebde7e4fbc3301ebee6a48"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/PathTracingScene$Instance.class",
+    "sha256": "fe5d8b71807548e53471be2f40eedffb0aaec22a694af54be08eb0cf8328a002"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/ObjModel3D.class",
+    "sha256": "b0153619e9242528f6fcd99a678a23a453800c5c199698a6da5e853082091a5b"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/ObjModel3D$Info.class",
+    "sha256": "cf2de6827b2ec309f2f6c240609139d54a25bface5e88ea27552dc8c3788274d"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/ObjModel3D$Part.class",
+    "sha256": "02e156e11108f0ab1b4bcde87e93e9f73b4f4746b099fb1345f7e434ec3d096d"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/ObjModel3D$Ref.class",
+    "sha256": "c5a64f9596f45d2b17a91ecf1a64bff01f8cf0a893fa2e2d3e9491cc721eef58"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/model/ObjModel3D$Resolver.class",
+    "sha256": "f05a506d0c5578c3d1152f96c276664faea788509af32ceafe20a4f25e775756"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/particle/Particle3D.class",
+    "sha256": "60d1810bee042c47921dbe0e63e7c07c749abb45d9179421b9c0dddb82b34a6b"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/particle/Particle3D$AttachedLight.class",
+    "sha256": "13a2b04a89127032f8111e1363875cd9e336be0aa15de8b785193307775f399e"
+  },
+  {
+    "path": "build/classes/java/main/valthorne/graphics/particle/ParticleEmitter3D.class",
+    "sha256": "10870fb511285c8cf99be12355caf6dc5bc01d284dd07918aa1b51ab5a1553de"
+  }
+]

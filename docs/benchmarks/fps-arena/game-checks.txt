@@ -1,0 +1,38 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Task :compileJava
+Note: C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\ui\nodes\nano\NanoCheckbox.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :compileExamplesJava
+> Task :processExamplesResources UP-TO-DATE
+> Task :examplesClasses
+> Task :writeFilamentLaunchClasspath
+
+> Task :verifyPhysicsStudioAssets
+Antique ceramic vase: 9408 triangles, 1 materials, 1.276 x 1.276 x 2.200
+Weathered military crate: 10476 triangles, 1 materials, 4.335 x 2.858 x 1.600
+Marble bust: 17456 triangles, 1 materials, 1.267 x 1.397 x 2.400
+Design sofa: 232 triangles, 2 materials, 4.480 x 1.640 x 1.600
+Lounge chair: 376 triangles, 3 materials, 1.400 x 1.928 x 1.800
+Desk chair: 656 triangles, 2 materials, 1.103 x 1.035 x 2.000
+
+> Task :verifyStudioLightRig
+StudioLightRig validation passed: 83 checks; no graphics context; temporary files only.
+
+> Task :verifyPhysicsStudio
+
+> Task :verifyFpsArena
+FPS_GAMEPLAY_VALIDATED checks=1349 walk=2.990 sprint=4.533 diagonal=3.091 jump=1.609
+
+[Incubating] Problems report is available at: file:///C:/Users/albert/Documents/GitHub/Valthorne/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 2s
+8 actionable tasks: 6 executed, 2 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

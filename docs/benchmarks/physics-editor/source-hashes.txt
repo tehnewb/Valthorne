@@ -1,0 +1,4 @@
+3CAB4C7C66D941497745BFB0D2E878A153D6F85FC1F5CBF719333D16E3BC0AB2  C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\PhysicsStudio.java
+17AC38F2D2F7EE0C8013DE2A7ABB7608E8831C3BEAFE1781C60E76CC81AC6C14  C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\PhysicsStudioModels.java
+E2054A6364B3A9092734E9117C04EC0AC60890F0BE10E859545330A1A4C3BE03  C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\StudioLightRig.java
+D7556C3AAB2E4B4A3DE5CB7722D619EAE9F75C34B44C5DD45B582B5AAB6A7227  C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\StudioLightRigValidation.java

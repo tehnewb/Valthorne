@@ -727,10 +727,26 @@ public final class Keyboard {
      */
     private static BitSet keyDown = new BitSet(GLFW_KEY_LAST + 1);
 
-    private static GLFWKeyCallback keyCallback; // GLFW callback instance installed on the active window
-    private static short currentKey; // Most recently pressed key code, or -1 when no active key is tracked
-    private static byte modifierState; // Current GLFW modifier mask containing Shift, Control, Alt, and Super state
-    private static boolean capsLockOn; // Cached Caps Lock state tracked through toolkit initialization and key toggles
+    /**
+     * Retained GLFW character callback delivering Unicode text input.
+     */
+    private static org.lwjgl.glfw.GLFWCharCallback textCallback;
+    /**
+     * Retained GLFW key callback installed on the active window.
+     */
+    private static GLFWKeyCallback keyCallback;
+    /**
+     * Most recently pressed key code; reset uses minus one when no key is tracked.
+     */
+    private static short currentKey;
+    /**
+     * Current GLFW Shift, Control, Alt, and Super modifier mask.
+     */
+    private static byte modifierState;
+    /**
+     * Cached Caps Lock state maintained by initialization and key toggles.
+     */
+    private static boolean capsLockOn;
 
     /**
      * <p>
@@ -782,7 +798,9 @@ public final class Keyboard {
             capsLockOn = false;
         }
 
-        keyCallback = glfwSetKeyCallback(Window.getAddress(), (win, key, scancode, action, mods) -> {
+        textCallback = org.lwjgl.glfw.GLFWCharCallback.create((win, codePoint) -> JGL.publish(new valthorne.event.events.TextInputEvent(new String(Character.toChars(codePoint)))));
+        glfwSetCharCallback(Window.getAddress(), textCallback);
+        keyCallback = GLFWKeyCallback.create((win, key, scancode, action, mods) -> {
             if (key < 0 || key > GLFW_KEY_LAST) return;
 
             KeyEvent event = null;
@@ -810,6 +828,7 @@ public final class Keyboard {
                 JGL.publish(event);
             }
         });
+        glfwSetKeyCallback(Window.getAddress(), keyCallback);
     }
 
     /**
@@ -862,13 +881,24 @@ public final class Keyboard {
      * </p>
      */
     static void dispose() {
+        if (textCallback != null) {
+            if (Window.getAddress() != 0) glfwSetCharCallback(Window.getAddress(), null);
+            textCallback.free();
+            textCallback = null;
+        }
         if (keyCallback != null) {
+            if (Window.getAddress() != 0) glfwSetKeyCallback(Window.getAddress(), null);
             keyCallback.free();
             keyCallback = null;
         }
         resetState();
     }
 
+    /**
+     * Clears pressed-key tracking, removes the current-key marker, and resets cached
+     * modifier and Caps Lock state. Does not unregister callbacks or change the
+     * operating system's actual Caps Lock setting.
+     */
     static void resetState() {
         keyDown.clear();
         currentKey = -1;

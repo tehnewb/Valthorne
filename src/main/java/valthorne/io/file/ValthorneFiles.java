@@ -21,14 +21,22 @@ import java.nio.file.StandardCopyOption;
  */
 public final class ValthorneFiles {
 
+    /**
+     * Prevents construction of this stateless classpath resource utility. All resource
+     * lookup and extraction operations are exposed through static methods.
+     */
     private ValthorneFiles() {
         // utility class
     }
 
     /**
-     * Reads a classpath resource into a byte[].
+     * Reads the complete classpath resource into memory and closes its stream.
+     * The returned array is independent of the stream and can be modified by the caller.
+     * No size limit is imposed on resource contents.
      *
-     * @param resourcePath path relative to classpath root (e.g. "data/test.json")
+     * @param resourcePath resource name relative to the classpath root
+     * @return newly allocated resource bytes
+     * @throws ValthorneFileException if reading fails or the resource cannot be found
      */
     public static byte[] readBytes(String resourcePath) {
         try (InputStream in = openResource(resourcePath)) {
@@ -39,19 +47,27 @@ public final class ValthorneFiles {
     }
 
     /**
-     * Reads a classpath resource into a UTF-8 String.
+     * Reads the entire resource as UTF-8 text and closes its stream. Decoding follows
+     * String's replacement behavior for malformed byte sequences.
      *
-     * @param resourcePath path relative to classpath root (e.g. "data/test.json")
+     * @param resourcePath resource name relative to the classpath root
+     * @return decoded resource contents
+     * @throws ValthorneFileException if reading fails or the resource cannot be found
      */
     public static String readString(String resourcePath) {
         return readString(resourcePath, StandardCharsets.UTF_8);
     }
 
     /**
-     * Reads a classpath resource into a String using the given charset.
+     * Reads all resource bytes and decodes them with the supplied character set.
+     * The source stream is closed by readBytes before decoding, and malformed byte
+     * sequences follow String's replacement behavior.
      *
-     * @param resourcePath path relative to classpath root (e.g. "data/test.json")
-     * @param charset      character set to decode bytes
+     * @param resourcePath resource name relative to the classpath root
+     * @param charset character set for decoding
+     * @return decoded resource contents
+     * @throws NullPointerException if charset is null
+     * @throws ValthorneFileException if reading fails or the resource cannot be found
      */
     public static String readString(String resourcePath, Charset charset) {
         byte[] bytes = readBytes(resourcePath);
@@ -102,9 +118,13 @@ public final class ValthorneFiles {
     }
 
     /**
-     * Returns true if the given classpath resource exists.
+     * Checks for a resource using this class's defining class loader without opening
+     * its stream. A positive result indicates lookup success at this instant and does
+     * not guarantee that a later read will succeed.
      *
-     * @param resourcePath path relative to classpath root (e.g. "data/test.json")
+     * @param resourcePath resource name relative to the classpath root
+     * @return whether class-loader lookup returns a resource URL
+     * @throws IllegalArgumentException if the resource name is null or empty
      */
     public static boolean exists(String resourcePath) {
         String normalized = normalize(resourcePath);
@@ -112,8 +132,14 @@ public final class ValthorneFiles {
     }
 
     /**
-     * Opens a classpath resource as an InputStream.
-     * Public in case you later decide to support streams, but everything else works without requiring streams.
+     * Opens a classpath resource with this class's defining class loader.
+     * The returned stream belongs to the caller and must be closed, preferably using
+     * try-with-resources. Leading slashes and surrounding whitespace are normalized.
+     *
+     * @param resourcePath resource name relative to the classpath root
+     * @return newly opened resource stream
+     * @throws IllegalArgumentException if the resource name is null or empty
+     * @throws ValthorneFileNotFoundException if lookup finds no resource
      */
     public static InputStream openResource(String resourcePath) {
         String normalized = normalize(resourcePath);
@@ -124,6 +150,15 @@ public final class ValthorneFiles {
         return in;
     }
 
+    /**
+     * Trims surrounding whitespace and removes every leading slash for ClassLoader
+     * lookup. Does not rewrite backslashes, collapse dot segments, or resolve filesystem
+     * paths; the remaining text is used as a classpath resource name.
+     *
+     * @param resourcePath requested resource name
+     * @return nonempty resource name without leading slashes
+     * @throws IllegalArgumentException if the argument is null or normalizes to empty
+     */
     private static String normalize(String resourcePath) {
         if (resourcePath == null) {
             throw new IllegalArgumentException("resourcePath cannot be null");

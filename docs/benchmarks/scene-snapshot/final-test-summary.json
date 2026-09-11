@@ -1,0 +1,30 @@
+[
+  {
+    "suite": "test",
+    "tests": 140,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2
+  },
+  {
+    "suite": "verify3D",
+    "tests": 87,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "verifyPhysics3D",
+    "tests": 32,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "verifyLighting",
+    "tests": 27,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "src/main/java/valthorne/graphics/model/PathTracingScene.java",
+    "sha256": "BB7802649452A6672B7CDC5A0C5428ED862F15C12C6E1478C3B0F9B811EBB0BD"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/FilamentRenderer3D.java",
+    "sha256": "CFCF5FE3FB3D1583904AF3B0B9F3A5F031558A4F94F7DC1E199C324CBA9C5076"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/PathTracer3D.java",
+    "sha256": "53757CC839D4ED95168C761ABE0200C3DC0900DFC88B2BC954E550AF08BA217E"
+  },
+  {
+    "path": "src/benchmark/java/valthorne/graphics/model/SceneSnapshotBenchmark.java",
+    "sha256": "637A79FCDA7535E9858325C9DDA2DA84DC5E89E51575B465C2E1D12D81EFC5DB"
+  },
+  {
+    "path": "src/test/java/valthorne/model3d/PathTracingSceneSnapshotTest.java",
+    "sha256": "F6F64F452AD538C18610C5489B2592FD8B3B6003C1D26E2DF8651D1411CA468D"
+  }
+]

@@ -29,7 +29,15 @@ import valthorne.event.events.KeyReleaseEvent;
  */
 public interface KeyListener extends EventHandler<KeyEvent> {
 
-    /** Dispatches the concrete key event to its specialized callback. */
+    /**
+     * Dispatches the concrete key event to its specialized callback.
+     * The callback executes immediately and receives the original event reference.
+     * This entry point neither copies the event nor consumes it automatically.
+     *
+     * @param event concrete event supported by this listener
+     * @throws IllegalStateException if the event has an unsupported subtype
+     * @throws NullPointerException  if event is null
+     */
     @Override
     default void handle(KeyEvent event) {
         switch (event) {
@@ -52,7 +60,7 @@ public interface KeyListener extends EventHandler<KeyEvent> {
      * Registers this exact listener instance for both concrete key routes.
      *
      * @param publisher target publisher
-     * @param priority explicit execution priority
+     * @param priority  execution priority; larger values run first
      */
     default void register(EventPublisher publisher, int priority) {
         publisher.register(EventTypes.KEY_PRESS, priority, this);
@@ -71,9 +79,23 @@ public interface KeyListener extends EventHandler<KeyEvent> {
         return press || release;
     }
 
-    /** @param event key press event */
+    /**
+     * Receives the key press event. The event is shared with the publisher's
+     * dispatch; consume it explicitly if later listeners should not receive it.
+     * Implementations run synchronously and should copy needed values before retaining
+     * information from reusable events.
+     *
+     * @param event key press event
+     */
     void keyPressed(KeyPressEvent event);
 
-    /** @param event key release event */
+    /**
+     * Receives the key release event. The event is shared with the publisher's
+     * dispatch; consume it explicitly if later listeners should not receive it.
+     * Implementations run synchronously and should copy needed values before retaining
+     * information from reusable events.
+     *
+     * @param event key release event
+     */
     void keyReleased(KeyReleaseEvent event);
 }

@@ -10,19 +10,23 @@ import java.nio.ShortBuffer;
 import java.nio.file.Path;
 
 /**
- * <p>
- * {@code OggSoundStream} provides chunked PCM decoding for OGG Vorbis audio using
- * STB Vorbis. It supports both file-path-backed and in-memory sources.
- * </p>
+ * Decodes file-backed or memory-backed OGG Vorbis audio into interleaved signed
+ * 16-bit PCM through an owned native STB decoder. Reads and seeks share one decoder
+ * position and must be externally serialized; instances are not thread-safe.
+ * <p>Close the stream to release the native decoder. Closing is idempotent and leaves
+ * metadata accessible, but further reads and seeks fail. Memory-backed encoded data
+ * is retained for the decoder's lifetime.
  *
  * @author Albert Beaupre
- * @since March 26th, 2026
  */
 public class OggSoundStream implements SoundStream {
 
     private final SoundData data; // Stream description and metadata used by this decoder
     private final ByteBuffer encodedData; // Encoded OGG data retained for memory-backed sources
     private final long decoder; // Native STB Vorbis decoder handle
+    private ByteBuffer lastDestination; // Last caller-owned PCM buffer, retained only to reuse its short view.
+    private ShortBuffer sampleView; // Cached signed-sample view of the last destination buffer.
+    private boolean closed; // Whether the native decoder has already been released.
 
     /**
      * Creates a new OGG stream for the supplied sound data.
@@ -88,21 +92,34 @@ public class OggSoundStream implements SoundStream {
      */
     @Override
     public boolean seek(float seconds) {
+        ensureOpen();
         int sample = Math.max(0, Math.round(clamp(seconds) * sampleRate()));
         return STBVorbis.stb_vorbis_seek(decoder, sample);
     }
 
     /**
-     * Reads decoded PCM data into the supplied buffer.
+     * Decodes from the current stream position into a direct PCM destination.
+     * The destination is cleared first, so its incoming position and limit are ignored.
+     * On return its position is zero and its limit is the number of decoded bytes.
+     * Samples are interleaved signed 16-bit values; use native byte order when reading
+     * them. A cached short view is reused while the same destination object is supplied.
      *
-     * @param pcmBuffer the destination PCM buffer
-     * @return the number of bytes read
+     * @param pcmBuffer writable direct buffer for complete interleaved PCM frames
+     *
+     * @return bytes produced, or zero when no more frames can be decoded
+     * @throws IllegalStateException if this stream has been closed
      */
     @Override
     public int read(ByteBuffer pcmBuffer) {
+        ensureOpen();
         pcmBuffer.clear();
 
-        ShortBuffer shortBuffer = pcmBuffer.asShortBuffer();
+        if (lastDestination != pcmBuffer) {
+            lastDestination = pcmBuffer;
+            sampleView = pcmBuffer.asShortBuffer();
+        }
+        ShortBuffer shortBuffer = sampleView;
+        shortBuffer.clear();
         int totalShorts = 0;
         int maxShorts = shortBuffer.remaining();
 
@@ -126,7 +143,21 @@ public class OggSoundStream implements SoundStream {
      */
     @Override
     public void close() {
+        if (closed) return;
+        closed = true;
         STBVorbis.stb_vorbis_close(decoder);
+        lastDestination = null;
+        sampleView = null;
+    }
+
+    /**
+     * Guards operations that dereference the native decoder. Metadata access does not
+     * require an open decoder, but reads and seeks call this before entering STB.
+     *
+     * @throws IllegalStateException if close has already released the decoder
+     */
+    private void ensureOpen() {
+        if (closed) throw new IllegalStateException("OGG stream is closed");
     }
 
     /**

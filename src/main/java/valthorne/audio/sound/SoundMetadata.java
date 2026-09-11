@@ -14,12 +14,12 @@ package valthorne.audio.sound;
  * long estimated = metadata.estimatedPcmBytes();
  * }</pre>
  *
- * @param duration the duration in seconds, or a negative value when unknown
- * @param channels the number of audio channels
- * @param sampleRate the sample rate in hertz
+ * @param duration      the duration in seconds, or a negative value when unknown
+ * @param channels      the number of audio channels
+ * @param sampleRate    the sample rate in hertz
  * @param bitsPerSample the number of bits per sample
- * @param dataOffset the byte offset where streamable PCM or encoded data begins
- * @param dataLength the byte length of the relevant data section
+ * @param dataOffset    the byte offset where streamable PCM or encoded data begins
+ * @param dataLength    the byte length of the relevant data section
  * @author Albert Beaupre
  * @since March 26th, 2026
  */

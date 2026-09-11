@@ -1,6 +1,7 @@
 package valthorne.graphics.radiance;
 
 import valthorne.graphics.shader.ComputeShader;
+import valthorne.graphics.shader.ShaderSources;
 import valthorne.graphics.texture.Texture;
 
 import java.util.ArrayList;
@@ -30,494 +31,95 @@ import static org.lwjgl.opengl.GL43.glBindImageTexture;
  *
  * <p>The final light texture resolves diffuse-like lighting by integrating the merged
  * cascade 0 cones at each pixel.</p>
+ *
+ * <pre>{@code
+ * RadianceSceneBuffer scene = new RadianceSceneBuffer(640, 360);
+ * RadianceCascades lighting = new RadianceCascades(640, 360);
+ * // Capture scene data into scene before solving.
+ * lighting.render(scene);
+ * Texture light = lighting.getLightTexture();
+ * // Consume light before resizing or disposing lighting.
+ * lighting.dispose();
+ * scene.dispose();
+ * }</pre>
+ *
+ * <p>Construction, solving, resizing, and disposal require a compute-capable OpenGL
+ * context. The solver owns its programs and textures, borrows the captured scene,
+ * and retains settings by reference. Configure hierarchy settings before creation:
+ * changing them does not automatically rebuild targets. Rendering leaves texture
+ * and image bindings changed and unbinds its compute program to program zero.</p>
+ *
+ * @author Albert Beaupre
  */
 public final class RadianceCascades {
 
+    /**
+     * Square compute workgroup extent matching the shader local size.
+     */
     private static final int WORKGROUP_SIZE = 8;
+    /**
+     * Factor used to derive automatic base interval length from probe spacing.
+     */
     private static final float SQRT_TWO_OVER_TWO = 0.70710677f;
 
-    private static final String TRACE_COMPUTE = """
-            #version 430 core
-            layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-
-            layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
-            uniform sampler2D u_sceneTexture;
-            uniform ivec2 u_sceneSize;
-            uniform ivec2 u_internalSceneSize;
-            uniform vec2 u_sceneScale;
-            uniform ivec2 u_probeCount;
-            uniform int u_probeSpacing;
-            uniform int u_rayCount;
-            uniform float u_intervalStart;
-            uniform float u_traceLength;
-            uniform float u_hitThreshold;
-
-            const float PI = 3.14159265358979323846;
-            const float TAU = PI * 2.0;
-
-            vec4 emptyInterval() {
-                return vec4(0.0, 0.0, 0.0, 1.0);
-            }
-
-            bool insideInternalCell(ivec2 cell) {
-                return cell.x >= 0 && cell.y >= 0 && cell.x < u_internalSceneSize.x && cell.y < u_internalSceneSize.y;
-            }
-
-            bool insideInternalPos(vec2 pos) {
-                return pos.x >= 0.0 && pos.y >= 0.0
-                    && pos.x < float(u_internalSceneSize.x)
-                    && pos.y < float(u_internalSceneSize.y);
-            }
-
-            ivec2 internalCellToScenePixel(ivec2 internalCell) {
-                vec2 scenePos = (vec2(internalCell) + vec2(0.5)) * u_sceneScale - vec2(0.5);
-                return ivec2(clamp(floor(scenePos), vec2(0.0), vec2(u_sceneSize) - vec2(1.0)));
-            }
-
-            vec4 readSceneCell(ivec2 internalCell) {
-                if (!insideInternalCell(internalCell)) return vec4(0.0);
-                return texelFetch(u_sceneTexture, internalCellToScenePixel(internalCell), 0);
-            }
-
-            vec2 directionForRay(int rayIndex, int rayCount) {
-                float angle = (float(rayIndex) + 0.5) * (TAU / float(max(rayCount, 1)));
-                return vec2(cos(angle), sin(angle));
-            }
-
-            vec4 hitToInterval(vec4 sceneValue) {
-                float opacity = clamp(sceneValue.a, 0.0, 1.0);
-                return vec4(sceneValue.rgb, 1.0 - opacity);
-            }
-
-            vec4 traceSegment(vec2 startPos, vec2 dir, float lengthToTrace) {
-                if (lengthToTrace <= 0.0001) return emptyInterval();
-                if (!insideInternalPos(startPos)) return emptyInterval();
-
-                vec2 sceneStart = clamp(startPos, vec2(0.0), vec2(u_internalSceneSize) - vec2(0.0001));
-                ivec2 cell = ivec2(floor(sceneStart));
-                ivec2 step = ivec2(sign(dir));
-
-                vec2 nextBoundary = vec2(
-                    step.x > 0 ? floor(sceneStart.x) + 1.0 : floor(sceneStart.x),
-                    step.y > 0 ? floor(sceneStart.y) + 1.0 : floor(sceneStart.y)
-                );
-
-                vec2 tMax = vec2(
-                    step.x == 0 ? 1e30 : (nextBoundary.x - sceneStart.x) / dir.x,
-                    step.y == 0 ? 1e30 : (nextBoundary.y - sceneStart.y) / dir.y
-                );
-
-                vec2 tDelta = vec2(
-                    step.x == 0 ? 1e30 : 1.0 / abs(dir.x),
-                    step.y == 0 ? 1e30 : 1.0 / abs(dir.y)
-                );
-
-                float travelled = 0.0;
-                while (travelled <= lengthToTrace && insideInternalCell(cell)) {
-                    vec4 sceneValue = readSceneCell(cell);
-                    if (sceneValue.a > u_hitThreshold) {
-                        return hitToInterval(sceneValue);
-                    }
-
-                    if (tMax.x < tMax.y) {
-                        travelled = tMax.x;
-                        cell.x += step.x;
-                        tMax.x += tDelta.x;
-                    } else if (tMax.y < tMax.x) {
-                        travelled = tMax.y;
-                        cell.y += step.y;
-                        tMax.y += tDelta.y;
-                    } else {
-                        travelled = tMax.x;
-                        cell.x += step.x;
-                        cell.y += step.y;
-                        tMax.x += tDelta.x;
-                        tMax.y += tDelta.y;
-                    }
-                }
-
-                return emptyInterval();
-            }
-
-            void main() {
-                ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
-                if (texel.y >= u_probeCount.y) return;
-
-                int probeX = texel.x / u_rayCount;
-                if (probeX >= u_probeCount.x) return;
-
-                int rayIndex = texel.x - probeX * u_rayCount;
-                vec2 probePos = (vec2(float(probeX), float(texel.y)) + vec2(0.5)) * float(u_probeSpacing);
-                vec2 dir = directionForRay(rayIndex, u_rayCount);
-                vec2 startPos = probePos + dir * u_intervalStart;
-
-                imageStore(u_outputImage, texel, traceSegment(startPos, dir, u_traceLength));
-            }
-            """;
-
-    private static final String EXTEND_COMPUTE = """
-            #version 430 core
-            layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-
-            layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
-            uniform sampler2D u_intervalTexture;
-            uniform ivec2 u_probeCount;
-            uniform int u_probeSpacing;
-            uniform int u_rayCount;
-            uniform float u_shiftDistance;
-            uniform int u_linearSpatial;
-            uniform float u_cutoff;
-
-            const float PI = 3.14159265358979323846;
-            const float TAU = PI * 2.0;
-
-            vec4 emptyInterval() {
-                return vec4(0.0, 0.0, 0.0, 1.0);
-            }
-
-            vec2 directionForRay(int rayIndex, int rayCount) {
-                float angle = (float(rayIndex) + 0.5) * (TAU / float(max(rayCount, 1)));
-                return vec2(cos(angle), sin(angle));
-            }
-
-            vec4 mergeInterval(vec4 nearValue, vec4 farValue) {
-                return vec4(nearValue.rgb + nearValue.a * farValue.rgb, nearValue.a * farValue.a);
-            }
-
-            vec4 fetchProbeRay(ivec2 probe, int rayIndex) {
-                if (probe.x < 0 || probe.y < 0 || probe.x >= u_probeCount.x || probe.y >= u_probeCount.y) {
-                    return emptyInterval();
-                }
-                rayIndex = clamp(rayIndex, 0, u_rayCount - 1);
-                return texelFetch(u_intervalTexture, ivec2(probe.x * u_rayCount + rayIndex, probe.y), 0);
-            }
-
-            vec4 sampleInterval(vec2 samplePos, int rayIndex) {
-                vec2 probeCoord = samplePos / float(u_probeSpacing) - vec2(0.5);
-                if (u_linearSpatial == 0) {
-                    ivec2 probe = ivec2(floor(probeCoord + vec2(0.5)));
-                    return fetchProbeRay(probe, rayIndex);
-                }
-
-                ivec2 base = ivec2(floor(probeCoord));
-                vec2 frac = fract(probeCoord);
-
-                vec4 s00 = fetchProbeRay(base + ivec2(0, 0), rayIndex);
-                vec4 s10 = fetchProbeRay(base + ivec2(1, 0), rayIndex);
-                vec4 s01 = fetchProbeRay(base + ivec2(0, 1), rayIndex);
-                vec4 s11 = fetchProbeRay(base + ivec2(1, 1), rayIndex);
-
-                vec4 top = mix(s00, s10, frac.x);
-                vec4 bottom = mix(s01, s11, frac.x);
-                return mix(top, bottom, frac.y);
-            }
-
-            void main() {
-                ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
-                if (texel.y >= u_probeCount.y) return;
-
-                int probeX = texel.x / u_rayCount;
-                if (probeX >= u_probeCount.x) return;
-
-                int rayIndex = texel.x - probeX * u_rayCount;
-                vec4 nearValue = texelFetch(u_intervalTexture, texel, 0);
-                if (nearValue.a <= u_cutoff) {
-                    imageStore(u_outputImage, texel, nearValue);
-                    return;
-                }
-
-                vec2 probePos = (vec2(float(probeX), float(texel.y)) + vec2(0.5)) * float(u_probeSpacing);
-                vec2 dir = directionForRay(rayIndex, u_rayCount);
-                vec4 farValue = sampleInterval(probePos + dir * u_shiftDistance, rayIndex);
-
-                imageStore(u_outputImage, texel, mergeInterval(nearValue, farValue));
-            }
-            """;
-
-    private static final String MERGE_COMPUTE = """
-            #version 430 core
-            layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-
-            layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
-            uniform sampler2D u_currentIntervalTexture;
-            uniform sampler2D u_nextMergedTexture;
-            uniform ivec2 u_currentProbeCount;
-            uniform ivec2 u_nextProbeCount;
-            uniform int u_currentProbeSpacing;
-            uniform int u_nextProbeSpacing;
-            uniform int u_currentRayCount;
-            uniform int u_nextRayCount;
-            uniform int u_hasNext;
-            uniform int u_linearSpatial;
-            uniform float u_cutoff;
-
-            vec4 emptyInterval() {
-                return vec4(0.0, 0.0, 0.0, 1.0);
-            }
-
-            vec4 mergeInterval(vec4 nearValue, vec4 farValue) {
-                return vec4(nearValue.rgb + nearValue.a * farValue.rgb, nearValue.a * farValue.a);
-            }
-
-            vec4 fetchCurrent(ivec2 probe, int rayIndex) {
-                if (probe.x < 0 || probe.y < 0 || probe.x >= u_currentProbeCount.x || probe.y >= u_currentProbeCount.y) {
-                    return emptyInterval();
-                }
-                rayIndex = clamp(rayIndex, 0, u_currentRayCount - 1);
-                return texelFetch(u_currentIntervalTexture, ivec2(probe.x * u_currentRayCount + rayIndex, probe.y), 0);
-            }
-
-            vec4 fetchNext(ivec2 probe, int rayIndex) {
-                if (probe.x < 0 || probe.y < 0 || probe.x >= u_nextProbeCount.x || probe.y >= u_nextProbeCount.y) {
-                    return emptyInterval();
-                }
-                rayIndex = clamp(rayIndex, 0, u_nextRayCount - 1);
-                return texelFetch(u_nextMergedTexture, ivec2(probe.x * u_nextRayCount + rayIndex, probe.y), 0);
-            }
-
-            vec4 sampleNextSingleRay(vec2 samplePos, int rayIndex) {
-                vec2 probeCoord = samplePos / float(u_nextProbeSpacing) - vec2(0.5);
-                if (u_linearSpatial == 0) {
-                    ivec2 probe = ivec2(floor(probeCoord + vec2(0.5)));
-                    return fetchNext(probe, rayIndex);
-                }
-
-                ivec2 base = ivec2(floor(probeCoord));
-                vec2 frac = fract(probeCoord);
-
-                vec4 s00 = fetchNext(base + ivec2(0, 0), rayIndex);
-                vec4 s10 = fetchNext(base + ivec2(1, 0), rayIndex);
-                vec4 s01 = fetchNext(base + ivec2(0, 1), rayIndex);
-                vec4 s11 = fetchNext(base + ivec2(1, 1), rayIndex);
-
-                vec4 top = mix(s00, s10, frac.x);
-                vec4 bottom = mix(s01, s11, frac.x);
-                return mix(top, bottom, frac.y);
-            }
-
-            vec4 sampleProjectedNext(vec2 samplePos, int rayIndex) {
-                if (u_hasNext == 0) {
-                    return emptyInterval();
-                }
-
-                int childFactor = max(u_nextRayCount / max(u_currentRayCount, 1), 1);
-                vec4 sum = vec4(0.0);
-                for (int child = 0; child < childFactor; child++) {
-                    sum += sampleNextSingleRay(samplePos, rayIndex * childFactor + child);
-                }
-                return sum / float(childFactor);
-            }
-
-            void main() {
-                ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
-                if (texel.y >= u_currentProbeCount.y) return;
-
-                int probeX = texel.x / u_currentRayCount;
-                if (probeX >= u_currentProbeCount.x) return;
-
-                int rayIndex = texel.x - probeX * u_currentRayCount;
-                vec4 nearValue = texelFetch(u_currentIntervalTexture, texel, 0);
-                if (u_hasNext == 0 || nearValue.a <= u_cutoff) {
-                    imageStore(u_outputImage, texel, nearValue);
-                    return;
-                }
-
-                vec2 probePos = (vec2(float(probeX), float(texel.y)) + vec2(0.5)) * float(u_currentProbeSpacing);
-                vec4 farValue = sampleProjectedNext(probePos, rayIndex);
-
-                imageStore(u_outputImage, texel, mergeInterval(nearValue, farValue));
-            }
-            """;
-
-    private static final String RESOLVE_COMPUTE = """
-            #version 430 core
-            layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-
-            layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
-            uniform sampler2D u_baseMergedTexture;
-            uniform sampler2D u_sceneTexture;
-            uniform ivec2 u_outputSize;
-            uniform ivec2 u_solveSize;
-            uniform ivec2 u_probeCount;
-            uniform int u_probeSpacing;
-            uniform int u_rayCount;
-            uniform int u_linearSpatial;
-            uniform float u_intensity;
-            uniform float u_surfaceThreshold;
-
-            vec4 emptyInterval() {
-                return vec4(0.0, 0.0, 0.0, 1.0);
-            }
-
-            float luminance(vec3 value) {
-                return dot(value, vec3(0.2126, 0.7152, 0.0722));
-            }
-
-            vec3 toneMap(vec3 radiance) {
-                vec3 linear = max(radiance, vec3(0.0));
-                return vec3(1.0) - (vec3(1.0) / pow(vec3(1.0) + linear, vec3(2.5)));
-            }
-
-            vec2 directionForRay(int rayIndex, int rayCount) {
-                const float PI = 3.14159265358979323846;
-                const float TAU = PI * 2.0;
-                float angle = (float(rayIndex) + 0.5) * (TAU / float(max(rayCount, 1)));
-                return vec2(cos(angle), sin(angle));
-            }
-
-            vec4 readScene(ivec2 pixel) {
-                pixel = clamp(pixel, ivec2(0), u_outputSize - ivec2(1));
-                return texelFetch(u_sceneTexture, pixel, 0);
-            }
-
-            float occupancyAt(ivec2 pixel) {
-                return readScene(pixel).a > u_surfaceThreshold ? 1.0 : 0.0;
-            }
-
-            float geometryPresence(ivec2 pixel) {
-                float center = occupancyAt(pixel);
-
-                float ring1 = 0.0;
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(-1, 0)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(1, 0)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(0, -1)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(0, 1)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(-1, -1)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(1, -1)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(-1, 1)));
-                ring1 = max(ring1, occupancyAt(pixel + ivec2(1, 1)));
-
-                float ring2 = 0.0;
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(-2, 0)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(2, 0)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(0, -2)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(0, 2)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(-2, -2)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(2, -2)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(-2, 2)));
-                ring2 = max(ring2, occupancyAt(pixel + ivec2(2, 2)));
-
-                return clamp(max(center, max(ring1 * 0.82, ring2 * 0.46)), 0.0, 1.0);
-            }
-
-            vec2 estimateNormal(ivec2 pixel, out float edgeStrength) {
-                float left = occupancyAt(pixel + ivec2(-1, 0));
-                float right = occupancyAt(pixel + ivec2(1, 0));
-                float down = occupancyAt(pixel + ivec2(0, -1));
-                float up = occupancyAt(pixel + ivec2(0, 1));
-
-                float downLeft = occupancyAt(pixel + ivec2(-1, -1));
-                float downRight = occupancyAt(pixel + ivec2(1, -1));
-                float upLeft = occupancyAt(pixel + ivec2(-1, 1));
-                float upRight = occupancyAt(pixel + ivec2(1, 1));
-
-                vec2 gradient = vec2(
-                    (right - left) + 0.5 * ((upRight + downRight) - (upLeft + downLeft)),
-                    (up - down) + 0.5 * ((upLeft + upRight) - (downLeft + downRight))
-                );
-
-                edgeStrength = length(gradient);
-                if (edgeStrength <= 0.0001) {
-                    return vec2(0.0, 0.0);
-                }
-                return -gradient / edgeStrength;
-            }
-
-            vec4 fetchBase(ivec2 probe, int rayIndex) {
-                if (probe.x < 0 || probe.y < 0 || probe.x >= u_probeCount.x || probe.y >= u_probeCount.y) {
-                    return emptyInterval();
-                }
-                rayIndex = clamp(rayIndex, 0, u_rayCount - 1);
-                return texelFetch(u_baseMergedTexture, ivec2(probe.x * u_rayCount + rayIndex, probe.y), 0);
-            }
-
-            vec4 sampleBase(vec2 solvePos, int rayIndex) {
-                vec2 probeCoord = solvePos / float(u_probeSpacing) - vec2(0.5);
-                if (u_linearSpatial == 0) {
-                    ivec2 probe = ivec2(floor(probeCoord + vec2(0.5)));
-                    return fetchBase(probe, rayIndex);
-                }
-
-                ivec2 base = ivec2(floor(probeCoord));
-                vec2 frac = fract(probeCoord);
-
-                vec4 s00 = fetchBase(base + ivec2(0, 0), rayIndex);
-                vec4 s10 = fetchBase(base + ivec2(1, 0), rayIndex);
-                vec4 s01 = fetchBase(base + ivec2(0, 1), rayIndex);
-                vec4 s11 = fetchBase(base + ivec2(1, 1), rayIndex);
-
-                vec4 top = mix(s00, s10, frac.x);
-                vec4 bottom = mix(s01, s11, frac.x);
-                return mix(top, bottom, frac.y);
-            }
-
-            void main() {
-                ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
-                if (pixel.x >= u_outputSize.x || pixel.y >= u_outputSize.y) return;
-
-                vec2 solvePos = (vec2(pixel) + vec2(0.5)) * vec2(u_solveSize) / vec2(u_outputSize);
-                vec4 sceneValue = readScene(pixel);
-                float emissiveStrength = smoothstep(0.015, 0.18, luminance(sceneValue.rgb) * sceneValue.a);
-                float nearGeometry = geometryPresence(pixel);
-                float edgeStrength;
-                vec2 normal = estimateNormal(pixel, edgeStrength);
-                float directionalMix = smoothstep(0.08, 0.9, edgeStrength) * (1.0 - emissiveStrength * 0.65);
-
-                vec3 total = vec3(0.0);
-                float totalWeight = 0.0;
-                float visibleWeight = 0.0;
-
-                for (int rayIndex = 0; rayIndex < u_rayCount; rayIndex++) {
-                    vec4 sampleValue = sampleBase(solvePos, rayIndex);
-                    vec2 dir = directionForRay(rayIndex, u_rayCount);
-                    float hemisphereWeight = max(dot(dir, normal), 0.0);
-                    float weight = mix(1.0, hemisphereWeight, directionalMix);
-                    total += sampleValue.rgb * weight;
-                    totalWeight += weight;
-                    visibleWeight += weight * (1.0 - sampleValue.a);
-                }
-
-                vec3 resolved = total * (u_intensity / max(totalWeight, 0.0001));
-                vec3 mapped = toneMap(resolved);
-
-                float rawLuma = luminance(resolved);
-                float mappedLuma = luminance(mapped);
-                float visibleRatio = visibleWeight / max(totalWeight, 0.0001);
-                float localLight = smoothstep(0.0025, 0.085, rawLuma);
-                float bloomLight = smoothstep(0.014, 0.18, rawLuma);
-                float transmittancePresence = smoothstep(0.015, 0.40, visibleRatio);
-                float surfaceMask = clamp(max(nearGeometry, emissiveStrength), 0.0, 1.0);
-                float airLift = localLight * (0.18 + 0.40 * transmittancePresence);
-
-                float alpha = max(emissiveStrength, localLight * mix(0.26, 0.98, surfaceMask));
-                alpha = max(alpha, airLift);
-                alpha = max(alpha, bloomLight * 0.12);
-                alpha *= mix(0.55, 1.0, surfaceMask);
-                alpha *= smoothstep(0.01, 0.16, mappedLuma + transmittancePresence * 0.55);
-                alpha = clamp(alpha, 0.0, 1.0);
-
-                imageStore(u_outputImage, pixel, vec4(mapped, alpha));
-            }
-            """;
-
-    private final RadianceCascadeSettings settings;
-    private final List<RadianceCascadeLevel> levels = new ArrayList<>();
-    private final ComputeShader traceShader;
-    private final ComputeShader extendShader;
-    private final ComputeShader mergeShader;
-    private final ComputeShader resolveShader;
-
-    private RadianceRenderTarget resolvedLight;
-    private int width;
-    private int height;
-    private int solveWidth;
-    private int solveHeight;
-    private float baseIntervalLength;
-
+    /**
+     * Source for tracing base-length intervals from captured scene data.
+     */
+    private static final String TRACE_COMPUTE = ShaderSources.load("radiance/trace.comp");
+
+    /**
+     * Source for extending intervals through alternating textures.
+     */
+    private static final String EXTEND_COMPUTE = ShaderSources.load("radiance/extend.comp");
+
+    /**
+     * Source for combining adjacent hierarchy levels.
+     */
+    private static final String MERGE_COMPUTE = ShaderSources.load("radiance/merge.comp");
+
+    /**
+     * Source for integrating base-level radiance into the output image.
+     */
+    private static final String RESOLVE_COMPUTE = ShaderSources.load("radiance/resolve.comp");
+
+    private final RadianceCascadeSettings settings; // Shared configuration retained from construction.
+    private final List<RadianceCascadeLevel> levels = new ArrayList<>(); // Owned levels ordered from finest to coarsest.
+    private final ComputeShader traceShader; // Owned interval tracing program.
+    private final ComputeShader extendShader; // Owned interval extension program.
+    private final ComputeShader mergeShader; // Owned hierarchy merge program.
+    private final ComputeShader resolveShader; // Owned final lighting resolve program.
+
+    private RadianceRenderTarget resolvedLight; // Owned full-resolution lighting output.
+    private int width; // Captured scene and output width in pixels.
+    private int height; // Captured scene and output height in pixels.
+    private int solveWidth; // Reduced internal solve width in pixels.
+    private int solveHeight; // Reduced internal solve height in pixels.
+    private float baseIntervalLength; // Resolved base interval length in internal solver units.
+
+    /**
+     * Creates a solver with default settings, compiling four compute programs and
+     * allocating its hierarchy immediately on the current graphics context.
+     *
+     * @param width positive capture width in pixels
+     * @param height positive capture height in pixels
+     * @throws IllegalArgumentException if a dimension is nonpositive
+     */
     public RadianceCascades(int width, int height) {
         this(width, height, new RadianceCascadeSettings());
     }
 
+    /**
+     * Validates Flatland settings, retains their reference, compiles compute programs,
+     * and allocates hierarchy and output textures. Resource allocation occurs immediately;
+     * configure structural settings before construction.
+     *
+     * @param width positive capture width in pixels
+     * @param height positive capture height in pixels
+     * @param settings configuration retained without copying
+     * @throws NullPointerException if settings is null
+     * @throws IllegalArgumentException if dimensions or checked settings are invalid
+     * @throws IllegalStateException if shader compilation or hierarchy construction fails
+     */
     public RadianceCascades(int width, int height, RadianceCascadeSettings settings) {
         if (width <= 0) throw new IllegalArgumentException("width must be > 0");
         if (height <= 0) throw new IllegalArgumentException("height must be > 0");
@@ -535,6 +137,11 @@ public final class RadianceCascades {
         rebuild();
     }
 
+    /**
+     * Disposes current targets and rebuilds reduced solve dimensions, base interval,
+     * cascade levels, and full-resolution output using current settings. Old borrowed
+     * wrappers become invalid; failures can leave partially reconstructed state.
+     */
     private void rebuild() {
         disposeTargets();
 
@@ -546,6 +153,12 @@ public final class RadianceCascades {
         resolvedLight = new RadianceRenderTarget(width, height, false, true);
     }
 
+    /**
+     * Uses a positive explicit interval or derives one as base probe spacing times
+     * sqrt(2)/2. Resolution does not modify the shared settings object.
+     *
+     * @return base interval length in solver units
+     */
     private float resolveBaseIntervalLength() {
         float configured = settings.getBaseIntervalLength();
         if (configured > 0f) {
@@ -554,6 +167,13 @@ public final class RadianceCascades {
         return settings.getBaseProbeSpacing() * SQRT_TWO_OVER_TWO;
     }
 
+    /**
+     * Allocates progressively coarser levels with doubled spacing and ray count and
+     * contiguous growing intervals. Stops at configured count, covered padded scene
+     * distance, or texture cap. Exceeding the cap at the base level is an error.
+     *
+     * @throws IllegalStateException if base geometry exceeds the cap or a parameter overflows
+     */
     private void buildLevels() {
         int cap = settings.getMaxCascadeTextureWidth();
         float intervalStart = 0f;
@@ -595,12 +215,30 @@ public final class RadianceCascades {
         }
     }
 
+    /**
+     * Computes a coverage distance from the diagonal of the solve rectangle enlarged
+     * by one probe spacing in each dimension.
+     *
+     * @param spacing current level's probe spacing
+     * @return padded diagonal in solver units
+     */
     private float maxSceneDistanceForSpacing(int spacing) {
         float paddedWidth = solveWidth + spacing;
         float paddedHeight = solveHeight + spacing;
         return (float) Math.hypot(paddedWidth, paddedHeight);
     }
 
+    /**
+     * Shifts a hierarchy parameter using a long intermediate and rejects results above
+     * the positive integer range. Intended for small nonnegative level indices; this
+     * helper does not validate all possible signed inputs or Java shift-distance wrapping.
+     *
+     * @param value positive base parameter
+     * @param shift nonnegative level index
+     * @return shifted parameter as an integer
+     * @throws IllegalArgumentException if shift is negative
+     * @throws IllegalStateException if the intermediate exceeds Integer.MAX_VALUE
+     */
     private int checkedShift(int value, int shift) {
         if (shift < 0) throw new IllegalArgumentException("shift must be >= 0");
         long result = (long) value << shift;
@@ -610,6 +248,10 @@ public final class RadianceCascades {
         return (int) result;
     }
 
+    /**
+     * Disposes all level textures and the resolved output, clearing retained references.
+     * Compute programs and configuration remain available for a subsequent rebuild.
+     */
     private void disposeTargets() {
         for (RadianceCascadeLevel level : levels) {
             level.dispose();
@@ -622,6 +264,15 @@ public final class RadianceCascades {
         }
     }
 
+    /**
+     * Rebuilds textures for changed positive capture dimensions, discarding previous
+     * lighting and invalidating borrowed wrappers. Equal dimensions are a no-op, so
+     * this method does not refresh changed structural settings at the same size.
+     *
+     * @param width positive capture width in pixels
+     * @param height positive capture height in pixels
+     * @throws IllegalArgumentException if either dimension is nonpositive
+     */
     public void resize(int width, int height) {
         if (width <= 0) throw new IllegalArgumentException("width must be > 0");
         if (height <= 0) throw new IllegalArgumentException("height must be > 0");
@@ -632,6 +283,15 @@ public final class RadianceCascades {
         rebuild();
     }
 
+    /**
+     * Solves captured scene lighting through tracing, extension, back-to-front merging,
+     * and final resolve. Resizes targets if capture dimensions differ. GPU barriers
+     * separate dependent passes; texture and image bindings are not restored afterward.
+     * The scene buffer remains owned by its caller.
+     *
+     * @param sceneBuffer populated capture buffer, not currently being written
+     * @throws NullPointerException if sceneBuffer is null
+     */
     public void render(RadianceSceneBuffer sceneBuffer) {
         if (sceneBuffer == null) throw new NullPointerException("sceneBuffer");
         if (sceneBuffer.getWidth() != width || sceneBuffer.getHeight() != height) {
@@ -644,6 +304,13 @@ public final class RadianceCascades {
         resolveLighting(sceneBuffer);
     }
 
+    /**
+     * Writes fresh base-length intervals for every level, resetting alternating targets
+     * and applying the current surface-hit threshold. Issues a memory barrier after each
+     * dispatch and unbinds the compute program when finished.
+     *
+     * @param sceneBuffer captured scene texture sampled on texture unit zero
+     */
     private void traceIntervals(RadianceSceneBuffer sceneBuffer) {
         traceShader.bind();
 
@@ -671,6 +338,11 @@ public final class RadianceCascades {
         traceShader.unbind();
     }
 
+    /**
+     * Extends each level's initial interval once per level index, doubling the shift
+     * distance each pass. Reads the current interval, writes the alternate, issues a
+     * barrier, and swaps their logical roles. Uses current interpolation and cutoff settings.
+     */
     private void extendIntervals() {
         extendShader.bind();
         extendShader.setUniform1i("u_linearSpatial", settings.isBilinearFix() ? 1 : 0);
@@ -698,6 +370,11 @@ public final class RadianceCascades {
         extendShader.unbind();
     }
 
+    /**
+     * Combines levels from coarsest to finest so each merged image includes its farther
+     * neighbor. The terminal level uses no next image. Each dispatch is followed by a
+     * barrier before a finer level samples the result.
+     */
     private void mergeLevels() {
         mergeShader.bind();
         mergeShader.setUniform1i("u_linearSpatial", settings.isBilinearFix() ? 1 : 0);
@@ -740,6 +417,13 @@ public final class RadianceCascades {
         mergeShader.unbind();
     }
 
+    /**
+     * Integrates the finest merged level into the full-resolution output with current
+     * intensity and surface threshold. Samples scene data and base radiance, writes
+     * the output image, and issues a barrier before returning.
+     *
+     * @param sceneBuffer captured scene used to distinguish surfaces during resolve
+     */
     private void resolveLighting(RadianceSceneBuffer sceneBuffer) {
         RadianceCascadeLevel base = levels.get(0);
 
@@ -765,30 +449,71 @@ public final class RadianceCascades {
         resolveShader.unbind();
     }
 
+    /**
+     * Rounds a positive image extent up to eight-wide workgroups, with a minimum of
+     * one group. The caller supplies image dimensions small enough to avoid addition overflow.
+     *
+     * @param value texture extent in pixels
+     * @return dispatch group count for one axis
+     */
     private int groupCount(int value) {
         return Math.max(1, (value + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE);
     }
 
+    /**
+     * Returns the borrowed resolved-light wrapper. Its contents are produced by render;
+     * resize invalidates earlier wrappers. Do not dispose this texture separately.
+     *
+     * @return current lighting texture
+     * @throws NullPointerException if targets have been disposed
+     */
     public Texture getLightTexture() {
         return resolvedLight.getTexture();
     }
 
+    /**
+     * Returns an unmodifiable live view of the owned level list. Rebuilding changes
+     * its contents and invalidates texture resources in previously retained levels.
+     *
+     * @return live level view ordered finest to coarsest
+     */
     public List<RadianceCascadeLevel> getLevels() {
         return Collections.unmodifiableList(levels);
     }
 
+    /**
+     * Returns the retained mutable settings reference. Structural changes are not
+     * automatically reflected in existing targets; configure them before solver creation.
+     *
+     * @return shared configuration
+     */
     public RadianceCascadeSettings getSettings() {
         return settings;
     }
 
+    /**
+     * Returns the reduced internal width chosen at the latest target rebuild.
+     *
+     * @return internal solve width in pixels
+     */
     public int getSolveWidth() {
         return solveWidth;
     }
 
+    /**
+     * Returns the reduced internal height chosen at the latest target rebuild.
+     *
+     * @return internal solve height in pixels
+     */
     public int getSolveHeight() {
         return solveHeight;
     }
 
+    /**
+     * Releases owned targets and all four compute programs on the current context.
+     * Borrowed output wrappers become invalid. The solver has no closed-state guard
+     * and must not be rendered after disposal.
+     */
     public void dispose() {
         disposeTargets();
         traceShader.dispose();

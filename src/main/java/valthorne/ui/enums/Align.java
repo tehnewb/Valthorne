@@ -40,16 +40,40 @@ import org.lwjgl.util.yoga.Yoga;
  */
 public enum Align {
 
+    /**
+     * Uses automatic cross-axis alignment, inheriting the applicable container policy.
+     */
     AUTO(Yoga.YGAlignAuto),
+    /**
+     * Aligns items or lines at the cross-axis start.
+     */
     FLEX_START(Yoga.YGAlignFlexStart),
+    /**
+     * Centers items or lines along the cross axis.
+     */
     CENTER(Yoga.YGAlignCenter),
+    /**
+     * Aligns items or lines at the cross-axis end.
+     */
     FLEX_END(Yoga.YGAlignFlexEnd),
+    /**
+     * Stretches eligible items or lines across available cross-axis space.
+     */
     STRETCH(Yoga.YGAlignStretch),
+    /**
+     * Aligns items by their text baseline where supported by the layout context.
+     */
     BASELINE(Yoga.YGAlignBaseline),
+    /**
+     * Distributes wrapped lines with free space between them and no extra outer gaps.
+     */
     SPACE_BETWEEN(Yoga.YGAlignSpaceBetween),
+    /**
+     * Distributes wrapped lines with surrounding space and half-sized outer gaps.
+     */
     SPACE_AROUND(Yoga.YGAlignSpaceAround);
 
-    private final int yoga;
+    private final int yoga; // Native Yoga enum value corresponding to this layout option.
 
     /**
      * Creates an alignment enum value mapped to the corresponding Yoga constant.

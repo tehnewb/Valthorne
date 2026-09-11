@@ -68,6 +68,8 @@ public final class TiledResolvers {
      * Dependency paths are resolved relative to the parent path, normalized into slash-separated
      * form, and then looked up directly in the stored file map.
      * </p>
+     *
+     * @author Albert Beaupre
      */
     public static final class InMemoryResolver implements TiledDependencyResolver {
 
@@ -80,28 +82,6 @@ public final class TiledResolvers {
          */
         public InMemoryResolver(Map<String, byte[]> files) {
             this.files = files;
-        }
-
-        /**
-         * Resolves a dependency path using the in-memory file map.
-         *
-         * <p>
-         * The parent bytes are unused by this implementation, but the parent path is used
-         * to resolve the dependency path relative to the referencing file.
-         * </p>
-         *
-         * @param parentBytes    the raw bytes of the parent file
-         * @param parentPath     the logical path of the parent file
-         * @param dependencyPath the dependency path to resolve
-         * @return the resolved dependency bytes
-         * @throws RuntimeException if the dependency is not present in the in-memory file map
-         */
-        @Override
-        public byte[] resolve(byte[] parentBytes, String parentPath, String dependencyPath) {
-            String resolved = normalize(resolvePath(parentPath, dependencyPath));
-            byte[] bytes = files.get(resolved);
-            if (bytes == null) throw new RuntimeException("Missing tiled dependency: " + resolved);
-            return bytes;
         }
 
         /**
@@ -129,6 +109,28 @@ public final class TiledResolvers {
          */
         private static String normalize(String path) {
             return path.replace('\\', '/');
+        }
+
+        /**
+         * Resolves a dependency path using the in-memory file map.
+         *
+         * <p>
+         * The parent bytes are unused by this implementation, but the parent path is used
+         * to resolve the dependency path relative to the referencing file.
+         * </p>
+         *
+         * @param parentBytes    the raw bytes of the parent file
+         * @param parentPath     the logical path of the parent file
+         * @param dependencyPath the dependency path to resolve
+         * @return the resolved dependency bytes
+         * @throws RuntimeException if the dependency is not present in the in-memory file map
+         */
+        @Override
+        public byte[] resolve(byte[] parentBytes, String parentPath, String dependencyPath) {
+            String resolved = normalize(resolvePath(parentPath, dependencyPath));
+            byte[] bytes = files.get(resolved);
+            if (bytes == null) throw new RuntimeException("Missing tiled dependency: " + resolved);
+            return bytes;
         }
     }
 }

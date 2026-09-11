@@ -57,15 +57,9 @@ public class PluginLoader {
      */
     private static final int SHUTDOWN_TIMEOUT_SECONDS = 10;
 
-    /**
-     * Executor service for managing asynchronous plugin loading tasks.
-     */
-    private final ExecutorService executor;
+    private final ExecutorService executor; // Executor responsible for asynchronous plugin loading.
 
-    /**
-     * Thread-safe list of successfully loaded plugins.
-     */
-    private final List<Plugin> loadedPlugins;
+    private final List<Plugin> loadedPlugins; // Thread-safe registry of successfully loaded plugins.
 
     /**
      * Constructs a {@code PluginLoader} with a specified thread pool size.

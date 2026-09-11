@@ -37,6 +37,9 @@ import valthorne.io.pool.Poolable;
  */
 public class Particle implements Poolable {
 
+    private final Color startColor = new Color(1f, 1f, 1f, 1f); // Color at spawn time (t = 0).
+    private final Color endColor = new Color(1f, 1f, 1f, 0f);   // Color at death time (t = 1).
+    private final Color color = new Color(1f, 1f, 1f, 1f);      // Current interpolated color used for rendering.
     private boolean active;                                    // Whether this particle is currently alive and should be updated/drawn.
     private float x, y;                                        // Current world-space particle position.
     private float velX, velY;                                  // Current world-space particle velocity (units per second).
@@ -47,9 +50,6 @@ public class Particle implements Poolable {
     private float startScale;                                  // Scale at spawn time (t = 0).
     private float endScale;                                    // Scale at death time (t = 1).
     private float scale;                                       // Current interpolated scale.
-    private final Color startColor = new Color(1f, 1f, 1f, 1f); // Color at spawn time (t = 0).
-    private final Color endColor = new Color(1f, 1f, 1f, 0f);   // Color at death time (t = 1).
-    private final Color color = new Color(1f, 1f, 1f, 1f);      // Current interpolated color used for rendering.
 
     /**
      * Resets this particle to deterministic defaults so it can be reused by a pool.

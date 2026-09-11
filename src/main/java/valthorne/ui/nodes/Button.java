@@ -1,128 +1,53 @@
 package valthorne.ui.nodes;
 
-import valthorne.event.events.MousePressEvent;
+import valthorne.Keyboard;
+import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Drawable;
-import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NodeAction;
-import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 /**
- * <p>
- * {@code Button} is a clickable UI node built on top of {@link Panel} that displays
- * a centered {@link Label} and optionally performs an action when pressed.
- * </p>
+ * A themed panel with a centered label and primary-button/keyboard activation.
+ * Release activation uses the root's left-button hit-test policy; keyboard activation
+ * accepts Enter or Space on an enabled receiver. Input routing supplies focus and
+ * capture behavior; these callbacks do not independently require an earlier press.
  *
- * <p>
- * This class is intended to be a simple, reusable button control for Valthorne's UI
- * system. It combines:
- * </p>
- *
- * <ul>
- *     <li>a background drawable resolved from style data</li>
- *     <li>a child label used to display text</li>
- *     <li>clickable and focusable interaction behavior</li>
- *     <li>an optional {@link NodeAction} callback executed on press</li>
- * </ul>
- *
- * <p>
- * The button automatically configures itself as clickable and focusable and centers
- * its internal label using its layout configuration. The visual background is not
- * hardcoded in the class itself. Instead, it is resolved from the button's style
- * using {@link #BACKGROUND_KEY}, allowing themes and skins to define how buttons
- * should look without changing button logic.
- * </p>
- *
- * <p>
- * Text content is managed through the embedded {@link Label} instance. This allows
- * the button to inherit all label-related rendering behavior while keeping the API
- * convenient through methods like {@link #text(String)} and {@link #getText()}.
- * </p>
- *
- * <p>
- * Interaction behavior is simple: when the button receives a mouse press event,
- * it executes its assigned action if one exists.
- * </p>
- *
- * <h2>Example Usage</h2>
- *
- * <pre>{@code
- * Button button = new Button("Play");
- *
- * button.getLayout()
- *       .width(180)
- *       .height(48);
- *
- * button.action(b -> {
- *     System.out.println("Clicked: " + b.getText());
- * });
- *
- * String text = button.getText();
- * Label label = button.getLabel();
- * NodeAction<Button> action = button.getAction();
- *
- * button.update(delta);
- * button.draw(batch);
- * }</pre>
- *
- * <p>
- * This example demonstrates the complete usage of the class: construction,
- * text assignment, layout sizing, action binding, label access, update, and draw.
- * </p>
+ * <p>All children, including NanoVG nodes, use the panel's shared rendering path.
+ * Background styling is inherited from Panel.</p>
+ * Actions run synchronously after event consumption, and a null action disables
+ * only the callback, not the button's normal input handling.
  *
  * @author Albert Beaupre
- * @since March 13th, 2026
  */
 public class Button extends Panel {
-
     /**
-     * Style key used to resolve the background drawable for the button.
+     * Alias of the panel background key, allowing button rules to use the shared
+     * drawable property without registering a separate key.
      */
-    public static final StyleKey<Drawable> BACKGROUND_KEY = StyleKey.of("background", Drawable.class);
+    public static final StyleKey<Drawable> BACKGROUND_KEY = Panel.BACKGROUND_KEY;
 
-    private final Label label = new Label(); // Embedded label used to display the button text
-    private NodeAction<Button> action; // Action executed when the button is pressed
+    private final Label label = new Label(); // Centered child label owned by the node hierarchy.
+    private NodeAction<Button> action; // Optional synchronous activation callback.
 
     /**
-     * <p>
-     * Creates a new button with no initial text.
-     * </p>
-     *
-     * <p>
-     * The button is configured as clickable and focusable, its layout is set to center
-     * child content both along the item axis and the justification axis, and the
-     * embedded label is added as a child node with no grow or shrink behavior.
-     * </p>
+     * Creates a clickable, focusable button with a centered non-clickable label.
+     * The label does not grow or shrink and is attached through the panel lifecycle.
      */
     public Button() {
-        setBit(CLICKABLE_BIT, true);
-        setBit(FOCUSABLE_BIT, true);
-
-        getLayout()
-                .itemsCenter()
-                .justifyCenter();
-
-        label.getLayout()
-                .noGrow()
-                .noShrink();
-
+        setClickable(true);
+        setFocusable(true);
+        getLayout().itemsCenter().justifyCenter();
+        label.getLayout().noGrow().noShrink();
         label.setClickable(false);
-
         super.add(label);
     }
 
     /**
-     * <p>
-     * Creates a new button with the given initial text.
-     * </p>
+     * Creates a default button and supplies its initial label text.
+     * Text handling and measurement are delegated to the child label.
      *
-     * <p>
-     * This constructor delegates to the default constructor and then assigns the
-     * provided text to the embedded label.
-     * </p>
-     *
-     * @param text the initial button text
+     * @param text initial label text
      */
     public Button(String text) {
         this();
@@ -130,38 +55,25 @@ public class Button extends Panel {
     }
 
     /**
-     * <p>
-     * Returns the embedded {@link Label} used by this button.
-     * </p>
+     * Returns the live child label for typography and layout customization.
+     * The button hierarchy retains ownership of this child.
      *
-     * @return the internal label
+     * @return the owned label
      */
-    public Label getLabel() {
-        return label;
-    }
+    public Label getLabel() { return label; }
+    /**
+     * Reads the current text from the child label without creating a text snapshot
+     * or changing layout.
+     *
+     * @return current label text
+     */
+    public String getText() { return label.getText(); }
 
     /**
-     * <p>
-     * Returns the button text currently displayed by the embedded label.
-     * </p>
+     * Replaces the label text through the label's normal text and measurement path.
+     * The action and focus state are preserved.
      *
-     * @return the current button text
-     */
-    public String getText() {
-        return label.getText();
-    }
-
-    /**
-     * <p>
-     * Sets the text shown by the embedded label.
-     * </p>
-     *
-     * <p>
-     * This method delegates directly to {@link Label#text(String)} and returns this
-     * button for fluent configuration.
-     * </p>
-     *
-     * @param text the new button text
+     * @param text replacement label text
      * @return this button
      */
     public Button text(String text) {
@@ -170,11 +82,10 @@ public class Button extends Panel {
     }
 
     /**
-     * <p>
-     * Sets the action performed when this button is pressed.
-     * </p>
+     * Replaces the callback invoked for accepted activations. The callback receives
+     * this button and runs synchronously; exceptions propagate to input dispatch.
      *
-     * @param action the action to execute on press
+     * @param action replacement callback, or null to clear it
      * @return this button
      */
     public Button action(NodeAction<Button> action) {
@@ -183,77 +94,31 @@ public class Button extends Panel {
     }
 
     /**
-     * <p>
-     * Returns the currently assigned button action.
-     * </p>
+     * Returns the configured activation callback without invoking it.
      *
-     * @return the assigned action, or {@code null} if none exists
+     * @return current callback, or null when unset
      */
-    public NodeAction<Button> getAction() {
-        return action;
-    }
+    public NodeAction<Button> getAction() { return action; }
 
     /**
-     * <p>
-     * Updates this button.
-     * </p>
+     * Applies the shared release-activation policy, consuming accepted releases
+     * before invoking the optional action. Rejected releases have no effect here.
      *
-     * <p>
-     * This implementation currently performs no per-frame logic, but the method exists
-     * to fulfill the UI node lifecycle contract and to provide a future extension point.
-     * </p>
-     *
-     * @param delta the frame delta time
+     * @param event routed mouse release
      */
-    @Override
-    public void update(float delta) {
-    }
-
-    /**
-     * <p>
-     * Handles a mouse press event for this button.
-     * </p>
-     *
-     * <p>
-     * If an action has been assigned, it is executed immediately with this button as
-     * the action target.
-     * </p>
-     *
-     * @param event the mouse press event
-     */
-    @Override
-    public void onMousePress(MousePressEvent event) {
-    }
-
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        if (action != null)
-            action.perform(this);
+        valthorne.ui.behavior.ActivationBehavior.release(this, event, () -> { if (action != null) action.perform(this); });
     }
 
     /**
-     * <p>
-     * Draws the button using the provided {@link TextureBatch}.
-     * </p>
+     * Consumes Enter or Space on an enabled button and invokes the optional action.
+     * Focus routing and repeat filtering are not performed by this callback itself.
      *
-     * <p>
-     * The method first resolves the button style and, if available, draws the
-     * background drawable using the current render bounds. It then draws the
-     * embedded label on top.
-     * </p>
-     *
-     * @param batch the batch used for rendering
+     * @param event routed key press
      */
     @Override
-    public void draw(TextureBatch batch) {
-        ResolvedStyle style = getStyle();
-        if (style != null) {
-            Drawable background = style.get(BACKGROUND_KEY);
-
-            if (background != null)
-                background.draw(batch, getRenderX(), getRenderY(), getWidth(), getHeight());
-        }
-
-        label.draw(batch);
+    public void onKeyPress(KeyPressEvent event) {
+        valthorne.ui.behavior.ActivationBehavior.key(this, event, () -> { if (action != null) action.perform(this); });
     }
 }

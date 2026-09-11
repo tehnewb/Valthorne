@@ -615,6 +615,17 @@ public final class TiledMap {
         return null;
     }
 
+    /**
+     * Resolves a finite tile using the first exact layer-name match.
+     * Coordinates use a bottom-left origin; infinite chunk storage is not queried.
+     * The result retains raw flip flags and the associated tileset.
+     *
+     * @param layerName exact non-null layer name
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return resolved tile, or null for missing, non-tile, empty, or out-of-bounds cells
+     * @throws NullPointerException if layerName is null
+     */
     public ResolvedTile getTile(String layerName, int tileX, int tileY) {
         MapLayer layer = getLayer(layerName);
         if (!(layer instanceof TiledTileMapLayer tileLayer)) {
@@ -623,6 +634,17 @@ public final class TiledMap {
         return getTile(tileLayer, tileX, tileY);
     }
 
+    /**
+     * Resolves a finite tile using the indexed layer.
+     * Coordinates use a bottom-left origin; infinite chunk storage is not queried.
+     * The result retains raw flip flags and the associated tileset.
+     *
+     * @param layerIndex zero-based map-layer index
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return resolved tile, or null for missing, non-tile, empty, or out-of-bounds cells
+     * @throws IndexOutOfBoundsException if layerIndex is outside the layer list
+     */
     public ResolvedTile getTile(int layerIndex, int tileX, int tileY) {
         MapLayer layer = getLayer(layerIndex);
         if (!(layer instanceof TiledTileMapLayer tileLayer)) {
@@ -631,26 +653,83 @@ public final class TiledMap {
         return getTile(tileLayer, tileX, tileY);
     }
 
+    /**
+     * Retrieves a finite tile's definition using the first exact layer-name match.
+     * Coordinates use a bottom-left origin; infinite chunk storage is not queried.
+     * A resolved tile can still have no definition.
+     *
+     * @param layerName exact non-null layer name
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return tile definition, or null when unavailable
+     * @throws NullPointerException if layerName is null
+     */
     public TileDefinition getTileDefinition(String layerName, int tileX, int tileY) {
         ResolvedTile tile = getTile(layerName, tileX, tileY);
         return tile != null ? tile.definition() : null;
     }
 
+    /**
+     * Retrieves a finite tile's definition using the indexed layer.
+     * Coordinates use a bottom-left origin; infinite chunk storage is not queried.
+     * A resolved tile can still have no definition.
+     *
+     * @param layerIndex zero-based map-layer index
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return tile definition, or null when unavailable
+     * @throws IndexOutOfBoundsException if layerIndex is outside the layer list
+     */
     public TileDefinition getTileDefinition(int layerIndex, int tileX, int tileY) {
         ResolvedTile tile = getTile(layerIndex, tileX, tileY);
         return tile != null ? tile.definition() : null;
     }
 
+    /**
+     * Retrieves a finite tile's global ID with flip bits removed using the first exact layer-name match.
+     * Coordinates use a bottom-left origin; infinite chunk storage is not queried.
+     * Zero denotes an empty or unresolved cell.
+     *
+     * @param layerName exact non-null layer name
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return resolved global ID, or zero for an unavailable tile
+     * @throws NullPointerException if layerName is null
+     */
     public int getTileGid(String layerName, int tileX, int tileY) {
         ResolvedTile tile = getTile(layerName, tileX, tileY);
         return tile != null ? tile.gid() : 0;
     }
 
+    /**
+     * Retrieves a finite tile's global ID with flip bits removed using the indexed layer.
+     * Coordinates use a bottom-left origin; infinite chunk storage is not queried.
+     * Zero denotes an empty or unresolved cell.
+     *
+     * @param layerIndex zero-based map-layer index
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return resolved global ID, or zero for an unavailable tile
+     * @throws IndexOutOfBoundsException if layerIndex is outside the layer list
+     */
     public int getTileGid(int layerIndex, int tileX, int tileY) {
         ResolvedTile tile = getTile(layerIndex, tileX, tileY);
         return tile != null ? tile.gid() : 0;
     }
 
+    /**
+     * Resolves a cell from finite row-major layer storage using this map's tilesets.
+     * The bottom-up tileY coordinate is inverted to TMX's stored row order. Zero IDs,
+     * missing layers or finite arrays, out-of-bounds coordinates, and unmatched tilesets
+     * return null. Flip flags are preserved in rawGid and removed from the resolved ID.
+     *
+     * @param layer finite tile layer, or null
+     * @param tileX tile column from the left
+     * @param tileY tile row from the bottom
+     * @return new resolution containing borrowed tileset/definition references, or null
+     * @throws ArrayIndexOutOfBoundsException if the layer's ID array is shorter than
+     *         its declared dimensions require
+     */
     public ResolvedTile getTile(TiledTileMapLayer layer, int tileX, int tileY) {
         if (layer == null || layer.getGids() == null) {
             return null;

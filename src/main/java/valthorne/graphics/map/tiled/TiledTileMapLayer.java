@@ -8,16 +8,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents a tile-based layer in a tiled map, extending from the base MapLayer class.
- * This layer contains information about tile arrangement, dimensions, tile IDs,
- * and whether the map uses infinite tiling.
+ * Stores a TMX tile layer as either a finite row-major ID array or a collection
+ * of infinite-map chunks. Global IDs retain Tiled's flip bits; consumers decode
+ * those flags when resolving tiles. Width and height are measured in tiles,
+ * while inherited offsets are measured in pixels.
+ * <p>The constructor retains supplied arrays and maps, and getters expose those live
+ * objects. This layer does not own textures or perform rendering. Infinite layers
+ * loaded from TMX use chunks and have a null finite ID array.
+ *
+ * @author Albert Beaupre
  */
 public class TiledTileMapLayer extends MapLayer {
-    private final int width;
-    private final int height;
-    private final int[] gids;
-    private final boolean infinite;
-    private final Map<Long, MapChunk> chunks;
+    private final int width; // Declared layer width in tile columns.
+    private final int height; // Declared layer height in tile rows.
+    private final int[] gids; // Borrowed row-major finite IDs with flip bits; null for loaded infinite layers.
+    private final boolean infinite; // Whether tile contents use chunk storage.
+    private final Map<Long, MapChunk> chunks; // Live chunk map keyed by packed signed tile-origin coordinates.
 
     /**
      * Creates a new instance of the TiledTileMapLayer class, representing a layer in a tiled map.
@@ -120,12 +126,12 @@ public class TiledTileMapLayer extends MapLayer {
      * This method performs a second pass to parse and decode the XML representation
      * of the layer data, including attributes like encoding and compression.
      *
-     * @param data       the byte array containing the XML data of the map.
-     * @param layerName  the name of the layer to decode.
-     * @param w          the width of the layer in tiles.
-     * @param h          the height of the layer in tiles.
+     * @param data      the byte array containing the XML data of the map.
+     * @param layerName the name of the layer to decode.
+     * @param w         the width of the layer in tiles.
+     * @param h         the height of the layer in tiles.
      * @return an integer array representing the decoded tile data of the specified layer.
-     *         If the layer is not found, a default array of size w * h is returned.
+     * If the layer is not found, a default array of size w * h is returned.
      * @throws Exception if an error occurs during XML parsing or data decoding.
      */
     private static int[] secondPassDecodeFiniteLayerData(byte[] data, String layerName, int w, int h) throws Exception {
@@ -168,6 +174,16 @@ public class TiledTileMapLayer extends MapLayer {
         return new int[Math.max(0, w * h)];
     }
 
+    /**
+     * Combines signed chunk-origin tile coordinates into a collision-free 64-bit key.
+     * The x bit pattern occupies the high half and y occupies the low half; negative
+     * coordinates remain distinct from positive coordinates.
+     *
+     * @param x chunk origin in tile columns
+     *
+     * @param y chunk origin in tile rows
+     * @return packed coordinate key
+     */
     private static long packChunkKey(int x, int y) {
         return (((long) x) << 32) ^ (y & 0xFFFF_FFFFL);
     }
@@ -191,9 +207,11 @@ public class TiledTileMapLayer extends MapLayer {
     }
 
     /**
-     * Retrieves the array of global tile IDs (gids) representing the tiles in this layer.
+     * Exposes the finite layer's row-major ID storage, including encoded flip flags.
+     * The array is borrowed directly from construction and is not copied; callers
+     * that modify it change the layer's data.
      *
-     * @return an integer array of global tile IDs, where each ID corresponds to a tile in the layer.
+     * @return live finite ID array, or null for an infinite layer loaded from TMX
      */
     public int[] getGids() {
         return gids;
@@ -210,12 +228,11 @@ public class TiledTileMapLayer extends MapLayer {
     }
 
     /**
-     * Retrieves the chunks associated with this layer. Each chunk is represented as
-     * a {@code MapChunk} object and is associated with a unique key of type {@code Long}.
+     * Exposes the live map of chunk origins to chunk data. Keys contain signed x in
+     * the high 32 bits and signed y in the low 32 bits. Mutations affect this layer;
+     * the map is not a snapshot and no synchronization is supplied.
      *
-     * @return a map where keys are {@code Long} values representing chunk identifiers
-     *         and values are {@code MapChunk} objects representing the corresponding
-     *         chunk data.
+     * @return mutable chunk map, normally empty for finite layers
      */
     public Map<Long, MapChunk> getChunks() {
         return chunks;

@@ -1,0 +1,146 @@
+[
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp0\\valthorne\\graphics\\model\\SceneSnapshotBenchmark.class",
+    "sha256": "6ACD9BE1B75831F42E0BDEE3C88391F60ABFCBC5D2C6E5BBFB61944AF2A3A7AD"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_collect_jmhTest.class",
+    "sha256": "25F50EA40121846EB9BC2AA2C95DFE17997CBEB1930D8219A422FA3F349F9A51"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType_B1.class",
+    "sha256": "F77B2F24749F9C99AAE3857078D3F7EBBFFFDDC3AB09A72526080112AE77B55B"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType_B2.class",
+    "sha256": "67781E844B9F5337E2151A4D095DAD0812566DC21BB55A1D922493454830F27A"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType_B3.class",
+    "sha256": "E768001B4E669ACEAE587A88ED274D5EB89C4DCEE025B6001E6883730B503953"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType.class",
+    "sha256": "B48CD59B592B16C772664C97686EDFACA9502752CC4F98FE308A601A3D6613E2"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\FilamentRenderer3D.class",
+    "sha256": "FDF18A70E9D8756D40F6CEFE403D89C8B5163C7F965E4B8E5A1E26655AA7DBC3"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\FilamentRenderer3D$Entry.class",
+    "sha256": "924B6BD018F9D8F63E0A13B7B5424E504A83262E08C63DA9EB448CD492002B5A"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\FilamentRenderer3D$ExplicitLight.class",
+    "sha256": "2661C547CC1559731A630D3F0C5FE5E4E141FE8DC1C611DB0C43FAFD47691F6E"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\FilamentRenderer3D$Mesh.class",
+    "sha256": "C83F5E0A627471B3365F81F0F01F85E9F2E3B3D2AEC1657206ECE0C136EAE391"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\FilamentRenderer3D$Quality.class",
+    "sha256": "FC6E1991FB5FE9AAC895F2B6E793BB458C17C46E792327F09C546C9635961F56"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracer3D.class",
+    "sha256": "849A8BE6EE82E7FE4544421CC9371D5BFE3366130597C560AAEAB7188A906AFC"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracer3D$Quality.class",
+    "sha256": "7449AEF331805C28037119414A5FAB23C8B6D890CA0A6EC04C84BD0351CE7BCB"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracer3D$RenderMode.class",
+    "sha256": "8CD55805A1394972D6F9DB93FE70176E575EBBEE1CEB9FD83B979767246C0043"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracer3D$State.class",
+    "sha256": "0A5A72FB8343671DE3E40B8A65A63EA49E7244FA8D5AEA38FC66700552867CCB"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracingScene.class",
+    "sha256": "D6CF164E29413D075589BC1B9A6229E5F3E27801FED6CE48B7DF6636488BCBAB"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracingScene$Collector.class",
+    "sha256": "DBD123BB3400C099DB3153726D41EF9E9204C9AFA6A58FEFD8D84897491F354F"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\before\\cp86\\valthorne\\graphics\\model\\PathTracingScene$Instance.class",
+    "sha256": "4829FEB37BB067A7BAE9071DAE4F7A5C057137BB5C5082EB0B59927508861ED7"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp0\\valthorne\\graphics\\model\\SceneSnapshotBenchmark.class",
+    "sha256": "6ACD9BE1B75831F42E0BDEE3C88391F60ABFCBC5D2C6E5BBFB61944AF2A3A7AD"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_collect_jmhTest.class",
+    "sha256": "25F50EA40121846EB9BC2AA2C95DFE17997CBEB1930D8219A422FA3F349F9A51"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType_B1.class",
+    "sha256": "F77B2F24749F9C99AAE3857078D3F7EBBFFFDDC3AB09A72526080112AE77B55B"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType_B2.class",
+    "sha256": "67781E844B9F5337E2151A4D095DAD0812566DC21BB55A1D922493454830F27A"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType_B3.class",
+    "sha256": "E768001B4E669ACEAE587A88ED274D5EB89C4DCEE025B6001E6883730B503953"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp0\\valthorne\\graphics\\model\\jmh_generated\\SceneSnapshotBenchmark_jmhType.class",
+    "sha256": "B48CD59B592B16C772664C97686EDFACA9502752CC4F98FE308A601A3D6613E2"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\FilamentRenderer3D.class",
+    "sha256": "6201D0F9F4A89F088FF0B24F5BF5631A396BEEA7925B03BB647287B19A1B2BD7"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\FilamentRenderer3D$Entry.class",
+    "sha256": "EA6FF0930709A220D4DE0AF9C6944763A7E094DD2D027003DAF50084A7A5C23C"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\FilamentRenderer3D$ExplicitLight.class",
+    "sha256": "02D72F0DB73B446D1C893F9572677465A425F444D706DB39C2EB12CDEF5AD604"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\FilamentRenderer3D$Mesh.class",
+    "sha256": "F22758548C1FF3AB0F5ED1C0CCC76ED40E268EA87C0B710E205A1C139D961F86"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\FilamentRenderer3D$Quality.class",
+    "sha256": "FC6E1991FB5FE9AAC895F2B6E793BB458C17C46E792327F09C546C9635961F56"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracer3D.class",
+    "sha256": "F6A8B153DD1C3642D37FAD6D319040D6A4844C26487F695AC18200083DE6EE0E"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracer3D$Quality.class",
+    "sha256": "7449AEF331805C28037119414A5FAB23C8B6D890CA0A6EC04C84BD0351CE7BCB"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracer3D$RenderMode.class",
+    "sha256": "8CD55805A1394972D6F9DB93FE70176E575EBBEE1CEB9FD83B979767246C0043"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracer3D$State.class",
+    "sha256": "507EC18D233F41AE77B484ED21961130B17530688921E9D56DC87930193D03F3"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracingScene.class",
+    "sha256": "9398FC1A35E4F83B01B7E75C11D92FB5F8BE93E3BD258B45B1DA255F9C6C122A"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracingScene$Collector.class",
+    "sha256": "15A79F770BF8E258BA60F0227B7EDDDFAED1A14C7B265015E93136FB2E33F27A"
+  },
+  {
+    "path": ".codex-temp\\snapshot-run\\after\\cp85\\valthorne\\graphics\\model\\PathTracingScene$Instance.class",
+    "sha256": "BAFC7670ADE4D28BFBA25412DE908BA99D12031E8E9921BAD911917080384FA4"
+  }
+]

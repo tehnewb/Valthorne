@@ -22,12 +22,26 @@ import java.util.Random;
  */
 public final class RadialBurstSpawnDistributor implements SpawnDistributor {
 
-    private final float radius;
+    private final float radius; // Fixed circumference radius, clamped against zero.
 
+    /**
+     * Creates circumference sampling with negative radius clamped to zero.
+     *
+     * @param radius distance from the emitter origin
+     */
     public RadialBurstSpawnDistributor(float radius) {
         this.radius = Math.max(0f, radius);
     }
 
+    /**
+     * Samples one uniform angle and writes a point on the fixed-radius circumference.
+     * A zero radius produces the origin.
+     *
+     * @param random nonnull random source
+     * @param out nonnull destination with at least two entries; X then Y
+     * @throws NullPointerException if random or out is null
+     * @throws ArrayIndexOutOfBoundsException if out has fewer than two entries
+     */
     @Override
     public void computeOffset(Random random, float[] out) {
         float a = (float) (random.nextFloat() * Math.PI * 2.0f);

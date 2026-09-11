@@ -1,100 +1,93 @@
-### Java ###
+# Build tools and generated output (at any project depth)
+.gradle/
+.gradle-local/
+build/
+out/
+bin/
+target/
 *.class
-*.log
-*.ctxt
 *.jar
 *.war
 *.ear
-*.zip
-*.tar.gz
-*.rar
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
-*.jar
-*.war
 *.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
+!gradle/wrapper/gradle-wrapper.jar
 
-# virtual machine crash logs
-hs_err_pid*
-
-### IntelliJ IDEA ###
+# Local IDE state
 .idea/
 *.iml
+*.ipr
 *.iws
-out/
-.idea_modules/
-.idea_workspace/
-.idea_modules/
-.idea/libraries/
-.idea/tasks.xml
-.idea/workspace.xml
-.idea/gradle.xml
-.idea/dictionaries/
-.idea/httpRequests/
-.idea/caches/
-.idea/sonarlint/
-.idea/compiler.xml
-.idea/jarRepositories.xml
-.idea/artifacts/
-
-### Eclipse ###
 .classpath
 .project
 .settings/
-.loadpath
+.factorypath
+.vscode/
 .recommenders/
-bin/
+.loadpath
+
+# Native extraction caches, recordings, and JVM diagnostics
+.lwjgl/
+lwjgl/
+.filament-kmp/
+*.log
+hs_err_pid*
+replay_pid*
+*.hprof
+*.jfr
+core.*
+
+# Local downloads, prototypes, and assistant scratch/reference checkouts
+/src/examples/
+/src/test/
+/src/benchmark/
+/integration-tests/
+# Historical nested source snapshots must not reintroduce test folders.
+**/src/test/
+**/src/examples/
+**/src/benchmark/
+/assets/
+/proto/
+/private/
+/.codex-temp/
+/.codex_tmp*
+/.claude/
+/%TEMP%/
 tmp/
+temp/
+__pycache__/
+*.pyc
+.venv/
 
-### Gradle ###
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
+# Credentials belong in the user Gradle home or environment, never in Git
+.env
+.env.*
+!.env.example
+*.local.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.asc
+/signing-data.png
+/sonatype-token.png
 
-### Maven ###
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
+# Downloaded distribution archives (runtime assets and provenance stay versioned)
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
 
-### OS Specific ###
-# Windows
+# Operating-system/editor metadata
+.DS_Store
+._*
+.AppleDouble/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
-*.lnk
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Linux
 *~
-
-lwjgl/
-proto/
-/assets/
-/private/
-gradle.properties
-sonatype-token.png
-signing-data.png
-/src/test/*
-.claude/settings.local.json
-/.gradle-local/
-/.codex-temp/
-/.claude/
+*.swp
+*.swo

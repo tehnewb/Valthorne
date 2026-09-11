@@ -1,0 +1,30 @@
+[
+  {
+    "Path": "build/classes/java/examples/valthorne/examples/FpsArena.class",
+    "SHA256": "C0EDB9DDFA0CD423FC9F4DA13D64E2D270A402FA7B3A51BAEAA1AFC3CB879FD8"
+  },
+  {
+    "Path": "build/classes/java/examples/valthorne/examples/FpsArenaEffects.class",
+    "SHA256": "B976ACDF5A53A7DCA1FAD5F42CB1A4E0D95B72C57D775F3D1B5C6BABD76345DB"
+  },
+  {
+    "Path": "build/classes/java/examples/valthorne/examples/FpsArenaWorld.class",
+    "SHA256": "088E92FBE09947E538F89B85C598F2F4F4A53218D06682D53F63E756EF9A1140"
+  },
+  {
+    "Path": "build/classes/java/main/valthorne/graphics/model/FilamentRenderer3D.class",
+    "SHA256": "0FF2DC5D2BB6D86AF57ACE7F4D2488C1219110AAE6E611E48DDD5554D29EEB4C"
+  },
+  {
+    "Path": "build/classes/java/main/valthorne/graphics/particle/Particle3D.class",
+    "SHA256": "41130D956A353B5404CE759B14523E8DC58BF57047DA8980CF1309844E08D967"
+  },
+  {
+    "Path": "build/classes/java/main/valthorne/graphics/particle/ParticleEmitter3D.class",
+    "SHA256": "10870FB511285C8CF99BE12355CAF6DC5BC01D284DD07918AA1B51AB5A1553DE"
+  },
+  {
+    "Path": "build/classes/java/main/valthorne/math/physics/PhysicsWorld3D.class",
+    "SHA256": "88BD82B0991F294811AFA831C5791596BAA82F5955CA7EAFFE1AE9B745AD0050"
+  }
+]

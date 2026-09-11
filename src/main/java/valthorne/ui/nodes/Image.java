@@ -54,7 +54,7 @@ import valthorne.ui.UINode;
 public class Image extends UINode {
 
     private Texture texture; // Texture currently displayed by this image node
-    private Color color = new Color(1, 1, 1, 1);
+    private Color color = new Color(1, 1, 1, 1); // Mutable image tint applied when drawing the texture.
 
     /**
      * <p>

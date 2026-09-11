@@ -1,0 +1,13 @@
+// Run only the CPU particle workloads using the current engine sources.
+gradle.projectsEvaluated {
+    rootProject.tasks.register('benchmarkParticles3D', JavaExec) {
+        group = 'verification'
+        classpath = rootProject.sourceSets.uiBenchmark.runtimeClasspath
+        mainClass = 'org.openjdk.jmh.Main'
+        def report = rootProject.providers.gradleProperty('particleBenchmarkReport')
+                .orElse('build/reports/particles-3d/results.json')
+        args 'valthorne.engine.benchmark.ParticleEmitter3DBenchmark.*', '-foe', 'true',
+                '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+        doFirst {rootProject.file(report.get()).parentFile.mkdirs()}
+    }
+}

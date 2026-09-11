@@ -32,11 +32,20 @@ import org.lwjgl.util.yoga.Yoga;
  */
 public enum Overflow {
 
+    /**
+     * Allows overflowing content to remain visible under the applicable rendering policy.
+     */
     VISIBLE(Yoga.YGOverflowVisible),
+    /**
+     * Requests hidden overflow; UI rendering must apply the corresponding clipping policy.
+     */
     HIDDEN(Yoga.YGOverflowHidden),
+    /**
+     * Marks content as scrollable for layout; a scroll control supplies offsets and interaction.
+     */
     SCROLL(Yoga.YGOverflowScroll);
 
-    private final int yoga;
+    private final int yoga; // Native Yoga enum value corresponding to this layout option.
 
     /**
      * Creates an overflow mode mapped to the Yoga constant.

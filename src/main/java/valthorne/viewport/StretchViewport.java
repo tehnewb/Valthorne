@@ -35,7 +35,7 @@ public class StretchViewport extends Viewport {
     /**
      * Creates a stretch viewport with the specified logical world size.
      *
-     * @param worldWidth the logical world width
+     * @param worldWidth  the logical world width
      * @param worldHeight the logical world height
      */
     public StretchViewport(float worldWidth, float worldHeight) {
@@ -50,7 +50,7 @@ public class StretchViewport extends Viewport {
      * projection is rebuilt for the current world size.
      * </p>
      *
-     * @param screenWidth the window width in pixels
+     * @param screenWidth  the window width in pixels
      * @param screenHeight the window height in pixels
      */
     @Override
@@ -60,6 +60,6 @@ public class StretchViewport extends Viewport {
         this.width = screenWidth;
         this.height = screenHeight;
 
-        projectionMatrix.ortho(0, worldWidth, 0, worldHeight, -1f, 1f);
+        projectionMatrix.setOrtho(0, worldWidth, 0, worldHeight, -1f, 1f);
     }
 }

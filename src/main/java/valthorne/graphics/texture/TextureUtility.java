@@ -1,25 +1,38 @@
 package valthorne.graphics.texture;
 
 import valthorne.graphics.Color;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 
 import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
- * A utility class for performing operations related to textures.
+ * CPU helpers for extracting a simplified pixel contour and dividing a texture
+ * into grid regions. Contour tracing reads retained RGBA bytes, selects the largest
+ * four-connected nontransparent component, and returns its largest boundary loop
+ * after collinear and 0.75-pixel Ramer-Douglas-Peucker simplification. Holes and
+ * smaller disconnected components are not returned.
+ * <p>
+ * Tracing does not read GPU pixels: textures without retained TextureData produce
+ * an empty contour. Returned points lie on pixel edges in the source buffer's
+ * coordinate orientation; region traces are local to the extracted region.
+ * Texture splitting creates borrowed views without copying pixels or owning the
+ * source texture.
+ * </p>
+ * @author Albert Beaupre
  */
 public class TextureUtility {
 
     /**
-     * Traces the contours of non-ignored areas within a given texture and returns the points
-     * defining the largest closed contour as an array of {@code Vector2f} objects.
+     * Traces the outer boundary of the largest four-connected solid pixel component.
+     * Alpha-zero pixels are always excluded; ignore colors match all four byte channels
+     * exactly. Retained data must be readable, tightly packed RGBA. The returned loop
+     * does not repeat its closing point and is simplified with 0.75-pixel tolerance.
      *
-     * @param texture the texture to be analyzed; must not be null
-     * @param ignore  the colors to be ignored during the tracing process; optional parameter
-     * @return an array of {@code Vector2f} objects representing the traced points of the largest
-     * loop contour; returns an empty array if the texture has invalid data or no valid loops are found
-     * @throws NullPointerException if the provided texture is null
+     * @param texture source with optional retained CPU data
+     * @param ignore exact colors to exclude; null array or entries have no effect
+     * @return independent pixel-edge points, or an empty array for absent data, nonpositive dimensions, or no boundary
+     * @throws NullPointerException if texture is null
      */
     public static Vector2f[] trace(Texture texture, Color... ignore) {
         if (texture == null)
@@ -61,14 +74,16 @@ public class TextureUtility {
     }
 
     /**
-     * Traces the largest closed contour within the specified texture region, ignoring specified colors,
-     * and returns the points defining the contour as an array of {@code Vector2f} objects.
+     * Copies a region's retained RGBA pixels and traces its largest solid component.
+     * Region coordinates and dimensions are truncated to integers. Returned points
+     * are relative to the region origin, without adding the atlas offset or applying
+     * a UV flip; the closing point is omitted.
      *
-     * @param textureRegion the texture region to be analyzed; must not be null
-     * @param ignore        the colors that should be ignored during the tracing process; optional parameter
-     * @return an array of {@code Vector2f} objects representing the points of the largest closed contour;
-     * returns an empty array if the texture region has invalid data or no valid contours are found
-     * @throws NullPointerException if the provided texture region is null
+     * @param textureRegion source region with valid bounds inside retained pixel data
+     * @param ignore exact RGBA colors to exclude in addition to transparent pixels
+     * @return simplified region-local boundary, or empty when data or contour is absent
+     * @throws NullPointerException if textureRegion is null
+     * @throws IndexOutOfBoundsException if region bounds exceed readable source data
      */
     public static Vector2f[] trace(TextureRegion textureRegion, Color... ignore) {
         if (textureRegion == null)
@@ -113,6 +128,19 @@ public class TextureUtility {
         return result;
     }
 
+    /**
+     * Copies a rectangular RGBA byte range using absolute accesses, preserving the
+     * source buffer position. Does not clamp or validate the requested rectangle.
+     *
+     * @param buffer readable tightly packed RGBA source
+     * @param x first source column
+     * @param y first source row
+     * @param width copied columns
+     * @param height copied rows
+     * @param textureWidth source row width in pixels
+     * @return heap buffer containing tightly packed region pixels
+     * @throws IndexOutOfBoundsException if a source access is outside the buffer limit
+     */
     private static ByteBuffer extractSubBuffer(ByteBuffer buffer, int x, int y, int width, int height, int textureWidth) {
         ByteBuffer subBuffer = ByteBuffer.allocate(width * height * 4);
         for (int row = 0; row < height; row++) {
@@ -127,6 +155,17 @@ public class TextureUtility {
         return subBuffer;
     }
 
+    /**
+     * Builds an X-major solid mask from RGBA bytes. Zero alpha always means empty;
+     * otherwise only an exact ignored RGBA value excludes the pixel. Null ignored
+     * entries use a nonmatching sentinel.
+     *
+     * @param buffer readable tightly packed RGBA pixels
+     * @param width pixel columns
+     * @param height pixel rows
+     * @param ignore exact colors to exclude
+     * @return mask indexed by X then Y
+     */
     private static boolean[][] buildSolidMask(ByteBuffer buffer, int width, int height, Color... ignore) {
         boolean[][] solid = new boolean[width][height];
 
@@ -182,6 +221,14 @@ public class TextureUtility {
         return solid;
     }
 
+    /**
+     * Flood-fills four-neighbor solid components and returns a mask containing only
+     * the one with the most pixels. Equal-size ties retain the first component found
+     * in row-major scanning. Assumes a nonempty rectangular input mask.
+     *
+     * @param solid X-major solid-pixel mask
+     * @return new mask containing the largest component, or all false if none
+     */
     private static boolean[][] extractLargestComponent(boolean[][] solid) {
         int width = solid.length;
         int height = solid[0].length;
@@ -238,6 +285,16 @@ public class TextureUtility {
         return best;
     }
 
+    /**
+     * Creates directed unit pixel-edge segments where a solid pixel touches empty
+     * space or the image boundary. Orientations are consistent around each pixel
+     * so matching endpoints can be stitched.
+     *
+     * @param solid X-major component mask
+     * @param width pixel columns
+     * @param height pixel rows
+     * @return newly allocated boundary edges
+     */
     private static List<Edge> buildBoundaryEdges(boolean[][] solid, int width, int height) {
         ArrayList<Edge> edges = new ArrayList<>();
 
@@ -263,6 +320,15 @@ public class TextureUtility {
         return edges;
     }
 
+    /**
+     * Groups outgoing directed edges by starting point and consumes them into
+     * boundary walks, marking each edge used. Closed walks repeat their first point.
+     * Retains walks with at least four points; valid pixel-boundary input is expected
+     * to close them.
+     *
+     * @param edges mutable-use boundary segments
+     * @return retained boundary walks
+     */
     private static List<List<Point>> stitchLoops(List<Edge> edges) {
         HashMap<Point, ArrayDeque<Edge>> outgoing = new HashMap<>();
         for (Edge edge : edges)
@@ -318,6 +384,13 @@ public class TextureUtility {
         return loops;
     }
 
+    /**
+     * Selects the supplied loop with greatest absolute shoelace area. Equal areas
+     * retain the first loop in the input list.
+     *
+     * @param loops nonempty candidate loops
+     * @return borrowed largest-area loop
+     */
     private static List<Point> largestLoop(List<List<Point>> loops) {
         List<Point> best = loops.getFirst();
         float bestArea = Math.abs(area(best));
@@ -334,12 +407,27 @@ public class TextureUtility {
         return best;
     }
 
+    /**
+     * Removes a repeated closing point by copying all preceding points. Returns
+     * the original list when its endpoints differ or it has fewer than two points.
+     *
+     * @param loop candidate closed walk
+     * @return loop without a repeated endpoint
+     */
     private static List<Point> removeDuplicateClosingPoint(List<Point> loop) {
         if (loop.size() > 1 && loop.getFirst().equals(loop.getLast()))
             return new ArrayList<>(loop.subList(0, loop.size() - 1));
         return loop;
     }
 
+    /**
+     * Repeatedly removes a vertex whose adjacent edge cross product is zero,
+     * including the wraparound junction. Short inputs are returned unchanged;
+     * other inputs are simplified in a copied list.
+     *
+     * @param points cyclic polygon vertices
+     * @return vertices with collinear intermediates removed
+     */
     private static List<Point> simplifyCollinear(List<Point> points) {
         if (points.size() < 3)
             return points;
@@ -373,6 +461,15 @@ public class TextureUtility {
         return result;
     }
 
+    /**
+     * Rotates a closed polygon to its leftmost, then lowest, point and temporarily
+     * duplicates that endpoint for recursive distance simplification. Removes the
+     * duplicate afterward and runs a final collinear pass.
+     *
+     * @param points cyclic vertices without a required closing duplicate
+     * @param epsilon perpendicular-distance tolerance in pixels
+     * @return simplified cyclic polygon
+     */
     private static List<Point> simplifyRdpClosed(List<Point> points, float epsilon) {
         if (points.size() < 4)
             return points;
@@ -399,6 +496,17 @@ public class TextureUtility {
         return simplifyCollinear(simplified);
     }
 
+    /**
+     * Recursively keeps the farthest intermediate point when its distance from the
+     * endpoint line exceeds epsilon; otherwise retains only endpoints. Appends to
+     * a shared output while removing duplicate recursion junctions.
+     *
+     * @param points ordered input path
+     * @param start inclusive first point
+     * @param end inclusive last point
+     * @param epsilon distance tolerance
+     * @param out mutable simplified output
+     */
     private static void rdp(List<Point> points, int start, int end, float epsilon, List<Point> out) {
         if (end <= start + 1) {
             if (out.isEmpty() || !out.getLast().equals(points.get(start)))
@@ -432,6 +540,15 @@ public class TextureUtility {
         }
     }
 
+    /**
+     * Measures distance to the infinite line through two points. Coincident endpoints
+     * instead produce ordinary distance to that endpoint.
+     *
+     * @param p point to measure
+     * @param a first line point
+     * @param b second line point
+     * @return distance in pixel coordinates
+     */
     private static float perpendicularDistance(Point p, Point a, Point b) {
         float dx = b.x - a.x;
         float dy = b.y - a.y;
@@ -447,6 +564,13 @@ public class TextureUtility {
         return numerator / denominator;
     }
 
+    /**
+     * Computes signed shoelace area, treating the last and first vertices as joined.
+     * The sign depends on winding and the source coordinate orientation.
+     *
+     * @param points polygon vertices
+     * @return signed area in square pixels
+     */
     private static float area(List<Point> points) {
         float sum = 0f;
         for (int i = 0; i < points.size(); i++) {
@@ -457,51 +581,18 @@ public class TextureUtility {
         return sum * 0.5f;
     }
 
-    private static final class Point {
-        final int x;
-        final int y;
-
-        Point(int x, int y) {
-            this.x = x;
-            this.y = y;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj)
-                return true;
-            if (!(obj instanceof Point other))
-                return false;
-            return x == other.x && y == other.y;
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * x + y;
-        }
-    }
-
-    private static final class Edge {
-        final Point a;
-        final Point b;
-        boolean used;
-
-        Edge(Point a, Point b) {
-            this.a = a;
-            this.b = b;
-        }
-    }
-
     /**
-     * Splits a given texture into a 2D array of smaller {@code TextureRegion} objects based on the specified
-     * number of rows and columns.
+     * Divides a texture into equal integer-sized borrowed regions indexed by row then
+     * column. Row zero uses the highest Y interval, and columns increase from X zero.
+     * Integer division discards remainder columns at the right and remainder rows
+     * at the low-Y edge. Too many rows or columns can produce zero-sized regions.
      *
-     * @param texture the texture to be split; must not be null
-     * @param rows    the number of rows to divide the texture into; must be greater than 0
-     * @param columns the number of columns to divide the texture into; must be greater than 0
-     * @return a 2D array of {@code TextureRegion} objects representing the divided regions of the texture
-     * @throws NullPointerException     if the provided texture is null
-     * @throws IllegalArgumentException if rows or columns are less than or equal to zero
+     * @param texture nonnull source texture
+     * @param rows positive row count
+     * @param columns positive column count
+     * @return independent region grid sharing the source texture
+     * @throws NullPointerException if texture is null
+     * @throws IllegalArgumentException if rows or columns are nonpositive
      */
     public static TextureRegion[][] split(Texture texture, int rows, int columns) {
         if (texture == null) throw new NullPointerException("Texture cannot be null");
@@ -525,5 +616,81 @@ public class TextureUtility {
         }
 
         return regions;
+    }
+
+    /**
+     * Immutable integer pixel-edge coordinate used as a graph key during boundary
+     * stitching. Equality and hashing compare coordinate values.
+     * <p>Pixel-edge coordinates identify corners between image pixels rather than pixel-center
+     * samples. Value equality lets independently created boundary segments meet at a
+     * shared graph vertex.</p>
+     *
+     * @author Albert Beaupre
+     */
+    private static final class Point {
+        final int x; // Horizontal pixel-edge coordinate.
+        final int y; // Vertical pixel-edge coordinate.
+
+        /**
+         * Stores an integer pixel-edge coordinate.
+         *
+         * @param x horizontal coordinate
+         * @param y vertical coordinate
+         */
+        Point(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        /**
+         * Compares coordinate values with another internal point.
+         *
+         * @param obj candidate point
+         * @return true for matching X and Y coordinates
+         */
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (!(obj instanceof Point other))
+                return false;
+            return x == other.x && y == other.y;
+        }
+
+        /**
+         * Combines coordinate values consistently with equality for boundary lookup.
+         *
+         * @return coordinate hash
+         */
+        @Override
+        public int hashCode() {
+            return 31 * x + y;
+        }
+    }
+
+    /**
+     * Directed pixel-boundary segment with a mutable traversal marker. Endpoints
+     * are immutable point values; stitching consumes each edge at most once.
+     * <p>Direction preserves the orientation of the extracted pixel outline. The used flag
+     * belongs to one stitching traversal and does not alter endpoint coordinates or
+     * change the source image.</p>
+     *
+     * @author Albert Beaupre
+     */
+    private static final class Edge {
+        final Point a; // Directed edge start.
+        final Point b; // Directed edge end.
+        boolean used; // Whether loop stitching has consumed this edge.
+
+        /**
+         * Stores directed boundary endpoints with an initially unused traversal marker.
+         *
+         * @param a start point
+         * @param b end point
+         */
+        Edge(Point a, Point b) {
+            this.a = a;
+            this.b = b;
+        }
     }
 }

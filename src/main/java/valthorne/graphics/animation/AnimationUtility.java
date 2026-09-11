@@ -4,16 +4,26 @@ import valthorne.graphics.texture.TextureRegion;
 import valthorne.graphics.texture.TextureRegionDrawable;
 
 /**
- * A utility class for creating animations using texture regions.
+ * Constructs frame sequences from existing texture regions, wrapping each region
+ * in a drawable without copying or taking ownership of its texture. Uniform-duration
+ * overloads divide the supplied forward-pass duration across the generated frames;
+ * playback direction and repetition remain properties of the returned animation.
+ *
+ * @author Albert Beaupre
  */
 public final class AnimationUtility {
 
+    /**
+     * Prevents construction of this stateless collection of animation factories.
+     */
     private AnimationUtility() {
         // Inaccessible
     }
 
     /**
      * Creates an animation using the specified playback mode, total duration, and texture regions.
+     * Region order is preserved. An empty array creates an empty animation; duration
+     * validation is left to the animation's timing behavior rather than this factory.
      *
      * @param mode     the playback mode for the animation, determining how frames are cycled.
      * @param duration the total duration of the animation in seconds.
@@ -30,6 +40,9 @@ public final class AnimationUtility {
     /**
      * Creates an animation using the specified playback mode, an array of frame durations,
      * and corresponding texture regions.
+     * The arrays are consumed in index order to create independent frame records;
+     * the wrapped regions continue to reference their original textures. Durations
+     * are stored as supplied and interpreted by the animation during playback.
      *
      * @param mode      the playback mode for the animation, determining the order and repetition of frames.
      * @param durations an array of durations in seconds, specifying the duration of each frame.
@@ -54,6 +67,9 @@ public final class AnimationUtility {
      * Creates an animation using the specified playback mode, total duration, and a 2D grid of texture regions.
      * Each texture region in the grid is treated as a frame in the animation, and all frames
      * are assigned an equal duration.
+     * Traversal is row-major, using the first row's width for every row. Supply a
+     * nonempty rectangular grid: short later rows cause an index error and additional
+     * entries in longer rows are ignored. Textures remain owned by the caller.
      *
      * @param mode     the playback mode for the animation, determining how frames are cycled.
      * @param duration the total duration of the animation in seconds. This is evenly distributed across all frames.

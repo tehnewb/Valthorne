@@ -1,6 +1,6 @@
 package valthorne.math.geometry;
 
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 
 /**
  * Represents a geometric area defined by a sequence of points that form its boundary.
@@ -10,88 +10,6 @@ import valthorne.math.Vector2f;
  * @since January 31st, 2026
  */
 public interface Area {
-
-    /**
-     * Returns the points that define the shape or boundary of this area.
-     *
-     * @return An array of Vector2f objects representing the vertices of the area in sequence.
-     */
-    Vector2f[] points();
-
-    /**
-     * Determines if the point specified by the coordinates (x, y) lies within
-     * the boundary defined by the area. This method uses the even-odd rule
-     * algorithm to check whether the point is inside the polygon formed by
-     * the area points.
-     *
-     * @param x the x-coordinate of the point to check
-     * @param y the y-coordinate of the point to check
-     * @return true if the point (x, y) is inside the boundary of the area;
-     * false otherwise
-     */
-    default boolean contains(float x, float y) {
-        Vector2f[] pts = points();
-        int count = (pts == null) ? 0 : pts.length;
-
-        if (count < 3) return false;
-
-        boolean inside = false;
-
-        for (int i = 0, j = count - 1; i < count; j = i++) {
-            Vector2f pi = pts[i];
-            Vector2f pj = pts[j];
-
-            if (pi == null || pj == null) continue;
-
-            boolean intersect = ((pi.getY() > y) != (pj.getY() > y)) && (x < (pj.getX() - pi.getX()) * (y - pi.getY()) / (pj.getY() - pi.getY()) + pi.getX());
-
-            if (intersect) inside = !inside;
-        }
-
-        return inside;
-    }
-
-    /**
-     * Determines if this area overlaps with the given area.
-     * Two areas are considered to overlap if any of their edges intersect
-     * or if one area contains any point from the other area.
-     *
-     * @param other the other area to check for overlap, can be null
-     * @return true if the two areas overlap, false otherwise
-     */
-    default boolean overlaps(Area other) {
-        if (other == null) return false;
-
-        Vector2f[] a = points();
-        Vector2f[] b = other.points();
-
-        int aCount = (a == null) ? 0 : a.length;
-        int bCount = (b == null) ? 0 : b.length;
-
-        if (aCount < 2 || bCount < 2) return false;
-
-        for (int i = 0; i < aCount; i++) {
-            Vector2f a1 = a[i];
-            Vector2f a2 = a[(i + 1) % aCount];
-            if (a1 == null || a2 == null) continue;
-
-            for (int j = 0; j < bCount; j++) {
-                Vector2f b1 = b[j];
-                Vector2f b2 = b[(j + 1) % bCount];
-                if (b1 == null || b2 == null) continue;
-
-                if (segmentsIntersectInclusive(a1, a2, b1, b2)) {
-                    return true;
-                }
-            }
-        }
-
-        Vector2f bAny = firstNonNull(b);
-        if (bAny != null && contains(bAny.getX(), bAny.getY())) return true;
-
-        Vector2f aAny = firstNonNull(a);
-        return aAny != null && other.contains(aAny.getX(), aAny.getY());
-    }
 
     /**
      * Returns the first non-null element from the given array of Vector2f objects.
@@ -150,7 +68,7 @@ public interface Area {
      * @return 0 if the points are collinear, 1 if they are oriented clockwise, or 2 if counter-clockwise
      */
     private static int orientation(Vector2f a, Vector2f b, Vector2f c) {
-        float v = (b.getY() - a.getY()) * (c.getX() - b.getX()) - (b.getX() - a.getX()) * (c.getY() - b.getY());
+        float v = (b.y() - a.y()) * (c.x() - b.x()) - (b.x() - a.x()) * (c.y() - b.y());
 
         final float eps = 1e-6f;
         if (Math.abs(v) <= eps) return 0;
@@ -168,6 +86,88 @@ public interface Area {
      * @return true if point b lies on the line segment defined by a and c, false otherwise
      */
     private static boolean onSegment(Vector2f a, Vector2f b, Vector2f c) {
-        return b.getX() <= Math.max(a.getX(), c.getX()) && b.getX() >= Math.min(a.getX(), c.getX()) && b.getY() <= Math.max(a.getY(), c.getY()) && b.getY() >= Math.min(a.getY(), c.getY());
+        return b.x() <= Math.max(a.x(), c.x()) && b.x() >= Math.min(a.x(), c.x()) && b.y() <= Math.max(a.y(), c.y()) && b.y() >= Math.min(a.y(), c.y());
+    }
+
+    /**
+     * Returns the points that define the shape or boundary of this area.
+     *
+     * @return An array of Vector2f objects representing the vertices of the area in sequence.
+     */
+    Vector2f[] points();
+
+    /**
+     * Determines if the point specified by the coordinates (x, y) lies within
+     * the boundary defined by the area. This method uses the even-odd rule
+     * algorithm to check whether the point is inside the polygon formed by
+     * the area points.
+     *
+     * @param x the x-coordinate of the point to check
+     * @param y the y-coordinate of the point to check
+     * @return true if the point (x, y) is inside the boundary of the area;
+     * false otherwise
+     */
+    default boolean contains(float x, float y) {
+        Vector2f[] pts = points();
+        int count = (pts == null) ? 0 : pts.length;
+
+        if (count < 3) return false;
+
+        boolean inside = false;
+
+        for (int i = 0, j = count - 1; i < count; j = i++) {
+            Vector2f pi = pts[i];
+            Vector2f pj = pts[j];
+
+            if (pi == null || pj == null) continue;
+
+            boolean intersect = ((pi.y() > y) != (pj.y() > y)) && (x < (pj.x() - pi.x()) * (y - pi.y()) / (pj.y() - pi.y()) + pi.x());
+
+            if (intersect) inside = !inside;
+        }
+
+        return inside;
+    }
+
+    /**
+     * Determines if this area overlaps with the given area.
+     * Two areas are considered to overlap if any of their edges intersect
+     * or if one area contains any point from the other area.
+     *
+     * @param other the other area to check for overlap, can be null
+     * @return true if the two areas overlap, false otherwise
+     */
+    default boolean overlaps(Area other) {
+        if (other == null) return false;
+
+        Vector2f[] a = points();
+        Vector2f[] b = other.points();
+
+        int aCount = (a == null) ? 0 : a.length;
+        int bCount = (b == null) ? 0 : b.length;
+
+        if (aCount < 2 || bCount < 2) return false;
+
+        for (int i = 0; i < aCount; i++) {
+            Vector2f a1 = a[i];
+            Vector2f a2 = a[(i + 1) % aCount];
+            if (a1 == null || a2 == null) continue;
+
+            for (int j = 0; j < bCount; j++) {
+                Vector2f b1 = b[j];
+                Vector2f b2 = b[(j + 1) % bCount];
+                if (b1 == null || b2 == null) continue;
+
+                if (segmentsIntersectInclusive(a1, a2, b1, b2)) {
+                    return true;
+                }
+            }
+        }
+
+        Vector2f bAny = firstNonNull(b);
+        if (bAny != null && contains(bAny.x(), bAny.y())) return true;
+
+        Vector2f aAny = firstNonNull(a);
+        return aAny != null && other.contains(aAny.x(), aAny.y());
     }
 }

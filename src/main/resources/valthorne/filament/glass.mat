@@ -1,0 +1,36 @@
+material {
+    name : ValthorneGlass,
+    shadingModel : lit,
+    flipUV : false,
+    blending : transparent,
+    refractionMode : screenspace,
+    refractionType : solid,
+    requires : [ uv0, color ],
+    parameters : [
+        { type : float4, name : tint },
+        { type : float, name : roughness },
+        { type : float, name : metallic },
+        { type : float3, name : emission },
+        { type : float, name : cutoff },
+        { type : sampler2d, name : albedo },
+        { type : float, name : ior },
+        { type : float, name : transmission },
+        { type : float, name : thickness }
+    ]
+}
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        vec4 texel = texture(materialParams_albedo, getUV0());
+        texel.rgb = mix(texel.rgb / 12.92, pow((texel.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), texel.rgb));
+        material.baseColor = materialParams.tint * getColor() * texel;
+        if (material.baseColor.a < materialParams.cutoff) discard;
+        material.roughness = materialParams.roughness;
+        material.metallic = materialParams.metallic;
+        material.emissive = vec4(materialParams.emission, 0.0);
+        material.ior = materialParams.ior;
+        material.transmission = materialParams.transmission;
+        material.thickness = materialParams.thickness;
+        material.absorption = vec3(0.0);
+    }
+}

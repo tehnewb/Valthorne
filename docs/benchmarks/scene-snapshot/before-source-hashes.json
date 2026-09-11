@@ -1,0 +1,22 @@
+[
+  {
+    "file": "FilamentRenderer3D.java",
+    "sha256": "92cf9167f84af6d91236384d462d990eb5d85c6ddf211e8c9e7b8f791befd188"
+  },
+  {
+    "file": "PathTracer3D.java",
+    "sha256": "e7130a4c72ffe7a6e1982cfd3c0e46eee804564ff0eeb658da08082c6baeeab6"
+  },
+  {
+    "file": "PathTracingScene.java",
+    "sha256": "1eb58fd8a890deeaf5aab77953c357baf05447df54677dda6be059c0e66ca5b6"
+  },
+  {
+    "file": "PathTracingSceneSnapshotTest.java",
+    "sha256": "1d00e5c5d768c396f133b0e77dd48f368b9acca047fa84a4d026bb443d7cfa73"
+  },
+  {
+    "file": "SceneSnapshotBenchmark.java",
+    "sha256": "637a79fcda7535e9858325c9dda2da84dc5e89e51575b465c2e1d12d81efc5db"
+  }
+]

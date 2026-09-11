@@ -5,36 +5,49 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * A generic implementation of a dynamic stack in Java. This is considered fast because it uses fewer
- * method calls and checks, which in turn is fewer instructions.
+ * Array-backed last-in, first-out storage for int values. Positive
+ * capacity doubles when full; push and pop normally access only the top slot.
+ * Empty pop returns -1, which is also a valid stored value, whereas empty
+ * peek throws. Use isEmpty when distinguishing an empty pop matters.
+ *
+ * <p>Iterators walk top to bottom over live storage with an initial cursor and
+ * no concurrent-modification checks. Do not mutate the stack while iterating.
+ * The class is mutable and supplies no thread synchronization. Construct with
+ * positive capacity: a zero-length array cannot grow by doubling.</p>
  *
  * @author Albert Beaupre
  * @since May 1st, 2024
  */
 public class IntFastStack implements Iterable<Integer> {
-    private int[] stack;
-    private int ordinal;
+    private int[] stack; // Backing storage; only slots before ordinal are occupied.
+    private int ordinal; // Number of occupied slots and insertion index for the next push.
 
     /**
-     * Constructs a FastStack with the default initial size.
+     * Creates an empty stack with ten storage slots. The backing array grows
+     * when later pushes fill its current capacity.
      */
     public IntFastStack() {
         this(10);
     }
 
     /**
-     * Constructs a FastStack with a specified initial size.
+     * Allocates the requested initial storage without placing any elements in it.
+     * Use positive capacity; zero is accepted here but the doubling growth rule
+     * cannot make a zero-length array usable for push.
      *
-     * @param size the initial size of the stack
+     * @param size initial number of storage slots
+     * @throws NegativeArraySizeException if size is negative
      */
     public IntFastStack(int size) {
         this.stack = new int[size];
     }
 
     /**
-     * Adds an element to the top of the stack.
+     * Appends a value at the top, doubling and copying the array when full.
+     * Existing order is preserved. Storage itself does not box primitive values.
      *
-     * @param data the element to be added
+     * @param data value to push
+     * @throws ArrayIndexOutOfBoundsException if constructed with zero capacity
      */
     public void push(int data) {
         if (ordinal == stack.length) { // Resize the stack array if it reaches its capacity
@@ -46,9 +59,11 @@ public class IntFastStack implements Iterable<Integer> {
     }
 
     /**
-     * Removes and returns the element at the top of the stack.
+     * Removes the most recently pushed element and clears its vacated slot.
+     * Empty stacks return -1 without changing state; that result is not a
+     * unique emptiness indicator because the same value can be pushed.
      *
-     * @return the element removed from the top of the stack
+     * @return previous top value, or -1 when empty
      */
     public int pop() {
         if (ordinal == 0)
@@ -59,10 +74,11 @@ public class IntFastStack implements Iterable<Integer> {
     }
 
     /**
-     * Returns the element at the top of the stack without removing it.
+     * Reads the most recently pushed element without removing or copying it.
+     * Unlike pop, an empty stack is reported by an exception.
      *
-     * @return the element at the top of the stack
-     * @throws NoSuchElementException if the stack is empty.
+     * @return current top value
+     * @throws NoSuchElementException if the stack is empty
      */
     public int peek() {
         if (ordinal == 0) {
@@ -72,25 +88,27 @@ public class IntFastStack implements Iterable<Integer> {
     }
 
     /**
-     * Checks if the stack is empty.
+     * Tests logical membership rather than backing-array capacity.
      *
-     * @return true if the stack is empty, false otherwise
+     * @return true when no elements are stored
      */
     public boolean isEmpty() {
         return ordinal == 0;
     }
 
     /**
-     * Returns the current number of elements in the stack.
+     * Reads the number of occupied slots. Reserved backing capacity is excluded.
      *
-     * @return the size of the stack
+     * @return current element count
      */
     public int size() {
         return ordinal;
     }
 
     /**
-     * Clears the stack by setting the number of elements to zero and filling the array with zeros.
+     * Fills the entire backing array with zero and resets the element count.
+     * Allocated capacity is retained for reuse; existing iterators are invalid for
+     * continued traversal after this mutation.
      */
     public void clear() {
         Arrays.fill(stack, 0);
@@ -98,9 +116,10 @@ public class IntFastStack implements Iterable<Integer> {
     }
 
     /**
-     * Returns a string representation of the elements in the stack.
+     * Copies the occupied prefix and formats it in bottom-to-top storage order.
+     * This order is the reverse of iterator traversal; unused capacity is omitted.
      *
-     * @return a string representation of the stack
+     * @return bracketed representation of the current elements
      */
     @Override
     public String toString() {
@@ -108,9 +127,11 @@ public class IntFastStack implements Iterable<Integer> {
     }
 
     /**
-     * Returns an iterator over the elements in this stack in LIFO order (from the top of the stack to the bottom).
+     * Creates a top-to-bottom iterator whose initial cursor is the current top.
+     * It reads live storage, does not detect later mutation, and does not support
+     * removal. Keep the stack unchanged while using the iterator.
      *
-     * @return an Iterator of Integer objects.
+     * @return new iterator over current stack positions
      */
     @Override
     public Iterator<Integer> iterator() {
@@ -118,16 +139,21 @@ public class IntFastStack implements Iterable<Integer> {
     }
 
     /**
-     * An iterator that traverses the IntFastStack in LIFO order.
+     * Live-storage iterator with an independent descending cursor initialized from
+     * the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
+     * mutation of the enclosing stack during traversal is unsupported.
+     *
+     * @author Albert Beaupre
      */
     private class IntFastStackIterator implements Iterator<Integer> {
         // Begin iteration at the top (most recently added element)
-        private int currentIndex = ordinal - 1;
+        private int currentIndex = ordinal - 1; // Next live slot to read, descending from the original top.
 
         /**
-         * Checks if there is another element in the iterator.
+         * Checks whether the saved cursor still addresses a nonnegative slot.
+         * Does not compare against the enclosing stack's current size.
          *
-         * @return true if there is another element, false otherwise.
+         * @return true when another cursor position remains
          */
         @Override
         public boolean hasNext() {
@@ -135,10 +161,11 @@ public class IntFastStack implements Iterable<Integer> {
         }
 
         /**
-         * Returns the next element from the stack.
+         * Reads the current live backing-array slot and decrements the cursor.
+         * The primitive value is boxed for the Iterator interface.
          *
-         * @return the next Integer (autoboxed from int) in LIFO order.
-         * @throws NoSuchElementException if no further elements exist.
+         * @return next value in top-to-bottom order
+         * @throws NoSuchElementException if the cursor is exhausted
          */
         @Override
         public Integer next() {
@@ -149,9 +176,10 @@ public class IntFastStack implements Iterable<Integer> {
         }
 
         /**
-         * The remove operation is not supported by this iterator.
+         * Rejects iterator removal without changing storage or cursor state.
+         * Use the enclosing stack's operations outside iteration instead.
          *
-         * @throws UnsupportedOperationException always.
+         * @throws UnsupportedOperationException always
          */
         @Override
         public void remove() {

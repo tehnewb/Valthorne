@@ -1,11 +1,9 @@
 package valthorne.ui.nodes;
 
-import valthorne.Keyboard;
 import valthorne.event.events.*;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.math.MathUtils;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.ui.NodeAction;
 import valthorne.ui.UIRoot;
 import valthorne.ui.theme.ResolvedStyle;
@@ -147,22 +145,16 @@ public class Slider extends Panel {
      */
     public static final StyleKey<NodeAction<Slider>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<Slider>>) (Class<?>) NodeAction.class);
 
+    private final valthorne.ui.behavior.RangeModel model = new valthorne.ui.behavior.RangeModel(0, 1, 0); // Shared range model storing bounds and current slider value.
     private NodeAction<Slider> action; // Explicit action performed when the slider value changes
 
-    private float min; // Minimum allowed value
-    private float max; // Maximum allowed value
-    private float value; // Current value
-    private float stepSize; // Optional step size used to snap values
 
     private float trackHeight = 8f; // Thickness of the track
     private float thumbWidth = 18f; // Width of the thumb
     private float thumbHeight = 18f; // Height of the thumb
     private float thumbOffsetY; // Vertical offset applied to the thumb in horizontal mode
 
-    private boolean dragging; // Whether the slider is currently being dragged
     private boolean vertical; // Whether the slider is vertical instead of horizontal
-    private float mouseStartX; // Previous mouse X position used during dragging
-    private float mouseStartY; // Previous mouse Y position used during dragging
 
     /**
      * <p>
@@ -183,8 +175,8 @@ public class Slider extends Panel {
      * No explicit action is assigned.
      * </p>
      *
-     * @param min the minimum value
-     * @param max the maximum value
+     * @param min   the minimum value
+     * @param max   the maximum value
      * @param value the initial value
      */
     public Slider(float min, float max, float value) {
@@ -202,16 +194,15 @@ public class Slider extends Panel {
      * focusable, draggable-capable, and scrollable. A default layout size is also set.
      * </p>
      *
-     * @param min the minimum value
-     * @param max the maximum value
-     * @param value the initial value
+     * @param min    the minimum value
+     * @param max    the maximum value
+     * @param value  the initial value
      * @param action the explicit action to perform when the value changes
      */
     public Slider(float min, float max, float value, NodeAction<Slider> action) {
         this.action = action;
-        this.min = min;
-        this.max = Math.max(min, max);
-        this.value = MathUtils.clamp(value, min, this.max);
+        model.range(min, max);
+        model.value(value);
 
         setBit(CLICKABLE_BIT, true);
         setBit(FOCUSABLE_BIT, true);
@@ -253,7 +244,7 @@ public class Slider extends Panel {
      * @return the minimum value
      */
     public float getMin() {
-        return min;
+        return model.min();
     }
 
     /**
@@ -270,10 +261,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider min(float min) {
-        this.min = min;
-        if (this.max < min)
-            this.max = min;
-        this.value = MathUtils.clamp(this.value, this.min, this.max);
+        model.range(min, model.max());
         return this;
     }
 
@@ -285,7 +273,7 @@ public class Slider extends Panel {
      * @return the maximum value
      */
     public float getMax() {
-        return max;
+        return model.max();
     }
 
     /**
@@ -302,8 +290,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider max(float max) {
-        this.max = Math.max(this.min, max);
-        this.value = MathUtils.clamp(this.value, this.min, this.max);
+        model.range(model.min(), max);
         return this;
     }
 
@@ -322,9 +309,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider range(float min, float max) {
-        this.min = min;
-        this.max = Math.max(min, max);
-        this.value = MathUtils.clamp(this.value, this.min, this.max);
+        model.range(min, max);
         return this;
     }
 
@@ -336,7 +321,7 @@ public class Slider extends Panel {
      * @return the current value
      */
     public float getValue() {
-        return value;
+        return model.value();
     }
 
     /**
@@ -353,7 +338,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider value(float value) {
-        this.value = snap(MathUtils.clamp(value, this.min, this.max));
+        model.value(value);
         return this;
     }
 
@@ -365,7 +350,7 @@ public class Slider extends Panel {
      * @return the step size, or {@code 0} when free movement is enabled
      */
     public float getStepSize() {
-        return stepSize;
+        return model.step();
     }
 
     /**
@@ -382,8 +367,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider stepSize(float stepSize) {
-        this.stepSize = Math.max(0f, stepSize);
-        this.value = snap(this.value);
+        model.step(stepSize);
         return this;
     }
 
@@ -400,8 +384,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider increment() {
-        float amount = stepSize > 0f ? stepSize : Math.max((max - min) / 100f, 0.000001f);
-        value(value + amount);
+        model.increment(1);
         return this;
     }
 
@@ -418,8 +401,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider decrement() {
-        float amount = stepSize > 0f ? stepSize : Math.max((max - min) / 100f, 0.000001f);
-        value(value - amount);
+        model.increment(-1);
         return this;
     }
 
@@ -579,7 +561,7 @@ public class Slider extends Panel {
      * Negative values are clamped to {@code 0}. Layout is then marked dirty.
      * </p>
      *
-     * @param width the new thumb width
+     * @param width  the new thumb width
      * @param height the new thumb height
      * @return this slider
      */
@@ -626,10 +608,7 @@ public class Slider extends Panel {
      * @return the normalized percentage
      */
     public float getPercent() {
-        float range = max - min;
-        if (range <= 0f)
-            return 0f;
-        return (value - min) / range;
+        return model.percent();
     }
 
     /**
@@ -641,7 +620,7 @@ public class Slider extends Panel {
      * @return this slider
      */
     public Slider percent(float percent) {
-        value(min + MathUtils.clamp(percent, 0f, 1f) * (max - min));
+        model.percent(percent);
         return this;
     }
 
@@ -653,7 +632,7 @@ public class Slider extends Panel {
      * @return {@code true} if dragging is active
      */
     public boolean isDragging() {
-        return dragging;
+        return getBit(DRAGGING_BIT);
     }
 
     /**
@@ -820,22 +799,9 @@ public class Slider extends Panel {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        dragging = true;
+        if (event.getButton() != valthorne.Mouse.LEFT || isDisabled()) return;
         setDragging(true);
-        setPressed(true);
-
-        Viewport viewport = getViewport();
-        if (viewport != null) {
-            Vector2f world = viewport.screenToWorld(event.getX(), event.getY());
-            if (world == null)
-                return;
-
-            mouseStartX = world.getX();
-            mouseStartY = world.getY();
-        } else {
-            mouseStartX = event.getX();
-            mouseStartY = event.getY();
-        }
+        updateFromPointer(event.getX(), event.getY());
     }
 
     /**
@@ -854,32 +820,8 @@ public class Slider extends Panel {
      */
     @Override
     public void onMouseDrag(MouseDragEvent event) {
-        if (!dragging)
-            return;
-
-        float diffX = event.getDeltaX();
-        float diffY = event.getDeltaY();
-
-        float previous = value;
-
-        if (vertical) {
-            float usableHeight = Math.max(0f, getTrackActualHeight() - thumbHeight);
-            if (usableHeight <= 0f)
-                return;
-
-            float valueDelta = diffY * ((max - min) / usableHeight);
-            value(value + valueDelta);
-        } else {
-            float usableWidth = Math.max(0f, getTrackWidth() - thumbWidth);
-            if (usableWidth <= 0f)
-                return;
-
-            float valueDelta = diffX * ((max - min) / usableWidth);
-            value(value + valueDelta);
-        }
-
-        if (previous != value)
-            fireAction();
+        if (event.getButton() == valthorne.Mouse.LEFT && isDragging())
+            updateFromPointer(event.getToX(), event.getToY());
     }
 
     /**
@@ -897,18 +839,12 @@ public class Slider extends Panel {
      */
     @Override
     public void onMouseScroll(MouseScrollEvent event) {
-        float previous = value;
-
-        float amount = stepSize > 0f ? stepSize : Math.max((max - min) / 100f, 0.000001f);
-        if (vertical) {
-            value(value + event.yOffset() * amount);
-        } else {
-            float offset = event.yOffset() != 0 ? event.yOffset() : event.xOffset();
-            value(value + offset * amount);
-        }
-
-        if (previous != value)
+        float previous = model.value();
+        model.increment(event.preciseYOffset() != 0 ? event.preciseYOffset() : event.preciseXOffset());
+        if (previous != model.value()) {
+            event.consume();
             fireAction();
+        }
     }
 
     /**
@@ -924,7 +860,6 @@ public class Slider extends Panel {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        dragging = false;
         setDragging(false);
         setPressed(false);
     }
@@ -944,35 +879,10 @@ public class Slider extends Panel {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        if (isDisabled())
-            return;
-
-        float previous = value;
-
-        if (vertical) {
-            if (event.getKey() == Keyboard.DOWN) {
-                decrement();
-            } else if (event.getKey() == Keyboard.UP) {
-                increment();
-            } else if (event.getKey() == Keyboard.HOME) {
-                value(min);
-            } else if (event.getKey() == Keyboard.END) {
-                value(max);
-            }
-        } else {
-            if (event.getKey() == Keyboard.LEFT) {
-                decrement();
-            } else if (event.getKey() == Keyboard.RIGHT) {
-                increment();
-            } else if (event.getKey() == Keyboard.HOME) {
-                value(min);
-            } else if (event.getKey() == Keyboard.END) {
-                value(max);
-            }
-        }
-
-        if (previous != value)
-            fireAction();
+        if (isDisabled()) return;
+        float previous = model.value();
+        if (model.key(event.getKey(), vertical)) event.consume();
+        if (previous != model.value()) fireAction();
     }
 
     /**
@@ -1095,6 +1005,19 @@ public class Slider extends Panel {
      * exists, it is performed with this slider as the target.
      * </p>
      */
+    private void updateFromPointer(int screenX, int screenY) {
+        Vector2f local = screenToLocal(screenX, screenY);
+        float previous = model.value();
+        model.pointer(vertical ? local.y() : local.x(), vertical ? getHeight() : getWidth(),
+                vertical ? thumbHeight : thumbWidth, vertical);
+        if (previous != model.value()) fireAction();
+    }
+
+    /**
+     * Invokes the explicit slider action, or resolves the style action when none is
+     * assigned. A missing action is ignored. Executes synchronously and propagates
+     * callback failures; this helper does not itself change or compare slider values.
+     */
     private void fireAction() {
         NodeAction<Slider> resolvedAction = action;
         if (resolvedAction == null) {
@@ -1122,11 +1045,6 @@ public class Slider extends Panel {
      * @return the snapped value
      */
     private float snap(float value) {
-        if (stepSize <= 0f)
-            return value;
-
-        float steps = Math.round((value - min) / stepSize);
-        float snapped = min + steps * stepSize;
-        return MathUtils.clamp(snapped, min, max);
+        return value;
     }
 }

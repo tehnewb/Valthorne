@@ -124,42 +124,6 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
     }
 
     /**
-     * Opens a new decoded stream for this sound.
-     *
-     * @return a new sound stream
-     */
-    public SoundStream openStream() {
-        if (!streaming) {
-            throw new IllegalStateException("SoundData is not stream-backed");
-        }
-
-        return switch (format) {
-            case WAV -> new WaveSoundStream(this);
-            case OGG -> new OggSoundStream(this);
-            case MP3 -> new Mp3SoundStream(this);
-            default -> throw new IllegalStateException("Streaming is not supported for format: " + format);
-        };
-    }
-
-    /**
-     * Estimates the PCM byte count represented by this sound.
-     *
-     * @return the estimated PCM byte count, {@code -1} when insufficient data exists,
-     * or {@link Long#MAX_VALUE} if the estimate would overflow
-     */
-    public long estimatedPcmBytes() {
-        if (duration <= 0f || channels <= 0 || sampleRate <= 0 || bitsPerSample <= 0) {
-            return -1L;
-        }
-
-        double bytes = duration * sampleRate * channels * (bitsPerSample / 8.0);
-        if (bytes >= Long.MAX_VALUE) {
-            return Long.MAX_VALUE;
-        }
-        return Math.round(bytes);
-    }
-
-    /**
      * Returns whether the sound should be streamed rather than fully buffered.
      *
      * @param format   the detected audio format
@@ -185,15 +149,6 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
         }
 
         return estimatedPcmBytes > MAX_BUFFERED_PCM_BYTES;
-    }
-
-    /**
-     * Converts the current SoundData object into a SoundPlayer instance.
-     *
-     * @return a new SoundPlayer initialized with the current SoundData
-     */
-    public SoundPlayer asSoundPlayer() {
-        return new SoundPlayer(this);
     }
 
     /**
@@ -271,5 +226,50 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
             System.arraycopy(header, 0, resized, 0, total);
             return resized;
         }
+    }
+
+    /**
+     * Opens a new decoded stream for this sound.
+     *
+     * @return a new sound stream
+     */
+    public SoundStream openStream() {
+        if (!streaming) {
+            throw new IllegalStateException("SoundData is not stream-backed");
+        }
+
+        return switch (format) {
+            case WAV -> new WaveSoundStream(this);
+            case OGG -> new OggSoundStream(this);
+            case MP3 -> new Mp3SoundStream(this);
+            default -> throw new IllegalStateException("Streaming is not supported for format: " + format);
+        };
+    }
+
+    /**
+     * Estimates the PCM byte count represented by this sound.
+     *
+     * @return the estimated PCM byte count, {@code -1} when insufficient data exists,
+     * or {@link Long#MAX_VALUE} if the estimate would overflow
+     */
+    public long estimatedPcmBytes() {
+        if (duration <= 0f || channels <= 0 || sampleRate <= 0 || bitsPerSample <= 0) {
+            return -1L;
+        }
+
+        double bytes = duration * sampleRate * channels * (bitsPerSample / 8.0);
+        if (bytes >= Long.MAX_VALUE) {
+            return Long.MAX_VALUE;
+        }
+        return Math.round(bytes);
+    }
+
+    /**
+     * Creates a managed player on the audio thread, with automatic stream and area updates.
+     *
+     * @return a new SoundPlayer initialized with the current SoundData
+     */
+    public SoundPlayer asSoundPlayer() {
+        return valthorne.Audio.create(this);
     }
 }

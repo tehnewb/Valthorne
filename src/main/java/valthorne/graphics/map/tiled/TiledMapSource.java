@@ -53,6 +53,8 @@ public sealed interface TiledMapSource permits TiledMapSource.PathSource, TiledM
      * </p>
      *
      * @param path the file-system path of the TMX map
+     *
+     * @author Albert Beaupre
      */
     record PathSource(String path) implements TiledMapSource {
 
@@ -83,6 +85,8 @@ public sealed interface TiledMapSource permits TiledMapSource.PathSource, TiledM
      *
      * @param bytes       the raw TMX bytes
      * @param virtualPath the logical path used for dependency resolution
+     *
+     * @author Albert Beaupre
      */
     record BytesSource(byte[] bytes, String virtualPath) implements TiledMapSource {
 

@@ -3,8 +3,8 @@ package valthorne.viewport;
 import valthorne.Window;
 import valthorne.camera.Camera;
 import valthorne.graphics.DrawFunction;
-import valthorne.math.Matrix4f;
-import valthorne.math.Vector2f;
+import org.joml.Matrix4f;
+import org.joml.Vector2f;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -96,7 +96,7 @@ import static org.lwjgl.opengl.GL11.*;
  *
  * Vector2f world = viewport.screenToWorld(mouseX, mouseY);
  * if (world != null) {
- *     System.out.println("Mouse in world: " + world.getX() + ", " + world.getY());
+ *     System.out.println("Mouse in world: " + world.x() + ", " + world.y());
  * }
  * }</pre>
  *
@@ -104,20 +104,14 @@ import static org.lwjgl.opengl.GL11.*;
  * @since December 1st, 2025
  */
 public abstract class Viewport {
+    private final float[] matrixUpload = new float[16]; // Reusable 16-float array for matrix upload.
 
-    /**
-     * Fallback projection matrix used whenever no camera is assigned to this viewport.
-     *
-     * <p>
-     * Subclasses usually rebuild this matrix inside {@link #update(int, int)} so it reflects
-     * the current world size and viewport strategy.
-     * </p>
-     */
-    protected final Matrix4f projectionMatrix = new Matrix4f();
+    protected final Matrix4f projectionMatrix = new Matrix4f(); // Live projection matrix rebuilt by viewport updates.
 
     private final int[] oldViewport = new int[4]; // Previously active OpenGL viewport restored by unbind or render.
     private final int[] previousScissor = new int[4]; // Previously active OpenGL scissor rectangle restored by endScissor.
     private final float[] oldProjectionMatrix = new float[16]; // Previously active engine projection restored by unbind or render.
+    private final Vector2f screenToWorldCoordinates = new Vector2f(); // Reused return vector for screen-to-world conversion.
     protected int x; // X position of this viewport in actual screen pixels.
     protected int y; // Y position of this viewport in actual screen pixels.
     protected int width; // Width of this viewport in actual screen pixels.
@@ -126,7 +120,6 @@ public abstract class Viewport {
     protected float worldHeight; // Logical world height visible through this viewport.
     protected Camera camera; // Optional camera used to build the active projection transform.
     private boolean scissorWasEnabled; // True when a scissor test was already active before beginScissor was called.
-    private final Vector2f screenToWorldCoordinates = new Vector2f(); // Reused return vector for screen-to-world conversion.
 
     /**
      * Creates a viewport with the specified logical world size.
@@ -180,9 +173,9 @@ public abstract class Viewport {
 
         if (camera != null) {
             camera.rebuild(worldWidth, worldHeight);
-            matrixData = camera.getProjection().get();
+            matrixData = camera.getProjection().get(matrixUpload);
         } else {
-            matrixData = projectionMatrix.get();
+            matrixData = projectionMatrix.get(matrixUpload);
         }
 
         Window.setProjectionMatrix(matrixData);
@@ -273,6 +266,15 @@ public abstract class Viewport {
             return null;
         }
 
+        return screenToWorldUnclipped(screenX, screenY);
+    }
+
+    /**
+     * Converts a captured pointer even after it leaves the viewport rectangle.
+     */
+    public Vector2f screenToWorldUnclipped(float screenX, float screenY) {
+        if (width <= 0 || height <= 0) throw new IllegalStateException("Viewport has no screen area.");
+
         float vx = screenX - x;
         float vy = screenY - y;
 
@@ -283,8 +285,8 @@ public abstract class Viewport {
             float halfW = worldWidth * 0.5f;
             float halfH = worldHeight * 0.5f;
 
-            wx = (wx - halfW) / camera.getZoom() + camera.getCenter().getX();
-            wy = (wy - halfH) / camera.getZoom() + camera.getCenter().getY();
+            wx = (wx - halfW) / camera.getZoom() + camera.getCenter().x();
+            wy = (wy - halfH) / camera.getZoom() + camera.getCenter().y();
         }
 
         return screenToWorldCoordinates.set(wx, wy);

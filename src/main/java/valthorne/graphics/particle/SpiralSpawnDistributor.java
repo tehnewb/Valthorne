@@ -16,14 +16,30 @@ import java.util.Random;
  */
 public final class SpiralSpawnDistributor implements SpawnDistributor {
 
-    private final float maxRadius;
-    private final float turns;
+    private final float maxRadius; // Maximum radial extent, clamped against zero.
+    private final float turns; // Number of spiral revolutions, clamped against zero.
 
+    /**
+     * Creates an Archimedean spiral parameterization, clamping negative radius and
+     * turn count to zero. Values are not checked for finiteness.
+     *
+     * @param maxRadius final spiral radius
+     * @param turns revolutions from the origin to the outer end
+     */
     public SpiralSpawnDistributor(float maxRadius, float turns) {
         this.maxRadius = Math.max(0f, maxRadius);
         this.turns = Math.max(0f, turns);
     }
 
+    /**
+     * Samples one uniform parameter t and evaluates radius maxRadius*t and angle
+     * 2*pi*turns*t. Sampling is uniform in the parameter, not arc length or area.
+     *
+     * @param random nonnull random source
+     * @param out nonnull destination with at least two entries; X then Y
+     * @throws NullPointerException if random or out is null
+     * @throws ArrayIndexOutOfBoundsException if out has fewer than two entries
+     */
     @Override
     public void computeOffset(Random random, float[] out) {
         float t = random.nextFloat();

@@ -27,6 +27,26 @@ public final class SlugGlyph {
     final float bandOffsetY; // Offset converting em y to horizontal-band index.
     final boolean drawable; // True when this glyph owns outline curves.
 
+    /**
+     * Stores normalized layout metrics and packed references to this glyph's Slug
+     * band data. Values are retained without validation; curve and band textures remain
+     * owned by the enclosing font rather than this metadata object.
+     *
+     * @param codepoint represented Unicode codepoint
+     * @param advance horizontal pen advance in em units
+     * @param leftSideBearing left bearing in em units
+     * @param x0 minimum horizontal outline bound in em units
+     * @param y0 minimum vertical outline bound in em units
+     * @param x1 maximum horizontal outline bound in em units
+     * @param y1 maximum vertical outline bound in em units
+     * @param glyphPack packed band-texture location
+     * @param glyphInfoPack packed band extents and fill flags
+     * @param bandScaleX multiplier from em x to vertical-band index
+     * @param bandScaleY multiplier from em y to horizontal-band index
+     * @param bandOffsetX offset from em x to vertical-band index
+     * @param bandOffsetY offset from em y to horizontal-band index
+     * @param drawable whether the glyph has outline curves to render
+     */
     SlugGlyph(int codepoint, float advance, float leftSideBearing, float x0, float y0, float x1, float y1,
               int glyphPack, int glyphInfoPack, float bandScaleX, float bandScaleY, float bandOffsetX, float bandOffsetY,
               boolean drawable) {

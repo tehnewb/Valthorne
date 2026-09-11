@@ -62,7 +62,7 @@ public class TexturePacker {
      *
      * @param width  atlas width in pixels (must be > 0)
      * @param height atlas height in pixels (must be > 0)
-     * @throws IllegalArgumentException if width or height is <= 0
+     * @throws IllegalArgumentException if width or height is &lt;= 0
      */
     public TexturePacker(int width, int height) {
         if (width <= 0) throw new IllegalArgumentException("width must be > 0");
@@ -86,7 +86,7 @@ public class TexturePacker {
      * @param dx  destination X in pixels within the atlas (top-left origin)
      * @param dy  destination Y in pixels within the atlas (top-left origin)
      * @throws NullPointerException     if src is null
-     * @throws IllegalArgumentException if sw/sh <= 0
+     * @throws IllegalArgumentException if sw/sh &lt;= 0
      */
     public void addRegion(TextureData src, int sx, int sy, int sw, int sh, int dx, int dy) {
         Objects.requireNonNull(src, "src");
@@ -108,7 +108,7 @@ public class TexturePacker {
      * @param dx  destination X in pixels within the atlas (top-left origin)
      * @param dy  destination Y in pixels within the atlas (top-left origin)
      * @throws NullPointerException     if src is null
-     * @throws IllegalArgumentException if sw/sh <= 0
+     * @throws IllegalArgumentException if sw/sh &lt;= 0
      */
     public void addRegion(Texture src, int sx, int sy, int sw, int sh, int dx, int dy) {
         Objects.requireNonNull(src, "src");
@@ -263,7 +263,7 @@ public class TexturePacker {
                 int si = srcBase + (x * 4);
                 int di = dstBase + (x * 4);
 
-                destAtlas.put(di,     srcPixels.get(si));
+                destAtlas.put(di, srcPixels.get(si));
                 destAtlas.put(di + 1, srcPixels.get(si + 1));
                 destAtlas.put(di + 2, srcPixels.get(si + 2));
                 destAtlas.put(di + 3, srcPixels.get(si + 3));
@@ -274,6 +274,10 @@ public class TexturePacker {
     /**
      * Immutable description of one region copy request.
      *
+     * <p>This is a deferred CPU pixel-copy request, not a GPU texture allocation. The source
+     * pixel buffer must remain readable until the packer performs the copy; source and
+     * destination coordinates both use a top-left pixel origin.</p>
+     *
      * @param src source texture pixels
      * @param sx  source X (top-left origin)
      * @param sy  source Y (top-left origin)
@@ -281,6 +285,9 @@ public class TexturePacker {
      * @param sh  height to copy
      * @param dx  destination X in atlas (top-left origin)
      * @param dy  destination Y in atlas (top-left origin)
+     *
+     * @author Albert Beaupre
      */
-    private record RegionRequest(TextureData src, int sx, int sy, int sw, int sh, int dx, int dy) { }
+    private record RegionRequest(TextureData src, int sx, int sy, int sw, int sh, int dx, int dy) {
+    }
 }

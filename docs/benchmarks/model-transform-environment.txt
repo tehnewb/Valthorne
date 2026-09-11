@@ -1,0 +1,11 @@
+2026-09-08/09 local desktop performance pass
+CPU: AMD Ryzen 9 7945HX
+Git HEAD: a6ca439e4dd1e257d4a0c3e1053ad37e89fdf034
+Workspace dirty: existing lighting, 3D, UI and documentation work preserved.
+ModelInstance3D baseline SHA256: 5D7454596996B92D39760DD1A7C606C363B3B1F637BFE8C04271D6DA2A2781E9
+Workload: ModelTransformBenchmark.worldTransforms, count 1/256, moving false/true.
+JMH: two forks, 3x1s warmup, 5x1s measurement, average ns per complete batch, GC profiler.
+Use JSON reports for JVM executable/version, confidence errors, per-iteration scores and allocation metrics.
+Before: gradlew benchmarkEngine --args="valthorne.engine.benchmark.ModelTransformBenchmark -foe true -prof gc -rf json -rff build/reports/model-transform/before.json"
+After: same parameters, report after.json. Affected tests ran before the after benchmark.
+No visible benchmark window; no competing benchmark process launched; JMH lock was not bypassed.

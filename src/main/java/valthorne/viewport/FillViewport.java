@@ -75,6 +75,6 @@ public class FillViewport extends Viewport {
             this.x = (screenWidth - this.width) / 2;
         }
 
-        projectionMatrix.ortho(0, worldWidth, 0, worldHeight, -1f, 1f);
+        projectionMatrix.setOrtho(0, worldWidth, 0, worldHeight, -1f, 1f);
     }
 }

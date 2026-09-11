@@ -83,10 +83,10 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
  */
 public class Texture implements Poolable {
 
-    protected TextureData data; // CPU-side texture metadata and pixel buffer associated with this texture
     protected final int textureID; // OpenGL texture object ID created for this texture
-    protected TextureFilter filter = TextureFilter.NEAREST; // Current filtering mode applied to the texture
     protected final boolean ownsData; // Whether this texture should dispose the decoded TextureData when the GPU texture is released
+    protected TextureData data; // CPU-side texture metadata and pixel buffer associated with this texture
+    protected TextureFilter filter = TextureFilter.NEAREST; // Current filtering mode applied to the texture
     private boolean disposed; // Whether this texture has already released its owned resources
 
     /**
@@ -147,6 +147,16 @@ public class Texture implements Poolable {
         this(data, false);
     }
 
+    /**
+     * Creates and uploads an RGBA8 OpenGL texture, retaining the supplied pixel data.
+     * Configures the default filters and clamp-to-edge wrapping and leaves the texture
+     * bound on the active texture unit. Disposal always releases the GPU object and
+     * also releases pixel data when ownsData is true. Requires a current OpenGL context.
+     *
+     * @param data decoded RGBA pixels and dimensions
+     * @param ownsData whether disposal also releases the decoded pixel buffer
+     * @throws NullPointerException if data is null
+     */
     protected Texture(TextureData data, boolean ownsData) {
         if (data == null) throw new NullPointerException("TextureData cannot be null");
 
@@ -183,6 +193,16 @@ public class Texture implements Poolable {
         this(textureID, data, false);
     }
 
+    /**
+     * Wraps an existing texture handle without uploading pixels or changing GL state.
+     * The wrapper takes responsibility for deleting the handle on disposal; ownsData
+     * separately controls release of the associated CPU pixel buffer.
+     *
+     * @param textureID existing OpenGL texture handle
+     * @param data retained pixel data and dimensions
+     * @param ownsData whether disposal also releases the pixel buffer
+     * @throws NullPointerException if data is null
+     */
     protected Texture(int textureID, TextureData data, boolean ownsData) {
         if (data == null) throw new NullPointerException("TextureData cannot be null");
 
@@ -203,6 +223,17 @@ public class Texture implements Poolable {
      */
     public void bind() {
         glBindTexture(GL_TEXTURE_2D, textureID);
+    }
+
+    /**
+     * <p>
+     * Returns the currently active filter for this texture.
+     * </p>
+     *
+     * @return the current texture filter
+     */
+    public TextureFilter getFilter() {
+        return filter;
     }
 
     /**
@@ -228,17 +259,6 @@ public class Texture implements Poolable {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.magFilter);
 
         if (filter.usesMipmaps()) glGenerateMipmap(GL_TEXTURE_2D);
-    }
-
-    /**
-     * <p>
-     * Returns the currently active filter for this texture.
-     * </p>
-     *
-     * @return the current texture filter
-     */
-    public TextureFilter getFilter() {
-        return filter;
     }
 
     /**

@@ -25,18 +25,22 @@ import static org.lwjgl.glfw.GLFW.GLFW_MOD_SUPER;
  * and must not be shared concurrently between publishing threads.
  * </p>
  *
+ * <p>Key codes are narrowed to signed shorts and modifier masks to bytes without range
+ * validation. Payload setters do not reset consumption or change the numeric route.
+ * Character lookup is a key-code mapping, not Unicode text-input composition.</p>
+ *
  * @author Albert Beaupre
  * @since December 18th, 2025
  */
 public class KeyEvent extends Event {
 
-    private short key;
-    private byte modifiers;
+    private short key; // Key code narrowed to signed-short storage.
+    private byte modifiers; // Modifier bits narrowed to byte storage.
 
     /**
      * Creates a raw key event routed as {@link EventTypes#KEY}.
      *
-     * @param key GLFW key code
+     * @param key       GLFW key code
      * @param modifiers GLFW modifier bit mask
      */
     public KeyEvent(int key, int modifiers) {
@@ -46,8 +50,8 @@ public class KeyEvent extends Event {
     /**
      * Constructor used by concrete key-event subclasses to select their own numeric route.
      *
-     * @param type concrete event type
-     * @param key GLFW key code
+     * @param type      concrete event type
+     * @param key       GLFW key code
      * @param modifiers GLFW modifier bit mask
      */
     protected KeyEvent(EventType<?> type, int key, int modifiers) {
@@ -59,7 +63,7 @@ public class KeyEvent extends Event {
     /**
      * Replaces both payload fields for object reuse.
      *
-     * @param key GLFW key code
+     * @param key       GLFW key code
      * @param modifiers modifier mask
      * @return this event
      */
@@ -69,17 +73,32 @@ public class KeyEvent extends Event {
         return this;
     }
 
-    /** @param modifiers modifier bit mask */
+    /**
+     * Replaces this payload component without changing other values, the numeric route,
+     * or consumption state. Storage uses the declared field type without range validation.
+     *
+     * @param modifiers modifier bit mask
+     */
     public void setModifiers(int modifiers) {
         this.modifiers = (byte) modifiers;
     }
 
-    /** @return key code */
+    /**
+     * Returns the current stored payload component without querying native input or
+     * window state. Copy the value if it is needed after this reusable event is updated.
+     *
+     * @return key code
+     */
     public short getKey() {
         return key;
     }
 
-    /** @param key key code */
+    /**
+     * Replaces this payload component without changing other values, the numeric route,
+     * or consumption state. Storage uses the declared field type without range validation.
+     *
+     * @param key key code
+     */
     public void setKey(int key) {
         this.key = (short) key;
     }
@@ -93,22 +112,42 @@ public class KeyEvent extends Event {
         return Keyboard.getKeyChar(key);
     }
 
-    /** @return whether Shift was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Shift was active
+     */
     public boolean isShiftDown() {
         return (modifiers & GLFW_MOD_SHIFT) != 0;
     }
 
-    /** @return whether Control was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Control was active
+     */
     public boolean isCtrlDown() {
         return (modifiers & GLFW_MOD_CONTROL) != 0;
     }
 
-    /** @return whether Alt was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Alt was active
+     */
     public boolean isAltDown() {
         return (modifiers & GLFW_MOD_ALT) != 0;
     }
 
-    /** @return whether Super/Command/Windows was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Super/Command/Windows was active
+     */
     public boolean isSuperDown() {
         return (modifiers & GLFW_MOD_SUPER) != 0;
     }

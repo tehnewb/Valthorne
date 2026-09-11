@@ -1,0 +1,62 @@
+[
+  {
+    "path": "build.gradle",
+    "sha256": "ead779d11f2f70d951eb7fb371f6f386e94ca76803e2cbd14accc41c6445df2e"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArena.java",
+    "sha256": "8a395059a500503eaf0c77259d8d9c79c76d6ddd9d127c40e07472643631650f"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArenaEffects.java",
+    "sha256": "df4d142bfd12ff751fc0dcda0abfb551d92ae492b6dbefe5f104f87eb70b75bb"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArenaWorld.java",
+    "sha256": "e3dca82e16bfbd10a630bf4086cb2001839c1700d48a65b229c5caf84b745bb5"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArenaValidation.java",
+    "sha256": "fef086016aa3aee80c8c71f08f13a75f61cd2d1815cafa8a27ca429053b9aad8"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsCombatModels.java",
+    "sha256": "2f34926063789143f22c4dcecee7defd98cf05dc52261d084746a44c116268ac"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsEnvironmentModels.java",
+    "sha256": "47f850eccf2bbb8cbf8d14b2415606b94051475e95dee4c8f9e0ba40772f8094"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/FilamentRenderer3D.java",
+    "sha256": "8fbd222d2df5b971ddf8256c900108f56e40d3d60cebc2144b317886e50d7c4f"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/Material3D.java",
+    "sha256": "968748faf98150f0b0b0c238f4d7e52062714d682c3f4badd84d0c0ea20f20d8"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/PathTracingScene.java",
+    "sha256": "99a0beab3efd3bba1023e846d29d6313c4870aa9e712bffa7b06c9f375344b8b"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/ObjModel3D.java",
+    "sha256": "25ef05c64aac3df5321375bec9186e7c9459ad11bece9d596c722642c95470a2"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/particle/Particle3D.java",
+    "sha256": "4e208504ca6ae7772f6822a4850d65a74bfa0c957b0aec2abd996059d831b406"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/particle/ParticleEmitter3D.java",
+    "sha256": "aecae41206850b6b0762e4008ee69e3f957094e5b223dd754eee08b9e9e81f5b"
+  },
+  {
+    "path": "src/main/resources/valthorne/filament/alpha.mat",
+    "sha256": "7c845708d25a0bf72ec528cc30e1f3c22b0bcf244976886f96e54cdfb0059abe"
+  },
+  {
+    "path": "src/main/resources/valthorne/filament/alpha.filamat",
+    "sha256": "5f74b9ccca1fb93cd5b2d841b88df2416490537acb6e0a6ee9c9a85655fa539e"
+  }
+]

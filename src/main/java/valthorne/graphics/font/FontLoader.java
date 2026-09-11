@@ -13,12 +13,23 @@ import valthorne.asset.AssetLoader;
  * <p>
  * If an unsupported or unknown FontSource is provided, an IllegalStateException is thrown.
  *
+ * @author Albert Beaupre
  * @see AssetLoader
  * @see FontParameters
  * @see FontData
  */
 public class FontLoader implements AssetLoader<FontParameters, FontData> {
 
+    /**
+     * Decodes and packs the requested character range from a path or copied byte
+     * source using the configured pixel font size. This creates font data; callers
+     * manage its lifetime and separately construct a rendering font when needed.
+     *
+     * @param parameters source, font size, first character, and character count
+     * @return newly loaded font data
+     * @throws NullPointerException  if parameters is null
+     * @throws IllegalStateException if the source type is unsupported
+     */
     @Override
     public FontData load(FontParameters parameters) {
         FontSource src = parameters.source();

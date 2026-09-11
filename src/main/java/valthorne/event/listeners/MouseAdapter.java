@@ -18,22 +18,46 @@ import valthorne.event.events.MouseReleaseEvent;
  */
 public class MouseAdapter implements MouseListener {
 
-    /** Default no-op press callback. */
+    /**
+     * Default no-op press callback.
+     * This implementation does not inspect, retain, or consume the event. Override
+     * this callback to handle the notification while leaving other callbacks inactive.
+     *
+     * @param event notification ignored by this default implementation
+     */
     @Override
     public void mousePressed(MousePressEvent event) {
     }
 
-    /** Default no-op release callback. */
+    /**
+     * Default no-op release callback.
+     * This implementation does not inspect, retain, or consume the event. Override
+     * this callback to handle the notification while leaving other callbacks inactive.
+     *
+     * @param event notification ignored by this default implementation
+     */
     @Override
     public void mouseReleased(MouseReleaseEvent event) {
     }
 
-    /** Default no-op drag callback. */
+    /**
+     * Default no-op drag callback.
+     * This implementation does not inspect, retain, or consume the event. Override
+     * this callback to handle the notification while leaving other callbacks inactive.
+     *
+     * @param event notification ignored by this default implementation
+     */
     @Override
     public void mouseDragged(MouseDragEvent event) {
     }
 
-    /** Default no-op move callback. */
+    /**
+     * Default no-op move callback.
+     * This implementation does not inspect, retain, or consume the event. Override
+     * this callback to handle the notification while leaving other callbacks inactive.
+     *
+     * @param event notification ignored by this default implementation
+     */
     @Override
     public void mouseMoved(MouseMoveEvent event) {
     }

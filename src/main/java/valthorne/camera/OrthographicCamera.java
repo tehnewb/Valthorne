@@ -49,12 +49,12 @@ public class OrthographicCamera extends Camera {
         float halfW = (worldWidth * 0.5f) / zoom;
         float halfH = (worldHeight * 0.5f) / zoom;
 
-        float left = center.getX() - halfW;
-        float right = center.getX() + halfW;
-        float bottom = center.getY() - halfH;
-        float top = center.getY() + halfH;
+        float left = center.x() - halfW;
+        float right = center.x() + halfW;
+        float bottom = center.y() - halfH;
+        float top = center.y() + halfH;
 
         // Construct a classic orthographic projection
-        projection.ortho(left, right, bottom, top, -1f, 1f);
+        projection.setOrtho(left, right, bottom, top, -1f, 1f);
     }
 }

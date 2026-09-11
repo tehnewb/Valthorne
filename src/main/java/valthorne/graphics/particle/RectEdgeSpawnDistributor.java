@@ -19,14 +19,31 @@ import java.util.Random;
  */
 public final class RectEdgeSpawnDistributor implements SpawnDistributor {
 
-    private final float halfWidth;
-    private final float halfHeight;
+    private final float halfWidth; // Horizontal rectangle half-extent about the origin.
+    private final float halfHeight; // Vertical rectangle half-extent about the origin.
 
+    /**
+     * Creates a centered rectangular edge distribution, clamping each negative
+     * half-extent to zero.
+     *
+     * @param halfWidth horizontal half-extent
+     * @param halfHeight vertical half-extent
+     */
     public RectEdgeSpawnDistributor(float halfWidth, float halfHeight) {
         this.halfWidth = Math.max(0f, halfWidth);
         this.halfHeight = Math.max(0f, halfHeight);
     }
 
+    /**
+     * Chooses each of four edges with equal probability, then samples uniformly
+     * along that edge. This is not uniform per unit perimeter length when width
+     * and height differ.
+     *
+     * @param random nonnull random source
+     * @param out nonnull destination with at least two entries; X then Y
+     * @throws NullPointerException if random or out is null
+     * @throws ArrayIndexOutOfBoundsException if out has fewer than two entries
+     */
     @Override
     public void computeOffset(Random random, float[] out) {
         float t = random.nextFloat();

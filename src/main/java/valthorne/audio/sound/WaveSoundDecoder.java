@@ -57,31 +57,6 @@ public class WaveSoundDecoder implements SoundDecoder {
 
     /**
      * <p>
-     * Decodes the supplied WAV bytes into a fully buffered {@link SoundData} instance.
-     * </p>
-     *
-     * <p>
-     * The method first probes the WAV metadata so it knows where the PCM payload starts
-     * and how large it is. It then copies just the audio payload into a direct
-     * {@link ByteBuffer}, flips that buffer for reading, and wraps the result in a
-     * non-streaming {@link SoundData} record marked as {@link AudioFormat#WAV}.
-     * </p>
-     *
-     * @param bytes the encoded WAV bytes to decode
-     * @return a fully buffered sound data object containing the PCM payload
-     */
-    @Override
-    public SoundData decode(byte[] bytes) {
-        SoundMetadata metadata = probe(bytes);
-        ByteBuffer pcm = BufferUtils.createByteBuffer((int) metadata.dataLength());
-        pcm.put(bytes, (int) metadata.dataOffset(), (int) metadata.dataLength());
-        pcm.flip();
-
-        return new SoundData(null, pcm, 0L, metadata.dataLength(), metadata.duration(), metadata.channels(), metadata.sampleRate(), metadata.bitsPerSample(), false, false, AudioFormat.WAV);
-    }
-
-    /**
-     * <p>
      * Probes WAV metadata from an in-memory byte array.
      * </p>
      *
@@ -175,7 +150,7 @@ public class WaveSoundDecoder implements SoundDecoder {
      * chunk is discovered.
      * </p>
      *
-     * @param buffer the little-endian WAV data buffer
+     * @param buffer     the little-endian WAV data buffer
      * @param totalBytes the total number of bytes available in the source buffer
      * @return the extracted sound metadata
      */
@@ -288,5 +263,30 @@ public class WaveSoundDecoder implements SoundDecoder {
         byte[] out = new byte[4];
         buffer.get(out);
         return new String(out, StandardCharsets.US_ASCII);
+    }
+
+    /**
+     * <p>
+     * Decodes the supplied WAV bytes into a fully buffered {@link SoundData} instance.
+     * </p>
+     *
+     * <p>
+     * The method first probes the WAV metadata so it knows where the PCM payload starts
+     * and how large it is. It then copies just the audio payload into a direct
+     * {@link ByteBuffer}, flips that buffer for reading, and wraps the result in a
+     * non-streaming {@link SoundData} record marked as {@link AudioFormat#WAV}.
+     * </p>
+     *
+     * @param bytes the encoded WAV bytes to decode
+     * @return a fully buffered sound data object containing the PCM payload
+     */
+    @Override
+    public SoundData decode(byte[] bytes) {
+        SoundMetadata metadata = probe(bytes);
+        ByteBuffer pcm = BufferUtils.createByteBuffer((int) metadata.dataLength());
+        pcm.put(bytes, (int) metadata.dataOffset(), (int) metadata.dataLength());
+        pcm.flip();
+
+        return new SoundData(null, pcm, 0L, metadata.dataLength(), metadata.duration(), metadata.channels(), metadata.sampleRate(), metadata.bitsPerSample(), false, false, AudioFormat.WAV);
     }
 }

@@ -80,10 +80,10 @@ public class Label extends UINode {
      */
     public static final StyleKey<Alignment> ALIGNMENT_KEY = StyleKey.of("alignment", Alignment.class, Alignment.START);
 
-    private String text = "";
-    private Font font;
-    private Color color;
-    private Alignment alignment = Alignment.START;
+    private String text = ""; // Retained nonnull text, with newline-separated lines.
+    private Font font; // Borrowed explicit or style-resolved font, possibly null.
+    private Color color; // Borrowed draw tint, or null for the font's default color.
+    private Alignment alignment = Alignment.START; // Horizontal alignment applied independently to each text line.
 
     /**
      * Constructs a new default instance of the Label class.
@@ -109,19 +109,37 @@ public class Label extends UINode {
         this.text = text == null ? "" : text;
     }
 
+    /**
+     * Recalculates content dimensions using the currently available font when the
+     * node is created. A missing font or empty text yields zero layout dimensions.
+     */
     @Override
     public void onCreate() {
         recalculateSize();
     }
 
+    /**
+     * Performs no label-specific cleanup because the font and color are borrowed.
+     */
     @Override
     public void onDestroy() {
     }
 
+    /**
+     * Performs no per-frame animation or input work for this text-only node.
+     *
+     * @param delta elapsed frame time in seconds, unused
+     */
     @Override
     public void update(float delta) {
     }
 
+    /**
+     * Returns the retained text, normalized to a nonnull string by constructors
+     * and the text setter.
+     *
+     * @return displayed text
+     */
     public String getText() {
         return text;
     }
@@ -148,16 +166,11 @@ public class Label extends UINode {
     }
 
     /**
-     * <p>
-     * Applies layout-related updates for this label.
-     * </p>
+     * Borrows a font reference, immediately recalculates dimensions, and marks
+     * layout dirty. A later resolved style font may replace this reference.
      *
-     * <p>
-     * The current style is resolved and used to update the label's font and color.
-     * If a font is available, the label's layout width and height are set to the
-     * measured size of the current text. After applying its own text-specific layout
-     * data, the method delegates to the superclass implementation.
-     * </p>
+     * @param font font to use, or null to produce no text geometry
+     * @return this label
      */
     public Label font(Font font) {
         this.font = font;
@@ -176,16 +189,22 @@ public class Label extends UINode {
     }
 
     /**
-     * Sets the color for this label.
+     * Borrows a color reference for subsequent draws. Null selects the font's default
+     * color path; a later resolved style color can replace this reference.
      *
-     * @param color the new color to be applied to the label
-     * @return this label, allowing for method chaining
+     * @param color draw tint, or null
+     * @return this label
      */
     public Label color(Color color) {
         this.color = color;
         return this;
     }
 
+    /**
+     * Returns the current borrowed tint, whether explicitly assigned or style-resolved.
+     *
+     * @return mutable tint reference, or null for the font's default color
+     */
     public Color getColor() {
         return color;
     }
@@ -213,6 +232,12 @@ public class Label extends UINode {
         return alignment;
     }
 
+    /**
+     * Applies nonnull resolved font, color, and alignment values, preserving current
+     * references when a style value is absent. Recalculates exact content width/height
+     * before delegating to base Yoga style application; this replaces explicit layout
+     * dimensions with measured text dimensions.
+     */
     @Override
     protected void applyLayout() {
         ResolvedStyle style = getStyle();
@@ -234,6 +259,10 @@ public class Label extends UINode {
         super.applyLayout();
     }
 
+    /**
+     * Sets layout width to the widest measured line and height to the multiline
+     * text height. Missing font or empty text sets both dimensions to zero.
+     */
     private void recalculateSize() {
         if (font == null || text == null || text.isEmpty()) {
             getLayout().width(0f);
@@ -245,10 +274,21 @@ public class Label extends UINode {
         getLayout().height(measureTextHeight());
     }
 
+    /**
+     * Splits retained text at newline characters while preserving trailing empty
+     * lines. Carriage returns and other characters remain in their line.
+     *
+     * @return line array, or one empty line for null text
+     */
     private String[] getLines() {
         return text == null ? new String[]{""} : text.split("\n", -1);
     }
 
+    /**
+     * Measures each line through the current font and returns the largest width.
+     *
+     * @return widest line width, or zero without a font
+     */
     private float measureTextWidth() {
         if (font == null)
             return 0f;
@@ -262,6 +302,13 @@ public class Label extends UINode {
         return width;
     }
 
+    /**
+     * Measures single-line text directly. Multiline text uses the representative
+     * Ag line height plus one inferred line advance per additional line, including
+     * trailing empty lines.
+     *
+     * @return text height, or zero for absent font or empty text
+     */
     private float measureTextHeight() {
         if (font == null || text == null || text.isEmpty())
             return 0f;
@@ -275,10 +322,21 @@ public class Label extends UINode {
         return singleLineHeight + (lines.length - 1) * lineAdvance;
     }
 
+    /**
+     * Measures Ag as a representative ascender/descender line.
+     *
+     * @return representative line height, or zero without a font
+     */
     private float getSingleLineHeight() {
         return font == null ? 0f : font.getHeight("Ag");
     }
 
+    /**
+     * Derives line spacing from the difference between two-line and single-line Ag
+     * measurements, falling back to single-line height when the difference is nonpositive.
+     *
+     * @return baseline step, or zero without a font
+     */
     private float getLineAdvance() {
         if (font == null)
             return 0f;
@@ -289,6 +347,14 @@ public class Label extends UINode {
         return lineAdvance > 0f ? lineAdvance : singleLineHeight;
     }
 
+    /**
+     * Draws each newline-separated line with independent start/center/end alignment
+     * inside the computed node width, advancing downward from the top text line.
+     * Uses the borrowed tint when present and the font's default draw path otherwise.
+     * Does nothing for a missing font or empty text.
+     *
+     * @param batch prepared texture batch receiving font glyphs
+     */
     @Override
     public void draw(TextureBatch batch) {
         if (font == null || text == null || text.isEmpty())

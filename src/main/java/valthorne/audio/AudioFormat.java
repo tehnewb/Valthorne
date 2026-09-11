@@ -37,15 +37,45 @@ import valthorne.audio.sound.WaveSoundDecoder;
  * @since December 5th, 2025
  */
 public enum AudioFormat {
+    /**
+     * RIFF/WAVE signature with the built-in WAV decoder.
+     */
     WAV(new WaveSoundDecoder(), new byte[][]{{'R', 'I', 'F', 'F'}, {'W', 'A', 'V', 'E'}}),
+    /**
+     * Ogg container signature with the built-in Vorbis decoder.
+     */
     OGG(new OggSoundDecoder(), new byte[][]{{'O', 'g', 'g', 'S'}}),
+    /**
+     * MP3 identification using ID3 signatures and frame-sync fallback, with a built-in decoder.
+     */
     MP3(new Mp3SoundDecoder(), new byte[][]{{'I', 'D', '3'}}, true),
+    /**
+     * FLAC signature recognized for identification; no decoder is registered here.
+     */
     FLAC(null, new byte[][]{{'f', 'L', 'a', 'C'}}),
+    /**
+     * AIFF container signature recognized for identification; no decoder is registered here.
+     */
     AIFF(null, new byte[][]{{'F', 'O', 'R', 'M'}, {'A', 'I', 'F', 'F'}}),
+    /**
+     * AAC ADTS signatures recognized for identification; no decoder is registered here.
+     */
     AAC(null, new byte[][]{{(byte) 0xFF, (byte) 0xF1}, {(byte) 0xFF, (byte) 0xF9}}),
+    /**
+     * Opus header signature recognized for identification; no decoder is registered here.
+     */
     OPUS(null, new byte[][]{{'O', 'p', 'u', 's', 'H', 'e', 'a', 'd'}}),
+    /**
+     * MIDI header signature recognized for identification; no synthesizer or decoder is registered here.
+     */
     MID(null, new byte[][]{{'M', 'T', 'h', 'd'}}),
+    /**
+     * Sun/NeXT AU signature recognized for identification; no decoder is registered here.
+     */
     AU(null, new byte[][]{{'.', 's', 'n', 'd'}}),
+    /**
+     * Fallback when no known signature matches; supplies no decoder.
+     */
     UNKNOWN(null, new byte[0][]);
 
     private final byte[][] magic; // Signature sequences used to identify this audio format
@@ -56,7 +86,7 @@ public enum AudioFormat {
      * Creates an audio format entry with standard signature matching.
      *
      * @param decoder the decoder used for this format, or {@code null} when unsupported
-     * @param magic the signature byte sequences used for detection
+     * @param magic   the signature byte sequences used for detection
      */
     AudioFormat(SoundDecoder decoder, byte[][] magic) {
         this(decoder, magic, false);
@@ -65,8 +95,8 @@ public enum AudioFormat {
     /**
      * Creates an audio format entry with full detection configuration.
      *
-     * @param decoder the decoder used for this format, or {@code null} when unsupported
-     * @param magic the signature byte sequences used for detection
+     * @param decoder          the decoder used for this format, or {@code null} when unsupported
+     * @param magic            the signature byte sequences used for detection
      * @param needsMp3Fallback whether MP3 frame-sync fallback detection should be applied
      */
     AudioFormat(SoundDecoder decoder, byte[][] magic, boolean needsMp3Fallback) {
@@ -127,8 +157,8 @@ public enum AudioFormat {
     /**
      * Compares a signature against the supplied data starting at a given offset.
      *
-     * @param data the source bytes being inspected
-     * @param sig the signature bytes to compare against
+     * @param data   the source bytes being inspected
+     * @param sig    the signature bytes to compare against
      * @param offset the starting offset in {@code data}
      * @return {@code true} when the signature matches at the given offset
      */

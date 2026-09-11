@@ -33,11 +33,20 @@ import org.lwjgl.util.yoga.Yoga;
  */
 public enum FlexWrap {
 
+    /**
+     * Keeps children on one flex line even when their requested sizes exceed available space.
+     */
     NO_WRAP(Yoga.YGWrapNoWrap),
+    /**
+     * Allows children to flow onto additional flex lines.
+     */
     WRAP(Yoga.YGWrapWrap),
+    /**
+     * Allows wrapping while reversing the cross-axis order of flex lines.
+     */
     WRAP_REVERSE(Yoga.YGWrapReverse);
 
-    private final int yoga;
+    private final int yoga; // Native Yoga enum value corresponding to this layout option.
 
     /**
      * Creates a flex wrap value mapped to the Yoga wrap constant.

@@ -79,10 +79,22 @@ import valthorne.math.MathUtils;
  */
 public class Animation implements Drawable {
 
-    private static final byte PAUSED = 0;                 // Bit index: animation updates are paused when set.
-    private static final byte LOOPING = 1;                // Bit index: animation loops at endpoints when set.
-    private static final byte RETURNING = 2;              // Bit index: BIDIRECTIONAL-only: true when moving backward.
-    private static final byte FINISHED = 3;               // Bit index: animation has finished (distinct from paused).
+    /**
+     * Packed bit index indicating that time-based animation advancement is paused.
+     */
+    private static final byte PAUSED = 0;
+    /**
+     * Packed bit index controlling repetition when an animation reaches its endpoint.
+     */
+    private static final byte LOOPING = 1;
+    /**
+     * Packed bit index marking the backward phase of bidirectional playback.
+     */
+    private static final byte RETURNING = 2;
+    /**
+     * Packed bit index marking completed playback independently of pause state.
+     */
+    private static final byte FINISHED = 3;
 
     private final ByteBits bits = new ByteBits();         // Packed flags: paused/looping/returning/finished.
     private final AnimationFrame[] frames;                // Ordered list of frames played by this animation.
@@ -407,6 +419,15 @@ public class Animation implements Drawable {
     }
 
     /**
+     * Returns the current playback speed multiplier.
+     *
+     * @return speed multiplier
+     */
+    public float getSpeed() {
+        return speed;
+    }
+
+    /**
      * Sets the playback speed multiplier.
      *
      * <p>Speed scales time inside {@link #update(float)}:</p>
@@ -416,21 +437,12 @@ public class Animation implements Drawable {
      *     <li>0.5: half speed</li>
      * </ul>
      *
-     * <p>Values <= 0 are clamped to a tiny positive value to avoid freezing or division edge cases.</p>
+     * <p>Values &lt;= 0 are clamped to a tiny positive value to avoid freezing or division edge cases.</p>
      *
      * @param speed playback speed multiplier
      */
     public void setSpeed(float speed) {
         this.speed = Math.max(0.000001f, speed);
-    }
-
-    /**
-     * Returns the current playback speed multiplier.
-     *
-     * @return speed multiplier
-     */
-    public float getSpeed() {
-        return speed;
     }
 
     /**
@@ -587,18 +599,6 @@ public class Animation implements Drawable {
     }
 
     /**
-     * Enables or disables looping.
-     *
-     * <p>If you set a loop count with {@link #loopCount(int)}, looping is automatically enabled when loops != 0.</p>
-     *
-     * @param looping true to loop, false for one-shot behavior
-     */
-    public Animation setLooping(boolean looping) {
-        this.bits.set(LOOPING, looping);
-        return this;
-    }
-
-    /**
      * Sets a loop count limit.
      *
      * <p>Values:</p>
@@ -655,6 +655,18 @@ public class Animation implements Drawable {
      */
     public boolean isLooping() {
         return bits.get(LOOPING);
+    }
+
+    /**
+     * Enables or disables looping.
+     *
+     * <p>If you set a loop count with {@link #loopCount(int)}, looping is automatically enabled when loops != 0.</p>
+     *
+     * @param looping true to loop, false for one-shot behavior
+     */
+    public Animation setLooping(boolean looping) {
+        this.bits.set(LOOPING, looping);
+        return this;
     }
 
     /**
@@ -749,6 +761,21 @@ public class Animation implements Drawable {
     }
 
     /**
+     * Computes the forward timeline time by summing all completed frame durations
+     * plus {@link #elapsedTime} for the current frame.
+     *
+     * @return forward time in seconds
+     */
+    private float getTimeForward() {
+        float acc = 0f;
+        for (int i = 0; i < currentIndex; i++) {
+            AnimationFrame f = frames[i];
+            if (f != null) acc += Math.max(0f, f.duration());
+        }
+        return acc + elapsedTime;
+    }
+
+    /**
      * Seeks to a forward time position within [0..duration].
      *
      * <p>This walks the frame durations cumulatively until it finds the frame containing {@code t},
@@ -772,6 +799,17 @@ public class Animation implements Drawable {
 
         currentIndex = (short) (frames.length - 1);
         elapsedTime = 0f;
+    }
+
+    /**
+     * Computes the reverse timeline time where 0 means "at end".
+     *
+     * <p>This returns {@code duration - forwardTime}.</p>
+     *
+     * @return reverse time in seconds
+     */
+    private float getTimeReverse() {
+        return Math.max(0f, totalDuration - getTimeForward());
     }
 
     /**
@@ -800,31 +838,5 @@ public class Animation implements Drawable {
 
         currentIndex = 0;
         elapsedTime = 0f;
-    }
-
-    /**
-     * Computes the forward timeline time by summing all completed frame durations
-     * plus {@link #elapsedTime} for the current frame.
-     *
-     * @return forward time in seconds
-     */
-    private float getTimeForward() {
-        float acc = 0f;
-        for (int i = 0; i < currentIndex; i++) {
-            AnimationFrame f = frames[i];
-            if (f != null) acc += Math.max(0f, f.duration());
-        }
-        return acc + elapsedTime;
-    }
-
-    /**
-     * Computes the reverse timeline time where 0 means "at end".
-     *
-     * <p>This returns {@code duration - forwardTime}.</p>
-     *
-     * @return reverse time in seconds
-     */
-    private float getTimeReverse() {
-        return Math.max(0f, totalDuration - getTimeForward());
     }
 }

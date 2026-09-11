@@ -34,6 +34,16 @@ import java.io.IOException;
  */
 public class XZStrategy implements CompressionStrategy {
 
+    /**
+     * Encodes the complete input as a XZ stream using the compressor's default
+     * settings. The output stream is finalized before its bytes are returned. Input
+     * contents remain unchanged, and each call uses independent temporary buffers.
+     *
+     * @param data non-null uncompressed bytes
+     *
+     * @return newly allocated, finalized XZ payload
+     * @throws RuntimeException if the compressor reports an I/O failure; the cause is retained
+     */
     @Override
     public byte[] compress(byte[] data) {
         try {
@@ -47,6 +57,16 @@ public class XZStrategy implements CompressionStrategy {
         }
     }
 
+    /**
+     * Expands a XZ payload into a new in-memory byte array. Bytes are copied
+     * until the decoder reports end of input, with no configured output-size limit.
+     * The supplied encoded array is not modified.
+     *
+     * @param data non-null XZ bytes
+     *
+     * @return newly allocated decompressed contents
+     * @throws RuntimeException if malformed data or another decoder I/O failure prevents decoding
+     */
     @Override
     public byte[] decompress(byte[] data) {
         try {

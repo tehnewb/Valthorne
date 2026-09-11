@@ -65,16 +65,17 @@ public enum TextureFilter {
      */
     LINEAR_MIPMAP_LINEAR(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
-    /**
-     * Minification filter parameter.
-     */
-    public final int minFilter;
+    public final int minFilter; // OpenGL minification filter, including mipmap selection where applicable.
+
+    public final int magFilter; // OpenGL magnification filter; always nearest or linear.
 
     /**
-     * Magnification filter parameter.
+     * Stores the OpenGL minification and magnification constants for an enum option.
+     * The constructor does not apply them to a texture or generate required mipmaps.
+     *
+     * @param minFilter OpenGL minification filter constant
+     * @param magFilter OpenGL magnification filter constant
      */
-    public final int magFilter;
-
     TextureFilter(int minFilter, int magFilter) {
         this.minFilter = minFilter;
         this.magFilter = magFilter;

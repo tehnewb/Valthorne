@@ -40,11 +40,9 @@ package valthorne.event;
  */
 public abstract class Event {
 
-    /** Numeric routing identifier used by {@link EventPublisher}. */
-    private final int typeId;
+    private final int typeId; // Permanent numeric route used by EventPublisher.
 
-    /** Dispatch-local propagation state. Intentionally non-volatile. */
-    private boolean consumed;
+    private boolean consumed; // Dispatch-local propagation state; intentionally non-volatile.
 
     /**
      * Creates an event permanently associated with the supplied event type.

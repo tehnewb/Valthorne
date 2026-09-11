@@ -1,0 +1,58 @@
+[
+  {
+    "Path": "src/examples/java/valthorne/examples/FpsArena.java",
+    "SHA256": "E3F86DFF1058018A2341B88A15AEEC21B057F9260B1418350BD7F0AC634C06B2"
+  },
+  {
+    "Path": "src/examples/java/valthorne/examples/FpsArenaEffects.java",
+    "SHA256": "9370D11F63B58E1578C629663790AD3421E42DC44853D94E544DC36A7AFC75BD"
+  },
+  {
+    "Path": "src/examples/java/valthorne/examples/FpsArenaWorld.java",
+    "SHA256": "DF42ED75E8647CE7C828F6B764F20C53DD0AB49D6F6BEF25071B3BA76A403FC3"
+  },
+  {
+    "Path": "src/examples/java/valthorne/examples/FpsArenaValidation.java",
+    "SHA256": "B9162C7B6028519F1745F9ED30A87BADCE80DA45F767CDB3A9C86AC1E15FDFEB"
+  },
+  {
+    "Path": "src/examples/java/valthorne/examples/PhysicsStudioModels.java",
+    "SHA256": "BE2CE01E7A5DD43856B17835A3F00A09F3AFBCE4350E2D80246D7C139F30C45D"
+  },
+  {
+    "Path": "src/main/java/valthorne/graphics/particle/Particle3D.java",
+    "SHA256": "65A612EE949721EF18160ED96892C4ACE9665C74A404719148689EEA308A3581"
+  },
+  {
+    "Path": "src/main/java/valthorne/graphics/particle/ParticleEmitter3D.java",
+    "SHA256": "AECAE41206850B6B0762E4008EE69E3F957094E5B223DD754EEE08B9E9E81F5B"
+  },
+  {
+    "Path": "src/main/java/valthorne/graphics/model/Scene3D.java",
+    "SHA256": "C1D150A4A19215FCB65D3649CA084EFA5E5CFB4725A6DC18131292265601AF34"
+  },
+  {
+    "Path": "src/main/java/valthorne/graphics/model/PointLight3D.java",
+    "SHA256": "E8B285464E42D6C2419353EBA997C06C9636AC96068E51AC071546D4C3AFA735"
+  },
+  {
+    "Path": "src/main/java/valthorne/graphics/model/FilamentRenderer3D.java",
+    "SHA256": "31FF03F021DCBFD37F8C1159B7DE9EF8259DF63059BA72F6F1E3A38B379B6353"
+  },
+  {
+    "Path": "src/main/java/valthorne/math/physics/PhysicsWorld3D.java",
+    "SHA256": "8229790B02118BC5CB7BAD96AFEEC5EC963C8D1A01238707B38195B474E54525"
+  },
+  {
+    "Path": "src/main/java/valthorne/math/physics/BodySettings3D.java",
+    "SHA256": "F59E587B44A0B3452310CC6BD9A3F227FC7C7147BAD618E6DEDC3A9F15BE1821"
+  },
+  {
+    "Path": "src/main/java/valthorne/math/physics/RigidBody3D.java",
+    "SHA256": "7CB7C86E737B9E170C6EBE367E1DFCBAB4E9C2B74B056014801CA501C09A7870"
+  },
+  {
+    "Path": "build.gradle",
+    "SHA256": "F56FF37D06F8433D014979FE25FE30E8E018484792FFA434A9242F4EC28797BA"
+  }
+]

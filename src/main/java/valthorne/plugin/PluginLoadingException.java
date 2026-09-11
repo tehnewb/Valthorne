@@ -1,10 +1,12 @@
 package valthorne.plugin;
 
 /**
- * Exception thrown when plugin loading fails due to an unrecoverable error.
+ * Unchecked failure carrying plugin-loading context and its underlying cause.
+ * The loader uses this to preserve the original exception while identifying the
+ * failed loading operation. Constructing the exception does not unload plugins,
+ * retry loading, or perform any resource cleanup.
  *
  * @author Albert Beaupre
- * @since March 13th, 2025
  */
 public class PluginLoadingException extends RuntimeException {
     /**

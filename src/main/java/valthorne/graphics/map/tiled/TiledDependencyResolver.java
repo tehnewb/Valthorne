@@ -4,6 +4,11 @@ package valthorne.graphics.map.tiled;
  * Defines an interface for resolving dependencies in Tiled map structures or related assets
  * such as external tileset or image files. This allows implementations to provide functionality
  * for locating and loading resources needed by Tiled map components.
+ * Resolution runs synchronously during loading. Implementations define the resource
+ * namespace and may use the parent bytes, parent path, or both; this interface does
+ * not impose filesystem access or cache decoded assets.
+ *
+ * @author Albert Beaupre
  */
 public interface TiledDependencyResolver {
 

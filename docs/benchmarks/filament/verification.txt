@@ -1,0 +1,109 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava
+> Task :processResources
+> Task :classes
+> Task :jar
+
+> Task :javadoc
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\animation\Animation.java:428: warning: invalid input: '<'
+     * <p>Values <= 0 are clamped to a tiny positive value to avoid freezing or division edge cases.</p>
+                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\font\FontParameters.java:19: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+ * @throws IllegalArgumentException if any argument is invalid
+   ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\font\FontSource.java:22: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided path is null or blank
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\FrameBuffer.java:77: warning: invalid input: '<'
+     * @throws IllegalArgumentException if width or height are <= 0
+                                                               ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\FrameBuffer.java:159: warning: invalid input: '<'
+     * @throws IllegalArgumentException if newWidth or newHeight are <= 0
+                                                                     ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\shader\ReflectionShader.java:23: warning: reference not found: Texture#draw()
+ *     <li>This assumes texture unit 0 is active (or at least the {@link Texture#draw()} call binds appropriately).</li>
+                                                                  ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:65: warning: invalid input: '<'
+     * @throws IllegalArgumentException if width or height is <= 0
+                                                              ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:89: warning: invalid input: '<'
+     * @throws IllegalArgumentException if sw/sh <= 0
+                                                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:111: warning: invalid input: '<'
+     * @throws IllegalArgumentException if sw/sh <= 0
+                                                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:44: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided byte array is null or empty
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:45: warning: unknown tag. Unregistered custom tag?
+     * @implSpec This class ensures that the byte array provided is immutable by copying it in the constructor.
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:22: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided path is null or blank
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\utility\TimeUtility.java:99: warning: invalid input: '<'
+     * @return fps, or 0 if dt <= 0
+                               ^
+13 warnings
+
+> Task :javadocJar
+> Task :sourcesJar
+> Task :assemble
+> Task :compileTestJava
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses
+FEngine (64 bits) created at 000001E64C722AD0 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+> Task :test
+> Task :check
+> Task :build
+> Task :compileVerification3DJava
+> Task :processVerification3DResources NO-SOURCE
+> Task :verification3DClasses
+FEngine (64 bits) created at 0000024AF6C10450 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+> Task :verify3D
+> Task :compileVerificationPhysics3DJava
+> Task :processVerificationPhysics3DResources NO-SOURCE
+> Task :verificationPhysics3DClasses
+> Task :verifyPhysics3D
+> Task :compileVerificationUIJava UP-TO-DATE
+> Task :processVerificationUIResources NO-SOURCE
+> Task :verificationUIClasses UP-TO-DATE
+> Task :verifyUI
+> Task :compileExamplesJava UP-TO-DATE
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses UP-TO-DATE
+
+> Task :runLightingStudio
+Studio smoke passed: native orbit, wheel zoom, UI placement tool, surface placement, light dragging, undo/redo, 2D/3D, GL checks.
+FEngine (64 bits) created at 0000018AFD995AC0 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+
+> Task :writeFilamentLaunchClasspath
+
+BUILD SUCCESSFUL in 16s
+18 actionable tasks: 15 executed, 3 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

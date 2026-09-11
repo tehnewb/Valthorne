@@ -36,6 +36,8 @@ public sealed interface TiledDependencySource permits TiledDependencySource.File
      * When this source is used, relative dependency paths are resolved against the parent
      * TMX or TSX path using normal file-system rules.
      * </p>
+     *
+     * @author Albert Beaupre
      */
     record FileSystemSource() implements TiledDependencySource {
     }
@@ -49,6 +51,8 @@ public sealed interface TiledDependencySource permits TiledDependencySource.File
      * </p>
      *
      * @param files the in-memory file map keyed by normalized path
+     *
+     * @author Albert Beaupre
      */
     record MapSource(Map<String, byte[]> files) implements TiledDependencySource {
 
@@ -78,6 +82,16 @@ public sealed interface TiledDependencySource permits TiledDependencySource.File
         }
 
         /**
+         * Normalizes a path into slash-separated form.
+         *
+         * @param path the input path
+         * @return the normalized slash-separated path, or null if the input was null
+         */
+        private static String normalize(String path) {
+            return path == null ? null : path.replace('\\', '/');
+        }
+
+        /**
          * Returns a defensive copy of the in-memory file map.
          *
          * <p>
@@ -94,16 +108,6 @@ public sealed interface TiledDependencySource permits TiledDependencySource.File
                 copy.put(entry.getKey(), Arrays.copyOf(entry.getValue(), entry.getValue().length));
             }
             return copy;
-        }
-
-        /**
-         * Normalizes a path into slash-separated form.
-         *
-         * @param path the input path
-         * @return the normalized slash-separated path, or null if the input was null
-         */
-        private static String normalize(String path) {
-            return path == null ? null : path.replace('\\', '/');
         }
     }
 }

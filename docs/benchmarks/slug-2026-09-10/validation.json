@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-10",
+  "standardTests": {
+    "tests": 140,
+    "failures": 0,
+    "errors": 0
+  },
+  "graphicsTests": {
+    "tests": 77,
+    "failures": 0,
+    "errors": 0
+  },
+  "slugNativeRegressions": 8,
+  "sourceHashes": [
+    {
+      "path": "src/main/java/valthorne/graphics/font/slug/SlugBatch.java",
+      "sha256": "6EC1069936B3AF2530428FD476900ED5F00458A77093BF14B097DADCF5BECEDE"
+    },
+    {
+      "path": "src/main/java/valthorne/graphics/font/slug/SlugFont.java",
+      "sha256": "7CA53826644F4FC0458A98C88EA80DBB12155D7A7A5ACBCA98E7D1F1B84B7C34"
+    },
+    {
+      "path": "src/main/java/valthorne/graphics/font/slug/SlugTextRun.java",
+      "sha256": "F7D063F28F7C92501AE3AB79D90A257265EC86D0EEE0B27489A31DC59D3CE158"
+    },
+    {
+      "path": "src/main/java/valthorne/graphics/font/slug/SlugShader.java",
+      "sha256": "937CA0A2A26788DC064B107B92885527E8C3A49409E1E49866BA7E6177FE5829"
+    },
+    {
+      "path": "src/main/java/valthorne/ui/nodes/SlugLabel.java",
+      "sha256": "E01A761548A5FA005266FF41FFD29AB8A47950945B827E837944DA16E597555E"
+    },
+    {
+      "path": "src/main/resources/valthorne/shaders/font/slug.frag",
+      "sha256": "D41B44728B1C54ACB7E6D0A62DD2C91A0F4EC53D14AB68EAE9FD7BCBDE2D1CEE"
+    },
+    {
+      "path": "src/main/resources/valthorne/shaders/font/slug.vert",
+      "sha256": "92871D766D6E7480B6D0BAC8156B0A7D673975773D23F8A9B7BBD571EB51813F"
+    },
+    {
+      "path": "src/benchmark/java/valthorne/font/benchmark/SlugBenchmark.java",
+      "sha256": "F658484A9636916D767232985AA8FB4D4A25B64F9EFECA210DE3F6B400F69E9B"
+    },
+    {
+      "path": "src/test/java/valthorne/graphics/font/slug/SlugIntegrationTest.java",
+      "sha256": "C1D73A0E1D837B2B48C67C918ED8214DE5C682AA0182319F07D82926056B124A"
+    }
+  ]
+}

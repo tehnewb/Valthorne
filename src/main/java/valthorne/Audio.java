@@ -105,15 +105,78 @@ public final class Audio {
      * Registry of all active sound players that should be updated by the audio thread.
      */
     private static final Set<SoundPlayer> PLAYERS = ConcurrentHashMap.newKeySet();
+    /**
+     * Cached player iteration array rebuilt after registry changes on the audio thread.
+     */
+    private static SoundPlayer[] playerSnapshot = new SoundPlayer[0];
+    /**
+     * Whether player registration changes require rebuilding the iteration snapshot.
+     */
+    private static boolean playersChanged;
 
     /**
      * Flag indicating whether the audio run loop should continue processing.
      */
     private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
 
+    /**
+     * Dedicated thread owning OpenAL operations; volatile visibility supports dispatch checks.
+     */
     private static volatile Thread audioThread; // Dedicated thread that owns OpenAL and processes audio work
+    /**
+     * Native OpenAL device handle, or NULL when no device is retained.
+     */
     private static volatile long device; // Native OpenAL device handle
+    /**
+     * Native OpenAL context handle, or NULL when no context is retained.
+     */
     private static volatile long context; // Native OpenAL context handle
+
+    /**
+     * Immutable logical listener coordinates used by ambient sound areas.
+     * Publishing a new snapshot triggers area-gain reevaluation without changing
+     * OpenAL's panning transform. Use the same world-coordinate units as the sound areas.
+     *
+     * @param x listener horizontal coordinate
+     *
+     * @param y listener vertical coordinate
+     * @param z listener depth coordinate
+     * @author Albert Beaupre
+     */
+    public record ListenerPosition(float x, float y, float z) {}
+    /**
+     * Latest immutable ambient listener coordinates, published atomically across threads.
+     */
+    private static volatile ListenerPosition listenerPosition = new ListenerPosition(0, 0, 0);
+
+    /**
+     * Publishes the listener position used for ambient-zone attenuation without
+     * waiting for the audio thread. Identical coordinates retain the existing snapshot
+     * so sound players can skip redundant calculations. This does not set OpenAL's
+     * spatial listener transform.
+     *
+     * @param x finite horizontal world coordinate
+     *
+     * @param y finite vertical world coordinate
+     * @param z finite depth world coordinate
+     * @throws IllegalArgumentException if any coordinate is infinite or NaN
+     */
+    public static void setListenerPosition(float x, float y, float z) {
+        if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z))
+            throw new IllegalArgumentException("Listener coordinates must be finite");
+        ListenerPosition current = listenerPosition;
+        if (current.x() == x && current.y() == y && current.z() == z) return;
+        listenerPosition = new ListenerPosition(x, y, z);
+    }
+
+    /**
+     * Returns the latest published ambient-zone listener position. The immutable
+     * snapshot can be retained across threads; a later position change publishes a
+     * new object without modifying this one.
+     *
+     * @return current logical listener snapshot
+     */
+    public static ListenerPosition getListenerPosition() { return listenerPosition; }
 
     /**
      * <p>
@@ -277,6 +340,7 @@ public final class Audio {
         return call(() -> {
             SoundPlayer player = new SoundPlayer(data);
             PLAYERS.add(player);
+            playersChanged = true;
             return player;
         });
     }
@@ -301,6 +365,7 @@ public final class Audio {
 
         run(() -> {
             PLAYERS.remove(player);
+            playersChanged = true;
             player.dispose();
         });
     }
@@ -450,6 +515,7 @@ public final class Audio {
         if (isAudioThread()) {
             if (!PLAYERS.contains(player)) {
                 PLAYERS.add(player);
+                playersChanged = true;
             }
             return;
         }
@@ -457,6 +523,7 @@ public final class Audio {
         run(() -> {
             if (!PLAYERS.contains(player)) {
                 PLAYERS.add(player);
+                playersChanged = true;
             }
         });
     }
@@ -485,10 +552,11 @@ public final class Audio {
 
         if (isAudioThread()) {
             PLAYERS.remove(player);
+            playersChanged = true;
             return;
         }
 
-        run(() -> PLAYERS.remove(player));
+        run(() -> { if (PLAYERS.remove(player)) playersChanged = true; });
     }
 
     /**
@@ -576,7 +644,8 @@ public final class Audio {
                 drainTasks();
                 updatePlayers();
                 drainTasks();
-                LockSupport.parkNanos(5_000_000L);
+                if (PLAYERS.isEmpty() && TASKS.isEmpty()) LockSupport.park();
+                else LockSupport.parkNanos(5_000_000L);
             }
 
             drainTasks();
@@ -602,7 +671,11 @@ public final class Audio {
      * </p>
      */
     private static void updatePlayers() {
-        for (SoundPlayer player : PLAYERS) {
+        if (playersChanged) {
+            playerSnapshot = PLAYERS.toArray(SoundPlayer[]::new);
+            playersChanged = false;
+        }
+        for (SoundPlayer player : playerSnapshot) {
             if (player == null) {
                 continue;
             }
@@ -657,7 +730,12 @@ public final class Audio {
         Runnable task;
 
         while ((task = TASKS.poll()) != null) {
-            task.run();
+            try {
+                task.run();
+            } catch (RuntimeException failure) {
+                // A failed asynchronous user command must not strand future callers.
+                failure.printStackTrace();
+            }
         }
     }
 
@@ -690,10 +768,18 @@ public final class Audio {
         }
     }
 
+    /**
+     * Clears Java-side run-loop state and native-handle references after teardown or
+     * failed initialization. Pending tasks and registered players are discarded; this
+     * helper does not itself dispose players or destroy native OpenAL resources.
+     * The logical ambient listener position is retained.
+     */
     private static void resetState() {
         RUNNING.set(false);
         TASKS.clear();
         PLAYERS.clear();
+        playerSnapshot = new SoundPlayer[0];
+        playersChanged = false;
         device = NULL;
         context = NULL;
     }

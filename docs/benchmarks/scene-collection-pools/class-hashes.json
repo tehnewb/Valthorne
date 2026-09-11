@@ -1,0 +1,117 @@
+[
+  {
+    "variant": "before",
+    "class": "SceneSnapshotBenchmark.class",
+    "sha256": "EDD57573473870368B479A7BD381A52F30616C9426BA9F534C270DBBD2A06F60"
+  },
+  {
+    "variant": "before",
+    "class": "Material3D.class",
+    "sha256": "E25FFC07EBCC6CD4CEE35B06CD93B4C653A91F65D71844D9712C19A14FCEDB66"
+  },
+  {
+    "variant": "before",
+    "class": "PathTracingScene.class",
+    "sha256": "9398FC1A35E4F83B01B7E75C11D92FB5F8BE93E3BD258B45B1DA255F9C6C122A"
+  },
+  {
+    "variant": "before",
+    "class": "PathTracingScene$Collector.class",
+    "sha256": "15A79F770BF8E258BA60F0227B7EDDDFAED1A14C7B265015E93136FB2E33F27A"
+  },
+  {
+    "variant": "before",
+    "class": "PathTracingScene$Instance.class",
+    "sha256": "BAFC7670ADE4D28BFBA25412DE908BA99D12031E8E9921BAD911917080384FA4"
+  },
+  {
+    "variant": "before",
+    "class": "Scene3D.class",
+    "sha256": "1CCAF0E02336C93ECAD8B8B0D77CD9B77AF596ACD9F7066146D64621DDD84662"
+  },
+  {
+    "variant": "before",
+    "class": "SceneNode3D.class",
+    "sha256": "37E30DD79F6CEB83E731299083B02A52A3AE5850ACB2F53298E543361698347B"
+  },
+  {
+    "variant": "after",
+    "class": "SceneSnapshotBenchmark.class",
+    "sha256": "64806C23EC3667F2D9BD6ADB5802EF64C0584F144BC7DA829A86BC799335405B"
+  },
+  {
+    "variant": "after",
+    "class": "Material3D.class",
+    "sha256": "FF7CC9258EA2CAFCE4D355890F538A3BE5F8DB7E59BDCE91C72DA8595BD1AF9C"
+  },
+  {
+    "variant": "after",
+    "class": "PathTracingScene.class",
+    "sha256": "3B10CB732FF4C890976222F89AD1AFFBAE88D0510396677776658D9730B5AE29"
+  },
+  {
+    "variant": "after",
+    "class": "PathTracingScene$Capacity.class",
+    "sha256": "FE3165FE95599D968AE83E7B859C394ADCA12013B6C029765CB2994593C8A879"
+  },
+  {
+    "variant": "after",
+    "class": "PathTracingScene$Collector.class",
+    "sha256": "15A79F770BF8E258BA60F0227B7EDDDFAED1A14C7B265015E93136FB2E33F27A"
+  },
+  {
+    "variant": "after",
+    "class": "PathTracingScene$Instance.class",
+    "sha256": "11A2248371A7D700A965E70A46C39B67D1C23A3639F4C95DA8BB736771ADE72C"
+  },
+  {
+    "variant": "after",
+    "class": "Scene3D.class",
+    "sha256": "5385F8F2DFD311C0647BA68D139376676130A247FE11EA217542F4086A9C6C64"
+  },
+  {
+    "variant": "after",
+    "class": "SceneNode3D.class",
+    "sha256": "EE851F43CF2DE95C059D2F1506553FDFEC4F97E371AE471007BDE9E1B870301D"
+  },
+  {
+    "variant": "linear",
+    "class": "SceneSnapshotBenchmark.class",
+    "sha256": "64806C23EC3667F2D9BD6ADB5802EF64C0584F144BC7DA829A86BC799335405B"
+  },
+  {
+    "variant": "linear",
+    "class": "Material3D.class",
+    "sha256": "FF7CC9258EA2CAFCE4D355890F538A3BE5F8DB7E59BDCE91C72DA8595BD1AF9C"
+  },
+  {
+    "variant": "linear",
+    "class": "PathTracingScene.class",
+    "sha256": "5F936BB82C1DD3C7B5EC065E63E5C78F61D7448630C3E72F866EED52F7122280"
+  },
+  {
+    "variant": "linear",
+    "class": "PathTracingScene$Capacity.class",
+    "sha256": "FE3165FE95599D968AE83E7B859C394ADCA12013B6C029765CB2994593C8A879"
+  },
+  {
+    "variant": "linear",
+    "class": "PathTracingScene$Collector.class",
+    "sha256": "15A79F770BF8E258BA60F0227B7EDDDFAED1A14C7B265015E93136FB2E33F27A"
+  },
+  {
+    "variant": "linear",
+    "class": "PathTracingScene$Instance.class",
+    "sha256": "39F5B4027F6C2E8474BE52BF8DFDE826541A809987719936D8558731EF0E5882"
+  },
+  {
+    "variant": "linear",
+    "class": "Scene3D.class",
+    "sha256": "5385F8F2DFD311C0647BA68D139376676130A247FE11EA217542F4086A9C6C64"
+  },
+  {
+    "variant": "linear",
+    "class": "SceneNode3D.class",
+    "sha256": "08A7B2C684BBCAC315CBC77A437B6070FE7ABCF84481D13CD245C640DE80B04B"
+  }
+]

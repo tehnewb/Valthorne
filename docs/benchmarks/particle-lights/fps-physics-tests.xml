@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="valthorne.physics3d.FpsPhysics3DTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-09T23:48:15.782Z" hostname="DESKTOP-HM4E53R" time="0.12">
+  <properties/>
+  <testcase name="rotationLockRejectsTorqueAndAngularImpulseButPreservesTranslation()" classname="valthorne.physics3d.FpsPhysics3DTest" time="0.061"/>
+  <testcase name="nativeFiltersHonorAllThirtyTwoObjectLayersAndDisabledPairs()" classname="valthorne.physics3d.FpsPhysics3DTest" time="0.033"/>
+  <testcase name="rotationLockedCapsuleStillRestsOnFloorWithPerTickSupportQueries()" classname="valthorne.physics3d.FpsPhysics3DTest" time="0.015"/>
+  <testcase name="ignoredPlayerBodyDoesNotHideTheWallImmediatelyBehindIt()" classname="valthorne.physics3d.FpsPhysics3DTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

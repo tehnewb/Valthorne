@@ -104,12 +104,17 @@ public class Font implements Dimensional {
 
     private final float fallbackAdvance; // Fallback horizontal advance used when a glyph is missing from the font.
     private final boolean ownsData; // Whether this font should dispose the baked FontData it loaded itself.
-
+    private final Color color = new Color(1, 1, 1, 1); // Mutable tint multiplied into glyph rendering.
+    private final Color outlineColor = new Color(0f, 0f, 0f, 1f); // Color used during the outline pass.
+    private final Color shadowColor = new Color(0f, 0f, 0f, 0.75f); // Color used during the shadow pass.
+    private final GlyphStyle tempStyle = new GlyphStyle(); // Reusable temporary style object used during runtime styling.
+    private final GlyphContext tempCtx = new GlyphContext(); // Reusable temporary glyph context used during runtime styling.
+    private final Color tempColor = new Color(1f, 1f, 1f, 1f); // Reusable temporary color used during outline rendering.
+    private final Color tempGlyphColor = new Color(1f, 1f, 1f, 1f); // Reusable temporary color used when the styler overrides glyph color.
     private Texture texture; // Atlas texture that contains all baked glyph pixels for this font.
     private FontData data; // Font metadata and glyph metrics used for measurement and rendering.
     private Glyph spaceGlyph; // Cached space glyph used to derive tab width efficiently.
     private String text = ""; // Current text content assigned to this font instance.
-    private final Color color = new Color(1, 1, 1, 1);
     private float x; // World-space x position of the text origin.
     private float y; // World-space y position of the text origin.
     private float width; // Cached measured width of the current text block.
@@ -125,20 +130,14 @@ public class Font implements Dimensional {
     private FontStyler styler; // Optional runtime styler used to modify glyph output while drawing.
     private boolean outlineEnabled; // True when outline rendering is enabled.
     private int outlinePx = 1; // Outline radius in pixels.
-    private final Color outlineColor = new Color(0f, 0f, 0f, 1f); // Color used during the outline pass.
     private boolean shadowEnabled; // True when shadow rendering is enabled.
     private float shadowOffsetX = 2f; // Horizontal offset applied to the shadow pass.
     private float shadowOffsetY = -2f; // Vertical offset applied to the shadow pass.
-    private final Color shadowColor = new Color(0f, 0f, 0f, 0.75f); // Color used during the shadow pass.
     private CachedQuad[] cachedQuads = new CachedQuad[0]; // Cached glyph quads built from the current text layout.
     private int cachedQuadCount; // Number of valid cached quads currently stored in the quad cache.
     private OutlineOffset[] outlineOffsets = new OutlineOffset[0]; // Cached offsets used to draw outline samples around glyphs.
     private int outlineOffsetCount; // Number of valid outline offsets currently stored in the outline cache.
     private int outlineOffsetsForRadius = -1; // Radius value that the current outline offset cache was built for.
-    private final GlyphStyle tempStyle = new GlyphStyle(); // Reusable temporary style object used during runtime styling.
-    private final GlyphContext tempCtx = new GlyphContext(); // Reusable temporary glyph context used during runtime styling.
-    private final Color tempColor = new Color(1f, 1f, 1f, 1f); // Reusable temporary color used during outline rendering.
-    private final Color tempGlyphColor = new Color(1f, 1f, 1f, 1f); // Reusable temporary color used when the styler overrides glyph color.
     private boolean disposed; // Whether this font has already released its owned resources.
 
     /**
@@ -161,6 +160,16 @@ public class Font implements Dimensional {
         this(data, false);
     }
 
+    /**
+     * Uploads the baked atlas and initializes metrics, scaling, and layout caches.
+     * The new texture belongs to this font. When ownsData is true, decoded atlas pixels
+     * are released immediately after upload while metrics remain available for layout.
+     * A current OpenGL context is required.
+     *
+     * @param data baked glyph metrics and atlas pixels
+     * @param ownsData whether this font may release the supplied atlas data
+     * @throws NullPointerException if data is null
+     */
     private Font(FontData data, boolean ownsData) {
         if (data == null) {
             throw new NullPointerException("FontData cannot be null");
@@ -200,6 +209,34 @@ public class Font implements Dimensional {
     }
 
     /**
+     * Evaluates a smoothstep interpolation.
+     *
+     * <p>
+     * This helper is used while building outline alpha falloff values.
+     * </p>
+     *
+     * @param a lower bound
+     * @param b upper bound
+     * @param x input value
+     * @return smooth interpolated value in the range {@code 0..1}
+     */
+    private static float smoothstep(float a, float b, float x) {
+        if (x <= a) return 0f;
+        if (x >= b) return 1f;
+        x = (x - a) / (b - a);
+        return x * x * (3f - 2f * x);
+    }
+
+    /**
+     * Returns the current text assigned to this font instance.
+     *
+     * @return current text
+     */
+    public String getText() {
+        return text;
+    }
+
+    /**
      * Replaces the current text and rebuilds the cached glyph layout if the text changed.
      *
      * <p>
@@ -228,15 +265,6 @@ public class Font implements Dimensional {
         this.text = newText;
         rebuildLayoutAndMeasureCache(this.text);
         return this;
-    }
-
-    /**
-     * Returns the current text assigned to this font instance.
-     *
-     * @return current text
-     */
-    public String getText() {
-        return text;
     }
 
     /**
@@ -288,6 +316,19 @@ public class Font implements Dimensional {
         drawImmediatePass(batch, text, x, y, tint);
     }
 
+    /**
+     * Submits offset copies of each drawable glyph to form the configured outline.
+     * Uses the prebuilt outline offsets and current scale caches; tabs and missing glyphs
+     * advance the pen without drawing. The optional styler controls visibility and
+     * geometry, while the supplied outline tint and per-offset alpha control color.
+     * This pass neither begins nor ends the batch and does not update stored text.
+     *
+     * @param batch active destination texture batch
+     * @param text non-null text to traverse as UTF-16 characters
+     * @param startX horizontal draw origin in batch coordinates
+     * @param startY vertical draw origin in batch coordinates
+     * @param tint outline color whose alpha is multiplied by each offset weight
+     */
     private void drawImmediateOutlinePass(TextureBatch batch, String text, float startX, float startY, Color tint) {
         final float sx = this.scaleX;
         final float sy = this.scaleY;
@@ -371,6 +412,18 @@ public class Font implements Dimensional {
         }
     }
 
+    /**
+     * Submits the main glyph fill directly without replacing the font's cached text.
+     * Applies current scale, tab spacing, fallback advances, and optional per-glyph
+     * styling. Newlines move the baseline downward by the cached line advance; missing
+     * or zero-area glyphs advance the pen without adding a quad.
+     *
+     * @param batch active destination texture batch
+     * @param text non-null text to traverse as UTF-16 characters
+     * @param startX horizontal draw origin in batch coordinates
+     * @param startY vertical draw origin in batch coordinates
+     * @param tint default fill tint, subject to the configured glyph styler
+     */
     private void drawImmediatePass(TextureBatch batch, String text, float startX, float startY, Color tint) {
         final float sx = this.scaleX;
         final float sy = this.scaleY;
@@ -535,23 +588,6 @@ public class Font implements Dimensional {
     }
 
     /**
-     * Assigns a runtime {@link FontStyler} that may modify glyph output during drawing.
-     *
-     * <p>
-     * The styler is consulted per glyph during normal, shadow, and outline rendering paths.
-     * It can hide glyphs, recolor them, offset them, or apply scale changes without forcing
-     * a layout rebuild.
-     * </p>
-     *
-     * @param styler styler to use, or null to disable styling
-     * @return this font instance for chaining
-     */
-    public Font setStyler(FontStyler styler) {
-        this.styler = styler;
-        return this;
-    }
-
-    /**
      * Removes any runtime styler currently assigned to this font.
      *
      * @return this font instance for chaining
@@ -568,6 +604,23 @@ public class Font implements Dimensional {
      */
     public FontStyler getStyler() {
         return styler;
+    }
+
+    /**
+     * Assigns a runtime {@link FontStyler} that may modify glyph output during drawing.
+     *
+     * <p>
+     * The styler is consulted per glyph during normal, shadow, and outline rendering paths.
+     * It can hide glyphs, recolor them, offset them, or apply scale changes without forcing
+     * a layout rebuild.
+     * </p>
+     *
+     * @param styler styler to use, or null to disable styling
+     * @return this font instance for chaining
+     */
+    public Font setStyler(FontStyler styler) {
+        this.styler = styler;
+        return this;
     }
 
     /**
@@ -803,6 +856,20 @@ public class Font implements Dimensional {
     }
 
     /**
+     * Directly sets the cached width value.
+     *
+     * <p>
+     * This method does not rebuild text layout.
+     * </p>
+     *
+     * @param width new width value
+     */
+    @Override
+    public void setWidth(float width) {
+        this.width = width;
+    }
+
+    /**
      * Measures the width of the supplied text.
      *
      * <p>
@@ -868,6 +935,20 @@ public class Font implements Dimensional {
     }
 
     /**
+     * Directly sets the cached height value.
+     *
+     * <p>
+     * This method does not rebuild text layout.
+     * </p>
+     *
+     * @param height new height value
+     */
+    @Override
+    public void setHeight(float height) {
+        this.height = height;
+    }
+
+    /**
      * Measures the height of the supplied text.
      *
      * <p>
@@ -906,34 +987,6 @@ public class Font implements Dimensional {
     @Override
     public void setSize(float width, float height) {
         this.width = width;
-        this.height = height;
-    }
-
-    /**
-     * Directly sets the cached width value.
-     *
-     * <p>
-     * This method does not rebuild text layout.
-     * </p>
-     *
-     * @param width new width value
-     */
-    @Override
-    public void setWidth(float width) {
-        this.width = width;
-    }
-
-    /**
-     * Directly sets the cached height value.
-     *
-     * <p>
-     * This method does not rebuild text layout.
-     * </p>
-     *
-     * @param height new height value
-     */
-    @Override
-    public void setHeight(float height) {
         this.height = height;
     }
 
@@ -1406,25 +1459,6 @@ public class Font implements Dimensional {
     }
 
     /**
-     * Evaluates a smoothstep interpolation.
-     *
-     * <p>
-     * This helper is used while building outline alpha falloff values.
-     * </p>
-     *
-     * @param a lower bound
-     * @param b upper bound
-     * @param x input value
-     * @return smooth interpolated value in the range {@code 0..1}
-     */
-    private static float smoothstep(float a, float b, float x) {
-        if (x <= a) return 0f;
-        if (x >= b) return 1f;
-        x = (x - a) / (b - a);
-        return x * x * (3f - 2f * x);
-    }
-
-    /**
      * @return The FontData corresponding to this Font.
      */
     public FontData getData() {
@@ -1438,6 +1472,10 @@ public class Font implements Dimensional {
      * Each cached quad stores the glyph's local position, size, UVs, and metadata
      * used by runtime styling.
      * </p>
+     *
+     * <p>Geometry is relative to the text origin and UVs refer to the font's shared atlas.
+     * Character, glyph, and line indices let the styler associate cached geometry with
+     * source text without rebuilding layout every frame.</p>
      *
      * @author Albert Beaupre
      * @since March 7th, 2026

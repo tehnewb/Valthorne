@@ -1,0 +1,67 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Task :compileJava
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources
+> Task :testClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+FEngine (64 bits) created at 00000192DC319BD0 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+> Task :test
+> Task :compileVerification3DJava
+> Task :processVerification3DResources NO-SOURCE
+> Task :verification3DClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+FEngine (64 bits) created at 000002191D462E80 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+> Task :verify3D
+> Task :compileVerificationPhysics3DJava
+> Task :processVerificationPhysics3DResources NO-SOURCE
+> Task :verificationPhysics3DClasses
+> Task :verifyPhysics3D
+> Task :compileVerificationUIJava
+> Task :processVerificationUIResources NO-SOURCE
+> Task :verificationUIClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+> Task :verifyUI
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+> Task :verifyLighting
+
+[Incubating] Problems report is available at: file:///C:/Users/albert/Documents/GitHub/Valthorne/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 25s
+12 actionable tasks: 12 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

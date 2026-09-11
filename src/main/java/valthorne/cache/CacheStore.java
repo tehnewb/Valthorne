@@ -72,8 +72,79 @@ import java.nio.file.StandardOpenOption;
 public class CacheStore {
 
     private CacheArchive[] archives; // Archives contained by this store (ordered by index/id).
-    private ChecksumTable checksums;
+    private ChecksumTable checksums; // Checksum metadata associated with this store, retained until rebuilt or replaced.
     private int version; // Store format version written as an unsigned short.
+
+    /**
+     * Loads a cache store from a file at the specified path.
+     * <p>
+     * This method reads the file data and attempts to decode it into a {@code CacheStore} instance.
+     * If a matching checksum file exists in the same location with a ".chk" extension, it will also parse
+     * and associate the checksum data with the loaded store.
+     *
+     * @param path the path to the cache store file to be loaded
+     * @return a {@code CacheStore} instance initialized from the file data
+     * @throws RuntimeException if an {@code IOException} occurs during file read operations
+     */
+    public static CacheStore load(Path path) {
+        try {
+            CacheStore store = load(Files.readAllBytes(path));
+
+            String fileName = path.getFileName().toString();
+            int dot = fileName.lastIndexOf('.');
+            String base = dot == -1 ? fileName : fileName.substring(0, dot);
+
+            Path checksumPath = path.resolveSibling(base + ".chk");
+
+            if (Files.exists(checksumPath)) {
+                byte[] checksumBytes = Files.readAllBytes(checksumPath);
+                store.checksums = ChecksumTable.decode(checksumBytes);
+            }
+
+            return store;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Loads a cache store from its raw bytes.
+     *
+     * <p>
+     * This validates the version and archive count, then reads each archive payload
+     * and delegates archive decoding to {@link CacheArchive#decompress(byte[], byte)}.
+     * </p>
+     *
+     * @param data raw file bytes
+     * @return loaded cache store
+     */
+    public static CacheStore load(byte[] data) {
+        DynamicByteBuffer buffer = new DynamicByteBuffer(data);
+        int version = buffer.readShort();
+        int archiveCount = buffer.readShort();
+
+        CacheArchive[] archives = new CacheArchive[archiveCount];
+        CacheStore store = new CacheStore();
+        store.version = version;
+        store.archives = archives;
+
+        for (int archiveID = 0; archiveID < archiveCount; archiveID++) {
+            byte compression = buffer.readByte();
+            int compressedSize = buffer.readInt();
+            byte[] payload = buffer.readBytes(compressedSize);
+            archives[archiveID] = CacheArchive.decompress(payload, compression);
+        }
+        return store;
+    }
+
+    /**
+     * Returns the store format version read from disk or set in memory.
+     *
+     * @return version value stored in this instance
+     */
+    public int getVersion() {
+        return version;
+    }
 
     /**
      * Sets the store format version that will be written by {@link #save(Path)}.
@@ -87,15 +158,6 @@ public class CacheStore {
      */
     public void setVersion(int version) {
         this.version = version;
-    }
-
-    /**
-     * Returns the store format version read from disk or set in memory.
-     *
-     * @return version value stored in this instance
-     */
-    public int getVersion() {
-        return version;
     }
 
     /**
@@ -230,6 +292,23 @@ public class CacheStore {
     }
 
     /**
+     * Replaces the archive array used by this store.
+     *
+     * <p>
+     * This is a direct assignment of the provided varargs array reference (no copy).
+     * The store enforces {@code Short.MAX_VALUE} because the count is stored as a short on disk.
+     * </p>
+     *
+     * @param archives new archives backing array (varargs)
+     * @throws IllegalArgumentException if archive count is >= {@code Short.MAX_VALUE}
+     */
+    public void setArchives(CacheArchive... archives) {
+        if (archives.length >= Short.MAX_VALUE)
+            throw new IllegalArgumentException("Cache store cannot contain more than " + Short.MAX_VALUE + " archives");
+        this.archives = archives;
+    }
+
+    /**
      * Returns the first archive whose name matches (case-insensitive).
      *
      * <p>
@@ -296,23 +375,6 @@ public class CacheStore {
     }
 
     /**
-     * Replaces the archive array used by this store.
-     *
-     * <p>
-     * This is a direct assignment of the provided varargs array reference (no copy).
-     * The store enforces {@code Short.MAX_VALUE} because the count is stored as a short on disk.
-     * </p>
-     *
-     * @param archives new archives backing array (varargs)
-     * @throws IllegalArgumentException if archive count is >= {@code Short.MAX_VALUE}
-     */
-    public void setArchives(CacheArchive... archives) {
-        if (archives.length >= Short.MAX_VALUE)
-            throw new IllegalArgumentException("Cache store cannot contain more than " + Short.MAX_VALUE + " archives");
-        this.archives = archives;
-    }
-
-    /**
      * Saves the current state of the cache store to the specified file path,
      * writing its archives and associated data. A corresponding checksum file
      * with the ".chk" extension is also created alongside the main file.
@@ -351,67 +413,5 @@ public class CacheStore {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * Loads a cache store from a file at the specified path.
-     * <p>
-     * This method reads the file data and attempts to decode it into a {@code CacheStore} instance.
-     * If a matching checksum file exists in the same location with a ".chk" extension, it will also parse
-     * and associate the checksum data with the loaded store.
-     *
-     * @param path the path to the cache store file to be loaded
-     * @return a {@code CacheStore} instance initialized from the file data
-     * @throws RuntimeException if an {@code IOException} occurs during file read operations
-     */
-    public static CacheStore load(Path path) {
-        try {
-            CacheStore store = load(Files.readAllBytes(path));
-
-            String fileName = path.getFileName().toString();
-            int dot = fileName.lastIndexOf('.');
-            String base = dot == -1 ? fileName : fileName.substring(0, dot);
-
-            Path checksumPath = path.resolveSibling(base + ".chk");
-
-            if (Files.exists(checksumPath)) {
-                byte[] checksumBytes = Files.readAllBytes(checksumPath);
-                store.checksums = ChecksumTable.decode(checksumBytes);
-            }
-
-            return store;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Loads a cache store from its raw bytes.
-     *
-     * <p>
-     * This validates the version and archive count, then reads each archive payload
-     * and delegates archive decoding to {@link CacheArchive#decompress(byte[], byte)}.
-     * </p>
-     *
-     * @param data raw file bytes
-     * @return loaded cache store
-     */
-    public static CacheStore load(byte[] data) {
-        DynamicByteBuffer buffer = new DynamicByteBuffer(data);
-        int version = buffer.readShort();
-        int archiveCount = buffer.readShort();
-
-        CacheArchive[] archives = new CacheArchive[archiveCount];
-        CacheStore store = new CacheStore();
-        store.version = version;
-        store.archives = archives;
-
-        for (int archiveID = 0; archiveID < archiveCount; archiveID++) {
-            byte compression = buffer.readByte();
-            int compressedSize = buffer.readInt();
-            byte[] payload = buffer.readBytes(compressedSize);
-            archives[archiveID] = CacheArchive.decompress(payload, compression);
-        }
-        return store;
     }
 }

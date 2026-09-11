@@ -15,7 +15,6 @@ import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
-import static org.lwjgl.opengl.GL20.glDisableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.*;
@@ -97,18 +96,18 @@ public final class TextureBatch {
     private final FloatBuffer instanceBuffer; // Buffer holding queued per-instance sprite data before upload
     private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
-    private Shader customShader; // Optional user-supplied shader override
-    private Shader activeShader; // Shader currently bound and used for rendering
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
     private final int quadVBO; // VBO containing the shared quad geometry used by all instances
     private final int instanceVBO; // VBO containing uploaded instance data for the current flush
-    private final int vao;
-    private int[] textureIDs; // Cached texture IDs currently bound to the batch's texture units
+    private final int vao; // Owned vertex-array name for quad and instance attributes.
     private final int[] vp = new int[4]; // Temporary viewport storage used when switching framebuffer targets
     private final int[] previousScissorBox = new int[4]; // Previous OpenGL scissor rectangle restored after batching
     private final float[] clipStack = new float[256]; // Stack storing nested clip rectangles as x, y, width, height groups
     private final float[] translationStack = new float[256]; // Stack storing nested translation states as x and y pairs
+    private Shader customShader; // Optional user-supplied shader override
+    private Shader activeShader; // Shader currently bound and used for rendering
+    private int[] textureIDs; // Cached texture IDs currently bound to the batch's texture units
     private int translationDepth; // Current depth of the translation stack
     private float translationX; // Current accumulated translation offset on the X axis
     private float translationY; // Current accumulated translation offset on the Y axis
@@ -136,6 +135,9 @@ public final class TextureBatch {
     private float clipH; // Active clip rectangle height
 
     private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
+    private long totalDrawCalls; // Cumulative nonempty instanced draw count.
+    private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
+    private long totalSubmittedSprites, totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
 
     /**
      * <p>
@@ -230,6 +232,59 @@ public final class TextureBatch {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
+    /**
+     * Adjusts the given value based on the size parameter. If the size is greater than 1,
+     * the value is incremented by 0.5. Otherwise, the value remains unchanged.
+     *
+     * @param value the initial float value to be adjusted
+     * @param size  the size parameter that determines whether the value should be incremented
+     * @return the adjusted float value based on the size parameter
+     */
+    private static float insetMin(float value, float size) {
+        return size > 1f ? value + 0.5f : value;
+    }
+
+    /**
+     * Adjusts the given value by adding a specified size, with a modification
+     * for sizes greater than 1. If the size is greater than 1, 0.5 is subtracted
+     * from the resulting sum. Otherwise, the size is added directly to the value.
+     *
+     * @param value the initial value to be adjusted
+     * @param size  the size to be added to the value
+     * @return the adjusted value after adding the size, with the specific
+     * modification for sizes greater than 1
+     */
+    private static float insetMax(float value, float size) {
+        return size > 1f ? value + size - 0.5f : value + size;
+    }
+
+    /**
+     * <p>
+     * Detects the number of supported texture image units from the current OpenGL
+     * context and clamps the result to a caller-provided maximum.
+     * </p>
+     *
+     * <p>
+     * If the driver reports an invalid value less than or equal to zero, the method
+     * falls back to eight texture units as a conservative default.
+     * </p>
+     *
+     * @param clampTo the maximum allowed texture unit count
+     * @return the detected and clamped texture unit count
+     */
+    private static int detectTextureUnitsClamped(int clampTo) {
+        int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
+        if (units <= 0) {
+            units = 8;
+        }
+        return Math.min(units, clampTo);
+    }
+
+    /**
+     * Associates static quad and streamed instance buffers with the batch vertex
+     * array, configuring the shared attribute layout and instance divisors. Requires
+     * the GL context and leaves array bindings at zero.
+     */
     private void configureVertexArray() {
         glBindVertexArray(vao);
 
@@ -299,22 +354,6 @@ public final class TextureBatch {
 
     /**
      * <p>
-     * Returns the default shader owned by this batch.
-     * </p>
-     *
-     * <p>
-     * This can be useful when the caller wants to inspect, configure, or compare the
-     * built-in shader without affecting the custom shader state.
-     * </p>
-     *
-     * @return the default batch shader
-     */
-    public Shader getDefaultShader() {
-        return defaultShader;
-    }
-
-    /**
-     * <p>
      * Sets a custom shader for the batch.
      * </p>
      *
@@ -345,6 +384,22 @@ public final class TextureBatch {
         if (drawing) {
             bindActiveShaderState();
         }
+    }
+
+    /**
+     * <p>
+     * Returns the default shader owned by this batch.
+     * </p>
+     *
+     * <p>
+     * This can be useful when the caller wants to inspect, configure, or compare the
+     * built-in shader without affecting the custom shader state.
+     * </p>
+     *
+     * @return the default batch shader
+     */
+    public Shader getDefaultShader() {
+        return defaultShader;
     }
 
     /**
@@ -483,29 +538,60 @@ public final class TextureBatch {
     }
 
     /**
-     * Adjusts the given value based on the size parameter. If the size is greater than 1,
-     * the value is incremented by 0.5. Otherwise, the value remains unchanged.
+     * Reports whether the batch currently has a logical clip rectangle enabled.
+     * This is batch state rather than a fresh query of GL scissor enablement.
      *
-     * @param value the initial float value to be adjusted
-     * @param size  the size parameter that determines whether the value should be incremented
-     * @return the adjusted float value based on the size parameter
+     * @return whether logical clipping is active
      */
-    private static float insetMin(float value, float size) {
-        return size > 1f ? value + 0.5f : value;
-    }
+    public boolean isClipEnabled() {return clipEnabled;}
 
     /**
-     * Adjusts the given value by adding a specified size, with a modification
-     * for sizes greater than 1. If the size is greater than 1, 0.5 is subtracted
-     * from the resulting sum. Otherwise, the size is added directly to the value.
+     * Returns the active logical clip's X coordinate in batch drawing space.
      *
-     * @param value the initial value to be adjusted
-     * @param size  the size to be added to the value
-     * @return the adjusted value after adding the size, with the specific
-     * modification for sizes greater than 1
+     * @return clip X; meaningful when clipping is enabled
      */
-    private static float insetMax(float value, float size) {
-        return size > 1f ? value + size - 0.5f : value + size;
+    public float getClipX() {return clipX;}
+
+    /**
+     * Returns the active logical clip's Y coordinate in batch drawing space.
+     *
+     * @return clip Y; meaningful when clipping is enabled
+     */
+    public float getClipY() {return clipY;}
+
+    /**
+     * Returns the active logical clip width before conversion to framebuffer scissor pixels.
+     *
+     * @return clip width
+     */
+    public float getClipWidth() {return clipW;}
+
+    /**
+     * Returns the active logical clip height before conversion to framebuffer scissor pixels.
+     *
+     * @return clip height
+     */
+    public float getClipHeight() {return clipH;}
+
+    /**
+     * Restores GPU bindings after another renderer has drawn. Call flush() before
+     * handing control away. Unlike begin(), this preserves clip and translation
+     * stacks, tint, shader choice, and framebuffer ownership.
+     */
+    public void resumeAfterExternalDraw() {
+        if (!drawing) throw new IllegalStateException("The batch is not drawing.");
+        if (instanceCount != 0) throw new IllegalStateException("Flush before switching renderers.");
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_SCISSOR_TEST);
+        activeTextureCount = 0;
+        lastTextureID = -1;
+        lastTextureUnit = -1;
+        Arrays.fill(textureIDs, 0, textureUnitCapacity, -1);
+        bindActiveShaderState();
     }
 
     /**
@@ -784,7 +870,7 @@ public final class TextureBatch {
 
         Color drawColor = tint != null ? tint : sprite.getColor();
 
-        drawUV(region.getTexture(), sprite.getX(), sprite.getY(), w, h, u0, v0, u1, v1, sprite.getRotationOrigin().getX(), sprite.getRotationOrigin().getY(), sin, cos, drawColor);
+        drawUV(region.getTexture(), sprite.getX(), sprite.getY(), w, h, u0, v0, u1, v1, sprite.getRotationOrigin().x(), sprite.getRotationOrigin().y(), sin, cos, drawColor);
     }
 
     /**
@@ -885,8 +971,8 @@ public final class TextureBatch {
         float scaleX = baseWidth == 0f ? 1f : width / baseWidth;
         float scaleY = baseHeight == 0f ? 1f : height / baseHeight;
 
-        float originX = sprite.getRotationOrigin().getX() * scaleX;
-        float originY = sprite.getRotationOrigin().getY() * scaleY;
+        float originX = sprite.getRotationOrigin().x() * scaleX;
+        float originY = sprite.getRotationOrigin().y() * scaleY;
 
         float rad = (float) Math.toRadians(-sprite.getRotation());
         float sin = (float) Math.sin(rad);
@@ -980,8 +1066,8 @@ public final class TextureBatch {
         float[] srcXs = {srcX0, left, srcX2, texW};
         float[] srcYs = {srcY0, bottom, srcY2, texH};
 
-        float originX = texture.getRotationOrigin().getX();
-        float originY = texture.getRotationOrigin().getY();
+        float originX = texture.getRotationOrigin().x();
+        float originY = texture.getRotationOrigin().y();
 
         float rad = (float) Math.toRadians(-texture.getRotation());
         float sin = (float) Math.sin(rad);
@@ -1268,7 +1354,6 @@ public final class TextureBatch {
         drawUV(tex, x, y, w, h, u0, v0, u1, v1, 0f, 0f, 0f, 1f, tint);
     }
 
-
     /**
      * <p>
      * Queues a {@link TextureRegion} for rendering without a tint override.
@@ -1522,6 +1607,12 @@ public final class TextureBatch {
         }
         Objects.requireNonNull(tex, "Texture cannot be null");
 
+        totalSubmittedSprites++;
+        if (cullingEnabled && activeShader == defaultShader && !SpriteCulling.visible(Window.getProjectionMatrix(), x + translationX, y + translationY, w, h, originX, originY, sinRot, cosRot)) {
+            totalCulledSprites++;
+            return;
+        }
+
         if (instanceCount >= maxSprites) {
             flush();
         }
@@ -1627,19 +1718,48 @@ public final class TextureBatch {
     }
 
     /**
-     * <p>
-     * Flushes queued sprite instances to the GPU if any are currently buffered.
-     * </p>
+     * Reports whether standard-quad viewport culling is enabled. Custom shaders
+     * remain conservatively exempt from this optimization.
      *
-     * <p>
-     * The instance buffer is flipped, uploaded into the instance VBO, and then rendered
-     * with a single instanced draw call. After rendering, the CPU-side buffer and all
-     * texture cache bookkeeping are reset so new instances can be queued.
-     * </p>
+     * @return configured culling flag
+     */
+    public boolean isCullingEnabled() {return cullingEnabled;}
+
+    /**
+     * Standard-quad viewport culling. Custom shaders are conservatively exempt.
+     */
+    public TextureBatch setCullingEnabled(boolean enabled) {
+        cullingEnabled = enabled;
+        return this;
+    }
+
+    /**
+     * Returns the cumulative sprite submission counter used by rendering diagnostics.
      *
-     * <p>
-     * Calling this method while no instances are queued is safe and returns immediately.
-     * </p>
+     * @return lifetime submitted-sprite count
+     */
+    public long getTotalSubmittedSprites() {return totalSubmittedSprites;}
+
+    /**
+     * Returns the cumulative number of sprites rejected by viewport culling.
+     *
+     * @return lifetime culled-sprite count
+     */
+    public long getTotalCulledSprites() {return totalCulledSprites;}
+
+    /**
+     * Returns the cumulative count of nonempty instanced draws issued by flush.
+     *
+     * @return lifetime draw-call count
+     */
+    public long getTotalDrawCalls() {return totalDrawCalls;}
+
+    /**
+     * Uploads queued instances after applying the active projection, orphans the
+     * stream buffer, and issues one instanced draw. Clears CPU instance/texture-slot
+     * bookkeeping afterward while retaining the drawing scope. Empty queues return
+     * immediately. Call within an active batch scope with its GL state intact;
+     * this method does not establish or restore the full scope itself.
      */
     public void flush() {
         if (instanceCount == 0) {
@@ -1655,6 +1775,7 @@ public final class TextureBatch {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
+        totalDrawCalls++;
 
         instanceBuffer.clear();
         instanceCount = 0;
@@ -1776,27 +1897,5 @@ public final class TextureBatch {
         textureIDs = Arrays.copyOf(textureIDs, newCapacity);
         Arrays.fill(textureIDs, oldCapacity, newCapacity, -1);
         textureUnitCapacity = newCapacity;
-    }
-
-    /**
-     * <p>
-     * Detects the number of supported texture image units from the current OpenGL
-     * context and clamps the result to a caller-provided maximum.
-     * </p>
-     *
-     * <p>
-     * If the driver reports an invalid value less than or equal to zero, the method
-     * falls back to eight texture units as a conservative default.
-     * </p>
-     *
-     * @param clampTo the maximum allowed texture unit count
-     * @return the detected and clamped texture unit count
-     */
-    private static int detectTextureUnitsClamped(int clampTo) {
-        int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
-        if (units <= 0) {
-            units = 8;
-        }
-        return Math.min(units, clampTo);
     }
 }

@@ -6,7 +6,7 @@ import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.graphics.texture.TextureRegion;
 import valthorne.io.pool.Poolable;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
@@ -88,12 +88,12 @@ import java.nio.FloatBuffer;
  */
 public class Sprite implements Poolable, Drawable {
 
+    protected final Rectangle bounds; // World position and unscaled size of the sprite
     protected TextureRegion region; // Texture region currently used by this sprite
     protected FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(8); // Cached world-space vertex positions for the four sprite corners
     protected FloatBuffer uvBuffer = BufferUtils.createFloatBuffer(8); // Cached UV coordinates for the four sprite corners
     protected float[] localVertices = new float[8]; // Cached local-space vertices before world transform is applied
     protected Vector2f origin = new Vector2f(0f, 0f); // Rotation origin used for local-to-world transformation
-    protected final Rectangle bounds; // World position and unscaled size of the sprite
     protected float rotation; // Current rotation in degrees
     protected float sinRot; // Cached sine of the current rotation
     protected float cosRot = 1f; // Cached cosine of the current rotation
@@ -169,6 +169,14 @@ public class Sprite implements Poolable, Drawable {
         this(texture, false);
     }
 
+    /**
+     * Creates a full-texture region and initializes the sprite through the region
+     * constructor. Ownership controls whether later sprite disposal releases the
+     * backing texture; no additional GPU texture is created.
+     *
+     * @param texture texture supplying the entire source image
+     * @param ownsTexture whether this sprite is responsible for texture disposal
+     */
     private Sprite(Texture texture, boolean ownsTexture) {
         this(new TextureRegion(texture), ownsTexture);
     }
@@ -192,6 +200,15 @@ public class Sprite implements Poolable, Drawable {
         this(region, false);
     }
 
+    /**
+     * Retains a region, initializes bounds to its pixel dimensions at the origin,
+     * and builds local vertices, UVs, and transformed vertex buffers. The region is
+     * shared rather than copied, and ownership applies to its backing texture.
+     *
+     * @param region initial source region
+     * @param ownsTexture whether disposal releases the backing texture
+     * @throws NullPointerException if region is null
+     */
     private Sprite(TextureRegion region, boolean ownsTexture) {
         if (region == null) throw new NullPointerException("TextureRegion cannot be null");
 
@@ -327,8 +344,8 @@ public class Sprite implements Poolable, Drawable {
         float oldScaleX = this.scaleX;
         float oldScaleY = this.scaleY;
 
-        if (oldScaleX != 0f) origin.setX(origin.getX() * (sx / oldScaleX));
-        if (oldScaleY != 0f) origin.setY(origin.getY() * (sy / oldScaleY));
+        if (oldScaleX != 0f) origin.x = origin.x() * (sx / oldScaleX);
+        if (oldScaleY != 0f) origin.y = origin.y() * (sy / oldScaleY);
 
         this.scaleX = sx;
         this.scaleY = sy;
@@ -474,6 +491,17 @@ public class Sprite implements Poolable, Drawable {
         return bounds.getY();
     }
 
+    /**
+     * Draws the full region at explicit bounds using the sprite's scale, origin,
+     * rotation, flips, and tint. Stored position and dimensions remain unchanged.
+     * A missing region is skipped.
+     *
+     * @param batch active destination texture batch
+     * @param x horizontal destination position
+     * @param y vertical destination position
+     * @param width destination width in batch units
+     * @param height destination height in batch units
+     */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height) {
         TextureRegion spriteRegion = this.region;
@@ -482,6 +510,18 @@ public class Sprite implements Poolable, Drawable {
         draw(batch, x, y, width, height, 0f, 0f, spriteRegion.getRegionWidth(), spriteRegion.getRegionHeight(), 0f, 0f, 0f, null);
     }
 
+    /**
+     * Draws the full region at explicit bounds with an additional tint multiplier.
+     * The sprite's scale, origin, rotation, and flips still apply without changing
+     * stored bounds. A missing region is skipped.
+     *
+     * @param batch active destination texture batch
+     * @param x horizontal destination position
+     * @param y vertical destination position
+     * @param width destination width in batch units
+     * @param height destination height in batch units
+     * @param tint color multiplied by the sprite tint, or null to use its tint alone
+     */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, Color tint) {
         TextureRegion spriteRegion = this.region;
@@ -490,6 +530,21 @@ public class Sprite implements Poolable, Drawable {
         draw(batch, x, y, width, height, 0f, 0f, spriteRegion.getRegionWidth(), spriteRegion.getRegionHeight(), 0f, 0f, 0f, tint);
     }
 
+    /**
+     * Draws the full region using explicit bounds and additional origin and rotation.
+     * Origin offsets and rotation are added to the sprite's stored values; scale,
+     * flips, and tint still apply. Stored sprite geometry is not changed.
+     *
+     * @param batch active destination texture batch
+     * @param x horizontal destination position
+     * @param y vertical destination position
+     * @param width destination width in batch units
+     * @param height destination height in batch units
+     * @param originX horizontal rotation-origin offset in destination units
+     * @param originY vertical rotation-origin offset in destination units
+     * @param rotation clockwise rotation in degrees
+     * @param tint optional tint multiplier, or null for the drawable's default tint
+     */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float originX, float originY, float rotation, Color tint) {
         TextureRegion spriteRegion = this.region;
@@ -498,11 +553,47 @@ public class Sprite implements Poolable, Drawable {
         draw(batch, x, y, width, height, 0f, 0f, spriteRegion.getRegionWidth(), spriteRegion.getRegionHeight(), originX, originY, rotation, tint);
     }
 
+    /**
+     * Draws a pixel subsection relative to the sprite's region at explicit bounds.
+     * Stored scale, rotation, origin, flips, and tint remain active, and source
+     * coordinates are not clamped to the region.
+     *
+     * @param batch active destination texture batch
+     * @param x horizontal destination position
+     * @param y vertical destination position
+     * @param width destination width in batch units
+     * @param height destination height in batch units
+     * @param regionX horizontal source offset in pixels
+     * @param regionY vertical source offset in pixels
+     * @param regionWidth source width in pixels
+     * @param regionHeight source height in pixels
+     */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight) {
         draw(batch, x, y, width, height, regionX, regionY, regionWidth, regionHeight, 0f, 0f, 0f, null);
     }
 
+    /**
+     * Submits a source subsection relative to the sprite region, honoring its flips.
+     * Destination dimensions are multiplied by stored scale; supplied origins and
+     * rotation are added to stored values. Tint multiplies the sprite color. Missing
+     * regions/textures and zero-size backing textures are skipped. This does not
+     * change stored bounds or clamp source coordinates to the region.
+     *
+     * @param batch active destination texture batch
+     * @param x horizontal destination position
+     * @param y vertical destination position
+     * @param width destination width in batch units
+     * @param height destination height in batch units
+     * @param regionX horizontal source offset in pixels
+     * @param regionY vertical source offset in pixels
+     * @param regionWidth source width in pixels
+     * @param regionHeight source height in pixels
+     * @param originX horizontal rotation-origin offset in destination units
+     * @param originY vertical rotation-origin offset in destination units
+     * @param rotation clockwise rotation in degrees
+     * @param tint optional tint multiplier, or null for the drawable's default tint
+     */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
         TextureRegion spriteRegion = this.region;
@@ -540,8 +631,8 @@ public class Sprite implements Poolable, Drawable {
 
         float drawWidth = width * scaleX;
         float drawHeight = height * scaleY;
-        float drawOriginX = this.origin.getX() + originX;
-        float drawOriginY = this.origin.getY() + originY;
+        float drawOriginX = this.origin.x() + originX;
+        float drawOriginY = this.origin.y() + originY;
         float drawRotation = this.rotation + rotation;
 
         float rad = (float) Math.toRadians(-drawRotation);
@@ -834,8 +925,8 @@ public class Sprite implements Poolable, Drawable {
      * </p>
      */
     protected void updateLocalVertices() {
-        float ox = origin.getX();
-        float oy = origin.getY();
+        float ox = origin.x();
+        float oy = origin.y();
 
         float scaledW = bounds.getWidth() * scaleX;
         float scaledH = bounds.getHeight() * scaleY;
@@ -862,8 +953,8 @@ public class Sprite implements Poolable, Drawable {
      * </p>
      */
     protected void updateVertexBuffer() {
-        float px = bounds.getX() + origin.getX();
-        float py = bounds.getY() + origin.getY();
+        float px = bounds.getX() + origin.x();
+        float py = bounds.getY() + origin.y();
 
         for (int i = 0; i < 4; i++) {
             float lx = localVertices[i * 2];

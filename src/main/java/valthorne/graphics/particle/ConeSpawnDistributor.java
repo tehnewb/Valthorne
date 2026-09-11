@@ -17,11 +17,21 @@ import java.util.Random;
  */
 public final class ConeSpawnDistributor implements SpawnDistributor {
 
-    private final float directionDeg;
-    private final float spreadDeg;
-    private final float radius;
-    private final boolean edgeOnly;
+    private final float directionDeg; // Sector center direction in degrees from positive X.
+    private final float spreadDeg; // Full angular sector width in degrees.
+    private final float radius; // Maximum sector radius, clamped against zero.
+    private final boolean edgeOnly; // Whether offsets lie on the outer arc instead of throughout the sector.
 
+    /**
+     * Creates a 2D circular sector distribution. Negative radius is clamped to zero;
+     * angles are stored without normalization or range validation. Edge mode selects
+     * the outer arc, not the sector's radial sides.
+     *
+     * @param directionDeg center angle in degrees
+     * @param spreadDeg full angular width in degrees
+     * @param radius maximum radial distance
+     * @param edgeOnly true for the outer arc
+     */
     public ConeSpawnDistributor(float directionDeg, float spreadDeg, float radius, boolean edgeOnly) {
         this.directionDeg = directionDeg;
         this.spreadDeg = spreadDeg;
@@ -29,6 +39,16 @@ public final class ConeSpawnDistributor implements SpawnDistributor {
         this.edgeOnly = edgeOnly;
     }
 
+    /**
+     * Samples an angle across the configured full spread and uses a fixed or
+     * square-root-distributed radius. Conventional positive sector spans give uniform
+     * area density when edgeOnly is false.
+     *
+     * @param random nonnull random source
+     * @param out nonnull destination with at least two entries; X then Y
+     * @throws NullPointerException if random or out is null
+     * @throws ArrayIndexOutOfBoundsException if out has fewer than two entries
+     */
     @Override
     public void computeOffset(Random random, float[] out) {
         float minA = directionDeg - spreadDeg * 0.5f;

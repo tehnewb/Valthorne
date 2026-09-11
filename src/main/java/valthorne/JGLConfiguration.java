@@ -82,6 +82,7 @@ import static org.lwjgl.glfw.GLFW.*;
  */
 public final class JGLConfiguration {
 
+    private final Map<Integer, Integer> extraHints = new LinkedHashMap<>(); // Extra raw GLFW integer hints applied after the standard hints
     private String title = "Valthorne"; // Title text used for the created window
     private int width = 1280; // Initial window width in pixels
     private int height = 720; // Initial window height in pixels
@@ -125,7 +126,6 @@ public final class JGLConfiguration {
     private String cocoaFrameName; // Optional Cocoa frame autosave name on macOS
     private String x11ClassName; // Optional X11 class name hint
     private String x11InstanceName; // Optional X11 instance name hint
-    private final Map<Integer, Integer> extraHints = new LinkedHashMap<>(); // Extra raw GLFW integer hints applied after the standard hints
 
     /**
      * <p>
@@ -138,6 +138,13 @@ public final class JGLConfiguration {
         return new JGLConfiguration();
     }
 
+    /**
+     * Detects the macOS configuration path from the os.name system property.
+     * A missing property is treated as empty; matching checks for mac in the lowercased
+     * name and does not query native platform APIs.
+     *
+     * @return whether the reported operating-system name contains mac
+     */
     private static boolean isMacOS() {
         String os = System.getProperty("os.name", "");
         return os.toLowerCase().contains("mac");
@@ -655,7 +662,7 @@ public final class JGLConfiguration {
      * Sets the initial window size.
      * </p>
      *
-     * @param width the desired window width in pixels
+     * @param width  the desired window width in pixels
      * @param height the desired window height in pixels
      * @return this configuration instance
      */
@@ -901,9 +908,9 @@ public final class JGLConfiguration {
      * Sets the requested framebuffer color channel precision.
      * </p>
      *
-     * @param redBits requested red channel bits
+     * @param redBits   requested red channel bits
      * @param greenBits requested green channel bits
-     * @param blueBits requested blue channel bits
+     * @param blueBits  requested blue channel bits
      * @param alphaBits requested alpha channel bits
      * @return this configuration instance
      */
@@ -946,9 +953,9 @@ public final class JGLConfiguration {
      * Sets the requested accumulation buffer precision.
      * </p>
      *
-     * @param redBits requested accumulation red bits
+     * @param redBits   requested accumulation red bits
      * @param greenBits requested accumulation green bits
-     * @param blueBits requested accumulation blue bits
+     * @param blueBits  requested accumulation blue bits
      * @param alphaBits requested accumulation alpha bits
      * @return this configuration instance
      */
@@ -1138,7 +1145,7 @@ public final class JGLConfiguration {
      * override a previously assigned standard hint if the same GLFW hint constant is used.
      * </p>
      *
-     * @param hint the GLFW hint constant
+     * @param hint  the GLFW hint constant
      * @param value the GLFW hint value
      * @return this configuration instance
      */

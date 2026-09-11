@@ -1,0 +1,8 @@
+
+Algorithm Hash                                                             Path
+--------- ----                                                             ----
+SHA256    895A5720F060759EA1ECF1A287BCE2507C134C686EBBBA12A5BE89079C10EB8E C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\PhysicsStudio.java
+SHA256    1C22E1849D7BD6BCD36BEFC3BBEBAF6CE0F800560D70F69077259001CF29493B C:\Users\albert\Documents\GitHub\Valthorne\src\examples\java\valthorne\examples\PhysicsStudioParticles.java
+SHA256    EB0332FBEAE0BB56D3B31E7414168170DE3B58F8E3EF5AB1A5FD42CAF0ADA765 C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\model\FilamentRenderer3D.java
+
+

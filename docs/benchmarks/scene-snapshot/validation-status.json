@@ -1,0 +1,13 @@
+{
+  "status": "accepted reusable collector",
+  "controlledBenchmarkCases": 12,
+  "focusedStaticObjPair": true,
+  "contractTests": 9,
+  "contractFailures": 0,
+  "integration": "build verify3D verifyPhysics3D verifyLighting verifyFpsArena passed",
+  "gameplayChecks": 1425,
+  "nativeFpsSmoke": "passed",
+  "optionalAudioFixtureSkips": 2,
+  "report": "RESULTS.md",
+  "limitations": "Most timing intervals overlap; retained scratch capacity is a tradeoff. No total-memory, instruction-count or end-to-end FPS claim."
+}

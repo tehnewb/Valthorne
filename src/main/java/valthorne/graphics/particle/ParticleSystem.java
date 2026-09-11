@@ -4,6 +4,7 @@ import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.shader.Shader;
+import valthorne.graphics.shader.ShaderSources;
 import valthorne.graphics.texture.Texture;
 import valthorne.io.pool.Pool;
 import valthorne.math.MathUtils;
@@ -13,7 +14,8 @@ import java.util.Random;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
@@ -75,12 +77,67 @@ import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
  */
 public final class ParticleSystem {
 
+    /**
+     * Power-of-two angular lookup-table length covering one full revolution.
+     */
     private static final int TRIG_LUT_SIZE = 2048;                                           // Trig LUT size (power of two).
+    /**
+     * Wrap mask for angular lookup indices.
+     */
     private static final int TRIG_LUT_MASK = TRIG_LUT_SIZE - 1;                               // Trig LUT index mask.
+    /**
+     * Multiplier converting degrees to angular lookup-table indices.
+     */
     private static final float DEG_TO_LUT = TRIG_LUT_SIZE / 360.0f;                           // Degrees to LUT index scale.
 
+    /**
+     * Sine samples spanning a full revolution, initialized once at class loading.
+     */
     private static final float[] SIN_LUT = new float[TRIG_LUT_SIZE];                          // Precomputed sin values (0..TAU).
+    /**
+     * Cosine samples spanning a full revolution, initialized once at class loading.
+     */
     private static final float[] COS_LUT = new float[TRIG_LUT_SIZE];                          // Precomputed cos values (0..TAU).
+    /**
+     * Interleaved particle width: position2, size1, aspect2, rotation1, color4.
+     */
+    private static final int FLOATS_PER_PARTICLE = 10;                                       // Interleaved float count per particle vertex.
+    /**
+     * Byte width of each particle attribute float.
+     */
+    private static final int BYTES_PER_FLOAT = 4;                                            // Bytes per float.
+    /**
+     * Byte stride between consecutive packed particle vertices.
+     */
+    private static final int STRIDE_BYTES = FLOATS_PER_PARTICLE * BYTES_PER_FLOAT;           // VBO stride in bytes.
+    /**
+     * Attribute location for two-component particle position.
+     */
+    private static final int ATTR_POS = 0;                                                   // Attribute index for a_pos.
+    /**
+     * Attribute location for scalar particle size.
+     */
+    private static final int ATTR_SIZE = 1;                                                  // Attribute index for a_size.
+    /**
+     * Attribute location for two-component particle aspect.
+     */
+    private static final int ATTR_ASPECT = 2;                                                // Attribute index for a_aspect.
+    /**
+     * Attribute location for particle rotation.
+     */
+    private static final int ATTR_ROT = 3;                                                   // Attribute index for a_rot.
+    /**
+     * Attribute location for RGBA particle color.
+     */
+    private static final int ATTR_COL = 4;                                                   // Attribute index for a_col.
+    /**
+     * Bundled particle vertex-stage GLSL loaded once at class initialization.
+     */
+    private static final String VERT = ShaderSources.load("particle/particle.vert");                                                                              // Vertex shader source.
+    /**
+     * Bundled particle fragment-stage GLSL loaded once at class initialization.
+     */
+    private static final String FRAG = ShaderSources.load("particle/particle.frag");                                                                              // Fragment shader source.
 
     static {
         for (int i = 0; i < TRIG_LUT_SIZE; i++) {
@@ -89,82 +146,6 @@ public final class ParticleSystem {
             COS_LUT[i] = (float) Math.cos(radians);
         }
     }
-
-    private static final int FLOATS_PER_PARTICLE = 10;                                       // Interleaved float count per particle vertex.
-    private static final int BYTES_PER_FLOAT = 4;                                            // Bytes per float.
-    private static final int STRIDE_BYTES = FLOATS_PER_PARTICLE * BYTES_PER_FLOAT;           // VBO stride in bytes.
-
-    private static final int ATTR_POS = 0;                                                   // Attribute index for a_pos.
-    private static final int ATTR_SIZE = 1;                                                  // Attribute index for a_size.
-    private static final int ATTR_ASPECT = 2;                                                // Attribute index for a_aspect.
-    private static final int ATTR_ROT = 3;                                                   // Attribute index for a_rot.
-    private static final int ATTR_COL = 4;                                                   // Attribute index for a_col.
-
-    private static final String VERT = """
-            #version 330 core
-
-            uniform mat4 u_mvp;
-
-            in vec2 a_pos;
-            in float a_size;
-            in vec2 a_aspect;
-            in float a_rot;
-            in vec4 a_col;
-
-            out vec4 v_col;
-            out vec2 v_aspect;
-            out float v_rot;
-
-            void main() {
-                gl_Position = u_mvp * vec4(a_pos.xy, 0.0, 1.0);
-                gl_PointSize = a_size;
-
-                v_col = a_col;
-                v_aspect = a_aspect;
-                v_rot = a_rot;
-            }
-            """;                                                                              // Vertex shader source.
-
-    private static final String FRAG = """
-            #version 330 core
-
-            uniform sampler2D u_texture;
-            uniform vec4 u_uvRect; // (u0, v0, u1, v1)
-
-            in vec4 v_col;
-            in vec2 v_aspect;
-            in float v_rot;
-
-            out vec4 fragColor;
-
-            vec2 rot2(vec2 p, float radians) {
-                float c = cos(radians);
-                float s = sin(radians);
-                p -= vec2(0.5);
-                vec2 r = vec2(p.x * c - p.y * s, p.x * s + p.y * c);
-                return r + vec2(0.5);
-            }
-
-            void main() {
-                vec2 uv = gl_PointCoord;
-
-                vec2 centered = uv - vec2(0.5);
-                centered /= max(v_aspect, vec2(0.0001));
-                uv = centered + vec2(0.5);
-
-                if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
-
-                uv = rot2(uv, radians(-v_rot));
-
-                vec2 atlasUV = vec2(
-                    mix(u_uvRect.x, u_uvRect.z, uv.x),
-                    mix(u_uvRect.y, u_uvRect.w, uv.y)
-                );
-
-                vec4 tex = texture(u_texture, atlasUV);
-                fragColor = tex * v_col;
-            }
-            """;                                                                              // Fragment shader source.
 
     private final int maxParticles;                                                           // Maximum number of simultaneously active particles.
     private final FloatBuffer batch;                                                          // CPU staging buffer for interleaved particle vertex data.
@@ -614,6 +595,11 @@ public final class ParticleSystem {
         glDisable(GL_PROGRAM_POINT_SIZE);
     }
 
+    /**
+     * Associates the owned VBO with the particle vertex array using a ten-float
+     * layout: XY position, scalar size, XY aspect, rotation, and RGBA color.
+     * Leaves array-buffer and vertex-array bindings at zero; requires the current GL context.
+     */
     private void configureVertexArray() {
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);

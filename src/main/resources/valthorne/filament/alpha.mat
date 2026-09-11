@@ -1,0 +1,31 @@
+material {
+    name : ValthorneAlpha,
+    shadingModel : lit,
+    flipUV : false,
+    blending : fade,
+    doubleSided : true,
+    depthWrite : false,
+    requires : [ uv0, color ],
+    parameters : [
+        { type : float4, name : tint },
+        { type : float, name : roughness },
+        { type : float, name : metallic },
+        { type : float3, name : emission },
+        { type : float, name : cutoff },
+        { type : sampler2d, name : albedo }
+    ]
+}
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        vec4 texel = texture(materialParams_albedo, getUV0());
+        texel.rgb = mix(texel.rgb / 12.92, pow((texel.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), texel.rgb));
+        material.baseColor = materialParams.tint * getColor() * texel;
+        if (material.baseColor.a <= materialParams.cutoff) discard;
+        material.baseColor.rgb *= material.baseColor.a;
+        material.roughness = materialParams.roughness;
+        material.metallic = materialParams.metallic;
+        // Filament applies opacity to lit emission itself in fade mode.
+        material.emissive = vec4(materialParams.emission, 0.0);
+    }
+}

@@ -125,6 +125,71 @@ public class SoundPlayer {
     private float streamedSeconds; // Number of seconds already consumed from processed stream buffers
     private float storedVolume = 1f; // Saved volume used to restore state after unmuting
     private boolean muted; // Whether this player is currently considered muted
+    private volatile boolean disposed; // Cross-thread flag indicating that player resources have been released.
+    private float volume = 1f, appliedGain = Float.NaN; // Configured volume and last submitted gain; NaN forces the first native update.
+    private SoundArea area; // Immutable ambient coverage, or null to disable area attenuation.
+    private float areaGain = 1f; // Attenuation multiplier evaluated at the cached listener position.
+    private Audio.ListenerPosition areaListener; // Last evaluated listener snapshot; null forces reevaluation.
+
+    /**
+     * Assigns immutable ambient coverage on the audio thread and recalculates gain
+     * at the latest listener position. Playback position and playing state are preserved.
+     * Passing null removes area attenuation; the player's configured volume still applies.
+     *
+     * @param area ambient coverage, or null for unrestricted playback
+     */
+    public void setArea(SoundArea area) {
+        execute(() -> {
+            this.area = area;
+            areaListener = null;
+            updateArea();
+        });
+    }
+
+    /**
+     * Retrieves the current ambient coverage through the audio-thread query mechanism.
+     * The returned area is immutable and may be shared without transferring ownership.
+     *
+     * @return current coverage, or null when no area attenuation is configured
+     */
+    public SoundArea getArea() { return query(() -> area); }
+
+    /**
+     * Recalculates area attenuation when the listener snapshot has changed and returns
+     * the source gain applied to OpenAL. This is configured volume multiplied by area
+     * gain; it does not include listener gain or subsequent device mixing.
+     *
+     * @return most recently applied source gain
+     */
+    public float getEffectiveVolume() {
+        return query(() -> { updateArea(); return appliedGain; });
+    }
+
+    /**
+     * Refreshes area attenuation for a new immutable listener-position snapshot.
+     * Identity equality skips redundant work. With no area the multiplier is one;
+     * otherwise the area's gain function determines the multiplier. Call on the audio
+     * thread after clearing the cached snapshot when changing areas.
+     */
+    private void updateArea() {
+        Audio.ListenerPosition listener = Audio.getListenerPosition();
+        if (areaListener == listener) return;
+        areaListener = listener;
+        areaGain = area == null ? 1f : area.gainAt(listener.x(), listener.y(), listener.z());
+        applyGain();
+    }
+
+    /**
+     * Applies configured volume multiplied by area attenuation to the OpenAL source.
+     * An unchanged product avoids a native call. The cached value records the value
+     * submitted to OpenAL; this helper must run on the audio thread with a live source.
+     */
+    private void applyGain() {
+        float gain = volume * areaGain;
+        if (gain == appliedGain) return;
+        alSourcef(source, AL_GAIN, gain);
+        appliedGain = gain;
+    }
 
     /**
      * <p>
@@ -152,7 +217,10 @@ public class SoundPlayer {
      * @param data the sound data that this player will control
      */
     public SoundPlayer(SoundData data) {
-        this.data = data;
+        this.data = java.util.Objects.requireNonNull(data, "data");
+        pcmFormat(data.channels(), data.bitsPerSample());
+        if (data.sampleRate() <= 0) throw new IllegalArgumentException("Sample rate must be positive");
+        if (!data.streaming()) java.util.Objects.requireNonNull(data.data(), "PCM data");
         this.source = alGenSources();
         this.streaming = data.streaming();
 
@@ -167,7 +235,12 @@ public class SoundPlayer {
                 streamBuffers[i] = alGenBuffers();
             }
 
-            resetStream(0f);
+            try {
+                resetStream(0f);
+            } catch (RuntimeException | Error failure) {
+                try { disposeInternal(); } catch (RuntimeException cleanup) { failure.addSuppressed(cleanup); }
+                throw failure;
+            }
         } else {
             this.streamBuffers = null;
             this.streamBufferDurations = null;
@@ -175,7 +248,7 @@ public class SoundPlayer {
             this.stream = null;
             this.buffer = alGenBuffers();
 
-            int format = data.channels() == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
+            int format = pcmFormat(data.channels(), data.bitsPerSample());
             ByteBuffer pcm = data.data().duplicate();
             pcm.position(0);
             alBufferData(buffer, format, pcm, data.sampleRate());
@@ -193,7 +266,7 @@ public class SoundPlayer {
      * </p>
      *
      * <p>
-     * This method does nothing for fully buffered sounds. For streamed sounds, it must
+     * Updates ambient attenuation for either playback mode. For streamed sounds, it must
      * run on the audio thread and is responsible for:
      * </p>
      *
@@ -714,17 +787,6 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Sets playback speed by mapping the given speed directly to source pitch.
-     * </p>
-     *
-     * @param speed the desired playback speed multiplier
-     */
-    public void setPlaybackSpeed(float speed) {
-        execute(() -> setPlaybackSpeedInternal(speed));
-    }
-
-    /**
-     * <p>
      * Returns the current playback speed value.
      * </p>
      *
@@ -736,6 +798,17 @@ public class SoundPlayer {
      */
     public float getPlaybackSpeed() {
         return query(this::getPlaybackSpeedInternal);
+    }
+
+    /**
+     * <p>
+     * Sets playback speed by mapping the given speed directly to source pitch.
+     * </p>
+     *
+     * @param speed the desired playback speed multiplier
+     */
+    public void setPlaybackSpeed(float speed) {
+        execute(() -> setPlaybackSpeedInternal(speed));
     }
 
     /**
@@ -776,7 +849,9 @@ public class SoundPlayer {
      * </p>
      */
     public void dispose() {
-        execute(this::disposeInternal);
+        if (disposed) return;
+        if (Audio.isAudioThread()) disposeInternal();
+        else Audio.sync(this::disposeInternal);
     }
 
     /**
@@ -804,7 +879,9 @@ public class SoundPlayer {
      * </p>
      */
     private void updateInternal() {
-        if (!streaming) {
+        if (disposed) return;
+        if (area != null) updateArea();
+        if (!streaming || !wantPlaying) {
             return;
         }
 
@@ -1073,7 +1150,7 @@ public class SoundPlayer {
      * @return the current volume value
      */
     private float getVolumeInternal() {
-        return alGetSourcef(source, AL_GAIN);
+        return volume;
     }
 
     /**
@@ -1089,7 +1166,9 @@ public class SoundPlayer {
      * @param volume the desired volume value
      */
     private void setVolumeInternal(float volume) {
-        alSourcef(source, AL_GAIN, Math.max(0f, Math.min(1f, volume)));
+        if (!Float.isFinite(volume)) throw new IllegalArgumentException("Volume must be finite");
+        this.volume = Math.max(0f, Math.min(1f, volume));
+        applyGain();
     }
 
     /**
@@ -1496,17 +1575,6 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Sets playback speed by updating pitch.
-     * </p>
-     *
-     * @param speed the desired playback speed multiplier
-     */
-    private void setPlaybackSpeedInternal(float speed) {
-        setPitchInternal(speed);
-    }
-
-    /**
-     * <p>
      * Returns playback speed by reading pitch.
      * </p>
      *
@@ -1514,6 +1582,17 @@ public class SoundPlayer {
      */
     private float getPlaybackSpeedInternal() {
         return getPitchInternal();
+    }
+
+    /**
+     * <p>
+     * Sets playback speed by updating pitch.
+     * </p>
+     *
+     * @param speed the desired playback speed multiplier
+     */
+    private void setPlaybackSpeedInternal(float speed) {
+        setPitchInternal(speed);
     }
 
     /**
@@ -1555,6 +1634,8 @@ public class SoundPlayer {
      * </p>
      */
     private void disposeInternal() {
+        if (disposed) return;
+        disposed = true;
         alSourceStop(source);
 
         if (streaming) {
@@ -1569,6 +1650,7 @@ public class SoundPlayer {
                 alDeleteBuffers(streamBuffer);
             }
         } else {
+            alSourcei(source, AL_BUFFER, 0);
             alDeleteBuffers(buffer);
         }
 
@@ -1593,10 +1675,10 @@ public class SoundPlayer {
      */
     private void resetStream(float seconds) {
         clearQueuedBuffers();
-        alSourcei(source, AL_BUFFER, 0);
 
         if (stream != null) {
             stream.close();
+            stream = null;
         }
 
         stream = data.openStream();
@@ -1605,6 +1687,7 @@ public class SoundPlayer {
         if (!stream.seek(streamedSeconds)) {
             streamedSeconds = 0f;
             stream.close();
+            stream = null;
             stream = data.openStream();
         }
 
@@ -1645,15 +1728,10 @@ public class SoundPlayer {
                 return false;
             }
 
-            if (stream != null) {
-                stream.close();
-            }
-
-            stream = data.openStream();
-            streamedSeconds = 0f;
-
             if (!stream.seek(0f)) {
-                return false;
+                stream.close();
+                stream = null;
+                stream = data.openStream();
             }
 
             bytesRead = readStreamChunk();
@@ -1665,12 +1743,11 @@ public class SoundPlayer {
         int channels = stream.channels();
         int sampleRate = stream.sampleRate();
         int bitsPerSample = stream.bitsPerSample();
-        int format = channels == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
+        int format = pcmFormat(channels, bitsPerSample);
 
-        ByteBuffer pcm = streamChunk.duplicate();
-        pcm.position(0);
-        pcm.limit(bytesRead);
-        alBufferData(bufferId, format, pcm, sampleRate);
+        streamChunk.position(0);
+        streamChunk.limit(bytesRead);
+        alBufferData(bufferId, format, streamChunk, sampleRate);
 
         float seconds = bytesRead / (float) (channels * sampleRate * (bitsPerSample / 8f));
         setStreamBufferDuration(bufferId, seconds);
@@ -1698,12 +1775,13 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Unqueues and clears all buffers currently attached to a streaming source.
+     * Detaches and clears all buffers currently attached to an inactive streaming source.
      * </p>
      *
      * <p>
      * This method is only meaningful for streaming playback. It removes every queued
-     * buffer from the source and clears the recorded duration for each one.
+     * buffer from the source and clears the recorded duration for each one. Callers
+     * must stop playback first, or supply an initial/exhausted source.
      * </p>
      */
     private void clearQueuedBuffers() {
@@ -1711,12 +1789,10 @@ public class SoundPlayer {
             return;
         }
 
-        int queued = alGetSourcei(source, AL_BUFFERS_QUEUED);
-
-        while (queued-- > 0) {
-            int bufferId = alSourceUnqueueBuffers(source);
-            setStreamBufferDuration(bufferId, 0f);
-        }
+        // All callers stop playback first (or have an initial/exhausted source).
+        // Detaching also handles AL_INITIAL queues, whose buffers are not processed.
+        alSourcei(source, AL_BUFFER, 0);
+        java.util.Arrays.fill(streamBufferDurations, 0f);
     }
 
     /**
@@ -1801,9 +1877,10 @@ public class SoundPlayer {
      */
     private void execute(Runnable action) {
         if (Audio.isAudioThread()) {
+            ensureAlive();
             action.run();
         } else {
-            Audio.sync(action);
+            Audio.sync(() -> { ensureAlive(); action.run(); });
         }
     }
 
@@ -1824,8 +1901,38 @@ public class SoundPlayer {
      */
     private <T> T query(Supplier<T> supplier) {
         if (Audio.isAudioThread()) {
+            ensureAlive();
             return supplier.get();
         }
-        return Audio.call(supplier::get);
+        return Audio.call(() -> { ensureAlive(); return supplier.get(); });
+    }
+
+    /**
+     * Rejects access after disposal before an operation can use released OpenAL state.
+     * This guard is used by both direct audio-thread operations and dispatched queries.
+     *
+     * @throws IllegalStateException if this player has been disposed
+     */
+    private void ensureAlive() {
+        if (disposed) throw new IllegalStateException("Sound player is disposed");
+    }
+
+    /**
+     * Selects the core OpenAL PCM format for the supplied channel and sample layout.
+     * Only mono or stereo, with eight- or sixteen-bit samples, is supported here.
+     *
+     * @param channels number of interleaved channels, one or two
+     *
+     * @param bits bits per sample, eight or sixteen
+     * @return corresponding OpenAL format constant
+     * @throws IllegalArgumentException if either layout component is unsupported
+     */
+    private static int pcmFormat(int channels, int bits) {
+        if (channels != 1 && channels != 2) throw new IllegalArgumentException("PCM must be mono or stereo");
+        return switch (bits) {
+            case 8 -> channels == 1 ? AL_FORMAT_MONO8 : AL_FORMAT_STEREO8;
+            case 16 -> channels == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
+            default -> throw new IllegalArgumentException("PCM must be 8 or 16 bit");
+        };
     }
 }

@@ -1,0 +1,589 @@
+{
+  "retrieved_utc": "2026-09-09",
+  "license": "CC0-1.0",
+  "coordinate_system": "Z-up; XY centered. Props centered XYZ; structures based at Z=0.",
+  "sources": [
+    {
+      "id": "Barrel_01",
+      "name": "Barrel_01",
+      "authors": {
+        "Jorge Camacho": "All"
+      },
+      "page": "https://polyhaven.com/a/Barrel_01",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "downloads": [
+        {
+          "local_source": "Barrel_01.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/Barrel_01/Barrel_01_1k.gltf",
+          "md5": "45c109401126ea3e5df2fe2c6b6f6d39",
+          "sha256": "e084945dedd6a3379c6f3e97842cac89df7169797707e123a5e5b42c135d6888",
+          "bytes": 2711
+        },
+        {
+          "local_source": "Barrel_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/Barrel_01/Barrel_01.bin",
+          "md5": "e9f1036a183a1747aea6d40c556d7410",
+          "sha256": "fe8369c1ac796059b62a091c0db7367dc420aa2cee212672e48f991f4208da98",
+          "bytes": 81756
+        },
+        {
+          "local_source": "textures/Barrel_01_explosive_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/Barrel_01/Barrel_01_explosive_diff_1k.jpg",
+          "md5": "a36cd738a17cab52dc4c264a03b2848b",
+          "sha256": "a7e5a7b03bbe0c9c56bf1ac09b24121a5d19148428e9e6eac326c803fc297098",
+          "bytes": 179308
+        }
+      ]
+    },
+    {
+      "id": "concrete_road_barrier_02",
+      "name": "Concrete Road Barrier 02",
+      "authors": {
+        "Amal Kumar": "All"
+      },
+      "page": "https://polyhaven.com/a/concrete_road_barrier_02",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "downloads": [
+        {
+          "local_source": "concrete_road_barrier_02.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/concrete_road_barrier_02/concrete_road_barrier_02_1k.gltf",
+          "md5": "4e6ba4903224a56a2dc3ce4126529c1e",
+          "sha256": "52d13b5105ce861db5dd1413a1a924ad5594dee5a8eb37dbe1a9df441fcd7caf",
+          "bytes": 2910
+        },
+        {
+          "local_source": "concrete_road_barrier_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/concrete_road_barrier_02/concrete_road_barrier_02.bin",
+          "md5": "205f6effdf30936bd1db4ea7d56e179c",
+          "sha256": "254ee05467733e224e127dc76e019e5b5211c0da4248fa3fc75117ec005d7c90",
+          "bytes": 542900
+        },
+        {
+          "local_source": "textures/concrete_road_barrier_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/concrete_road_barrier_02/concrete_road_barrier_02_diff_1k.jpg",
+          "md5": "f2f6eea94258691bc344441b9e6a15fc",
+          "sha256": "9329260ebfc8632a5d47d9b344ab6f916e26604e73ebd2c495fee544df4bdefa",
+          "bytes": 741673
+        }
+      ]
+    },
+    {
+      "id": "modular_factory_facade",
+      "name": "Modular Factory Facade",
+      "authors": {
+        "James Ray Cock": "All"
+      },
+      "page": "https://polyhaven.com/a/modular_factory_facade",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "downloads": [
+        {
+          "local_source": "modular_factory_facade.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_factory_facade/modular_factory_facade_1k.gltf",
+          "md5": "0633b294fcc02eac73cfd7be32ab5dce",
+          "sha256": "41ff58b722f9cb3e9db8bcacae3163946603ae99a1d42bb6f9045d7c4ec0f179",
+          "bytes": 372666
+        },
+        {
+          "local_source": "textures/modular_factory_facade_brick_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_factory_facade/modular_factory_facade_brick_diff_1k.jpg",
+          "md5": "4feceecc0de80a7a918da3d978a3ce43",
+          "sha256": "852b01c61efc07fd8e60e59767657ef51112bf65f5eaf184f02c27ea5170582d",
+          "bytes": 1115986
+        },
+        {
+          "local_source": "textures/modular_factory_facade_doors_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_factory_facade/modular_factory_facade_doors_diff_1k.jpg",
+          "md5": "5bce81bcd8fc898b944c4b093d52ba7c",
+          "sha256": "157b59b9d1c929e51e2747f4f9481389743acba539308cecbb98c17294b6c7e1",
+          "bytes": 570733
+        },
+        {
+          "local_source": "textures/modular_factory_facade_trim_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_factory_facade/modular_factory_facade_trim_01_diff_1k.jpg",
+          "md5": "c7a15377b393f037443e3d7887a29774",
+          "sha256": "beff49832938c5493a4b5bbb82eeabd138c29c6523e5228e006f702859bbc87f",
+          "bytes": 617348
+        },
+        {
+          "local_source": "textures/modular_factory_facade_garage_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_factory_facade/modular_factory_facade_garage_diff_1k.jpg",
+          "md5": "792087136344341d1f7e9d84ea7c7ed4",
+          "sha256": "d1cf6239c7364900b02279600937a4c9bf0a21d315efabf18f16d5637020e39f",
+          "bytes": 588149
+        },
+        {
+          "local_source": "textures/modular_factory_facade_windows_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_factory_facade/modular_factory_facade_windows_diff_1k.jpg",
+          "md5": "6017facba3275e6d0903fea05834f9df",
+          "sha256": "d361dacbd23095dacf1d82eb5a509a305c44b007f8adfb221dc2e5efe56180e0",
+          "bytes": 619613
+        },
+        {
+          "local_source": "modular_factory_facade.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modular_factory_facade/modular_factory_facade.bin",
+          "md5": "225eee006759007851584344b0b22847",
+          "sha256": "12702fb065a838695e0621e1aac3947af92d32c439fb965c8b0563ad691fed70",
+          "bytes": 6269260
+        }
+      ]
+    },
+    {
+      "id": "modular_fire_escape",
+      "name": "Modular Fire Escape",
+      "authors": {
+        "Juniix": "All"
+      },
+      "page": "https://polyhaven.com/a/modular_fire_escape",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "downloads": [
+        {
+          "local_source": "modular_fire_escape.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_fire_escape/modular_fire_escape_1k.gltf",
+          "md5": "498464ece6337d8a5fad13b2c52b9a8f",
+          "sha256": "3a28e24cf2b6fc32c86f4fd378a372f9c3babfb9c2206036c6276d5bb47df2fd",
+          "bytes": 13672
+        },
+        {
+          "local_source": "modular_fire_escape.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modular_fire_escape/modular_fire_escape.bin",
+          "md5": "2aec399d6248cb657cd26eaee303e778",
+          "sha256": "5173033f47b33cbfe47fb38fb18ad99e6d78070ab7e1faf6fcc5a002afe98728",
+          "bytes": 515356
+        },
+        {
+          "local_source": "textures/modular_fire_escape_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_fire_escape/modular_fire_escape_02_diff_1k.jpg",
+          "md5": "41d01ed76f372f9671d4bee951c740f7",
+          "sha256": "9e969f5912b61aee6a6aa6dac3d98a4be3a4c92bf3b8f71e80fedc068493aa18",
+          "bytes": 615280
+        },
+        {
+          "local_source": "textures/modular_fire_escape_01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_fire_escape/modular_fire_escape_01_diff_1k.jpg",
+          "md5": "b84d59c223b8eae20a322f45304b4096",
+          "sha256": "50b15363269bee95c4c4aeb54a4a4df31a3e52680877fe286259c92885c17b74",
+          "bytes": 591379
+        }
+      ]
+    },
+    {
+      "id": "modular_industrial_pipes_01",
+      "name": "Modular Industrial Pipes 01",
+      "authors": {
+        "Jorge Camacho": "All"
+      },
+      "page": "https://polyhaven.com/a/modular_industrial_pipes_01",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "downloads": [
+        {
+          "local_source": "modular_industrial_pipes_01.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_industrial_pipes_01/modular_industrial_pipes_01_1k.gltf",
+          "md5": "cb30fdf4d471374ba439bfd5a0c8105d",
+          "sha256": "455d3a0fe95b7900a08cbebb23cfb2c341672fcb67ae7355d776e53cfa3d0688",
+          "bytes": 15014
+        },
+        {
+          "local_source": "textures/modular_industrial_pipes_01_group01_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_industrial_pipes_01/modular_industrial_pipes_01_group01_diff_1k.jpg",
+          "md5": "28678434837d64476cb8d75d0314166e",
+          "sha256": "c0233f66b18e3374dfbbb8c8078a41f6571a0809d3eb14dd9d3c332265cfde7b",
+          "bytes": 553576
+        },
+        {
+          "local_source": "modular_industrial_pipes_01.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modular_industrial_pipes_01/modular_industrial_pipes_01.bin",
+          "md5": "a18d063dc719e19b9c20d2f8c0a8bec4",
+          "sha256": "2e11e1a7dabd56b1e158364f48b0b388bf316fcab61a01274740db75dbafa448",
+          "bytes": 515160
+        },
+        {
+          "local_source": "textures/modular_industrial_pipes_01_group02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_industrial_pipes_01/modular_industrial_pipes_01_group02_diff_1k.jpg",
+          "md5": "d3d951f471cfcd15e89cedcd43d28606",
+          "sha256": "ef8a75c402a8871903dcaa147b023d57c640d0de4c7a8acdfdee822861656a92",
+          "bytes": 580676
+        }
+      ]
+    },
+    {
+      "id": "wooden_crate_02",
+      "name": "Wooden Crate 02",
+      "authors": {
+        "James Ray Cock": "modeling",
+        "Jurita Burger": "graphic design"
+      },
+      "page": "https://polyhaven.com/a/wooden_crate_02",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "downloads": [
+        {
+          "local_source": "wooden_crate_02.gltf",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/wooden_crate_02/wooden_crate_02_1k.gltf",
+          "md5": "a69eb62fd20e6badb6bb56f052930e06",
+          "sha256": "e90985d317664668988cb95ce707784c94ab0ccc6d13c980ca789fa69a5cf7b6",
+          "bytes": 4150
+        },
+        {
+          "local_source": "textures/wooden_crate_02_diff_1k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/wooden_crate_02/wooden_crate_02_diff_1k.jpg",
+          "md5": "45bca8f49da9d541e06bc926ab001c81",
+          "sha256": "a6e57123110d2899af9493c22b1918174f1c96c707e7126ac67738d98ee10c07",
+          "bytes": 716110
+        },
+        {
+          "local_source": "wooden_crate_02.bin",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_crate_02/wooden_crate_02.bin",
+          "md5": "08d98507231cdeda1070d1a2d0646254",
+          "sha256": "e68e272641f704e5241e4108894f0b97363d511944db8b991a48787d0160ea5e",
+          "bytes": 150064
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "name": "factory_wall",
+      "source_asset": "modular_factory_facade",
+      "source_nodes": [
+        "wall_window_centered_large_01",
+        "window_centered_large_01",
+        "window_centered_large_01"
+      ],
+      "triangles": 2278,
+      "materials": 3,
+      "textures": [
+        "modular_factory_facade_brick_diff_1k.jpg",
+        "modular_factory_facade_windows_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        4.0,
+        0.4,
+        4.0
+      ],
+      "centered_xyz": false,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        1.3333316379144822,
+        1.739130515908027,
+        1.333333545260993
+      ],
+      "simplification": null
+    },
+    {
+      "name": "steel_deck",
+      "source_asset": "modular_fire_escape",
+      "source_nodes": [
+        "modular_fire_escape_platform_bottom"
+      ],
+      "triangles": 892,
+      "materials": 1,
+      "textures": [
+        "modular_fire_escape_02_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        4.0,
+        4.0,
+        0.17999999999999997
+      ],
+      "centered_xyz": false,
+      "source_selection": "deck",
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        0.8361264574525159,
+        2.931622621833239,
+        1.2248657616755263
+      ],
+      "simplification": null
+    },
+    {
+      "name": "factory_beam",
+      "source_asset": "modular_factory_facade",
+      "source_nodes": [
+        "cornice03_standard_standard_01"
+      ],
+      "triangles": 144,
+      "materials": 1,
+      "textures": [
+        "modular_factory_facade_windows_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        4.0,
+        0.3,
+        0.24
+      ],
+      "centered_xyz": false,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        1.333334816828365,
+        1.7021317292853706,
+        1.9247317769123131
+      ],
+      "simplification": null
+    },
+    {
+      "name": "factory_pillar",
+      "source_asset": "modular_factory_facade",
+      "source_nodes": [
+        "wall_pier_corner_01"
+      ],
+      "triangles": 576,
+      "materials": 1,
+      "textures": [
+        "modular_factory_facade_brick_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        0.45,
+        0.45,
+        4.0
+      ],
+      "centered_xyz": false,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        1.4999931231456367,
+        1.5000177847467473,
+        1.3333333333333333
+      ],
+      "simplification": null
+    },
+    {
+      "name": "steel_platform",
+      "source_asset": "modular_fire_escape",
+      "source_nodes": [
+        "modular_fire_escape_platform_bottom"
+      ],
+      "triangles": 956,
+      "materials": 1,
+      "textures": [
+        "modular_fire_escape_02_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        6.000000000000001,
+        6.0,
+        1.4
+      ],
+      "centered_xyz": false,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        1.251800987420521,
+        4.397433932749859,
+        1.8124867197034842
+      ],
+      "simplification": null
+    },
+    {
+      "name": "steel_stairs",
+      "source_asset": "modular_fire_escape",
+      "source_nodes": [
+        "modular_fire_escape_stairs"
+      ],
+      "triangles": 5674,
+      "materials": 1,
+      "textures": [
+        "modular_fire_escape_01_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        6.0,
+        6.0,
+        1.4
+      ],
+      "centered_xyz": false,
+      "source_selection": "stairs",
+      "z_up_axis_transform": [
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "scale_xyz": [
+        8.227755382276495,
+        2.003580531567183,
+        0.34951721954073683
+      ],
+      "simplification": null
+    },
+    {
+      "name": "concrete_barrier",
+      "source_asset": "concrete_road_barrier_02",
+      "source_nodes": [
+        "concrete_road_barrier_02"
+      ],
+      "triangles": 23822,
+      "materials": 1,
+      "textures": [
+        "concrete_road_barrier_02_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        3.2,
+        0.9,
+        1.5000000000000002
+      ],
+      "centered_xyz": false,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        2.044193727872803,
+        2.0355452339920745,
+        1.3489779615690765
+      ],
+      "simplification": null
+    },
+    {
+      "name": "wooden_crate",
+      "source_asset": "wooden_crate_02",
+      "source_nodes": [
+        "wooden_crate_02_crate",
+        "wooden_crate_02_lid"
+      ],
+      "triangles": 5176,
+      "materials": 1,
+      "textures": [
+        "wooden_crate_02_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        0.5291009545326233,
+        1.1663258075714111,
+        0.46395455300807953
+      ],
+      "centered_xyz": true,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "simplification": null
+    },
+    {
+      "name": "oil_barrel",
+      "source_asset": "Barrel_01",
+      "source_nodes": [
+        "Barrel_01"
+      ],
+      "triangles": 2682,
+      "materials": 1,
+      "textures": [
+        "Barrel_01_explosive_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        0.5630351305007935,
+        0.5630352199077606,
+        0.8800000050105155
+      ],
+      "centered_xyz": true,
+      "source_selection": null,
+      "z_up_axis_transform": null,
+      "scale_xyz": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "simplification": null
+    },
+    {
+      "name": "industrial_pipe",
+      "source_asset": "modular_industrial_pipes_01",
+      "source_nodes": [
+        "modular_industrial_pipes_01_pipe02"
+      ],
+      "triangles": 648,
+      "materials": 1,
+      "textures": [
+        "modular_industrial_pipes_01_group01_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        3.9999999999999996,
+        0.25,
+        0.24999999999999997
+      ],
+      "centered_xyz": false,
+      "source_selection": null,
+      "z_up_axis_transform": [
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          -1,
+          0,
+          0
+        ]
+      ],
+      "scale_xyz": [
+        2.0464130431567487,
+        1.2117041734968745,
+        1.2071234837896454
+      ],
+      "simplification": null
+    },
+    {
+      "name": "factory_backing",
+      "source_asset": "modular_factory_facade",
+      "source_nodes": [
+        "wall_standard_standard_01",
+        "wall_standard_standard_01"
+      ],
+      "triangles": 4,
+      "materials": 1,
+      "textures": [
+        "modular_factory_facade_brick_diff_1k.jpg"
+      ],
+      "dimensions_xyz": [
+        4.0,
+        4.0,
+        0.08
+      ],
+      "centered_xyz": false,
+      "source_selection": "backing",
+      "z_up_axis_transform": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ],
+        [
+          0,
+          1,
+          0
+        ]
+      ],
+      "scale_xyz": [
+        1.3333333333333333,
+        1.3333333333333333,
+        1.0
+      ],
+      "simplification": "Verified coplanar rectangle; four original corner positions, normals and UVs retained."
+    }
+  ]
+}

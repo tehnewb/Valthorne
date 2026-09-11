@@ -133,6 +133,14 @@ public final class UIConstants {
         applyEdgePadding(node, Yoga.YGEdgeBottom, style.getPaddingBottom());
     }
 
+    /**
+     * Applies width to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO selects Yoga's automatic width.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyWidth(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetWidthAuto(node);
@@ -147,6 +155,14 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetWidthPercent(node, value.getValue());
     }
 
+    /**
+     * Applies height to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO selects Yoga's automatic height.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyHeight(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetHeightAuto(node);
@@ -161,6 +177,14 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetHeightPercent(node, value.getValue());
     }
 
+    /**
+     * Applies minimum width to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO clears the constraint with NaN.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyMinWidth(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetMinWidth(node, Float.NaN);
@@ -175,6 +199,14 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetMinWidthPercent(node, value.getValue());
     }
 
+    /**
+     * Applies minimum height to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO clears the constraint with NaN.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyMinHeight(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetMinHeight(node, Float.NaN);
@@ -189,6 +221,14 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetMinHeightPercent(node, value.getValue());
     }
 
+    /**
+     * Applies maximum width to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO clears the constraint with NaN.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyMaxWidth(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetMaxWidth(node, Float.NaN);
@@ -203,6 +243,14 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetMaxWidthPercent(node, value.getValue());
     }
 
+    /**
+     * Applies maximum height to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO clears the constraint with NaN.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyMaxHeight(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetMaxHeight(node, Float.NaN);
@@ -217,6 +265,14 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetMaxHeightPercent(node, value.getValue());
     }
 
+    /**
+     * Applies flex basis to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO selects Yoga's automatic basis.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param value engine layout value
+     */
     private static void applyFlexBasis(long node, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetFlexBasisAuto(node);
@@ -231,6 +287,15 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetFlexBasisPercent(node, value.getValue());
     }
 
+    /**
+     * Applies edge offset to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO passes NaN to the point-valued setter.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param edge Yoga edge enum to update
+     * @param value engine layout value
+     */
     private static void applyEdgePosition(long node, int edge, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetPosition(node, edge, Float.NaN);
@@ -245,6 +310,15 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetPositionPercent(node, edge, value.getValue());
     }
 
+    /**
+     * Applies edge margin to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO passes NaN to the point-valued setter rather than the dedicated auto-margin setter.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param edge Yoga edge enum to update
+     * @param value engine layout value
+     */
     private static void applyEdgeMargin(long node, int edge, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetMargin(node, edge, Float.NaN);
@@ -259,6 +333,15 @@ public final class UIConstants {
         Yoga.YGNodeStyleSetMarginPercent(node, edge, value.getValue());
     }
 
+    /**
+     * Applies edge padding to a live Yoga node. POINTS uses the numeric style setter,
+     * PERCENT uses its percentage counterpart, and AUTO passes NaN to the point-valued setter.
+     * The caller owns node lifetime and supplies a nonnull layout value.
+     *
+     * @param node valid native Yoga node
+     * @param edge Yoga edge enum to update
+     * @param value engine layout value
+     */
     private static void applyEdgePadding(long node, int edge, LayoutValue value) {
         if (value.isAuto()) {
             Yoga.YGNodeStyleSetPadding(node, edge, Float.NaN);

@@ -74,14 +74,15 @@ public class WaveSoundStream implements SoundStream {
     public WaveSoundStream(SoundData data) {
         this.data = data;
         this.frameSize = Math.max(1, data.channels() * (data.bitsPerSample() / 8));
-        this.scratch = new byte[64 * 1024];
 
         try {
             if (data.source() instanceof SoundSource.PathSource(String path)) {
+                this.scratch = new byte[64 * 1024];
                 this.file = new RandomAccessFile(path, "r");
                 this.file.seek(data.streamOffset());
                 this.memoryBytes = null;
             } else if (data.source() instanceof SoundSource.BytesSource(byte[] bytes)) {
+                this.scratch = null;
                 this.memoryBytes = bytes;
                 this.file = null;
             } else {

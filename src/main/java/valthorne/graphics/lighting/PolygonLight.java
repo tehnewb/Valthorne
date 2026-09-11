@@ -1,14 +1,41 @@
 package valthorne.graphics.lighting;
 
 import valthorne.graphics.Color;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 
+/**
+ * Refines a radial light footprint by adding rays at and around nearby occluder
+ * vertices. Base rays maintain circular coverage while extra angles improve corner
+ * boundaries. Only vertices within the light radius contribute; an occluder with no
+ * nearby vertex is omitted from this refinement even if an edge crosses the radius.
+ *
+ * @author Albert Beaupre
+ */
 public final class PolygonLight extends VertexCastLight {
 
+    /**
+     * Initializes shared light state and endpoint storage. The constructor retains the
+     * handler but does not register this light with its render list; geometry is rebuilt
+     * by update when active and dirty.
+     *
+     * @param rayHandler handler providing the occlusion world
+     * @param rays base ray count, at least three
+     * @param color color copied into the light
+     * @param distance radial extent in world units
+     * @param x world-space center X
+     * @param y world-space center Y
+     * @throws NullPointerException if handler or color is null
+     * @throws IllegalArgumentException if rays is below three
+     */
     public PolygonLight(RayHandler rayHandler, int rays, Color color, float distance, float x, float y) {
         super(rayHandler, rays, color, distance, x, y);
     }
 
+    /**
+     * When active and dirty, collects base circle angles plus three rays around each
+     * eligible nearby occluder vertex. Filters category masks, sorts and compacts the
+     * angles, casts endpoints, and clears dirty state. Skips inactive or clean lights.
+     */
     @Override
     public void update() {
         if (!active || !dirty) {
@@ -38,8 +65,8 @@ public final class PolygonLight extends VertexCastLight {
                     continue;
                 }
 
-                float dx = point.getX() - x;
-                float dy = point.getY() - y;
+                float dx = point.x() - x;
+                float dy = point.y() - y;
                 float pointDistanceSquared = dx * dx + dy * dy;
                 if (pointDistanceSquared > maxDistanceSquared) {
                     continue;
@@ -55,6 +82,13 @@ public final class PolygonLight extends VertexCastLight {
         rebuildFromAngles();
     }
 
+    /**
+     * Writes an unoccluded endpoint at index times one full turn divided by base rays.
+     * Does not validate the index, array length, or radial extent.
+     *
+     * @param index ray index in circular order
+     * @param output destination with at least two elements for world X/Y
+     */
     @Override
     protected void computeRayEnd(int index, float[] output) {
         float angle = (float) (index * (Math.PI * 2.0) / rays);

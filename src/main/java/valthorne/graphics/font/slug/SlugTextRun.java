@@ -33,7 +33,18 @@ public final class SlugTextRun {
     private float size; // World units per em.
     private float width; // Measured width.
     private float height; // Measured height.
+    private float minX, minY, maxX, maxY;
 
+    /**
+     * Creates a reusable layout for the supplied font and immediately builds its
+     * glyph positions. The font is borrowed and must remain usable while the run is
+     * drawn; this object does not allocate or own font textures.
+     *
+     * @param font font supplying metrics and glyph data
+     * @param text source text, with null treated as empty
+     * @param size finite, nonnegative world units per em
+     * @throws NullPointerException if font is null
+     */
     SlugTextRun(SlugFont font, String text, float size) {
         if (font == null) {
             throw new NullPointerException("font");
@@ -49,14 +60,22 @@ public final class SlugTextRun {
      * @param size world units per em
      */
     public void rebuild(String text, float size) {
+        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Size must be finite and nonnegative");
+        String normalized = text == null ? "" : text;
+        if (glyphs != null && this.size == size && normalized.equals(this.text)) return;
         this.text = text == null ? "" : text;
         this.size = size;
 
         int capacity = Math.max(8, this.text.length());
-        glyphs = new SlugGlyph[capacity];
-        xOffsets = new float[capacity];
-        yOffsets = new float[capacity];
+        int oldCount = count;
+        if (glyphs == null) {
+            glyphs = new SlugGlyph[capacity];
+            xOffsets = new float[capacity];
+            yOffsets = new float[capacity];
+        } else ensureCapacity(capacity);
         count = 0;
+        minX = minY = Float.POSITIVE_INFINITY;
+        maxX = maxY = Float.NEGATIVE_INFINITY;
 
         float penX = 0f;
         float penY = 0f;
@@ -107,6 +126,10 @@ public final class SlugTextRun {
                 glyphs[count] = glyph;
                 xOffsets[count] = penX;
                 yOffsets[count] = penY;
+                minX = Math.min(minX, penX + glyph.x0 * size);
+                minY = Math.min(minY, penY + glyph.y0 * size);
+                maxX = Math.max(maxX, penX + glyph.x1 * size);
+                maxY = Math.max(maxY, penY + glyph.y1 * size);
                 count++;
             }
 
@@ -117,9 +140,17 @@ public final class SlugTextRun {
         }
 
         width = Math.max(maxWidth, lineWidth);
-        height = lines * font.lineHeight() * size;
+        height = this.text.isEmpty() ? 0 : lines * font.lineHeight() * size;
+        if (count < oldCount) Arrays.fill(glyphs, count, oldCount, null);
     }
 
+    /**
+     * Grows the three parallel glyph-layout arrays together while preserving entries.
+     * Capacity doubles unless the requested minimum is larger; an already sufficient
+     * capacity avoids allocation and leaves the drawable count unchanged.
+     *
+     * @param required minimum number of glyph slots
+     */
     private void ensureCapacity(int required) {
         if (required <= glyphs.length) {
             return;
@@ -145,6 +176,9 @@ public final class SlugTextRun {
         if (color == null || color.a() <= 0f || size == 0f) {
             return;
         }
+        batch.requireDrawing();
+        if (font.curveTexture() == 0) throw new IllegalStateException("Slug font is disposed");
+        if (count == 0 || !batch.intersects(x + minX, y + minY, x + maxX, y + maxY)) return;
         for (int i = 0; i < count; i++) {
             batch.drawGlyph(font, glyphs[i], x + xOffsets[i], y + yOffsets[i], size, color);
         }

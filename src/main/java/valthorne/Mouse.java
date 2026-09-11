@@ -189,21 +189,66 @@ public final class Mouse {
      */
     public static final int CURSOR_VRESIZE = GLFW_VRESIZE_CURSOR;
 
+    /**
+     * Reusable mouse press event instance. Consumers must copy values for a historical snapshot.
+     */
     private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0); // Reusable mouse press event instance
+    /**
+     * Reusable mouse release event instance. Consumers must copy values for a historical snapshot.
+     */
     private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0); // Reusable mouse release event instance
+    /**
+     * Reusable mouse move event instance. Consumers must copy values for a historical snapshot.
+     */
     private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0); // Reusable mouse move event instance
+    /**
+     * Reusable mouse drag event instance. Consumers must copy values for a historical snapshot.
+     */
     private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0); // Reusable mouse drag event instance
+    /**
+     * Reusable mouse scroll event instance. Consumers must copy values for a historical snapshot.
+     */
     private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0); // Reusable mouse scroll event instance
+    /**
+     * GLFW callback used to track cursor movement.
+     */
     private static GLFWCursorPosCallback cursorPosCallback; // GLFW callback used to track cursor movement
+    /**
+     * GLFW callback used to track mouse button actions.
+     */
     private static GLFWMouseButtonCallback mouseButtonCallback; // GLFW callback used to track mouse button actions
+    /**
+     * GLFW callback used to track scroll wheel movement.
+     */
     private static GLFWScrollCallback scrollCallback; // GLFW callback used to track scroll wheel movement
+    /**
+     * Current raw GLFW cursor X position.
+     */
     private static short x; // Current raw GLFW cursor X position
+    /**
+     * Current raw GLFW cursor Y position.
+     */
     private static short y; // Current raw GLFW cursor Y position
+    /**
+     * Bitmask representing currently pressed mouse buttons.
+     */
     private static byte buttonState; // Bitmask representing currently pressed mouse buttons
+    /**
+     * Bitmask representing the current modifier key state.
+     */
     private static byte modifierState; // Bitmask representing the current modifier key state
+    /**
+     * Latest horizontal scroll delta.
+     */
     private static byte scrollX; // Latest horizontal scroll delta
+    /**
+     * Latest vertical scroll delta.
+     */
     private static byte scrollY; // Latest vertical scroll delta
 
+    /**
+     * Native GLFW cursor handle currently assigned to the window.
+     */
     private static long currentCursor = 0; // Native GLFW cursor handle currently assigned to the window
 
     /**
@@ -251,31 +296,29 @@ public final class Mouse {
         dispose();
         resetState();
 
-        cursorPosCallback = glfwSetCursorPosCallback(Window.getAddress(), (win, xpos, ypos) -> {
+        cursorPosCallback = GLFWCursorPosCallback.create((win, xpos, ypos) -> {
             short fromX = x;
             short fromY = y;
             x = (short) xpos;
             y = (short) ypos;
 
-            MouseMoveEvent event = moveEvent;
-
-            if (buttonState > 0) {
-                event = dragEvent;
-                event.setX(fromX);
-                event.setY((short) (Window.getHeight() - fromY));
-                event.setToX(x);
-                event.setToY((short) (Window.getHeight() - y));
+            if (buttonState != 0) {
+                // Drag payloads use the same button code as press/release, not the state mask.
+                // Publish each held button so a second press cannot steal an existing drag.
+                int heldButtons = Byte.toUnsignedInt(buttonState);
+                for (int button = 0; button <= GLFW_MOUSE_BUTTON_LAST; button++) {
+                    if ((heldButtons & (1 << button)) == 0) continue;
+                    dragEvent.set(button, modifierState, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
+                    JGL.publish(dragEvent);
+                }
             } else {
-                event.setX(x);
-                event.setY((short) (Window.getHeight() - y));
+                moveEvent.set(-1, modifierState, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
+                JGL.publish(moveEvent);
             }
-            event.setButton(buttonState);
-            event.setModifiers(modifierState);
-
-            JGL.publish(event);
         });
+        glfwSetCursorPosCallback(Window.getAddress(), cursorPosCallback);
 
-        mouseButtonCallback = glfwSetMouseButtonCallback(Window.getAddress(), (win, button, action, mods) -> {
+        mouseButtonCallback = GLFWMouseButtonCallback.create((win, button, action, mods) -> {
             if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST) return;
 
             MouseEvent event = null;
@@ -288,6 +331,7 @@ public final class Mouse {
                 buttonState &= (byte) ~(1 << button);
             }
 
+            modifierState = (byte) mods;
             if (event != null) {
                 event.setX(x);
                 event.setY((short) (Window.getHeight() - y));
@@ -296,18 +340,18 @@ public final class Mouse {
                 JGL.publish(event);
             }
 
-            modifierState = (byte) mods;
         });
+        glfwSetMouseButtonCallback(Window.getAddress(), mouseButtonCallback);
 
-        scrollCallback = glfwSetScrollCallback(Window.getAddress(), (win, xoff, yoff) -> {
+        scrollCallback = GLFWScrollCallback.create((win, xoff, yoff) -> {
             scrollX = (byte) xoff;
             scrollY = (byte) yoff;
 
-            scrollEvent.setXOffset(scrollX);
-            scrollEvent.setYOffset(scrollY);
+            scrollEvent.setPreciseOffsets((float) xoff, (float) yoff);
 
             JGL.publish(scrollEvent);
         });
+        glfwSetScrollCallback(Window.getAddress(), scrollCallback);
     }
 
     /**
@@ -526,14 +570,17 @@ public final class Mouse {
      */
     static void dispose() {
         if (cursorPosCallback != null) {
+            if (Window.getAddress() != 0) glfwSetCursorPosCallback(Window.getAddress(), null);
             cursorPosCallback.free();
             cursorPosCallback = null;
         }
         if (mouseButtonCallback != null) {
+            if (Window.getAddress() != 0) glfwSetMouseButtonCallback(Window.getAddress(), null);
             mouseButtonCallback.free();
             mouseButtonCallback = null;
         }
         if (scrollCallback != null) {
+            if (Window.getAddress() != 0) glfwSetScrollCallback(Window.getAddress(), null);
             scrollCallback.free();
             scrollCallback = null;
         }
@@ -544,6 +591,20 @@ public final class Mouse {
         resetState();
     }
 
+    /**
+     * Cancel held input while preserving cursor position across window activation changes.
+     */
+    static void cancelButtons() {
+        buttonState = 0;
+        modifierState = 0;
+        scrollX = scrollY = 0;
+    }
+
+    /**
+     * Clears cached cursor coordinates, pressed-button/modifier masks, and scroll
+     * deltas without publishing events. Native callbacks and cursor resources are
+     * managed separately by disposal.
+     */
     static void resetState() {
         x = 0;
         y = 0;

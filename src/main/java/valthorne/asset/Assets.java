@@ -6,6 +6,8 @@ import valthorne.graphics.font.FontLoader;
 import valthorne.graphics.font.FontParameters;
 import valthorne.graphics.map.tiled.TiledMapLoader;
 import valthorne.graphics.map.tiled.TiledMapParameters;
+import valthorne.graphics.model.ModelLoader;
+import valthorne.graphics.model.ModelParameters;
 import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
 
@@ -84,21 +86,46 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class Assets {
 
+    /**
+     * Lock protecting recreation and replacement of the shared loader executor.
+     */
     private static final Object SERVICE_LOCK = new Object();
-    private static volatile ExecutorService service = createExecutorService();
+    /**
+     * Concurrent registry mapping parameter classes to asset loaders.
+     */
     private static final ConcurrentMap<Class<?>, AssetLoader<?, ?>> loaders = new ConcurrentHashMap<>();
+    /**
+     * Concurrent cache of load futures indexed by asset key.
+     */
     private static final ConcurrentMap<String, CompletableFuture<?>> cache = new ConcurrentHashMap<>();
+    /**
+     * Atomic completed-load progress counter.
+     */
     private static final AtomicInteger completedCount = new AtomicInteger(0);
+    /**
+     * Concurrent set of assets queued for prepared loading.
+     */
     private static final Set<AssetParameters> prepared = ConcurrentHashMap.newKeySet();
+    /**
+     * Atomic count used as the prepared-loading progress denominator.
+     */
     private static final AtomicInteger preparedCount = new AtomicInteger(0);
+    /**
+     * Volatile owned virtual-thread executor, recreated after shutdown when needed.
+     */
+    private static volatile ExecutorService service = createExecutorService();
 
     static {
         addLoader(SoundParameters.class, new SoundLoader());
         addLoader(TextureParameters.class, new TextureLoader());
         addLoader(FontParameters.class, new FontLoader());
         addLoader(TiledMapParameters.class, new TiledMapLoader());
+        addLoader(ModelParameters.class, new ModelLoader());
     }
 
+    /**
+     * Prevents construction of the shared asset loading and caching service.
+     */
     private Assets() {
     }
 
@@ -364,10 +391,22 @@ public final class Assets {
                 .whenComplete((_, _) -> System.gc());
     }
 
+    /**
+     * Creates a virtual-thread-per-task executor for asynchronous asset loading.
+     * The asset service owns its shutdown.
+     *
+     * @return new executor
+     */
     private static ExecutorService createExecutorService() {
         return Executors.newVirtualThreadPerTaskExecutor();
     }
 
+    /**
+     * Returns an active loader executor, recreating it under the service lock when
+     * absent, shut down, or terminated. Uses a volatile fast path for normal access.
+     *
+     * @return current usable executor
+     */
     private static ExecutorService ensureService() {
         ExecutorService executor = service;
         if (executor != null && !executor.isShutdown() && !executor.isTerminated()) {
@@ -383,10 +422,25 @@ public final class Assets {
         }
     }
 
+    /**
+     * Attempts cancellation of a nonnull unfinished future. CompletableFuture's
+     * cancellation request does not guarantee interruption of its producing work.
+     *
+     * @param future candidate future
+     * @return true if this call successfully cancels an incomplete future
+     */
     private static boolean cancelIncomplete(CompletableFuture<?> future) {
         return future != null && !future.isDone() && future.cancel(true);
     }
 
+    /**
+     * Cancels unfinished work or releases the value of a normally completed future.
+     * Cancelled and exceptional futures have no value disposed here. Does not wait
+     * for outstanding work to finish.
+     *
+     * @param future cached future, possibly null
+     * @return disposal failure, or null
+     */
     private static Throwable releaseFuture(CompletableFuture<?> future) {
         if (future == null) {
             return null;
@@ -399,6 +453,15 @@ public final class Assets {
         return disposeAssetValue(future.getNow(null));
     }
 
+    /**
+     * Releases a loaded value using AutoCloseable first, otherwise a public no-argument
+     * dispose method discovered by reflection. Values with neither contract are ignored.
+     * Captures failures and unwraps reflective invocation causes so other assets can
+     * still be released. Caller must satisfy resource-specific thread/context rules.
+     *
+     * @param asset loaded value, possibly null
+     * @return disposal failure, or null
+     */
     private static Throwable disposeAssetValue(Object asset) {
         if (asset == null) {
             return null;
@@ -426,6 +489,14 @@ public final class Assets {
         }
     }
 
+    /**
+     * Keeps the first cleanup failure and attaches a later nonnull failure as
+     * suppressed. Callers must avoid passing the same throwable as both arguments.
+     *
+     * @param primary earlier failure, possibly null
+     * @param next later failure, possibly null
+     * @return first available failure
+     */
     private static Throwable appendSuppressed(Throwable primary, Throwable next) {
         if (next == null) {
             return primary;
@@ -437,6 +508,12 @@ public final class Assets {
         return primary;
     }
 
+    /**
+     * Rethrows runtime exceptions and errors unchanged, wrapping other throwable
+     * types so cleanup can report them without a checked throws declaration.
+     *
+     * @param throwable nonnull failure to propagate
+     */
     private static void rethrowUnchecked(Throwable throwable) {
         if (throwable instanceof RuntimeException runtimeException) {
             throw runtimeException;

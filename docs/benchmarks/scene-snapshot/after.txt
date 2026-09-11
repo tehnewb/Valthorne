@@ -1,0 +1,1153 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 1, kind = direct, moving = false)
+
+# Run progress: 0.00% complete, ETA 00:01:00
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.056 us/op
+# Warmup Iteration   2: 0.056 us/op
+Iteration   1: 0.053 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 0.054 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 0.055 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 4.17% complete, ETA 00:01:04
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.059 us/op
+# Warmup Iteration   2: 0.059 us/op
+Iteration   1: 0.058 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 0.059 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 0.053 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  0.055 ±(99.9%) 0.007 us/op [Average]
+  (min, avg, max) = (0.053, 0.055, 0.059), stdev = 0.002
+  CI (99.9%): [0.048, 0.062] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  0.013 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.013, 0.013, 0.013), stdev = 0.001
+  CI (99.9%): [0.013, 0.013] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  0.001 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.001, 0.001, 0.001), stdev = 0.001
+  CI (99.9%): [0.001, 0.001] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 1, kind = direct, moving = true)
+
+# Run progress: 8.33% complete, ETA 00:01:01
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.090 us/op
+# Warmup Iteration   2: 0.086 us/op
+Iteration   1: 0.095 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 0.095 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 0.086 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 12.50% complete, ETA 00:00:58
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.092 us/op
+# Warmup Iteration   2: 0.086 us/op
+Iteration   1: 0.086 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 0.095 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 0.086 us/op
+                 gc.alloc.rate:      0.013 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  0.091 ±(99.9%) 0.014 us/op [Average]
+  (min, avg, max) = (0.086, 0.091, 0.095), stdev = 0.005
+  CI (99.9%): [0.077, 0.104] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  0.013 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.013, 0.013, 0.013), stdev = 0.001
+  CI (99.9%): [0.013, 0.013] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  0.001 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.001, 0.001, 0.001), stdev = 0.001
+  CI (99.9%): [0.001, 0.001] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 1, kind = hierarchy, moving = false)
+
+# Run progress: 16.67% complete, ETA 00:00:56
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.223 us/op
+# Warmup Iteration   2: 0.196 us/op
+Iteration   1: 0.198 us/op
+                 gc.alloc.rate:      1157.055 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 0.193 us/op
+                 gc.alloc.rate:      1185.155 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   3: 0.193 us/op
+                 gc.alloc.rate:      1183.245 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            1.000 ms
+
+
+# Run progress: 20.83% complete, ETA 00:00:53
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.199 us/op
+# Warmup Iteration   2: 0.187 us/op
+Iteration   1: 0.188 us/op
+                 gc.alloc.rate:      1220.059 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 0.190 us/op
+                 gc.alloc.rate:      1206.874 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 0.190 us/op
+                 gc.alloc.rate:      1202.480 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            1.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  0.192 ±(99.9%) 0.010 us/op [Average]
+  (min, avg, max) = (0.188, 0.192, 0.198), stdev = 0.004
+  CI (99.9%): [0.182, 0.202] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  1192.478 ±(99.9%) 62.220 MB/sec [Average]
+  (min, avg, max) = (1157.055, 1192.478, 1220.059), stdev = 22.188
+  CI (99.9%): [1130.258, 1254.698] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  240.003 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (240.003, 240.003, 240.003), stdev = 0.001
+  CI (99.9%): [240.003, 240.003] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  24.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (4.000, 4.000, 4.000), stdev = 0.001
+  CI (99.9%): [24.000, 24.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  19.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 3.167, 5.000), stdev = 1.722
+  CI (99.9%): [19.000, 19.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 1, kind = hierarchy, moving = true)
+
+# Run progress: 25.00% complete, ETA 00:00:50
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.201 us/op
+# Warmup Iteration   2: 0.203 us/op
+Iteration   1: 0.195 us/op
+                 gc.alloc.rate:      1173.129 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 0.194 us/op
+                 gc.alloc.rate:      1179.602 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   3: 0.190 us/op
+                 gc.alloc.rate:      1206.430 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            1.000 ms
+
+
+# Run progress: 29.17% complete, ETA 00:00:47
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.202 us/op
+# Warmup Iteration   2: 0.190 us/op
+Iteration   1: 0.195 us/op
+                 gc.alloc.rate:      1171.118 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 0.195 us/op
+                 gc.alloc.rate:      1170.815 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 0.190 us/op
+                 gc.alloc.rate:      1201.932 MB/sec
+                 gc.alloc.rate.norm: 240.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            2.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  0.193 ±(99.9%) 0.007 us/op [Average]
+  (min, avg, max) = (0.190, 0.193, 0.195), stdev = 0.003
+  CI (99.9%): [0.186, 0.201] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  1183.838 ±(99.9%) 45.247 MB/sec [Average]
+  (min, avg, max) = (1170.815, 1183.838, 1206.430), stdev = 16.136
+  CI (99.9%): [1138.591, 1229.085] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  240.003 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (240.003, 240.003, 240.003), stdev = 0.001
+  CI (99.9%): [240.003, 240.003] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  24.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (4.000, 4.000, 4.000), stdev = 0.001
+  CI (99.9%): [24.000, 24.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  20.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 3.333, 5.000), stdev = 1.506
+  CI (99.9%): [20.000, 20.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 1, kind = obj, moving = false)
+
+# Run progress: 33.33% complete, ETA 00:00:45
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.159 us/op
+# Warmup Iteration   2: 0.154 us/op
+Iteration   1: 0.153 us/op
+                 gc.alloc.rate:      1591.428 MB/sec
+                 gc.alloc.rate.norm: 256.002 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 0.150 us/op
+                 gc.alloc.rate:      1631.554 MB/sec
+                 gc.alloc.rate.norm: 256.002 B/op
+                 gc.count:           6.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 0.146 us/op
+                 gc.alloc.rate:      1667.217 MB/sec
+                 gc.alloc.rate.norm: 256.002 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 37.50% complete, ETA 00:00:42
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.152 us/op
+# Warmup Iteration   2: 0.139 us/op
+Iteration   1: 0.143 us/op
+                 gc.alloc.rate:      1703.567 MB/sec
+                 gc.alloc.rate.norm: 256.002 B/op
+                 gc.count:           6.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 0.138 us/op
+                 gc.alloc.rate:      1764.487 MB/sec
+                 gc.alloc.rate.norm: 256.002 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 0.137 us/op
+                 gc.alloc.rate:      1787.115 MB/sec
+                 gc.alloc.rate.norm: 256.002 B/op
+                 gc.count:           6.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  0.145 ±(99.9%) 0.018 us/op [Average]
+  (min, avg, max) = (0.137, 0.145, 0.153), stdev = 0.006
+  CI (99.9%): [0.126, 0.163] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  1690.895 ±(99.9%) 212.861 MB/sec [Average]
+  (min, avg, max) = (1591.428, 1690.895, 1787.115), stdev = 75.908
+  CI (99.9%): [1478.034, 1903.755] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  256.002 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (256.002, 256.002, 256.002), stdev = 0.001
+  CI (99.9%): [256.002, 256.002] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  33.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (5.000, 5.500, 6.000), stdev = 0.548
+  CI (99.9%): [33.000, 33.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  21.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 3.500, 6.000), stdev = 1.975
+  CI (99.9%): [21.000, 21.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 1, kind = obj, moving = true)
+
+# Run progress: 41.67% complete, ETA 00:00:39
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.195 us/op
+# Warmup Iteration   2: 0.185 us/op
+Iteration   1: 0.185 us/op
+                 gc.alloc.rate:      1316.352 MB/sec
+                 gc.alloc.rate.norm: 256.003 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   2: 0.180 us/op
+                 gc.alloc.rate:      1358.809 MB/sec
+                 gc.alloc.rate.norm: 256.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 0.185 us/op
+                 gc.alloc.rate:      1322.062 MB/sec
+                 gc.alloc.rate.norm: 256.003 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 45.83% complete, ETA 00:00:36
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.205 us/op
+# Warmup Iteration   2: 0.189 us/op
+Iteration   1: 0.189 us/op
+                 gc.alloc.rate:      1288.307 MB/sec
+                 gc.alloc.rate.norm: 256.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   2: 0.189 us/op
+                 gc.alloc.rate:      1291.265 MB/sec
+                 gc.alloc.rate.norm: 256.003 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 0.186 us/op
+                 gc.alloc.rate:      1309.669 MB/sec
+                 gc.alloc.rate.norm: 256.003 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            2.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  0.186 ±(99.9%) 0.010 us/op [Average]
+  (min, avg, max) = (0.180, 0.186, 0.189), stdev = 0.004
+  CI (99.9%): [0.176, 0.196] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  1314.411 ±(99.9%) 71.747 MB/sec [Average]
+  (min, avg, max) = (1288.307, 1314.411, 1358.809), stdev = 25.586
+  CI (99.9%): [1242.663, 1386.158] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  256.003 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (256.003, 256.003, 256.003), stdev = 0.001
+  CI (99.9%): [256.002, 256.003] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  27.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (4.000, 4.500, 5.000), stdev = 0.548
+  CI (99.9%): [27.000, 27.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  21.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 3.500, 5.000), stdev = 1.378
+  CI (99.9%): [21.000, 21.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 256, kind = direct, moving = false)
+
+# Run progress: 50.00% complete, ETA 00:00:33
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 13.122 us/op
+# Warmup Iteration   2: 12.761 us/op
+Iteration   1: 12.726 us/op
+                 gc.alloc.rate:      7.657 MB/sec
+                 gc.alloc.rate.norm: 102.212 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 12.867 us/op
+                 gc.alloc.rate:      3.570 MB/sec
+                 gc.alloc.rate.norm: 48.179 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 12.670 us/op
+                 gc.alloc.rate:      3.625 MB/sec
+                 gc.alloc.rate.norm: 48.176 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 54.17% complete, ETA 00:00:30
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 13.074 us/op
+# Warmup Iteration   2: 12.697 us/op
+Iteration   1: 12.686 us/op
+                 gc.alloc.rate:      7.624 MB/sec
+                 gc.alloc.rate.norm: 101.441 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 12.992 us/op
+                 gc.alloc.rate:      3.535 MB/sec
+                 gc.alloc.rate.norm: 48.180 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 12.569 us/op
+                 gc.alloc.rate:      3.654 MB/sec
+                 gc.alloc.rate.norm: 48.174 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  12.752 ±(99.9%) 0.428 us/op [Average]
+  (min, avg, max) = (12.569, 12.752, 12.992), stdev = 0.152
+  CI (99.9%): [12.324, 13.179] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  4.944 ±(99.9%) 5.858 MB/sec [Average]
+  (min, avg, max) = (3.535, 4.944, 7.657), stdev = 2.089
+  CI (99.9%): [≈ 0, 10.802] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  66.060 ±(99.9%) 77.692 B/op [Average]
+  (min, avg, max) = (48.174, 66.060, 102.212), stdev = 27.706
+  CI (99.9%): [≈ 0, 143.752] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 256, kind = direct, moving = true)
+
+# Run progress: 58.33% complete, ETA 00:00:28
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 22.137 us/op
+# Warmup Iteration   2: 21.423 us/op
+Iteration   1: 21.436 us/op
+                 gc.alloc.rate:      4.994 MB/sec
+                 gc.alloc.rate.norm: 112.298 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 21.425 us/op
+                 gc.alloc.rate:      4.997 MB/sec
+                 gc.alloc.rate.norm: 112.297 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 23.405 us/op
+                 gc.alloc.rate:      4.575 MB/sec
+                 gc.alloc.rate.norm: 112.330 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 62.50% complete, ETA 00:00:25
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 22.228 us/op
+# Warmup Iteration   2: 21.558 us/op
+Iteration   1: 21.474 us/op
+                 gc.alloc.rate:      4.985 MB/sec
+                 gc.alloc.rate.norm: 112.296 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 21.483 us/op
+                 gc.alloc.rate:      4.984 MB/sec
+                 gc.alloc.rate.norm: 112.298 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 21.708 us/op
+                 gc.alloc.rate:      4.341 MB/sec
+                 gc.alloc.rate.norm: 98.852 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  21.822 ±(99.9%) 2.194 us/op [Average]
+  (min, avg, max) = (21.425, 21.822, 23.405), stdev = 0.783
+  CI (99.9%): [19.627, 24.016] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  4.813 ±(99.9%) 0.798 MB/sec [Average]
+  (min, avg, max) = (4.341, 4.813, 4.997), stdev = 0.284
+  CI (99.9%): [4.015, 5.611] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  110.062 ±(99.9%) 15.400 B/op [Average]
+  (min, avg, max) = (98.852, 110.062, 112.330), stdev = 5.492
+  CI (99.9%): [94.662, 125.462] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 256, kind = hierarchy, moving = false)
+
+# Run progress: 66.67% complete, ETA 00:00:22
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 33.080 us/op
+# Warmup Iteration   2: 31.617 us/op
+Iteration   1: 32.313 us/op
+                 gc.alloc.rate:      606.598 MB/sec
+                 gc.alloc.rate.norm: 20560.452 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 31.603 us/op
+                 gc.alloc.rate:      620.228 MB/sec
+                 gc.alloc.rate.norm: 20560.439 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 33.400 us/op
+                 gc.alloc.rate:      586.859 MB/sec
+                 gc.alloc.rate.norm: 20560.467 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 70.83% complete, ETA 00:00:19
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 34.242 us/op
+# Warmup Iteration   2: 31.267 us/op
+Iteration   1: 32.631 us/op
+                 gc.alloc.rate:      600.657 MB/sec
+                 gc.alloc.rate.norm: 20560.457 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 31.133 us/op
+                 gc.alloc.rate:      629.554 MB/sec
+                 gc.alloc.rate.norm: 20560.435 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 30.318 us/op
+                 gc.alloc.rate:      646.542 MB/sec
+                 gc.alloc.rate.norm: 20560.424 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  31.899 ±(99.9%) 3.106 us/op [Average]
+  (min, avg, max) = (30.318, 31.899, 33.400), stdev = 1.108
+  CI (99.9%): [28.794, 35.005] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  615.073 ±(99.9%) 60.173 MB/sec [Average]
+  (min, avg, max) = (586.859, 615.073, 646.542), stdev = 21.458
+  CI (99.9%): [554.900, 675.246] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  20560.446 ±(99.9%) 0.044 B/op [Average]
+  (min, avg, max) = (20560.424, 20560.446, 20560.467), stdev = 0.016
+  CI (99.9%): [20560.401, 20560.490] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  12.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (2.000, 2.000, 2.000), stdev = 0.001
+  CI (99.9%): [12.000, 12.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  14.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 2.333, 3.000), stdev = 0.516
+  CI (99.9%): [14.000, 14.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 256, kind = hierarchy, moving = true)
+
+# Run progress: 75.00% complete, ETA 00:00:16
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 31.553 us/op
+# Warmup Iteration   2: 29.896 us/op
+Iteration   1: 29.796 us/op
+                 gc.alloc.rate:      657.850 MB/sec
+                 gc.alloc.rate.norm: 20560.417 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 29.832 us/op
+                 gc.alloc.rate:      657.084 MB/sec
+                 gc.alloc.rate.norm: 20560.417 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 29.842 us/op
+                 gc.alloc.rate:      656.825 MB/sec
+                 gc.alloc.rate.norm: 20560.417 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            4.000 ms
+
+
+# Run progress: 79.17% complete, ETA 00:00:14
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 31.197 us/op
+# Warmup Iteration   2: 31.142 us/op
+Iteration   1: 31.761 us/op
+                 gc.alloc.rate:      617.113 MB/sec
+                 gc.alloc.rate.norm: 20560.444 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 30.997 us/op
+                 gc.alloc.rate:      632.377 MB/sec
+                 gc.alloc.rate.norm: 20560.434 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 33.433 us/op
+                 gc.alloc.rate:      586.299 MB/sec
+                 gc.alloc.rate.norm: 20560.468 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  30.944 ±(99.9%) 4.090 us/op [Average]
+  (min, avg, max) = (29.796, 30.944, 33.433), stdev = 1.459
+  CI (99.9%): [26.854, 35.034] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  634.591 ±(99.9%) 81.116 MB/sec [Average]
+  (min, avg, max) = (586.299, 634.591, 657.850), stdev = 28.927
+  CI (99.9%): [553.475, 715.708] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  20560.433 ±(99.9%) 0.057 B/op [Average]
+  (min, avg, max) = (20560.417, 20560.433, 20560.468), stdev = 0.020
+  CI (99.9%): [20560.375, 20560.490] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  13.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (2.000, 2.167, 3.000), stdev = 0.408
+  CI (99.9%): [13.000, 13.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  15.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 2.500, 4.000), stdev = 0.837
+  CI (99.9%): [15.000, 15.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 256, kind = obj, moving = false)
+
+# Run progress: 83.33% complete, ETA 00:00:11
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 41.632 us/op
+# Warmup Iteration   2: 36.909 us/op
+Iteration   1: 36.237 us/op
+                 gc.alloc.rate:      1727.150 MB/sec
+                 gc.alloc.rate.norm: 65648.507 B/op
+                 gc.count:           6.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   2: 36.725 us/op
+                 gc.alloc.rate:      1703.978 MB/sec
+                 gc.alloc.rate.norm: 65648.513 B/op
+                 gc.count:           6.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 36.080 us/op
+                 gc.alloc.rate:      1734.477 MB/sec
+                 gc.alloc.rate.norm: 65648.512 B/op
+                 gc.count:           6.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 87.50% complete, ETA 00:00:08
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 39.659 us/op
+# Warmup Iteration   2: 41.832 us/op
+Iteration   1: 42.379 us/op
+                 gc.alloc.rate:      1476.543 MB/sec
+                 gc.alloc.rate.norm: 65648.591 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   2: 40.337 us/op
+                 gc.alloc.rate:      1551.237 MB/sec
+                 gc.alloc.rate.norm: 65648.561 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 39.914 us/op
+                 gc.alloc.rate:      1567.813 MB/sec
+                 gc.alloc.rate.norm: 65648.566 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  38.612 ±(99.9%) 7.364 us/op [Average]
+  (min, avg, max) = (36.080, 38.612, 42.379), stdev = 2.626
+  CI (99.9%): [31.248, 45.976] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  1626.866 ±(99.9%) 305.610 MB/sec [Average]
+  (min, avg, max) = (1476.543, 1626.866, 1734.477), stdev = 108.984
+  CI (99.9%): [1321.256, 1932.477] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  65648.542 ±(99.9%) 0.100 B/op [Average]
+  (min, avg, max) = (65648.507, 65648.542, 65648.591), stdev = 0.036
+  CI (99.9%): [65648.442, 65648.641] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  33.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (5.000, 5.500, 6.000), stdev = 0.548
+  CI (99.9%): [33.000, 33.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  25.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 4.167, 7.000), stdev = 2.229
+  CI (99.9%): [25.000, 25.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.2, Java HotSpot(TM) 64-Bit Server VM, 25.0.2+10-LTS-69
+# VM invoker: C:\Program Files\Java\jdk-25.0.2\bin\java.exe
+# VM options: --enable-native-access=ALL-UNNAMED -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 500 ms each
+# Measurement: 3 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: valthorne.graphics.model.SceneSnapshotBenchmark.collect
+# Parameters: (count = 256, kind = obj, moving = true)
+
+# Run progress: 91.67% complete, ETA 00:00:05
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 49.764 us/op
+# Warmup Iteration   2: 44.407 us/op
+Iteration   1: 44.650 us/op
+                 gc.alloc.rate:      1401.737 MB/sec
+                 gc.alloc.rate.norm: 65648.625 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 44.028 us/op
+                 gc.alloc.rate:      1421.548 MB/sec
+                 gc.alloc.rate.norm: 65648.615 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 43.863 us/op
+                 gc.alloc.rate:      1426.751 MB/sec
+                 gc.alloc.rate.norm: 65648.621 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 95.83% complete, ETA 00:00:02
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 47.999 us/op
+# Warmup Iteration   2: 44.854 us/op
+Iteration   1: 45.078 us/op
+                 gc.alloc.rate:      1388.341 MB/sec
+                 gc.alloc.rate.norm: 65648.630 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   2: 47.029 us/op
+                 gc.alloc.rate:      1330.611 MB/sec
+                 gc.alloc.rate.norm: 65648.658 B/op
+                 gc.count:           5.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 45.216 us/op
+                 gc.alloc.rate:      1384.064 MB/sec
+                 gc.alloc.rate.norm: 65648.641 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            2.000 ms
+
+
+
+Result "valthorne.graphics.model.SceneSnapshotBenchmark.collect":
+  44.977 ±(99.9%) 3.204 us/op [Average]
+  (min, avg, max) = (43.863, 44.977, 47.029), stdev = 1.143
+  CI (99.9%): [41.773, 48.181] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate":
+  1392.175 ±(99.9%) 97.303 MB/sec [Average]
+  (min, avg, max) = (1330.611, 1392.175, 1426.751), stdev = 34.699
+  CI (99.9%): [1294.872, 1489.479] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.alloc.rate.norm":
+  65648.632 ±(99.9%) 0.044 B/op [Average]
+  (min, avg, max) = (65648.615, 65648.632, 65648.658), stdev = 0.016
+  CI (99.9%): [65648.587, 65648.676] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.count":
+  27.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (4.000, 4.500, 5.000), stdev = 0.548
+  CI (99.9%): [27.000, 27.000] (assumes normal distribution)
+
+Secondary result "valthorne.graphics.model.SceneSnapshotBenchmark.collect:gc.time":
+  19.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 3.167, 4.000), stdev = 0.983
+  CI (99.9%): [19.000, 19.000] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:01:07
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                          (count)     (kind)  (moving)  Mode  Cnt      Score     Error   Units
+SceneSnapshotBenchmark.collect                           1     direct     false  avgt    6      0.055 ±   0.007   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate             1     direct     false  avgt    6      0.013 ±   0.001  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm        1     direct     false  avgt    6      0.001 ±   0.001    B/op
+SceneSnapshotBenchmark.collect:gc.count                  1     direct     false  avgt    6        ≈ 0            counts
+SceneSnapshotBenchmark.collect                           1     direct      true  avgt    6      0.091 ±   0.014   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate             1     direct      true  avgt    6      0.013 ±   0.001  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm        1     direct      true  avgt    6      0.001 ±   0.001    B/op
+SceneSnapshotBenchmark.collect:gc.count                  1     direct      true  avgt    6        ≈ 0            counts
+SceneSnapshotBenchmark.collect                           1  hierarchy     false  avgt    6      0.192 ±   0.010   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate             1  hierarchy     false  avgt    6   1192.478 ±  62.220  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm        1  hierarchy     false  avgt    6    240.003 ±   0.001    B/op
+SceneSnapshotBenchmark.collect:gc.count                  1  hierarchy     false  avgt    6     24.000            counts
+SceneSnapshotBenchmark.collect:gc.time                   1  hierarchy     false  avgt    6     19.000                ms
+SceneSnapshotBenchmark.collect                           1  hierarchy      true  avgt    6      0.193 ±   0.007   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate             1  hierarchy      true  avgt    6   1183.838 ±  45.247  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm        1  hierarchy      true  avgt    6    240.003 ±   0.001    B/op
+SceneSnapshotBenchmark.collect:gc.count                  1  hierarchy      true  avgt    6     24.000            counts
+SceneSnapshotBenchmark.collect:gc.time                   1  hierarchy      true  avgt    6     20.000                ms
+SceneSnapshotBenchmark.collect                           1        obj     false  avgt    6      0.145 ±   0.018   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate             1        obj     false  avgt    6   1690.895 ± 212.861  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm        1        obj     false  avgt    6    256.002 ±   0.001    B/op
+SceneSnapshotBenchmark.collect:gc.count                  1        obj     false  avgt    6     33.000            counts
+SceneSnapshotBenchmark.collect:gc.time                   1        obj     false  avgt    6     21.000                ms
+SceneSnapshotBenchmark.collect                           1        obj      true  avgt    6      0.186 ±   0.010   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate             1        obj      true  avgt    6   1314.411 ±  71.747  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm        1        obj      true  avgt    6    256.003 ±   0.001    B/op
+SceneSnapshotBenchmark.collect:gc.count                  1        obj      true  avgt    6     27.000            counts
+SceneSnapshotBenchmark.collect:gc.time                   1        obj      true  avgt    6     21.000                ms
+SceneSnapshotBenchmark.collect                         256     direct     false  avgt    6     12.752 ±   0.428   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate           256     direct     false  avgt    6      4.944 ±   5.858  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm      256     direct     false  avgt    6     66.060 ±  77.692    B/op
+SceneSnapshotBenchmark.collect:gc.count                256     direct     false  avgt    6        ≈ 0            counts
+SceneSnapshotBenchmark.collect                         256     direct      true  avgt    6     21.822 ±   2.194   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate           256     direct      true  avgt    6      4.813 ±   0.798  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm      256     direct      true  avgt    6    110.062 ±  15.400    B/op
+SceneSnapshotBenchmark.collect:gc.count                256     direct      true  avgt    6        ≈ 0            counts
+SceneSnapshotBenchmark.collect                         256  hierarchy     false  avgt    6     31.899 ±   3.106   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate           256  hierarchy     false  avgt    6    615.073 ±  60.173  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm      256  hierarchy     false  avgt    6  20560.446 ±   0.044    B/op
+SceneSnapshotBenchmark.collect:gc.count                256  hierarchy     false  avgt    6     12.000            counts
+SceneSnapshotBenchmark.collect:gc.time                 256  hierarchy     false  avgt    6     14.000                ms
+SceneSnapshotBenchmark.collect                         256  hierarchy      true  avgt    6     30.944 ±   4.090   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate           256  hierarchy      true  avgt    6    634.591 ±  81.116  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm      256  hierarchy      true  avgt    6  20560.433 ±   0.057    B/op
+SceneSnapshotBenchmark.collect:gc.count                256  hierarchy      true  avgt    6     13.000            counts
+SceneSnapshotBenchmark.collect:gc.time                 256  hierarchy      true  avgt    6     15.000                ms
+SceneSnapshotBenchmark.collect                         256        obj     false  avgt    6     38.612 ±   7.364   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate           256        obj     false  avgt    6   1626.866 ± 305.610  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm      256        obj     false  avgt    6  65648.542 ±   0.100    B/op
+SceneSnapshotBenchmark.collect:gc.count                256        obj     false  avgt    6     33.000            counts
+SceneSnapshotBenchmark.collect:gc.time                 256        obj     false  avgt    6     25.000                ms
+SceneSnapshotBenchmark.collect                         256        obj      true  avgt    6     44.977 ±   3.204   us/op
+SceneSnapshotBenchmark.collect:gc.alloc.rate           256        obj      true  avgt    6   1392.175 ±  97.303  MB/sec
+SceneSnapshotBenchmark.collect:gc.alloc.rate.norm      256        obj      true  avgt    6  65648.632 ±   0.044    B/op
+SceneSnapshotBenchmark.collect:gc.count                256        obj      true  avgt    6     27.000            counts
+SceneSnapshotBenchmark.collect:gc.time                 256        obj      true  avgt    6     19.000                ms
+
+Benchmark result is saved to docs/benchmarks/scene-snapshot/after.json

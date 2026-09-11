@@ -1,7 +1,7 @@
 package valthorne.math.geometry;
 
 import valthorne.graphics.Color;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 
 /**
  * The Shape class serves as an abstract base class for defining 2D geometric shapes.
@@ -13,8 +13,8 @@ import valthorne.math.Vector2f;
  */
 public abstract class Shape implements Area {
 
-    private Border border;
-    private Color color;
+    private Border border; // Optional border style retained by this shape.
+    private Color color; // Fill color retained by this shape.
 
     /**
      * Constructs a new Shape instance with a default color of white.

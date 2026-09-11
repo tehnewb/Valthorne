@@ -45,12 +45,23 @@ package valthorne.encryption;
  * </p>
  *
  * @author Bob Jenkins
+ *
+ * @author Albert Beaupre
  */
 public class ISAAC {
 
-    private static final int SIZEL = 8; // log2 of the internal state size (256 => 2^8).
-    private static final int SIZE = 1 << SIZEL; // Number of 32-bit words in the internal state and output arrays.
-    private static final int MASK = (SIZE - 1) << 2; // Bitmask used for indirection lookups (word index * 4).
+    /**
+     * Base-two logarithm of the 256-word ISAAC state size.
+     */
+    private static final int SIZEL = 8;
+    /**
+     * Number of 32-bit words in the internal state and output arrays.
+     */
+    private static final int SIZE = 1 << SIZEL;
+    /**
+     * Byte-offset mask used by ISAAC's indirect state lookups.
+     */
+    private static final int MASK = (SIZE - 1) << 2;
 
     private final int[] results; // Output batch of 256 generated values returned to the caller.
     private final int[] memory; // Internal 256-word state table used by the ISAAC mixing function.

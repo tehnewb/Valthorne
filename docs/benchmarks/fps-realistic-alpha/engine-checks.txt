@@ -1,0 +1,247 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :jar
+
+> Task :javadoc
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\animation\Animation.java:428: warning: invalid input: '<'
+     * <p>Values <= 0 are clamped to a tiny positive value to avoid freezing or division edge cases.</p>
+                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\font\FontParameters.java:19: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+ * @throws IllegalArgumentException if any argument is invalid
+   ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\font\FontSource.java:22: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided path is null or blank
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\FrameBuffer.java:77: warning: invalid input: '<'
+     * @throws IllegalArgumentException if width or height are <= 0
+                                                               ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\FrameBuffer.java:159: warning: invalid input: '<'
+     * @throws IllegalArgumentException if newWidth or newHeight are <= 0
+                                                                     ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\shader\ReflectionShader.java:23: warning: reference not found: Texture#draw()
+ *     <li>This assumes texture unit 0 is active (or at least the {@link Texture#draw()} call binds appropriately).</li>
+                                                                  ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:65: warning: invalid input: '<'
+     * @throws IllegalArgumentException if width or height is <= 0
+                                                              ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:89: warning: invalid input: '<'
+     * @throws IllegalArgumentException if sw/sh <= 0
+                                                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TexturePacker.java:111: warning: invalid input: '<'
+     * @throws IllegalArgumentException if sw/sh <= 0
+                                                 ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:44: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided byte array is null or empty
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:45: warning: unknown tag. Unregistered custom tag?
+     * @implSpec This class ensures that the byte array provided is immutable by copying it in the constructor.
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\graphics\texture\TextureSource.java:22: warning: Tag @throws cannot be used in class documentation.  It can only be used in the following types of documentation: constructor, method.
+     * @throws IllegalArgumentException if the provided path is null or blank
+       ^
+C:\Users\albert\Documents\GitHub\Valthorne\src\main\java\valthorne\utility\TimeUtility.java:99: warning: invalid input: '<'
+     * @return fps, or 0 if dt <= 0
+                               ^
+13 warnings
+
+> Task :javadocJar
+> Task :sourcesJar
+> Task :assemble
+> Task :compileTestJava UP-TO-DATE
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+FEngine (64 bits) created at 0000014D84079B90 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000014D84079B90 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000014D84079B90 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000014D84079B90 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000014D84F35B50 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000014DFFEAC590 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000014DFFEAC590 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+> Task :test
+> Task :check
+> Task :build
+> Task :compileVerification3DJava
+> Task :processVerification3DResources NO-SOURCE
+> Task :verification3DClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+FEngine (64 bits) created at 0000025421DE0030 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000025421DE0030 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000025421DE0030 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000025421DE0030 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000025421DE0030 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000025420F46A90 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+FEngine (64 bits) created at 0000025423214DB0 (threading is enabled)
+FEngine resolved backend: OpenGL
+[NVIDIA Corporation], [NVIDIA GeForce RTX 5070/PCIe/SSE2], [4.5.0 NVIDIA 610.88], [4.50 NVIDIA]
+Feature level: 3
+Active workarounds: 
+allow_read_only_ancillary_feedback_loop
+Backend feature level: 3
+FEngine feature level: 1
+> Task :verify3D
+> Task :compileVerificationPhysics3DJava
+> Task :processVerificationPhysics3DResources NO-SOURCE
+> Task :verificationPhysics3DClasses
+> Task :verifyPhysics3D
+> Task :compileVerificationUIJava
+> Task :processVerificationUIResources NO-SOURCE
+> Task :verificationUIClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+> Task :verifyUI
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/C:/Users/albert/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.8/fc0a71dad90a2cf41d82a76156a0e700af8e4f8d/joml-1.10.8.jar)
+WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+> Task :verifyLighting
+> Task :compileExamplesJava UP-TO-DATE
+> Task :processExamplesResources UP-TO-DATE
+> Task :examplesClasses UP-TO-DATE
+
+> Task :verifyPhysicsStudioAssets
+Antique ceramic vase: 9408 triangles, 1 materials, 1.276 x 1.276 x 2.200
+Weathered military crate: 10476 triangles, 1 materials, 4.335 x 2.858 x 1.600
+Marble bust: 17456 triangles, 1 materials, 1.267 x 1.397 x 2.400
+Design sofa: 232 triangles, 2 materials, 4.480 x 1.640 x 1.600
+Lounge chair: 376 triangles, 3 materials, 1.400 x 1.928 x 1.800
+Desk chair: 656 triangles, 2 materials, 1.103 x 1.035 x 2.000
+
+> Task :verifyStudioLightRig
+StudioLightRig validation passed: 83 checks; no graphics context; temporary files only.
+
+> Task :verifyPhysicsStudio
+
+> Task :verifyFpsCombatAssets
+M4A1 carbine: 9,213 triangles, 1 materials, 0.067 x 0.900 x 0.279 m
+SENTRY-2 industrial robot: 2,196 triangles, 1 materials, 1.274 x 1.260 x 1.700 m
+Mk2 fragmentation grenade: 2,568 triangles, 1 materials, 0.110 x 0.092 x 0.180 m
+M4A1 magazine: 716 triangles, 1 materials, 0.022 x 0.091 x 0.193 m
+First-person arms: 8,152 triangles, 1 materials, 0.529 x 0.804 x 0.368 m
+
+> Task :verifyFpsEnvironmentAssets
+Factory brick and window module: 2278 triangles, 3 materials, 4.000 x 0.400 x 4.000, centered=false
+Steel deck panel: 892 triangles, 1 materials, 4.000 x 4.000 x 0.180, centered=false
+Factory cornice beam: 144 triangles, 1 materials, 4.000 x 0.300 x 0.240, centered=false
+Factory brick pier: 576 triangles, 1 materials, 0.450 x 0.450 x 4.000, centered=false
+Braced steel platform: 956 triangles, 1 materials, 6.000 x 6.000 x 1.400, centered=false
+Steel access stairs: 5674 triangles, 1 materials, 6.000 x 6.000 x 1.400, centered=false
+Weathered concrete barrier: 23822 triangles, 1 materials, 3.200 x 0.900 x 1.500, centered=false
+Wooden shipping crate: 5176 triangles, 1 materials, 0.529 x 1.166 x 0.464, centered=true
+Weathered oil drum: 2682 triangles, 1 materials, 0.563 x 0.563 x 0.880, centered=true
+Flanged industrial pipe: 648 triangles, 1 materials, 4.000 x 0.250 x 0.250, centered=false
+Opaque factory panel underlay: 4 triangles, 1 materials, 4.000 x 4.000 x 0.080, centered=false
+
+> Task :verifyFpsAssets
+
+> Task :verifyFpsArena
+FPS_GAMEPLAY_VALIDATED checks=1425 walk=2.990 sprint=4.533 diagonal=3.091 jump=1.609
+
+BUILD SUCCESSFUL in 18s
+23 actionable tasks: 18 executed, 5 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

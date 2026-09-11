@@ -1,0 +1,92 @@
+#version 430 core
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
+uniform sampler2D u_currentIntervalTexture;
+uniform sampler2D u_nextMergedTexture;
+uniform ivec2 u_currentProbeCount;
+uniform ivec2 u_nextProbeCount;
+uniform int u_currentProbeSpacing;
+uniform int u_nextProbeSpacing;
+uniform int u_currentRayCount;
+uniform int u_nextRayCount;
+uniform int u_hasNext;
+uniform int u_linearSpatial;
+uniform float u_cutoff;
+
+vec4 emptyInterval() {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+vec4 mergeInterval(vec4 nearValue, vec4 farValue) {
+    return vec4(nearValue.rgb + nearValue.a * farValue.rgb, nearValue.a * farValue.a);
+}
+
+vec4 fetchCurrent(ivec2 probe, int rayIndex) {
+    if (probe.x < 0 || probe.y < 0 || probe.x >= u_currentProbeCount.x || probe.y >= u_currentProbeCount.y) {
+        return emptyInterval();
+    }
+    rayIndex = clamp(rayIndex, 0, u_currentRayCount - 1);
+    return texelFetch(u_currentIntervalTexture, ivec2(probe.x * u_currentRayCount + rayIndex, probe.y), 0);
+}
+
+vec4 fetchNext(ivec2 probe, int rayIndex) {
+    if (probe.x < 0 || probe.y < 0 || probe.x >= u_nextProbeCount.x || probe.y >= u_nextProbeCount.y) {
+        return emptyInterval();
+    }
+    rayIndex = clamp(rayIndex, 0, u_nextRayCount - 1);
+    return texelFetch(u_nextMergedTexture, ivec2(probe.x * u_nextRayCount + rayIndex, probe.y), 0);
+}
+
+vec4 sampleNextSingleRay(vec2 samplePos, int rayIndex) {
+    vec2 probeCoord = samplePos / float(u_nextProbeSpacing) - vec2(0.5);
+    if (u_linearSpatial == 0) {
+        ivec2 probe = ivec2(floor(probeCoord + vec2(0.5)));
+        return fetchNext(probe, rayIndex);
+    }
+
+    ivec2 base = ivec2(floor(probeCoord));
+    vec2 frac = fract(probeCoord);
+
+    vec4 s00 = fetchNext(base + ivec2(0, 0), rayIndex);
+    vec4 s10 = fetchNext(base + ivec2(1, 0), rayIndex);
+    vec4 s01 = fetchNext(base + ivec2(0, 1), rayIndex);
+    vec4 s11 = fetchNext(base + ivec2(1, 1), rayIndex);
+
+    vec4 top = mix(s00, s10, frac.x);
+    vec4 bottom = mix(s01, s11, frac.x);
+    return mix(top, bottom, frac.y);
+}
+
+vec4 sampleProjectedNext(vec2 samplePos, int rayIndex) {
+    if (u_hasNext == 0) {
+        return emptyInterval();
+    }
+
+    int childFactor = max(u_nextRayCount / max(u_currentRayCount, 1), 1);
+    vec4 sum = vec4(0.0);
+    for (int child = 0; child < childFactor; child++) {
+        sum += sampleNextSingleRay(samplePos, rayIndex * childFactor + child);
+    }
+    return sum / float(childFactor);
+}
+
+void main() {
+    ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    if (texel.y >= u_currentProbeCount.y) return;
+
+    int probeX = texel.x / u_currentRayCount;
+    if (probeX >= u_currentProbeCount.x) return;
+
+    int rayIndex = texel.x - probeX * u_currentRayCount;
+    vec4 nearValue = texelFetch(u_currentIntervalTexture, texel, 0);
+    if (u_hasNext == 0 || nearValue.a <= u_cutoff) {
+        imageStore(u_outputImage, texel, nearValue);
+        return;
+    }
+
+    vec2 probePos = (vec2(float(probeX), float(texel.y)) + vec2(0.5)) * float(u_currentProbeSpacing);
+    vec4 farValue = sampleProjectedNext(probePos, rayIndex);
+
+    imageStore(u_outputImage, texel, mergeInterval(nearValue, farValue));
+}

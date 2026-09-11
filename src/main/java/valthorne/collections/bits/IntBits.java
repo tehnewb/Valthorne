@@ -75,6 +75,28 @@ public class IntBits {
     }
 
     /**
+     * Validates that a bit index falls within the valid int range.
+     *
+     * @param index the index to validate
+     * @throws IndexOutOfBoundsException if the index is outside {@code 0..31}
+     */
+    private static void validateIndex(int index) {
+        if (index < 0 || index >= BIT_COUNT) {
+            throw new IndexOutOfBoundsException("Bit index must be between 0 and 31: " + index);
+        }
+    }
+
+    /**
+     * Returns the mask for the specified bit index.
+     *
+     * @param index the validated bit index
+     * @return an integer mask with that bit enabled
+     */
+    private static int mask(int index) {
+        return 1 << index;
+    }
+
+    /**
      * Returns whether the bit at the specified index is set.
      *
      * @param index the bit index to query
@@ -322,27 +344,5 @@ public class IntBits {
      */
     public int getBits() {
         return bits;
-    }
-
-    /**
-     * Validates that a bit index falls within the valid int range.
-     *
-     * @param index the index to validate
-     * @throws IndexOutOfBoundsException if the index is outside {@code 0..31}
-     */
-    private static void validateIndex(int index) {
-        if (index < 0 || index >= BIT_COUNT) {
-            throw new IndexOutOfBoundsException("Bit index must be between 0 and 31: " + index);
-        }
-    }
-
-    /**
-     * Returns the mask for the specified bit index.
-     *
-     * @param index the validated bit index
-     * @return an integer mask with that bit enabled
-     */
-    private static int mask(int index) {
-        return 1 << index;
     }
 }

@@ -62,11 +62,19 @@ import java.util.Arrays;
  *
  * @author Paulo S.L.M. Barreto
  * @author Vincent Rijmen.
+ *
+ * @author Albert Beaupre
  */
 public class Whirlpool {
 
-    protected static final int R = 10; // Round count for the internal dedicated block cipher.
+    /**
+     * Number of rounds in Whirlpool's dedicated block cipher.
+     */
+    protected static final int R = 10;
 
+    /**
+     * Packed substitution-box entries used to initialize the round transformation tables.
+     */
     private static final String sbox =
             "\u1823\uc6E8\u87B8\u014F\u36A6\ud2F5\u796F\u9152"
                     + "\u60Bc\u9B8E\uA30c\u7B35\u1dE0\ud7c2\u2E4B\uFE57"
@@ -85,8 +93,14 @@ public class Whirlpool {
                     + "\u2ABB\uc153\udc0B\u9d6c\u3174\uF646\uAc89\u14E1"
                     + "\u163A\u6909\u70B6\ud0Ed\ucc42\u98A4\u285c\uF886"; // Packed S-box values used to build the C tables.
 
-    private static final long[][] C = new long[8][256]; // Circulant tables used by the round transformation.
-    private static final long[] rc = new long[R + 1]; // Round constants (index 1..R).
+    /**
+     * Eight circulant lookup tables, each containing all 256 byte substitutions.
+     */
+    private static final long[][] C = new long[8][256];
+    /**
+     * Round constants indexed from one through R; element zero is unused by rounds.
+     */
+    private static final long[] rc = new long[R + 1];
 
     static {
         for (int x = 0; x < 256; x++) {
@@ -158,8 +172,8 @@ public class Whirlpool {
      * </p>
      *
      * @param data source byte array
-     * @param off starting offset into {@code data}
-     * @param len number of bytes to hash
+     * @param off  starting offset into {@code data}
+     * @param len  number of bytes to hash
      * @return 64-byte Whirlpool digest
      */
     public static byte[] whirlpool(byte[] data, int off, int len) {
@@ -266,7 +280,7 @@ public class Whirlpool {
      * write location. This method maintains the invariant {@code bufferBits < 512} when it returns.
      * </p>
      *
-     * @param source input bytes containing the bits to hash
+     * @param source     input bytes containing the bits to hash
      * @param sourceBits number of bits from {@code source} to consume
      */
     public void NESSIEadd(byte[] source, long sourceBits) {

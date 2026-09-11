@@ -1,0 +1,181 @@
+// Release checks are local: nothing uploads unless a publishing task is requested.
+def graphicsTag = 'graphics'
+def releaseVersion = project.version.toString()
+def releaseDirectory = layout.buildDirectory.dir("release-repository/io/github/tehnewb/Valthorne/${releaseVersion}")
+def releaseSigning = providers.gradleProperty('releaseSigning').map { it.toBoolean() }.orElse(false)
+def repositoryRoot = rootDir.toPath()
+apply from: 'gradle/consumer-check.gradle'
+tasks.named('test', Test) {
+    description = 'Runs CPU and native physics regressions without a display.'
+    useJUnitPlatform { excludeTags graphicsTag }
+}
+tasks.register('graphicsTest', Test) {
+    description = 'Runs real OpenGL regressions; requires a display and compatible driver.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags graphicsTag }
+    // Graphics fixtures own process-global Window/GLFW state and native callbacks.
+    // Isolate their lifetimes so one fixture cannot reuse a destroyed window handle.
+    forkEvery = 1
+    maxParallelForks = 1
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('runMinimalExample', JavaExec) {
+    description = 'Opens an asset-free OpenGL 3.3 starter window.'
+    group = 'application'
+    classpath = sourceSets.examples.runtimeClasspath
+    mainClass = 'valthorne.examples.MinimalExample'
+}
+
+tasks.withType(JavaExec).configureEach {
+    doFirst {
+        if (mainClass.getOrElse('').startsWith('valthorne.examples.') &&
+                !repositoryRoot.resolve('src/examples/java').toFile().isDirectory()) {
+            throw new GradleException('This optional launcher requires local src/examples files, which are excluded from Git and releases. See docs/examples.md.')
+        }
+    }
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+tasks.named('jar', Jar) {
+    from('LICENSE') { into 'META-INF' }
+    from('THIRD_PARTY_NOTICES.md') { into 'META-INF' }
+    manifest {
+        attributes('Implementation-Title': 'Valthorne',
+                'Implementation-Version': project.version.toString())
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'releaseCheck'
+            url = layout.buildDirectory.dir('release-repository')
+        }
+    }
+}
+
+tasks.register('verifyReleaseArtifacts') {
+    description = 'Checks published jars and metadata in an isolated local Maven repository.'
+    group = 'verification'
+    dependsOn 'publishAllPublicationsToReleaseCheckRepository'
+    doLast {
+        def directory = releaseDirectory.get().asFile
+        def prefix = "Valthorne-${releaseVersion}"
+        if (releaseVersion.endsWith('-SNAPSHOT')) {
+            def metadata = new groovy.xml.XmlSlurper().parse(new File(directory, 'maven-metadata.xml'))
+            def snapshot = metadata.versioning.snapshotVersions.snapshotVersion.find {
+                it.extension.text() == 'jar' && it.classifier.text().isEmpty()
+            }.value.text()
+            if (!snapshot) throw new GradleException('Published snapshot metadata has no library JAR')
+            prefix = "Valthorne-${snapshot}"
+        }
+        ['', '-sources', '-javadoc'].each { classifier ->
+            def artifact = new File(directory, "${prefix}${classifier}.jar")
+            if (!artifact.isFile()) throw new GradleException("Missing publication: ${artifact}")
+            new java.util.zip.ZipFile(artifact).withCloseable { zip ->
+                if (zip.size() < 2) throw new GradleException("Empty publication: ${artifact}")
+                def exampleEntry = zip.entries().find { entry ->
+                    entry.name.startsWith('valthorne/examples/') || entry.name.startsWith('valthorne/fps-arena/') ||
+                            entry.name.startsWith('valthorne/physics-studio/')
+                }
+                if (exampleEntry != null) throw new GradleException("Example content leaked into ${artifact.name}: ${exampleEntry.name}")
+                if (classifier == '-javadoc' && zip.getEntry('index.html') == null)
+                    throw new GradleException('Published Javadoc has no index.html')
+                if (classifier == '') {
+                    ['valthorne/JGL.class', 'valthorne/shaders/core/shape.vert',
+                     'valthorne/filament/surface.filamat', 'valthorne/filament/alpha.filamat',
+                     'valthorne/filament/glass.filamat', 'valthorne/filament/studio-ibl.ktx',
+                     'ui/AtkinsonHyperlegible-Regular.ttf', 'ui/OFL-AtkinsonHyperlegible.txt',
+                     'META-INF/LICENSE', 'META-INF/THIRD_PARTY_NOTICES.md',
+                     'META-INF/licenses/filament.txt'].each { resource ->
+                        if (zip.getEntry(resource) == null) throw new GradleException("Missing runtime resource: ${resource}")
+                    }
+                    def forbidden = zip.entries().find { entry ->
+                        entry.name.startsWith('valthorne/examples/') || entry.name.startsWith('valthorne/fps-arena/') ||
+                                entry.name.startsWith('valthorne/physics-studio/') || entry.name.endsWith('.java')
+                    }
+                    if (forbidden != null) throw new GradleException("Development content leaked into library: ${forbidden.name}")
+                }
+            }
+        }
+        def pom = new File(directory, "${prefix}.pom").text
+        ['<artifactId>Valthorne</artifactId>', "<version>${releaseVersion}</version>",
+         '<artifactId>joml</artifactId>', '<artifactId>lwjgl-bom</artifactId>',
+         'natives-macos-arm64', 'natives-linux', 'natives-windows',
+         'jolt-jni-MacOSX_ARM64', 'jolt-jni-Linux64', 'jolt-jni-Windows64'].each { value ->
+            if (!pom.contains(value)) throw new GradleException("Publication POM is missing ${value}")
+        }
+        logger.lifecycle('Verified library, sources, Javadoc, resources, licenses, and publication metadata.')
+    }
+}
+
+// Exercise both Gradle module metadata and POM-only resolution (the Maven dependency model).
+['Module', 'Pom', 'Graphics'].each { format ->
+    tasks.register("verify${format}Consumer", Exec) {
+        description = "Compiles and runs a separate consumer using ${format.toLowerCase()} metadata."
+        group = 'verification'
+        dependsOn 'verifyReleaseArtifacts', 'prepareReleaseConsumer'
+        workingDir rootDir
+        def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows')
+        def wrapper = isWindows ? ['cmd', '/c', file('gradlew.bat').absolutePath] : ['sh', file('gradlew').absolutePath]
+        commandLine wrapper + ['-p', layout.buildDirectory.dir('release-consumer').get().asFile.absolutePath, '--no-daemon', '--console=plain',
+                "-PvalthorneVersion=${project.version}",
+                "-PvalthorneRepository=${layout.buildDirectory.dir('release-repository').get().asFile.toURI()}",
+                "-PpomOnly=${format == 'Pom'}", "-Pgraphics=${format == 'Graphics'}", 'clean', 'run']
+    }
+}
+tasks.named('verifyPomConsumer') { mustRunAfter 'verifyModuleConsumer' }
+tasks.named('verifyGraphicsConsumer') { mustRunAfter 'verifyModuleConsumer', 'verifyPomConsumer' }
+tasks.register('verifyRelease') {
+    description = 'Builds and validates release packaging and two external consumer dependency models.'
+    group = 'verification'
+    dependsOn 'build', 'verifyModuleConsumer', 'verifyPomConsumer'
+}
+
+// A missing signing flag should fail before attempting a Central upload.
+tasks.matching {
+    it.name == 'publishToMavenCentral' || it.name == 'publishAndReleaseToMavenCentral' ||
+            it.name.endsWith('ToMavenCentralRepository')
+}.configureEach {
+    doFirst {
+        if (!releaseSigning.get())
+            throw new GradleException('Maven Central publication requires -PreleaseSigning=true and signing credentials. See docs/releasing.md.')
+    }
+}
+
+tasks.register('verifyDocumentation') {
+    description = 'Checks local Markdown link targets in release documentation.'
+    group = 'verification'
+    def documents = fileTree(rootDir) {
+        include '*.md', 'docs/**/*.md',
+                'src/main/resources/**/*.md'
+        exclude '**/build/**', '**/.gradle/**'
+        // Verbatim source-era document copies retain their original relative context.
+        exclude 'docs/benchmarks/**/assets/**'
+    }
+    inputs.files(documents)
+    doLast {
+        def failures = []
+        documents.each { document ->
+            def content = document.getText('UTF-8').replaceAll(/(?s)```.*?```/, '')
+            def links = content =~ /!?\[[^\]\r\n]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/
+            links.each { match ->
+                def target = match[1].replaceAll(/^<|>$/, '').split('#', 2)[0]
+                if (target && !(target ==~ /^[a-zA-Z][a-zA-Z0-9+.-]*:.*/) && !target.startsWith('/')) {
+                    def decoded = java.net.URLDecoder.decode(target.replace('+', '%2B'), 'UTF-8')
+                    if (!new File(document.parentFile, decoded).exists())
+                        failures.add("${repositoryRoot.relativize(document.toPath())} -> ${target}")
+                }
+            }
+        }
+        if (!failures.isEmpty()) throw new GradleException('Broken documentation links:\n' + failures.join('\n'))
+        logger.lifecycle("Verified local links in ${documents.files.size()} Markdown documents.")
+    }
+}
+tasks.named('check') { dependsOn 'verifyDocumentation' }

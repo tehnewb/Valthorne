@@ -6,11 +6,11 @@ import org.lwjgl.stb.STBImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 /**
  * Immutable container holding OpenGL texture information and its decoded width/height.
@@ -40,7 +40,13 @@ import java.nio.file.Path;
  */
 public record TextureData(ByteBuffer buffer, int width, int height) {
 
+    /**
+     * Serializes STB image operations and access to decoded-buffer disposal tracking.
+     */
     private static final Object STB_LOCK = new Object();
+    /**
+     * Identity-based registry of freed pixel buffers used to avoid releasing the same buffer twice.
+     */
     private static final Set<ByteBuffer> disposedBuffers = Collections.newSetFromMap(new IdentityHashMap<>());
 
     /**
