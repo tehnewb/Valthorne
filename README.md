@@ -40,6 +40,10 @@ walkthroughs, documented source, and licensed assets. Clone it or
 It consumes Valthorne from Maven Central and has its own build and validation.
 See the [example catalog](docs/examples.md) for commands and platform requirements.
 
+To play on Windows x64, download the **Windows desktop ZIP**, extract it, and
+double-click any demo's `.bat` file. All ten examples include Java and dependencies;
+running them requires neither Gradle nor a Java installation.
+
 The [integration guide](docs/getting-started.md) also includes a minimal application
 you can copy into your own project. Example code and resources remain excluded
 from this engine repository's normal build and all published library artifacts.

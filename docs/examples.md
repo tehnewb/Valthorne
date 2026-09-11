@@ -5,6 +5,18 @@ and redistributable resources for Valthorne 2.0.0. Each demo includes a walkthro
 documented source, controls, platform requirements, and a bounded smoke mode.
 It builds against the released Maven Central dependency.
 
+## Run without a build tool
+
+Download the **Windows x64 desktop ZIP** from the
+[examples release](https://github.com/tehnewb/Valthorne-examples/releases/latest),
+extract it, and double-click `fps.bat`, `scene.bat`, or another demo. Java and all
+dependencies are bundled. All ten demos run without Gradle or a Java installation.
+The smaller runtime ZIP supports other platforms with a user-supplied Java 25;
+see [direct launch instructions](https://github.com/tehnewb/Valthorne-examples/blob/main/README-RUNTIME.md).
+Graphics requirements still apply.
+
+## Build or edit source
+
 ```sh
 git clone https://github.com/tehnewb/Valthorne-examples.git
 cd Valthorne-examples
