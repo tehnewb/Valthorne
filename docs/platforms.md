@@ -16,7 +16,8 @@ This does not make every renderer available on every operating system.
 ARM32 is an artifact target, not a release-tested Java 25 environment. Android,
 iOS, browsers, other Unix systems, and Windows x86 are not supported by this build.
 Native availability alone is not a claim of hardware validation. The CI workflow
-runs build/native-physics/consumer checks on Windows x64, Linux x64, and macOS ARM64;
+runs build/native-physics/consumer checks on Windows x64, Linux x64, and macOS
+Intel and ARM64;
 other listed CPUs require testing on their own hardware before game distribution.
 
 ## Graphics and launchers
@@ -29,6 +30,13 @@ Applications consuming the library must configure their own launcher, along with
 macOS OpenGL is limited to 4.1, so OpenGL 4.3 compute shaders (path tracing and
 radiance cascades) cannot run there. GLFW also documents its macOS core-context
 and window-system constraints in the [compatibility guide](https://www.glfw.org/docs/latest/compat_guide.html).
+
+The hosted Intel and Apple Silicon CI runners passed native dependency and
+physics checks, but could not create an NSGL OpenGL pixel format. CI checks native
+window creation and the first-thread launcher separately with `verifyWindowConsumer`.
+Mac rendering remains unverified; run `verifyGraphicsConsumer` on a Mac with a
+working OpenGL driver before distributing a game for that target. The strict
+graphics check still fails if no context can be created.
 
 Filament's upstream runtime supports more platforms than Valthorne's current
 shared-texture adapter. Valthorne currently uses WGL and the Windows x64 binding;

@@ -12,13 +12,7 @@ types. See the [changelog](CHANGELOG.md) and [JOML migration guide](docs/joml-mi
 ## Start a game
 
 Follow the [complete Gradle and Maven integration guide](docs/getting-started.md).
-To try the current source, install it locally first:
-
-```sh
-./gradlew publishToMavenLocal
-```
-
-On Windows PowerShell, use `./gradlew.bat`. In your application:
+In your application:
 
 ```groovy
 repositories {
@@ -33,6 +27,10 @@ Use JDK 25. Launch with `--enable-native-access=ALL-UNNAMED`; on macOS also use
 `-XstartOnFirstThread`. The integration guide includes complete launcher configuration,
 a minimal application, Kotlin DSL, Maven, IDE setup, and distribution instructions.
 Runtime native dependencies arrive transitively; no native compiler is required.
+
+To use a local source build, run `./gradlew publishToMavenLocal` (Windows:
+`./gradlew.bat publishToMavenLocal`) and add `mavenLocal()` before `mavenCentral()`
+in the application's repositories.
 
 ## Application examples
 

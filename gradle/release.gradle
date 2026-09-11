@@ -116,7 +116,7 @@ tasks.register('verifyReleaseArtifacts') {
 }
 
 // Exercise both Gradle module metadata and POM-only resolution (the Maven dependency model).
-['Module', 'Pom', 'Graphics'].each { format ->
+['Module', 'Pom', 'Graphics', 'Window'].each { format ->
     tasks.register("verify${format}Consumer", Exec) {
         description = "Compiles and runs a separate consumer using ${format.toLowerCase()} metadata."
         group = 'verification'
@@ -127,11 +127,13 @@ tasks.register('verifyReleaseArtifacts') {
         commandLine wrapper + ['-p', layout.buildDirectory.dir('release-consumer').get().asFile.absolutePath, '--no-daemon', '--console=plain',
                 "-PvalthorneVersion=${project.version}",
                 "-PvalthorneRepository=${layout.buildDirectory.dir('release-repository').get().asFile.toURI()}",
-                "-PpomOnly=${format == 'Pom'}", "-Pgraphics=${format == 'Graphics'}", 'clean', 'run']
+                "-PpomOnly=${format == 'Pom'}", "-Pgraphics=${format == 'Graphics'}",
+                "-Pwindow=${format == 'Window'}", 'clean', 'run']
     }
 }
 tasks.named('verifyPomConsumer') { mustRunAfter 'verifyModuleConsumer' }
 tasks.named('verifyGraphicsConsumer') { mustRunAfter 'verifyModuleConsumer', 'verifyPomConsumer' }
+tasks.named('verifyWindowConsumer') { mustRunAfter 'verifyModuleConsumer', 'verifyPomConsumer', 'verifyGraphicsConsumer' }
 tasks.register('verifyRelease') {
     description = 'Builds and validates release packaging and two external consumer dependency models.'
     group = 'verification'

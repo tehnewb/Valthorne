@@ -36,12 +36,12 @@ jobs:
       - name: Build and validate publication consumers
         shell: bash
         run: bash ./gradlew verifyRelease --stacktrace --console=plain
-      - name: Validate macOS application launch and rendering
-        # The hosted ARM64 VM cannot supply an NSGL OpenGL pixel format.
-        # Keep its build/native checks; exercise rendering on the Intel runner.
-        if: matrix.os == 'macos-15-intel'
+      - name: Validate macOS native window and first-thread launch
+        # Both hosted Mac architectures lack an accelerated NSGL pixel format.
+        # This is native window coverage; hardware rendering still needs a Mac GPU.
+        if: runner.os == 'macOS'
         shell: bash
-        run: bash ./gradlew verifyGraphicsConsumer --stacktrace --console=plain
+        run: bash ./gradlew verifyWindowConsumer --stacktrace --console=plain
       - name: Retain reports
         if: always()
         uses: actions/upload-artifact@v4
