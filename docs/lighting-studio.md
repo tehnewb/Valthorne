@@ -1,8 +1,10 @@
 # Lighting Studio
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 On Windows x64 the studio defaults to **Filament / real-time PBR**. Other supported
 OpenGL 4.3 desktop hosts use the path tracer and omit the Filament choice. See
@@ -10,7 +12,8 @@ OpenGL 4.3 desktop hosts use the path tracer and omit the Filament choice. See
 [platform requirements](platforms.md). This studio cannot run on macOS OpenGL;
 use `run3DExample` or `runPhysics3DExample` for the portable raster path.
 
-Run `./gradlew runLightingStudio` or `./gradlew runPathTracingExample` with no arguments.
+Run `./gradlew runLightingStudio`. The companion project launches a separate progressive
+path-tracing scene with `runPathTracingExample`; it no longer aliases this workbench.
 
 The workbench uses Valthorne's themed UI, including scrollable properties, dropdowns, keyboard-focusable buttons and sliders. It renders a material gallery with glass, gold, roughness samples and colored walls. The central viewport is separate from the UI, so UI input does not move the camera.
 
@@ -40,7 +43,7 @@ The default rig uses neutral sources, a closer camera, and a toggleable checker 
 .\gradlew.bat runLightingStudio --args="--benchmark-motion"
 .\gradlew.bat runLightingStudio --args="--benchmark-motion --progressive"
 .\gradlew.bat runLightingStudio --args="--visual-validation=build/visual-validation"
-.\gradlew.bat verify3D verifyPhysics3D verifyUI
+.\gradlew.bat build
 ```
 
 The hidden smoke run invokes installed native cursor/button/wheel callbacks and checks orbiting, zooming, activation of the placement button, surface placement, light dragging, undo/redo, both projections and GL errors. It writes `build/lighting-studio/studio.png` and `top-view.png` for visual review.

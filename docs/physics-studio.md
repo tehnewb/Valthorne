@@ -1,8 +1,10 @@
 # Physics Studio
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 Run `./gradlew runPhysicsStudio` on Windows x64 with JDK 25 and an OpenGL 4.3 capable GPU.
 
@@ -53,7 +55,7 @@ The **Particle fountain / Jolt** scenario replaces spawn settings with emission,
 
 Use `--smoke --scenario=4` for actual particle-button interaction and body cleanup checks. `--benchmark --scenario=4` measures physical particles; add `--visual-particles` for visual particles or `--particle-rate=120` for a heavier emission load. Scene indices now range from 0 through 4; the gallery remains the default.
 
-`./gradlew build verify3D verifyPhysics3D verifyUI verifyLighting verifyPhysicsStudio`
+`./gradlew build verifyPhysicsStudio`
 
 `./gradlew runPhysicsStudio --args="--smoke"` checks native mouse orbit/wheel events, actual pause/resume/single-step buttons, bulb picking and horizontal/height dragging, surface placement, toggle/duplicate/delete buttons, imported-model drops and collisions, finite simulation positions, and OpenGL errors. It also checks that UI clicks, second mouse buttons, wheel events during dragging, and repeated Escape events cannot interfere with scene controls. It writes `build/physics-studio/scenario-3.png` from the rendered framebuffer by default. Use `--scenario=0`, `1`, `2` or `3` to select another scene.
 

@@ -34,10 +34,15 @@ in the application's repositories.
 
 ## Application examples
 
-The [integration guide](docs/getting-started.md) includes a minimal application you
-can copy into your own project. Local demos under `src/examples/`, including their
-resources, are excluded from Git, normal builds, CI, and published artifacts.
-Their optional development launchers are described in the [local example catalog](docs/examples.md).
+The public [Valthorne examples project](https://github.com/tehnewb/Valthorne-examples) contains ten runnable demos with
+walkthroughs, documented source, and licensed assets. Clone it or
+[download the standalone ZIP](https://github.com/tehnewb/Valthorne-examples/releases/latest).
+It consumes Valthorne from Maven Central and has its own build and validation.
+See the [example catalog](docs/examples.md) for commands and platform requirements.
+
+The [integration guide](docs/getting-started.md) also includes a minimal application
+you can copy into your own project. Example code and resources remain excluded
+from this engine repository's normal build and all published library artifacts.
 
 ## Platform support
 
@@ -77,8 +82,9 @@ use them as evidence for those measurements, not as a guarantee for another mach
 ./gradlew verifyGraphicsConsumer   # Published-library OpenGL launch and pixel check
 ```
 
-Tests, integration-test folders, benchmarks, and examples remain local-only and
-are ignored by Git. CI generates disposable consumers under `build/`, so release
+Tests, integration-test folders, benchmarks, and the engine's local `src/examples/`
+directory are ignored by Git. Public examples live in the companion project above.
+CI generates disposable consumers under `build/`, so release
 checks require none of those folders. `test`, `graphicsTest`, `verify3D`,
 `verifyLighting`, and `verifyUI` can still run separately available local tests.
 Javadoc is generated under `build/docs/javadoc`; Javadoc errors fail the build.

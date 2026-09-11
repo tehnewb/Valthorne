@@ -1,8 +1,10 @@
 # Lighting and FPS
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 Valthorne now has separate 2D and 3D lighting implementations built for OpenGL 3.3.
 They do not depend on the old ray-handler meshes or radiance cascades. Existing lighting
@@ -13,7 +15,7 @@ APIs remain available for compatibility; attach the new systems as shown below.
 ```shell
 ./gradlew runPhysics3DExample
 ./gradlew runLighting2DExample
-./gradlew verifyLighting
+./gradlew build
 ```
 
 Use `gradlew.bat` on Windows. Both playgrounds show live FPS and milliseconds per frame.

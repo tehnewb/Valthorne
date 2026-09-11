@@ -1,8 +1,10 @@
 # Path-traced lighting and culling
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 `PathTracer3D` and `PathTracer2D` progressively compute bounced light, area shadows, metal reflections and dielectric glass on the GPU. `Lighting3D` and `Lighting2D` remain the fast gameplay renderers.
 

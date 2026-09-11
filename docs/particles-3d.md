@@ -1,8 +1,10 @@
 # 3D particles
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 `ParticleEmitter3D` supports pooled billboard and mesh particles, with optional Jolt rigid bodies. Each emitter has a fixed capacity, a spawn initializer, timed emission, explicit bursts, and finite particle lifetimes. Mesh particles use Filament lighting, shadows and frustum culling when attached to a `Scene3D`.
 
@@ -80,4 +82,4 @@ Run `./gradlew runPhysicsStudio --args="--scenario=4"` to open the fountain, ang
 
 `--visual-particles` starts the same scenario without physics. `--particle-rate=120` selects a higher load (0–120 births/second, capped at 512 live particles). Add `--smoke` to exercise camera, light and particle controls with native mouse events, or `--benchmark` for a moving-camera, completed-frame timing run.
 
-Regression tests run with `./gradlew verify3D verifyPhysics3D`. [Benchmarks and raw measurements](benchmarks/particles-3d/README.md) cover pooled visual updates and the native studio scenarios.
+Engine regression tasks `./gradlew verify3D verifyPhysics3D` require optional local test files in the engine checkout. Use the companion project's `build` and particle-fountain smoke run for public example validation. [Benchmarks and raw measurements](benchmarks/particles-3d/README.md) cover pooled visual updates and the native studio scenarios.

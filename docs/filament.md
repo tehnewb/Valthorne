@@ -1,8 +1,10 @@
 # Filament desktop renderer
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 On Windows x64, Lighting Studio defaults to **Filament / real-time PBR**. The integration uses the community `filament-ffm-runtime-windows-x64:0.4.0` binding from Maven Central, which bundles Filament with material ABI 75 (Filament 1.75). Java 25 calls its C API through the Foreign Function & Memory API; no local native compiler is required to run or build Valthorne. Other OpenGL 4.3 hosts use the studio's path tracer. See [platform support](platforms.md) and [consumer setup](getting-started.md).
 

@@ -179,9 +179,10 @@ set the same VM options shown above. Gradle's settings in Valthorne do not trans
 automatically into a consuming application's launcher. Use the normal classpath;
 JPMS/module-path packaging is not validated by this release preparation.
 
-Optional local demos are excluded from Git and the release. If you already have
-the `src/examples/` directory locally, its launchers use the `Valthorne.examples`
-classpath module. A fresh checkout builds and validates without those files.
+Runnable demos and their assets are available in the separate
+[examples project](https://github.com/tehnewb/Valthorne-examples); see the [catalog](examples.md).
+They consume the published engine and are excluded from its library artifacts.
+A fresh engine checkout builds and validates without them.
 
 Gradle `installDist`/`distZip` retain separate dependency/native JARs. Build platform
 installers on each target OS and include a Java 25 runtime if users will not supply

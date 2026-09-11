@@ -2,7 +2,8 @@
 
 The stable version is `2.0.0` in `gradle.properties`. Normal builds and verification
 need no signing/upload secrets. Tests, integration-test folders, benchmarks and
-examples are intentionally local-only and excluded from Git.
+the engine's `src/examples/` directory are excluded from Git. Public examples are
+maintained in the separate [companion project](https://github.com/tehnewb/Valthorne-examples).
 
 ## Validate the release revision
 

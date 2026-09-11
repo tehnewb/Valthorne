@@ -1,8 +1,10 @@
 # UI system guide
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 Valthorne has one UI tree with texture and NanoVG rendering. Existing widget
 classes remain available; nodes can be nested across families without converting
@@ -12,8 +14,7 @@ assets. See [mixed rendering](ui-rendering.md) for the drawing contract.
 
 ```powershell
 .\gradlew.bat runUIShowcase
-.\gradlew.bat verifyUI
-.\gradlew.bat verifyUIBenchmark
+.\gradlew.bat build
 .\gradlew.bat benchmarkUITable
 .\gradlew.bat runUIShowcase --args=--smoke
 .\gradlew.bat build

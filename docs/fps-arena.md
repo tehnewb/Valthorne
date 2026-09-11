@@ -1,8 +1,10 @@
 # Live Fire: first-person feature arena
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 Run `./gradlew runFpsArena` with JDK 25 on Windows x64 and an OpenGL 4.3-capable GPU. Click **Enter arena** to capture the mouse. Escape pauses and releases it; the test console adjusts lighting and effects. Losing window focus also pauses play.
 
@@ -40,7 +42,7 @@ The HUD displays FPS, render/simulation timings, particles, lights and body coun
 ## Checks and measurements
 
 ```text
-./gradlew build verify3D verifyPhysics3D verifyUI verifyLighting verifyPhysicsStudio verifyFpsAssets verifyFpsArena
+./gradlew build verifyAssets verifyFpsArena
 ./gradlew runFpsArena --args="--smoke"
 ./gradlew runFpsArena --args="--benchmark"
 ./gradlew runFpsArena --args="--benchmark --no-particle-lights"
