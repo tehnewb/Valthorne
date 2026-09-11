@@ -35,6 +35,7 @@ application {
 }
 tasks.named('run', JavaExec) {
     if (providers.gradleProperty('graphics').getOrElse('false').toBoolean()) args '--graphics'
+    if (providers.gradleProperty('window').getOrElse('false').toBoolean()) args '--window'
 }
 ''', 'UTF-8')
         new File(sources, 'ReleaseProbe.java').setText('''
@@ -54,8 +55,8 @@ public final class ReleaseProbe {
     public static void main(String[] args) throws Exception {
         try (var callback = org.lwjgl.glfw.GLFWErrorCallback.createPrint(System.err)) {
             org.lwjgl.glfw.GLFW.glfwSetErrorCallback(callback);
-            run(args);
-            org.lwjgl.glfw.GLFW.glfwSetErrorCallback(null);
+            try { run(args); }
+            finally { org.lwjgl.glfw.GLFW.glfwSetErrorCallback(null); }
         }
     }
     private static void run(String[] args) throws Exception {
@@ -79,6 +80,36 @@ public final class ReleaseProbe {
             physics.step();
             if (physics.getStepCount() != 1) throw new AssertionError("Jolt did not step");
         }
+        if (java.util.Arrays.asList(args).contains("--window")) {
+            // Exercise native desktop integration on CI hosts without an OpenGL driver.
+            if (!org.lwjgl.glfw.GLFW.glfwInit()) throw new AssertionError("GLFW initialization failed");
+            try {
+                org.lwjgl.glfw.GLFW.glfwDefaultWindowHints();
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_CLIENT_API, org.lwjgl.glfw.GLFW.GLFW_NO_API);
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_VISIBLE, org.lwjgl.glfw.GLFW.GLFW_FALSE);
+                long window = org.lwjgl.glfw.GLFW.glfwCreateWindow(64, 64, "Valthorne native window check", 0, 0);
+                if (window == 0) throw new AssertionError("Native window creation failed");
+                try {
+                    org.lwjgl.glfw.GLFW.glfwPollEvents();
+                    org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose(window, true);
+                    if (!org.lwjgl.glfw.GLFW.glfwWindowShouldClose(window)) throw new AssertionError("Native window state failed");
+                } finally { org.lwjgl.glfw.GLFW.glfwDestroyWindow(window); }
+                // Report a plain GLFW baseline separately from engine rendering checks.
+                org.lwjgl.glfw.GLFW.glfwDefaultWindowHints();
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_VISIBLE, org.lwjgl.glfw.GLFW.GLFW_FALSE);
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_OPENGL_PROFILE, org.lwjgl.glfw.GLFW.GLFW_OPENGL_CORE_PROFILE);
+                org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_OPENGL_FORWARD_COMPAT, org.lwjgl.glfw.GLFW.GLFW_TRUE);
+                long baseline = org.lwjgl.glfw.GLFW.glfwCreateWindow(64, 64, "Host OpenGL diagnostic", 0, 0);
+                if (baseline == 0) {
+                    System.out.println("Host OpenGL diagnostic: unavailable; graphics rendering is NOT validated by this window check.");
+                } else {
+                    org.lwjgl.glfw.GLFW.glfwDestroyWindow(baseline);
+                    System.out.println("Host OpenGL diagnostic: available; use verifyGraphicsConsumer to validate engine rendering.");
+                }
+            } finally { org.lwjgl.glfw.GLFW.glfwTerminate(); }
+        }
         if (java.util.Arrays.asList(args).contains("--graphics")) {
             JGL.init(new Application() {
                 private int frames;
@@ -101,7 +132,8 @@ public final class ReleaseProbe {
             }, JGLConfiguration.defaults().title("Valthorne release check").size(64, 64).visible(false));
         }
         System.out.println("Published Valthorne consumer passed on " + System.getProperty("os.name")
-                + "/" + System.getProperty("os.arch") + " graphics=" + java.util.Arrays.asList(args).contains("--graphics"));
+                + "/" + System.getProperty("os.arch") + " graphics=" + java.util.Arrays.asList(args).contains("--graphics")
+                + " window=" + java.util.Arrays.asList(args).contains("--window"));
     }
 }
 ''', 'UTF-8')

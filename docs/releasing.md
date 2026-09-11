@@ -23,7 +23,10 @@ examples are intentionally local-only and excluded from Git.
    checks rendered pixels. It needs a display and driver; silent CI sets
    `ALSOFT_DRIVERS=null` only for that process.
 3. Pass CI on the same commit. The matrix builds on Windows, Linux and macOS;
-   Linux uses Xvfb/Mesa for graphics and macOS uses the first-thread JVM launcher.
+   Linux uses Xvfb/Mesa for graphics. Both macOS architectures check native windows
+   with the first-thread JVM launcher; their hosted VMs cannot supply an NSGL
+   pixel format. Mac rendering needs a separate hardware run of
+   `verifyGraphicsConsumer` and must not be inferred from a passing CI window check.
    No test folders are copied into CI. Optional local `test`, `graphicsTest`,
    `verify3D`, `verifyPhysics3D`, `verifyLighting` and `verifyUI` suites provide
    additional regression coverage when their ignored source files are available.
