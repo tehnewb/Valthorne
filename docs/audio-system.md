@@ -1,8 +1,10 @@
 # Audio performance and area sounds
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions.
 
 ## Ambient coverage
 
@@ -43,7 +45,7 @@ are displayed with VSync off. This remains ambient coverage, not directional pan
 source picking, listener dragging and zone editing, verifies expanding waves,
 stationary source/area state, pause/mute gating and geometry reuse, checks OpenAL gains/playback
 and OpenGL errors, then saves `build/audio-studio/studio.png` and exits.
-The example uses its own source set so unrelated local examples cannot break launch.
+The public example uses the companion project's shared launcher and published engine dependency.
 
 ### Library API
 

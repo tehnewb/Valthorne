@@ -6,7 +6,7 @@ Thanks for taking the time to contribute.
 
 Use JDK 25 and the checked-in Gradle wrapper (9.3.1). No native compiler, signing
 key or publication account is needed. See [setup](docs/getting-started.md),
-[platform requirements](docs/platforms.md), and the [local example catalog](docs/examples.md).
+[platform requirements](docs/platforms.md), and the [public example catalog](docs/examples.md).
 
 Please search existing issues and pull requests before opening a new one. If you are not sure whether an idea belongs in an issue yet, start a discussion first.
 
@@ -40,7 +40,8 @@ Before opening a pull request, please run:
 
 Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources and
 Javadoc. Tests, integration-test folders, benchmarks, examples and their resources
-are local-only and ignored by Git. They are not required in a fresh checkout.
+are ignored by Git in this engine checkout. They are not required in a fresh checkout.
+Public demos are maintained in the separate [examples project](https://github.com/tehnewb/Valthorne-examples).
 `verifyRelease` additionally checks the published artifacts and separate consumers.
 For rendering changes, run `./gradlew verifyGraphicsConsumer` with a compatible OpenGL driver
 and display. Focused `verify3D`, `verifyLighting`, and `verifyUI` tasks also include

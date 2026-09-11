@@ -1,8 +1,12 @@
 # UI performance: measured costs and regression checks
 
-Local demo commands in this guide require separately available `src/examples/`
-source and resources. These are ignored by Git and excluded from releases and CI;
-see [optional local examples](examples.md).
+Runnable demos and assets are maintained in the public
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
+`src/examples/` files remain ignored and excluded from library artifacts.
+See the [example catalog](examples.md). Historical measurements retain their
+original commands and source revisions. Engine `verify*` and benchmark tasks in
+those records still require their optional local test/benchmark sources; use the
+companion project's `build` and documented smoke tasks for current examples.
 
 This suite measures defined workloads, not a universal UI performance score.
 Minimizing allocations must not break painter order, Unicode boundaries, focus,

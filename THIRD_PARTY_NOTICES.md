@@ -26,8 +26,10 @@ binaries. Distribute the licenses accompanying those dependencies with your game
 
 ## Example-only assets
 
-Examples and their assets are local-only, ignored by Git, and excluded from all
-library publication artifacts. The following paths describe optional local files
+Examples and their assets are available in the separate [examples project](https://github.com/tehnewb/Valthorne-examples),
+with its own [notices and provenance](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
+They are excluded from all engine library publication artifacts.
+The following paths describe optional local files
 and are not part of a fresh checkout. When
 redistributing an example, preserve its resource directories and notices:
 
