@@ -14,7 +14,7 @@ systems described below. These changes are not part of the older 1.4.6 artifact.
   `--enable-native-access=ALL-UNNAMED`; macOS graphics launchers also need
   `-XstartOnFirstThread`.
 
-### Engine and examples in this development tree
+### Engine systems
 
 - 3D scenes, OBJ/MTL assets, cameras, picking, transform animation, raster lighting,
   shadows, particles, and a Windows x64 Filament renderer.
@@ -22,8 +22,8 @@ systems described below. These changes are not part of the older 1.4.6 artifact.
 - OpenGL 4.3 path tracing, cached 2D lighting, and spatial sound areas.
 - Shared texture/NanoVG UI lifecycle, editing, themes, virtual controls, tables,
   tabs, split panes, modals, and inspection tools.
-- Optional local examples, asset provenance, subsystem guides, regression tests and
-  recorded performance evidence.
+- Subsystem guides, asset provenance and recorded performance evidence.
+  Development examples and regression suites remain optional local files.
 
 ### Release preparation
 
