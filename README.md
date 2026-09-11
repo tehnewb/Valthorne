@@ -40,9 +40,17 @@ walkthroughs, documented source, and licensed assets. Clone it or
 It consumes Valthorne from Maven Central and has its own build and validation.
 See the [example catalog](docs/examples.md) for commands and platform requirements.
 
-To play on Windows x64, download the **Windows desktop ZIP**, extract it, and
-double-click any demo's `.bat` file. All ten examples include Java and dependencies;
-running them requires neither Gradle nor a Java installation.
+Click a demo below to download its Windows x64 package. Extract it and
+double-click **Start.bat**. Java, assets and dependencies are included; no Gradle,
+Java installation, or repository clone is needed.
+
+| Download demo | Download demo |
+| --- | --- |
+| [Application starter](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-starter-windows-x64-2.0.1.zip) | [3D scene](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-scene-windows-x64-2.0.1.zip) |
+| [Physics playground](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-physics-windows-x64-2.0.1.zip) | [2D lighting](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-lighting2d-windows-x64-2.0.1.zip) |
+| [UI gallery](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-ui-windows-x64-2.0.1.zip) | [Audio studio](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-audio-windows-x64-2.0.1.zip) |
+| [Lighting studio](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-lighting-studio-windows-x64-2.0.1.zip) | [Path tracing](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-path-tracing-windows-x64-2.0.1.zip) |
+| [Physics studio](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-physics-studio-windows-x64-2.0.1.zip) | [FPS arena](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-fps-windows-x64-2.0.1.zip) |
 
 The [integration guide](docs/getting-started.md) also includes a minimal application
 you can copy into your own project. Example code and resources remain excluded
