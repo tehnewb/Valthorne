@@ -3,57 +3,59 @@ package valthorne.collections.queue;
 import java.util.Arrays;
 
 /**
- * A class that manages a unique index queue, allowing for the retrieval of unused
- * and reinsertion of used indices. This class is designed to manage a sequence of unique
- * short indexes efficiently, reusing them when possible. It provides methods to pop an
- * index from the queue and push an index back into it, automatically handling the queue's
- * capacity and ensures uniqueness and sequential order of indexes.
+ * Sequential short index generator with a reusable-index buffer. Callers return
+ * indices with push; buffered values are normally reused in last-in, first-out
+ * order before sequential generation resumes. The class does not track live
+ * allocations or reject duplicate returns, so uniqueness depends on caller use.
+ *
+ * <p>Arithmetic follows primitive overflow rules. The current pop calculation
+ * also rejects a completely full buffer with an array-index exception; it does
+ * not implement a general circular queue. Operations are unsynchronized.</p>
  *
  * @author Albert Beaupre
- * @since May 1st, 2024
  */
 public class ShortUUIDQueue {
 
     // The array used to store the queue of indexes. The capacity of the queue can expand as needed.
-    private short[] queue = new short[16];
-    // The index to be dequeued next if the queue is empty. This ensures unique and sequential index generation.
-    private short dequeue;
+    private short[] queue = new short[16]; // Returned indices awaiting reuse, valid before enqueue.
+    // Next sequential value issued when no returned IDs are available.
+    private short dequeue; // Next sequential value when the reuse buffer is empty.
     // The current position for enqueueing a new index. This also represents the number of elements in the queue.
-    private int enqueue;
+    private int enqueue; // Number of buffered values and insertion position.
 
     /**
-     * Constructs a new ShortUUIDQueue object with the default starting value of zero.
-     * This constructor initializes the queue's dequeue index to 0, allowing sequential
-     * generation of unique integer indices starting from zero.
+     * Creates an empty reuse buffer and starts sequential generation at zero.
+     * Sixteen returned-index slots are initially allocated.
      */
     public ShortUUIDQueue() {
         this(0);
     }
 
     /**
-     * Constructs a new ShortUUIDQueue object with the specified starting value.
-     * This starting value determines the initial value for generating unique indices.
+     * Creates an empty reuse buffer with a caller-selected generation start.
+     * The int is narrowed to short without a range check.
      *
-     * @param startingValue The initial value to set for the queue's dequeue index.
+     * @param startingValue first sequential index when no returned indices exist
      */
     public ShortUUIDQueue(int startingValue) {
         this.dequeue = (short) startingValue;
     }
 
     /**
-     * Pops an index from the queue, returning a unique short index.
-     * If the queue is empty, it generates a new index sequentially.
-     * This method ensures that indexes are reused when possible, and new indexes are generated only when necessary.
+     * Reuses the newest buffered index when the buffer is partially occupied;
+     * otherwise generates and increments the next sequential value. Arithmetic
+     * wraps at the primitive limit. At full buffer capacity, the modulo-based
+     * slot calculation produces minus one before membership is decremented.
      *
-     * @return The next available unique index. If the queue is not empty, it returns and removes the oldest index in the queue.
-     * If the queue is empty, it generates and returns a new sequential index.
+     * @return buffered value or next sequential value
+     * @throws ArrayIndexOutOfBoundsException if the reuse buffer is exactly full
      */
     public short pop() {
         if (enqueue > 0) {
-            // Calculate the index within the queue array to pop, taking into account the circular nature of the queue.
+            // Locate the most recently returned ID using the current modulo-based index calculation.
             int index = (enqueue % this.queue.length) - 1;
             short oldIndex = this.queue[index];
-            // Clear the old index to prevent memory leaks and decrement the enqueue index to remove the element from the queue.
+            // Clear the consumed primitive slot and reduce the number of queued returns.
             this.queue[--enqueue] = 0;
             return oldIndex;
         } else {
@@ -63,11 +65,11 @@ public class ShortUUIDQueue {
     }
 
     /**
-     * Pushes a given index back into the queue if it is valid (not greater than the current dequeue index).
-     * This method allows for the reuse of indexes by adding them back into the queue.
-     * It also ensures that the queue's capacity is dynamically adjusted to accommodate more indexes if needed.
+     * Returns an index for later reuse unless it is greater than the next sequential
+     * value. Equality is accepted and advances that counter; negatives and duplicate
+     * returns are not rejected. Full storage grows by doubling before insertion.
      *
-     * @param index The index to be pushed back into the queue.
+     * @param index value to append to the reuse buffer
      */
     public void push(short index) {
         // Ignore indexes that are not valid for reuse (i.e., greater than the current dequeue index).
@@ -90,11 +92,11 @@ public class ShortUUIDQueue {
     }
 
     /**
-     * Compacts the queue into a new array containing only non-zero indices.
-     * This method iterates through the current queue, ignoring zeros,
-     * and copies all valid indices into a new, smaller array.
+     * Copies the occupied reuse-buffer prefix in insertion order. Zero values and
+     * duplicates are preserved; the method neither filters entries nor alters the
+     * buffer. Modifying the result does not change subsequent allocation.
      *
-     * @return a new, compacted array containing all valid indices from the queue.
+     * @return independent array of currently buffered values
      */
     public short[] getCompactQueue() {
         return Arrays.copyOf(queue, enqueue);

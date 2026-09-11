@@ -4,7 +4,7 @@ import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
 import valthorne.graphics.ImmediateTextureRenderer;
 import valthorne.io.pool.Poolable;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
@@ -104,21 +104,16 @@ public class NinePatchTexture implements Poolable {
      * The total number of vertices across all quads.
      */
     private static final int VERTS = QUADS * VERTS_PER_QUAD;
-
+    /**
+     * The total number of float components required for the full nine-patch mesh.
+     */
+    private static final int FLOATS = VERTS * NinePatchTexture.FLOATS_PER_VERT;
     /**
      * The number of float components per vertex.
      */
     private static final int FLOATS_PER_VERT = 2;
-
-    /**
-     * The total number of float components required for the full nine-patch mesh.
-     */
-    private static final int FLOATS = VERTS * FLOATS_PER_VERT;
-
     private final Texture texture; // Backing texture used by the nine-patch
     private final TextureRegion region; // Source region inside the backing texture
-    private FloatBuffer nineVertexBuffer = BufferUtils.createFloatBuffer(FLOATS); // World-space vertex buffer used for rendering
-    private FloatBuffer nineUvBuffer = BufferUtils.createFloatBuffer(FLOATS); // UV buffer used for rendering
     private final float[] nineLocalVertices = new float[FLOATS]; // Cached local-space vertex positions for all nine quads
     private final float[] nineLocalUvs = new float[FLOATS]; // Cached local-space UV coordinates for all nine quads
     private final float[] sliceX = new float[QUADS]; // Cached local X positions for each patch slice
@@ -127,19 +122,19 @@ public class NinePatchTexture implements Poolable {
     private final float[] sliceH = new float[QUADS]; // Cached heights for each patch slice
     private final int[] src = new int[QUADS * 4]; // Cached source pixel rectangles for each patch slice
     private final Rectangle bounds; // Destination bounds of the nine-patch in world space
+    private final boolean ownsTexture; // Whether this nine-patch should dispose the backing texture when released
+    private FloatBuffer nineVertexBuffer = BufferUtils.createFloatBuffer(FLOATS); // World-space vertex buffer used for rendering
+    private FloatBuffer nineUvBuffer = BufferUtils.createFloatBuffer(FLOATS); // UV buffer used for rendering
     private Vector2f origin = new Vector2f(0f, 0f); // Rotation origin used when transforming the mesh
     private Color color = new Color(1f, 1f, 1f, 1f); // Current tint color applied during drawing
-
     private int left; // Left border thickness in pixels
     private int right; // Right border thickness in pixels
     private int top; // Top border thickness in pixels
     private int bottom; // Bottom border thickness in pixels
-
     private boolean flippedX; // Whether the nine-patch is horizontally flipped
     private boolean flippedY; // Whether the nine-patch is vertically flipped
     private boolean dirtyMesh = true; // Whether the local mesh and UVs need to be rebuilt
     private boolean dirtyWorld = true; // Whether world-space transformed vertices need to be updated
-
     private float scaleX = 1f; // Horizontal scale factor
     private float scaleY = 1f; // Vertical scale factor
     private float rotation; // Rotation angle in degrees
@@ -152,7 +147,6 @@ public class NinePatchTexture implements Poolable {
     private float cachedRotation = Float.NaN; // Last rotation value used to cache sine and cosine
     private float sinRot; // Cached sine of the current rotation
     private float cosRot = 1f; // Cached cosine of the current rotation
-    private final boolean ownsTexture; // Whether this nine-patch should dispose the backing texture when released
     private boolean disposed; // Whether this nine-patch has already released its owned resources
 
     /**
@@ -218,6 +212,20 @@ public class NinePatchTexture implements Poolable {
         this(texture, left, right, top, bottom, false);
     }
 
+    /**
+     * Initializes nine-patch slicing over the complete backing texture.
+     * Initial bounds equal the texture's pixel dimensions and geometry is rebuilt
+     * lazily. Border values are retained as supplied; this constructor does not clamp
+     * or validate their sum against the texture dimensions.
+     *
+     * @param texture backing texture
+     * @param left left border width in pixels
+     * @param right right border width in pixels
+     * @param top top border height in pixels
+     * @param bottom bottom border height in pixels
+     * @param ownsTexture whether disposal releases the backing texture
+     * @throws NullPointerException if texture is null
+     */
     private NinePatchTexture(Texture texture, int left, int right, int top, int bottom, boolean ownsTexture) {
         if (texture == null) throw new NullPointerException("Texture cannot be null");
 
@@ -486,8 +494,8 @@ public class NinePatchTexture implements Poolable {
         float oldScaleX = this.scaleX;
         float oldScaleY = this.scaleY;
 
-        if (oldScaleX != 0f) origin.setX(origin.getX() * (sx / oldScaleX));
-        if (oldScaleY != 0f) origin.setY(origin.getY() * (sy / oldScaleY));
+        if (oldScaleX != 0f) origin.x = origin.x() * (sx / oldScaleX);
+        if (oldScaleY != 0f) origin.y = origin.y() * (sy / oldScaleY);
 
         this.scaleX = sx;
         this.scaleY = sy;
@@ -555,7 +563,7 @@ public class NinePatchTexture implements Poolable {
      * @param oy the origin Y
      */
     public void setRotationOrigin(float ox, float oy) {
-        if (origin.getX() == ox && origin.getY() == oy) return;
+        if (origin.x() == ox && origin.y() == oy) return;
 
         origin.set(ox, oy);
         markDirtyAll();
@@ -931,8 +939,8 @@ public class NinePatchTexture implements Poolable {
     private void updateWorldBuffers() {
         cacheRotationTrigIfNeeded();
 
-        float ox = origin.getX();
-        float oy = origin.getY();
+        float ox = origin.x();
+        float oy = origin.y();
 
         float px = bounds.getX() + ox;
         float py = bounds.getY() + oy;

@@ -14,55 +14,27 @@ import java.nio.ShortBuffer;
 import java.nio.file.Path;
 
 /**
- * <p>
- * {@code OggSoundDecoder} decodes OGG Vorbis audio using STB Vorbis and also exposes
- * metadata probing helpers for both memory and file-path sources.
- * </p>
+ * Decodes complete OGG Vorbis payloads into interleaved 16-bit PCM and probes
+ * metadata without retaining a streaming decoder. Probing accepts either a file
+ * path or encoded bytes; full decoding accepts bytes and returns independent
+ * buffered SoundData. Temporary native decoder and decoded-sample allocations
+ * are released after use.
+ * <p>For long audio that should not be held fully decoded in memory, use the separate
+ * OggSoundStream implementation. This decoder creates no OpenAL playback source.
  *
  * @author Albert Beaupre
- * @since March 26th, 2026
  */
 public class OggSoundDecoder implements SoundDecoder {
 
     /**
-     * Decodes OGG Vorbis bytes into buffered PCM sound data.
+     * Opens a temporary native decoder over a direct copy of the encoded bytes and
+     * reads channels, sample rate, and stream length. No PCM buffer is returned; the
+     * decoder is closed even when metadata extraction fails.
      *
-     * @param data the encoded OGG bytes
-     * @return the decoded sound data
-     * @throws Exception if decoding fails
-     */
-    @Override
-    public SoundData decode(byte[] data) throws Exception {
-        ByteBuffer encoded = BufferUtils.createByteBuffer(data.length);
-        encoded.put(data).flip();
-
-        IntBuffer channelsBuffer = BufferUtils.createIntBuffer(1);
-        IntBuffer sampleRateBuffer = BufferUtils.createIntBuffer(1);
-        ShortBuffer pcm = STBVorbis.stb_vorbis_decode_memory(encoded, channelsBuffer, sampleRateBuffer);
-
-        if (pcm == null) {
-            throw new RuntimeException("Failed to decode OGG file");
-        }
-
-        int channels = channelsBuffer.get(0);
-        int sampleRate = sampleRateBuffer.get(0);
-        int bitsPerSample = 16;
-        int pcmSamples = pcm.remaining();
-        ByteBuffer pcmBytes = BufferUtils.createByteBuffer(pcmSamples * 2);
-        pcmBytes.asShortBuffer().put(pcm);
-        pcmBytes.limit(pcmSamples * 2);
-
-        float duration = pcmSamples / (float) (channels * sampleRate);
-        LibCStdlib.free(pcm);
-
-        return new SoundData(null, pcmBytes, 0L, pcmBytes.remaining(), duration, channels, sampleRate, bitsPerSample, false, true, AudioFormat.OGG);
-    }
-
-    /**
-     * Probes OGG metadata from encoded bytes.
-     *
-     * @param data the encoded OGG bytes
-     * @return the probed metadata
+     * @param data complete encoded OGG Vorbis payload
+     * @return metadata with 16-bit PCM depth, encoded byte length, and duration in
+     *         seconds, or minus one duration when sample count is unavailable
+     * @throws RuntimeException if STB cannot open the encoded stream
      */
     public static SoundMetadata probe(byte[] data) {
         ByteBuffer encoded = BufferUtils.createByteBuffer(data.length);
@@ -90,10 +62,14 @@ public class OggSoundDecoder implements SoundDecoder {
     }
 
     /**
-     * Probes OGG metadata from a file path.
+     * Opens a temporary decoder using an absolute filesystem path, reads metadata,
+     * and closes the decoder. A separate file-size failure records minus one encoded
+     * bytes without discarding successfully read audio metadata.
      *
-     * @param path the file path to inspect
-     * @return the probed metadata
+     * @param path filesystem path to an OGG Vorbis file
+     * @return metadata with 16-bit PCM depth and duration in seconds; unavailable
+     *         duration or encoded byte count is represented by minus one
+     * @throws RuntimeException if STB cannot open the file
      */
     public static SoundMetadata probe(String path) {
         ByteBuffer fileNameBuffer = MemoryUtil.memUTF8(Path.of(path).toAbsolutePath().toString());
@@ -123,6 +99,44 @@ public class OggSoundDecoder implements SoundDecoder {
             }
         } finally {
             STBVorbis.stb_vorbis_close(decoder);
+        }
+    }
+
+    /**
+     * Decodes the complete payload into interleaved signed 16-bit PCM.
+     * Copies native STB samples into a separate direct buffer before freeing the STB
+     * allocation. Returned SoundData retains this PCM buffer and does not retain the
+     * encoded input or create an OpenAL source.
+     *
+     * @param data complete encoded OGG Vorbis bytes
+     * @return buffered PCM data with channel count, sample rate, and duration
+     * @throws Exception if decoding fails or the decoded byte count cannot be represented
+     */
+    @Override
+    public SoundData decode(byte[] data) throws Exception {
+        ByteBuffer encoded = BufferUtils.createByteBuffer(data.length);
+        encoded.put(data).flip();
+
+        IntBuffer channelsBuffer = BufferUtils.createIntBuffer(1);
+        IntBuffer sampleRateBuffer = BufferUtils.createIntBuffer(1);
+        ShortBuffer pcm = STBVorbis.stb_vorbis_decode_memory(encoded, channelsBuffer, sampleRateBuffer);
+
+        if (pcm == null) {
+            throw new RuntimeException("Failed to decode OGG file");
+        }
+
+        int channels = channelsBuffer.get(0);
+        int sampleRate = sampleRateBuffer.get(0);
+        int bitsPerSample = 16;
+        int pcmSamples = pcm.remaining();
+        try {
+            ByteBuffer pcmBytes = BufferUtils.createByteBuffer(Math.multiplyExact(pcmSamples, 2));
+            // Do not advance the owning buffer: free() uses its current address.
+            pcmBytes.asShortBuffer().put(pcm.duplicate());
+            float duration = pcmSamples / (float) (channels * sampleRate);
+            return new SoundData(null, pcmBytes, 0L, pcmBytes.remaining(), duration, channels, sampleRate, bitsPerSample, false, true, AudioFormat.OGG);
+        } finally {
+            LibCStdlib.free(pcm);
         }
     }
 }

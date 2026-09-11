@@ -39,7 +39,7 @@ public class ScreenViewport extends Viewport {
     /**
      * Creates a screen viewport whose initial logical world size matches the supplied pixel size.
      *
-     * @param width the initial screen-like world width
+     * @param width  the initial screen-like world width
      * @param height the initial screen-like world height
      */
     public ScreenViewport(int width, int height) {
@@ -54,7 +54,7 @@ public class ScreenViewport extends Viewport {
      * matches the current screen size.
      * </p>
      *
-     * @param worldWidth the initial logical world width
+     * @param worldWidth  the initial logical world width
      * @param worldHeight the initial logical world height
      */
     public ScreenViewport(float worldWidth, float worldHeight) {
@@ -69,7 +69,7 @@ public class ScreenViewport extends Viewport {
      * The fallback orthographic projection is then rebuilt so world units match screen pixels.
      * </p>
      *
-     * @param screenWidth the window width in pixels
+     * @param screenWidth  the window width in pixels
      * @param screenHeight the window height in pixels
      */
     @Override
@@ -81,6 +81,6 @@ public class ScreenViewport extends Viewport {
         this.worldWidth = screenWidth;
         this.worldHeight = screenHeight;
 
-        projectionMatrix.ortho(0, worldWidth, 0, worldHeight, -1f, 1f);
+        projectionMatrix.setOrtho(0, worldWidth, 0, worldHeight, -1f, 1f);
     }
 }

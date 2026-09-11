@@ -23,23 +23,27 @@ import static org.lwjgl.glfw.GLFW.GLFW_MOD_SUPER;
  * is being published.
  * </p>
  *
+ * <p>Button codes and modifier masks are narrowed to bytes without validation; X/Y
+ * remain integers in the producer's cursor coordinate space. Setters change payload
+ * only and preserve the event's route and consumption state.</p>
+ *
  * @author Albert Beaupre
  * @since December 18th, 2025
  */
 public class MouseEvent extends Event {
 
-    private int x;
-    private int y;
-    private byte button;
-    private byte modifiers;
+    private int x; // Starting or current cursor X coordinate from the producer.
+    private int y; // Starting or current cursor Y coordinate from the producer.
+    private byte button; // Button code narrowed to signed-byte storage.
+    private byte modifiers; // Modifier bits narrowed to byte storage.
 
     /**
      * Creates a raw mouse event routed as {@link EventTypes#MOUSE}.
      *
-     * @param button mouse button code
+     * @param button    mouse button code
      * @param modifiers modifier bit mask
-     * @param x cursor X coordinate
-     * @param y cursor Y coordinate
+     * @param x         cursor X coordinate
+     * @param y         cursor Y coordinate
      */
     public MouseEvent(int button, int modifiers, int x, int y) {
         this(EventTypes.MOUSE, button, modifiers, x, y);
@@ -48,11 +52,11 @@ public class MouseEvent extends Event {
     /**
      * Constructor used by subclasses to choose a concrete numeric route.
      *
-     * @param type concrete event type
-     * @param button mouse button code
+     * @param type      concrete event type
+     * @param button    mouse button code
      * @param modifiers modifier bit mask
-     * @param x cursor X coordinate
-     * @param y cursor Y coordinate
+     * @param x         cursor X coordinate
+     * @param y         cursor Y coordinate
      */
     protected MouseEvent(EventType<?> type, int button, int modifiers, int x, int y) {
         super(type);
@@ -63,7 +67,13 @@ public class MouseEvent extends Event {
     }
 
     /**
-     * Replaces the complete base mouse payload for reuse.
+     * Replaces the complete base mouse payload for reuse without resetting consumption.
+     * Button and modifier values are narrowed to bytes; coordinates remain integers.
+     *
+     * @param button mouse button code
+     * @param modifiers modifier mask
+     * @param x cursor X coordinate
+     * @param y cursor Y coordinate
      *
      * @return this event
      */
@@ -75,57 +85,112 @@ public class MouseEvent extends Event {
         return this;
     }
 
-    /** @param modifiers modifier bit mask */
+    /**
+     * Replaces this payload component without changing other values, the numeric route,
+     * or consumption state. Storage uses the declared field type without range validation.
+     *
+     * @param modifiers modifier bit mask
+     */
     public void setModifiers(int modifiers) {
         this.modifiers = (byte) modifiers;
     }
 
-    /** @return cursor X coordinate */
+    /**
+     * Returns the current stored payload component without querying native input or
+     * window state. Copy the value if it is needed after this reusable event is updated.
+     *
+     * @return cursor X coordinate
+     */
     public int getX() {
         return x;
     }
 
-    /** @param x new cursor X coordinate */
+    /**
+     * Replaces this payload component without changing other values, the numeric route,
+     * or consumption state. Storage uses the declared field type without range validation.
+     *
+     * @param x new cursor X coordinate
+     */
     public void setX(int x) {
         this.x = x;
     }
 
-    /** @return cursor Y coordinate */
+    /**
+     * Returns the current stored payload component without querying native input or
+     * window state. Copy the value if it is needed after this reusable event is updated.
+     *
+     * @return cursor Y coordinate
+     */
     public int getY() {
         return y;
     }
 
-    /** @param y new cursor Y coordinate */
+    /**
+     * Replaces this payload component without changing other values, the numeric route,
+     * or consumption state. Storage uses the declared field type without range validation.
+     *
+     * @param y new cursor Y coordinate
+     */
     public void setY(int y) {
         this.y = y;
     }
 
-    /** @return mouse button code */
+    /**
+     * Returns the current stored payload component without querying native input or
+     * window state. Copy the value if it is needed after this reusable event is updated.
+     *
+     * @return mouse button code
+     */
     public int getButton() {
         return button;
     }
 
-    /** @param button mouse button code */
+    /**
+     * Replaces this payload component without changing other values, the numeric route,
+     * or consumption state. Storage uses the declared field type without range validation.
+     *
+     * @param button mouse button code
+     */
     public void setButton(int button) {
         this.button = (byte) button;
     }
 
-    /** @return whether Shift was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Shift was active
+     */
     public boolean isShiftDown() {
         return (modifiers & GLFW_MOD_SHIFT) != 0;
     }
 
-    /** @return whether Control was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Control was active
+     */
     public boolean isCtrlDown() {
         return (modifiers & GLFW_MOD_CONTROL) != 0;
     }
 
-    /** @return whether Alt was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Alt was active
+     */
     public boolean isAltDown() {
         return (modifiers & GLFW_MOD_ALT) != 0;
     }
 
-    /** @return whether Super/Command/Windows was active */
+    /**
+     * Tests the stored modifier bit without polling current keyboard state.
+     * The result describes this event's payload at the time it is read.
+     *
+     * @return whether Super/Command/Windows was active
+     */
     public boolean isSuperDown() {
         return (modifiers & GLFW_MOD_SUPER) != 0;
     }

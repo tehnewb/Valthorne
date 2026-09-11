@@ -1,0 +1,116 @@
+#version 430 core
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
+uniform sampler2D u_sceneTexture;
+uniform ivec2 u_sceneSize;
+uniform ivec2 u_internalSceneSize;
+uniform vec2 u_sceneScale;
+uniform ivec2 u_probeCount;
+uniform int u_probeSpacing;
+uniform int u_rayCount;
+uniform float u_intervalStart;
+uniform float u_traceLength;
+uniform float u_hitThreshold;
+
+const float PI = 3.14159265358979323846;
+const float TAU = PI * 2.0;
+
+vec4 emptyInterval() {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+bool insideInternalCell(ivec2 cell) {
+    return cell.x >= 0 && cell.y >= 0 && cell.x < u_internalSceneSize.x && cell.y < u_internalSceneSize.y;
+}
+
+bool insideInternalPos(vec2 pos) {
+    return pos.x >= 0.0 && pos.y >= 0.0
+    && pos.x < float(u_internalSceneSize.x)
+    && pos.y < float(u_internalSceneSize.y);
+}
+
+ivec2 internalCellToScenePixel(ivec2 internalCell) {
+    vec2 scenePos = (vec2(internalCell) + vec2(0.5)) * u_sceneScale - vec2(0.5);
+    return ivec2(clamp(floor(scenePos), vec2(0.0), vec2(u_sceneSize) - vec2(1.0)));
+}
+
+vec4 readSceneCell(ivec2 internalCell) {
+    if (!insideInternalCell(internalCell)) return vec4(0.0);
+    return texelFetch(u_sceneTexture, internalCellToScenePixel(internalCell), 0);
+}
+
+vec2 directionForRay(int rayIndex, int rayCount) {
+    float angle = (float(rayIndex) + 0.5) * (TAU / float(max(rayCount, 1)));
+    return vec2(cos(angle), sin(angle));
+}
+
+vec4 hitToInterval(vec4 sceneValue) {
+    float opacity = clamp(sceneValue.a, 0.0, 1.0);
+    return vec4(sceneValue.rgb, 1.0 - opacity);
+}
+
+vec4 traceSegment(vec2 startPos, vec2 dir, float lengthToTrace) {
+    if (lengthToTrace <= 0.0001) return emptyInterval();
+    if (!insideInternalPos(startPos)) return emptyInterval();
+
+    vec2 sceneStart = clamp(startPos, vec2(0.0), vec2(u_internalSceneSize) - vec2(0.0001));
+    ivec2 cell = ivec2(floor(sceneStart));
+    ivec2 step = ivec2(sign(dir));
+
+    vec2 nextBoundary = vec2(
+            step.x > 0 ? floor(sceneStart.x) + 1.0 : floor(sceneStart.x),
+            step.y > 0 ? floor(sceneStart.y) + 1.0 : floor(sceneStart.y)
+    );
+
+    vec2 tMax = vec2(
+            step.x == 0 ? 1e30 : (nextBoundary.x - sceneStart.x) / dir.x,
+            step.y == 0 ? 1e30 : (nextBoundary.y - sceneStart.y) / dir.y
+    );
+
+    vec2 tDelta = vec2(
+            step.x == 0 ? 1e30 : 1.0 / abs(dir.x),
+            step.y == 0 ? 1e30 : 1.0 / abs(dir.y)
+    );
+
+    float travelled = 0.0;
+    while (travelled <= lengthToTrace && insideInternalCell(cell)) {
+        vec4 sceneValue = readSceneCell(cell);
+        if (sceneValue.a > u_hitThreshold) {
+            return hitToInterval(sceneValue);
+        }
+
+        if (tMax.x < tMax.y) {
+            travelled = tMax.x;
+            cell.x += step.x;
+            tMax.x += tDelta.x;
+        } else if (tMax.y < tMax.x) {
+            travelled = tMax.y;
+            cell.y += step.y;
+            tMax.y += tDelta.y;
+        } else {
+            travelled = tMax.x;
+            cell.x += step.x;
+            cell.y += step.y;
+            tMax.x += tDelta.x;
+            tMax.y += tDelta.y;
+        }
+    }
+
+    return emptyInterval();
+}
+
+void main() {
+    ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    if (texel.y >= u_probeCount.y) return;
+
+    int probeX = texel.x / u_rayCount;
+    if (probeX >= u_probeCount.x) return;
+
+    int rayIndex = texel.x - probeX * u_rayCount;
+    vec2 probePos = (vec2(float(probeX), float(texel.y)) + vec2(0.5)) * float(u_probeSpacing);
+    vec2 dir = directionForRay(rayIndex, u_rayCount);
+    vec2 startPos = probePos + dir * u_intervalStart;
+
+    imageStore(u_outputImage, texel, traceSegment(startPos, dir, u_traceLength));
+}

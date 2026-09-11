@@ -74,12 +74,49 @@ import java.util.Arrays;
  * clearing the map.
  * </p>
  *
+ * <p>Values are retained by reference, and null represents absence rather than
+ * an explicit override of a key's default. Mutations notify an optional callback
+ * after updating storage; changing a mutable stored object directly does not
+ * notify the map. Copies and snapshots share those value objects. Instances
+ * are not synchronized and should be accessed on their owning UI thread.</p>
+ *
  * @author Albert Beaupre
  * @since March 9th, 2026
  */
 public final class StyleMap {
-
+    private final Runnable changed; // Synchronous callback invoked after notified changes to stored values.
     private Object[] values = new Object[16]; // Backing array indexed by StyleKey ID
+
+    /**
+     * Creates an empty map with a no-op change callback. Keys use their defaults
+     * until explicit nonnull values are stored; initial capacity is 16 slots.
+     */
+    public StyleMap() {this(() -> {});}
+
+    /**
+     * Creates an empty map that calls the supplied action after notified mutations.
+     * The callback is retained by reference and is not invoked during construction.
+     * Callback failures propagate after the map has changed, without rollback.
+     *
+     * @param changed the nonnull synchronous mutation callback
+     * @throws NullPointerException if changed is null
+     */
+    public StyleMap(Runnable changed) {this.changed = java.util.Objects.requireNonNull(changed);}
+
+    /**
+     * Copies explicitly stored values into an unmodifiable map ordered by key
+     * name. Default-only values are omitted. The map structure is independent of
+     * subsequent edits, but referenced values are shared and can remain mutable.
+     * This operation scans registered keys and does not notify the change callback.
+     *
+     * @return an unmodifiable, shallow snapshot indexed by registered key name
+     */
+    public java.util.Map<String, Object> snapshot() {
+        java.util.Map<String, Object> result = new java.util.TreeMap<>();
+        for (StyleKey<?> key : StyleKey.registeredKeys())
+            if (contains(key)) result.put(key.getName(), get(key));
+        return java.util.Collections.unmodifiableMap(result);
+    }
 
     /**
      * <p>
@@ -89,16 +126,23 @@ public final class StyleMap {
      * <p>
      * The backing array is expanded if necessary so the key's ID can be used as a valid
      * index. The provided value is then written directly into that slot.
+     * A value equal to the current slot under Objects.equals is ignored, retaining
+     * the existing reference. Otherwise the new reference is stored and the callback
+     * runs once. Null clears the slot and restores default lookup behavior; values
+     * are not copied or runtime-checked until retrieval.
      * </p>
      *
      * @param key   the style key whose value should be set
      * @param value the value to store
      * @param <T>   the value type
+     * @throws NullPointerException if key is null
      */
     public <T> void set(StyleKey<T> key, T value) {
         int id = key.getID();
         ensureCapacity(id + 1);
+        if (java.util.Objects.equals(values[id], value)) return;
         values[id] = value;
+        changed.run();
     }
 
     /**
@@ -119,6 +163,8 @@ public final class StyleMap {
      * @param key the style key to query
      * @param <T> the expected value type
      * @return the stored value, or the key's default value if none is present
+     * @throws NullPointerException if key is null
+     * @throws ClassCastException   if an explicitly stored value does not match the key type
      */
     public <T> T get(StyleKey<T> key) {
         int id = key.getID();
@@ -142,6 +188,7 @@ public final class StyleMap {
      *
      * @param key the style key to test
      * @return {@code true} if a concrete value is stored for the key
+     * @throws NullPointerException if key is null
      */
     public boolean contains(StyleKey<?> key) {
         int id = key.getID();
@@ -156,13 +203,19 @@ public final class StyleMap {
      * <p>
      * After removal, future lookups for that key will fall back to the key's default
      * value unless another value is stored later.
+     * Removing a present value invokes the callback once after clearing its slot;
+     * removing an absent value is silent and does not shrink the backing array.
      * </p>
      *
      * @param key the style key whose stored value should be removed
+     * @throws NullPointerException if key is null
      */
     public void remove(StyleKey<?> key) {
         int id = key.getID();
-        if (id < values.length) values[id] = null;
+        if (id < values.length && values[id] != null) {
+            values[id] = null;
+            changed.run();
+        }
     }
 
     /**
@@ -174,16 +227,25 @@ public final class StyleMap {
      * The backing array is expanded as needed to fit the other map. Only non-null values
      * are copied, which means absent values in the source map do not clear values that
      * already exist in this map.
+     * Equal values retain their existing references. The callback runs once after
+     * the entire merge if any slot changed, and does not run for an unchanged merge.
+     * Copied values remain shared with the source; no deep copy is performed.
      * </p>
      *
      * @param other the source map whose values should be copied into this map
+     * @throws NullPointerException if other is null
      */
     public void putAll(StyleMap other) {
         ensureCapacity(other.values.length);
+        boolean modified = false;
         for (int i = 0; i < other.values.length; i++) {
             Object value = other.values[i];
-            if (value != null) values[i] = value;
+            if (value != null && !java.util.Objects.equals(values[i], value)) {
+                values[i] = value;
+                modified = true;
+            }
         }
+        if (modified) changed.run();
     }
 
     /**
@@ -195,6 +257,8 @@ public final class StyleMap {
      * The backing value array is duplicated, but the individual stored objects are not
      * cloned. The resulting map therefore shares the same referenced values while
      * maintaining its own independent storage array.
+     * The copy uses the no-op callback from the default constructor; it does not
+     * inherit the original map's observer or notify it during copying.
      * </p>
      *
      * @return a copy of this style map
@@ -234,10 +298,13 @@ public final class StyleMap {
      * <p>
      * After clearing, all keys behave as though no explicit values are stored and will
      * therefore resolve to their default values when queried.
+     * Capacity is retained. The callback runs once even when the map was already
+     * empty, so callers can use this operation as an explicit invalidation.
      * </p>
      */
     public void clear() {
         Arrays.fill(values, null);
+        changed.run();
     }
 
 }

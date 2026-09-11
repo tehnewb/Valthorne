@@ -3,11 +3,7 @@ package valthorne.event.listeners;
 import valthorne.event.EventHandler;
 import valthorne.event.EventPublisher;
 import valthorne.event.EventTypes;
-import valthorne.event.events.MouseDragEvent;
-import valthorne.event.events.MouseEvent;
-import valthorne.event.events.MouseMoveEvent;
-import valthorne.event.events.MousePressEvent;
-import valthorne.event.events.MouseReleaseEvent;
+import valthorne.event.events.*;
 
 /**
  * Convenience handler spanning the four primary mouse action routes.
@@ -29,7 +25,15 @@ import valthorne.event.events.MouseReleaseEvent;
  */
 public interface MouseListener extends EventHandler<MouseEvent> {
 
-    /** Dispatches a routed concrete mouse event to its specialized callback. */
+    /**
+     * Dispatches a routed concrete mouse event to its specialized callback.
+     * The callback executes immediately and receives the original event reference.
+     * This entry point neither copies the event nor consumes it automatically.
+     *
+     * @param event concrete event supported by this listener
+     * @throws IllegalStateException if the event has an unsupported subtype
+     * @throws NullPointerException  if event is null
+     */
     @Override
     default void handle(MouseEvent event) {
         switch (event) {
@@ -41,7 +45,14 @@ public interface MouseListener extends EventHandler<MouseEvent> {
         }
     }
 
-    /** Registers all four supported mouse routes at priority {@code 0}. */
+    /**
+     * Registers all four supported mouse routes at priority {@code 0}.
+     * Registration retains this listener instance on the corresponding numeric route
+     * or routes; call unregister when the listener's owner no longer needs delivery.
+     *
+     * @param publisher publisher receiving the registration
+     * @throws NullPointerException if publisher is null
+     */
     default void register(EventPublisher publisher) {
         register(publisher, 0);
     }
@@ -50,7 +61,7 @@ public interface MouseListener extends EventHandler<MouseEvent> {
      * Registers all four concrete mouse routes with one explicit priority.
      *
      * @param publisher target publisher
-     * @param priority execution priority
+     * @param priority  execution priority; larger values run first
      */
     default void register(EventPublisher publisher, int priority) {
         publisher.register(EventTypes.MOUSE_MOVE, priority, this);
@@ -60,8 +71,10 @@ public interface MouseListener extends EventHandler<MouseEvent> {
     }
 
     /**
-     * Removes this listener from all four routes.
+     * Removes this listener from all four routes. Each route is checked even if
+     * an earlier removal succeeds; registrations on other routes are preserved.
      *
+     * @param publisher publisher from which to detach
      * @return {@code true} if at least one registration was removed
      */
     default boolean unregister(EventPublisher publisher) {
@@ -72,15 +85,43 @@ public interface MouseListener extends EventHandler<MouseEvent> {
         return removed;
     }
 
-    /** @param event mouse-button press event */
+    /**
+     * Receives the mouse-button press event. The event is shared with the publisher's
+     * dispatch; consume it explicitly if later listeners should not receive it.
+     * Implementations run synchronously and should copy needed values before retaining
+     * information from reusable events.
+     *
+     * @param event mouse-button press event
+     */
     void mousePressed(MousePressEvent event);
 
-    /** @param event mouse-button release event */
+    /**
+     * Receives the mouse-button release event. The event is shared with the publisher's
+     * dispatch; consume it explicitly if later listeners should not receive it.
+     * Implementations run synchronously and should copy needed values before retaining
+     * information from reusable events.
+     *
+     * @param event mouse-button release event
+     */
     void mouseReleased(MouseReleaseEvent event);
 
-    /** @param event mouse drag event */
+    /**
+     * Receives the mouse drag event. The event is shared with the publisher's
+     * dispatch; consume it explicitly if later listeners should not receive it.
+     * Implementations run synchronously and should copy needed values before retaining
+     * information from reusable events.
+     *
+     * @param event mouse drag event
+     */
     void mouseDragged(MouseDragEvent event);
 
-    /** @param event mouse movement event */
+    /**
+     * Receives the mouse movement event. The event is shared with the publisher's
+     * dispatch; consume it explicitly if later listeners should not receive it.
+     * Implementations run synchronously and should copy needed values before retaining
+     * information from reusable events.
+     *
+     * @param event mouse movement event
+     */
     void mouseMoved(MouseMoveEvent event);
 }

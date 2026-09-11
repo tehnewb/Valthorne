@@ -23,11 +23,27 @@ public interface Sizeable {
     float getWidth();
 
     /**
+     * Sets the width of the object.
+     * This method adjusts the width property, which might be used in layout calculations or spatial transformations.
+     *
+     * @param width the new width value for the object, specified as a float. It represents the horizontal dimension.
+     */
+    void setWidth(float width);
+
+    /**
      * Retrieves the height of the object implementing this method.
      *
      * @return the height of the object as a float value.
      */
     float getHeight();
+
+    /**
+     * Sets the height of the object.
+     * This method adjusts the height property, which might be used in layout calculations or spatial transformations.
+     *
+     * @param height the new height value for the object, specified as a float. It represents the vertical dimension.
+     */
+    void setHeight(float height);
 
     /**
      * Sets the size of the object by specifying its width and height.
@@ -38,20 +54,4 @@ public interface Sizeable {
      * @param height the new height value for the object, specified as a float. It represents the vertical dimension.
      */
     void setSize(float width, float height);
-
-    /**
-     * Sets the width of the object.
-     * This method adjusts the width property, which might be used in layout calculations or spatial transformations.
-     *
-     * @param width the new width value for the object, specified as a float. It represents the horizontal dimension.
-     */
-    void setWidth(float width);
-
-    /**
-     * Sets the height of the object.
-     * This method adjusts the height property, which might be used in layout calculations or spatial transformations.
-     *
-     * @param height the new height value for the object, specified as a float. It represents the vertical dimension.
-     */
-    void setHeight(float height);
 }

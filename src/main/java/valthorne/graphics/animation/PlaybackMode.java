@@ -1,11 +1,12 @@
 package valthorne.graphics.animation;
 
 /**
- * Represents the playback modes for a media or process in the system.
- * This enum defines the possible directions a playback can take.
+ * Selects the direction policy used by Animation when advancing frames.
+ * Forward and reverse traverse one direction; bidirectional changes direction at
+ * endpoints. This enum does not determine whether playback repeats or stops;
+ * looping and completion limits are separate animation settings.
  *
  * @author Albert Beaupre
- * @since February 8th, 2026
  */
 public enum PlaybackMode {
     /**

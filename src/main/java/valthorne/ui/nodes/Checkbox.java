@@ -1,6 +1,5 @@
 package valthorne.ui.nodes;
 
-import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Drawable;
@@ -96,7 +95,6 @@ public class Checkbox extends Panel {
     public static final StyleKey<NodeAction<Checkbox>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<Checkbox>>) (Class<?>) NodeAction.class);
 
     private NodeAction<Checkbox> action; // Explicit action executed when the checked state changes
-    private boolean checked; // Current checked state of the checkbox
 
     /**
      * <p>
@@ -149,7 +147,7 @@ public class Checkbox extends Panel {
      * @return {@code true} if checked
      */
     public boolean isChecked() {
-        return checked;
+        return getBit(CHECKED_BIT);
     }
 
     /**
@@ -176,10 +174,9 @@ public class Checkbox extends Panel {
      * @return this checkbox
      */
     public Checkbox checked(boolean checked) {
-        if (this.checked == checked)
+        if (isChecked() == checked)
             return this;
 
-        this.checked = checked;
         setChecked(checked);
 
         NodeAction<Checkbox> resolvedAction = action;
@@ -203,7 +200,7 @@ public class Checkbox extends Panel {
      * @return this checkbox
      */
     public Checkbox toggle() {
-        return checked(!checked);
+        return checked(!isChecked());
     }
 
     /**
@@ -219,9 +216,7 @@ public class Checkbox extends Panel {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        int key = event.getKey();
-        if (key == Keyboard.SPACE || key == Keyboard.ENTER)
-            toggle();
+        valthorne.ui.behavior.ActivationBehavior.key(this, event, this::toggle);
     }
 
     /**
@@ -237,7 +232,7 @@ public class Checkbox extends Panel {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        toggle();
+        valthorne.ui.behavior.ActivationBehavior.release(this, event, this::toggle);
     }
 
     /**
@@ -265,7 +260,7 @@ public class Checkbox extends Panel {
             if (background != null)
                 background.draw(batch, getRenderX(), getRenderY(), getWidth(), getHeight());
 
-            if (checked) {
+            if (isChecked()) {
                 Drawable checkmark = style.get(CHECKMARK_KEY);
                 if (checkmark != null) {
                     float checkmarkWidth = getWidth() * 0.5f;

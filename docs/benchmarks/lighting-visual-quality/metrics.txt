@@ -1,0 +1,2 @@
+visual-baseline glass=23.3454 metal=11.6930 wall=17.9636
+visual-final-sharp glass=16.6568 metal=10.6182 wall=14.2172

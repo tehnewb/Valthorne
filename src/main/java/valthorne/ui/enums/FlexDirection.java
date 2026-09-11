@@ -37,12 +37,24 @@ import org.lwjgl.util.yoga.Yoga;
  */
 public enum FlexDirection {
 
+    /**
+     * Lays children along the horizontal main axis in the layout direction.
+     */
     ROW(Yoga.YGFlexDirectionRow),
+    /**
+     * Lays children along the vertical main axis from top to bottom.
+     */
     COLUMN(Yoga.YGFlexDirectionColumn),
+    /**
+     * Lays children horizontally with main-axis order reversed.
+     */
     ROW_REVERSE(Yoga.YGFlexDirectionRowReverse),
+    /**
+     * Lays children vertically with main-axis order reversed.
+     */
     COLUMN_REVERSE(Yoga.YGFlexDirectionColumnReverse);
 
-    private final int yoga;
+    private final int yoga; // Native Yoga enum value corresponding to this layout option.
 
     /**
      * Creates a flex direction mapped to the corresponding Yoga constant.

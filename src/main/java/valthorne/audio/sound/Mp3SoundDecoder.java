@@ -24,29 +24,6 @@ import java.util.Map;
 public class Mp3SoundDecoder implements SoundDecoder {
 
     /**
-     * Decodes MP3 bytes into buffered PCM sound data.
-     *
-     * @param data the encoded MP3 bytes
-     * @return the decoded sound data
-     * @throws Exception if decoding fails
-     */
-    @Override
-    public SoundData decode(byte[] data) throws Exception {
-        try (AudioInputStream input = AudioSystem.getAudioInputStream(new ByteArrayInputStream(data))) {
-            javax.sound.sampled.AudioFormat sourceFormat = input.getFormat();
-            javax.sound.sampled.AudioFormat pcmFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
-
-            try (AudioInputStream pcmInput = AudioSystem.getAudioInputStream(pcmFormat, input)) {
-                byte[] pcmBytes = pcmInput.readAllBytes();
-                ByteBuffer pcm = BufferUtils.createByteBuffer(pcmBytes.length);
-                pcm.put(pcmBytes).flip();
-                float duration = pcmBytes.length / (pcmFormat.getChannels() * pcmFormat.getSampleRate() * 2);
-                return new SoundData(null, pcm, 0L, pcmBytes.length, duration, pcmFormat.getChannels(), (int) pcmFormat.getSampleRate(), 16, false, true, AudioFormat.MP3);
-            }
-        }
-    }
-
-    /**
      * Probes MP3 metadata from an in-memory byte array.
      *
      * @param data the encoded MP3 bytes
@@ -100,5 +77,28 @@ public class Mp3SoundDecoder implements SoundDecoder {
         }
 
         return -1f;
+    }
+
+    /**
+     * Decodes MP3 bytes into buffered PCM sound data.
+     *
+     * @param data the encoded MP3 bytes
+     * @return the decoded sound data
+     * @throws Exception if decoding fails
+     */
+    @Override
+    public SoundData decode(byte[] data) throws Exception {
+        try (AudioInputStream input = AudioSystem.getAudioInputStream(new ByteArrayInputStream(data))) {
+            javax.sound.sampled.AudioFormat sourceFormat = input.getFormat();
+            javax.sound.sampled.AudioFormat pcmFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
+
+            try (AudioInputStream pcmInput = AudioSystem.getAudioInputStream(pcmFormat, input)) {
+                byte[] pcmBytes = pcmInput.readAllBytes();
+                ByteBuffer pcm = BufferUtils.createByteBuffer(pcmBytes.length);
+                pcm.put(pcmBytes).flip();
+                float duration = pcmBytes.length / (pcmFormat.getChannels() * pcmFormat.getSampleRate() * 2);
+                return new SoundData(null, pcm, 0L, pcmBytes.length, duration, pcmFormat.getChannels(), (int) pcmFormat.getSampleRate(), 16, false, true, AudioFormat.MP3);
+            }
+        }
     }
 }

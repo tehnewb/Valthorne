@@ -1,36 +1,41 @@
 package valthorne.collections.array;
 
 /**
- * DoubleArray is a class that represents a dynamic array with automatic resizing capabilities for primitive doubles.
- * It allows the storage and retrieval of elements at specified indices, automatically resizing the underlying array
- * when necessary to accommodate new elements.
+ * Resizable indexed storage for double values with no separate logical element count.
+ * Every allocated slot is readable, including untouched zero entries. Set may
+ * replace the backing array; callers holding getElements results must reacquire
+ * that array after growth. Mutations are unsynchronized.
+ *
+ * <p>Growth allocates exactly index plus one slots, preserving earlier values.
+ * There is no shrink operation or automatic growth on reads. Large sparse
+ * indices still allocate every intermediate slot.</p>
  *
  * @author Albert Beaupre
- * @version 1.0
- * @since May 1st, 2024
  */
 public class DoubleArray {
 
-    /**
-     * The underlying array to store double elements.
-     */
-    private double[] array;
+    private double[] array; // Current backing storage, replaced when set grows its allocated length.
 
     /**
-     * Constructs a DoubleArray with the specified initial size.
+     * Allocates primitive storage of the requested length, initially filled with
+     * zero. A later set beyond the last slot grows storage as needed.
      *
-     * @param size the initial size of the array.
+     * @param size initial allocated length
+     * @throws NegativeArraySizeException if size is negative
      */
     public DoubleArray(int size) {
         this.array = new double[size];
     }
 
     /**
-     * Sets the double at the specified index. If the index is greater than or equal to the current length of the array,
-     * the array is resized to accommodate the new index, and the double is then set at the specified index.
+     * Stores a value, replacing backing storage when index reaches or exceeds length.
+     * Growth allocates exactly index plus one slots, copying prior values and
+     * leaving intermediate new slots zero. Previously returned backing arrays
+     * no longer track the replacement.
      *
-     * @param index the index at which to set the double.
-     * @param value the double value to be set at the specified index.
+     * @param index nonnegative destination slot whose growth size fits an int
+     * @param value value to store
+     * @throws ArrayIndexOutOfBoundsException if index is negative
      */
     public void set(int index, double value) {
         if (index >= array.length) {
@@ -42,24 +47,34 @@ public class DoubleArray {
     }
 
     /**
-     * Retrieves the double at the specified index.
+     * Reads an allocated slot without resizing or changing membership.
+     * Untouched slots return zero; length describes all readable indices.
      *
-     * @param index the index of the double to retrieve.
-     * @return the double at the specified index.
+     * @param index slot from zero through length minus one
+     * @return stored primitive value
+     * @throws ArrayIndexOutOfBoundsException if index is outside allocated storage
      */
     public double get(int index) {
         return array[index];
     }
 
     /**
-     * @return The length of elements within this ResizingArray.
+     * Returns backing-array length, including untouched and default-valued slots.
+     * This is capacity, not a count of explicitly assigned values.
+     *
+     * @return current allocated number of slots
      */
     public int length() {
         return array.length;
     }
 
     /**
-     * @return The elements within this ResizingArray.
+     * Exposes the live backing array without copying it. Direct writes immediately
+     * affect this object until a subsequent set replaces storage during growth.
+     * Retained arrays remain valid Java arrays after growth but no longer represent
+     * this object's current storage.
+     *
+     * @return current mutable backing array
      */
     public double[] getElements() {
         return array;

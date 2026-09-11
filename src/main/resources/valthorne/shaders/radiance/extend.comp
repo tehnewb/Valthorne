@@ -1,0 +1,76 @@
+#version 430 core
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(rgba16f, binding = 0) writeonly uniform image2D u_outputImage;
+uniform sampler2D u_intervalTexture;
+uniform ivec2 u_probeCount;
+uniform int u_probeSpacing;
+uniform int u_rayCount;
+uniform float u_shiftDistance;
+uniform int u_linearSpatial;
+uniform float u_cutoff;
+
+const float PI = 3.14159265358979323846;
+const float TAU = PI * 2.0;
+
+vec4 emptyInterval() {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+vec2 directionForRay(int rayIndex, int rayCount) {
+    float angle = (float(rayIndex) + 0.5) * (TAU / float(max(rayCount, 1)));
+    return vec2(cos(angle), sin(angle));
+}
+
+vec4 mergeInterval(vec4 nearValue, vec4 farValue) {
+    return vec4(nearValue.rgb + nearValue.a * farValue.rgb, nearValue.a * farValue.a);
+}
+
+vec4 fetchProbeRay(ivec2 probe, int rayIndex) {
+    if (probe.x < 0 || probe.y < 0 || probe.x >= u_probeCount.x || probe.y >= u_probeCount.y) {
+        return emptyInterval();
+    }
+    rayIndex = clamp(rayIndex, 0, u_rayCount - 1);
+    return texelFetch(u_intervalTexture, ivec2(probe.x * u_rayCount + rayIndex, probe.y), 0);
+}
+
+vec4 sampleInterval(vec2 samplePos, int rayIndex) {
+    vec2 probeCoord = samplePos / float(u_probeSpacing) - vec2(0.5);
+    if (u_linearSpatial == 0) {
+        ivec2 probe = ivec2(floor(probeCoord + vec2(0.5)));
+        return fetchProbeRay(probe, rayIndex);
+    }
+
+    ivec2 base = ivec2(floor(probeCoord));
+    vec2 frac = fract(probeCoord);
+
+    vec4 s00 = fetchProbeRay(base + ivec2(0, 0), rayIndex);
+    vec4 s10 = fetchProbeRay(base + ivec2(1, 0), rayIndex);
+    vec4 s01 = fetchProbeRay(base + ivec2(0, 1), rayIndex);
+    vec4 s11 = fetchProbeRay(base + ivec2(1, 1), rayIndex);
+
+    vec4 top = mix(s00, s10, frac.x);
+    vec4 bottom = mix(s01, s11, frac.x);
+    return mix(top, bottom, frac.y);
+}
+
+void main() {
+    ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+    if (texel.y >= u_probeCount.y) return;
+
+    int probeX = texel.x / u_rayCount;
+    if (probeX >= u_probeCount.x) return;
+
+    int rayIndex = texel.x - probeX * u_rayCount;
+    vec4 nearValue = texelFetch(u_intervalTexture, texel, 0);
+    if (nearValue.a <= u_cutoff) {
+        imageStore(u_outputImage, texel, nearValue);
+        return;
+    }
+
+    vec2 probePos = (vec2(float(probeX), float(texel.y)) + vec2(0.5)) * float(u_probeSpacing);
+    vec2 dir = directionForRay(rayIndex, u_rayCount);
+    vec4 farValue = sampleInterval(probePos + dir * u_shiftDistance, rayIndex);
+
+    imageStore(u_outputImage, texel, mergeInterval(nearValue, farValue));
+}

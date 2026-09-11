@@ -1,0 +1,68 @@
+# Publishing Valthorne
+
+The stable version is `2.0.0` in `gradle.properties`. Normal builds and verification
+need no signing/upload secrets. Tests, integration-test folders, benchmarks and
+examples are intentionally local-only and excluded from Git.
+
+## Validate the release revision
+
+1. Review and commit the intended engine sources, library resources, documentation,
+   build scripts and wrapper. Do not add local test/example folders or credentials.
+2. Run with JDK 25:
+
+   ```sh
+   ./gradlew clean verifyRelease
+   ./gradlew verifyGraphicsConsumer
+   ```
+
+   Windows PowerShell uses `./gradlew.bat`. The first command checks all publication
+   artifacts and generates two disposable external consumers under ignored
+   `build/release-consumer`: Gradle metadata and POM-only dependency resolution.
+   Both compile the API, check packaged resources, load LWJGL/Yoga and step Jolt.
+   The second opens a real OpenGL 3.3 context, creates a texture-batch shader and
+   checks rendered pixels. It needs a display and driver; silent CI sets
+   `ALSOFT_DRIVERS=null` only for that process.
+3. Pass CI on the same commit. The matrix builds on Windows, Linux and macOS;
+   Linux uses Xvfb/Mesa for graphics and macOS uses the first-thread JVM launcher.
+   No test folders are copied into CI. Optional local `test`, `graphicsTest`,
+   `verify3D`, `verifyPhysics3D`, `verifyLighting` and `verifyUI` suites provide
+   additional regression coverage when their ignored source files are available.
+4. Inspect `build/docs/javadoc/` and
+   `build/release-repository/io/github/tehnewb/Valthorne/2.0.0/`. Library, sources
+   and Javadoc JARs must contain no examples or test folders. Preserve runtime
+   shaders, fonts, Filament materials/environment, and license notices.
+5. Record the exact validated commit and platform outcomes. See the
+   [validation history](release-validation.md). Check target installers and any
+   feature-specific graphics paths beyond the consumer smoke before distributing
+   an application. Filament remains Windows x64 only; compute requires OpenGL 4.3.
+
+## Signing and publication
+
+The build uses [Vanniktech Maven Publish](https://vanniktech.github.io/gradle-maven-publish-plugin/central/).
+Keep `mavenCentralUsername` and `mavenCentralPassword` in the private user Gradle
+home or use `ORG_GRADLE_PROJECT_` environment variables. Signing supports the
+standard `signing.keyId`, `signing.password`, and `signing.secretKeyRingFile`
+properties, or `signingInMemoryKey` / `signingInMemoryKeyPassword` (and optional
+`signingInMemoryKeyId`). Never store actual values in this repository.
+
+Verify signing without uploading:
+
+```sh
+./gradlew signMavenPublication -PreleaseSigning=true
+```
+
+After CI passes for the release commit, upload and release deliberately:
+
+```sh
+./gradlew publishAndReleaseToMavenCentral -PreleaseSigning=true
+```
+
+Alternatively `publishToMavenCentral -PreleaseSigning=true` uploads a deployment
+for manual publication in the Central Portal. Neither task is part of CI or
+`verifyRelease`. Maven Central versions are immutable; never reuse `2.0.0` for
+changed code. Publication may take time to propagate to Maven Central mirrors.
+
+After publication, resolve `io.github.tehnewb:Valthorne:2.0.0` from Maven Central
+in an independent consumer, verify the artifact/signature files, and tag the
+validated commit `v2.0.0`. Include the JARs, sources, Javadoc and checksums in the
+GitHub release. Future development must use a new version.

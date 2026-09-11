@@ -95,20 +95,11 @@ public final class ChecksumTable {
      */
     private static final int MAX_NAME_BYTES = 255;
 
-    /**
-     * CacheStore version this table was built from.
-     */
-    private final int storeVersion;
+    private final int storeVersion; // CacheStore format version recorded when the table was built.
 
-    /**
-     * CRC32 of the encoded payload (everything after this field).
-     */
-    private final int tableCrc32;
+    private final int tableCrc32; // CRC32 of the encoded payload following the checksum field.
 
-    /**
-     * Archive checksum rows in the order they were built/decoded.
-     */
-    private final ArchiveRow[] archives;
+    private final ArchiveRow[] archives; // Archive checksum rows in their build or decode order.
 
     /**
      * Creates a checksum table instance.
@@ -126,45 +117,6 @@ public final class ChecksumTable {
         this.storeVersion = storeVersion;
         this.tableCrc32 = tableCrc32;
         this.archives = archives == null ? new ArchiveRow[0] : archives;
-    }
-
-    /**
-     * Returns the {@link CacheStore} version that this table corresponds to.
-     *
-     * <p>
-     * This is whatever {@link CacheStore#getVersion()} returned at build time, or what was decoded from bytes.
-     * </p>
-     *
-     * @return store version
-     */
-    public int getStoreVersion() {
-        return storeVersion;
-    }
-
-    /**
-     * Returns the CRC32 of the encoded payload portion of this table.
-     *
-     * <p>
-     * This is the value written during {@link #encode(ChecksumTable)} and verified during {@link #decode(byte[])}.
-     * </p>
-     *
-     * @return payload CRC32
-     */
-    public int getTableCrc32() {
-        return tableCrc32;
-    }
-
-    /**
-     * Returns the archive rows contained in this table.
-     *
-     * <p>
-     * The returned array is the internal backing array. Treat it as read-only.
-     * </p>
-     *
-     * @return archive rows (never null)
-     */
-    public ArchiveRow[] getArchiveRows() {
-        return archives;
     }
 
     /**
@@ -374,6 +326,99 @@ public final class ChecksumTable {
     }
 
     /**
+     * Writes a UTF-8 string with an unsigned byte length prefix.
+     *
+     * <p>
+     * The maximum encoded length is {@link #MAX_NAME_BYTES}. Null strings are encoded as empty.
+     * </p>
+     *
+     * @param b output buffer writer
+     * @param s string to write (null becomes "")
+     * @throws IllegalArgumentException if the UTF-8 encoding exceeds {@link #MAX_NAME_BYTES}
+     */
+    private static void writeUtf8(DynamicByteBuffer b, String s) {
+        if (s == null) s = "";
+        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
+
+        if (bytes.length > MAX_NAME_BYTES) {
+            throw new IllegalArgumentException("String too long (max " + MAX_NAME_BYTES + " bytes): " + bytes.length);
+        }
+
+        b.writeByte((byte) bytes.length);
+        b.writeBytes(bytes);
+    }
+
+    /**
+     * Reads a UTF-8 string that was written with {@link #writeUtf8(DynamicByteBuffer, String)}.
+     *
+     * <p>
+     * The stored length prefix is treated as unsigned (0..255).
+     * </p>
+     *
+     * @param b buffer reader
+     * @return decoded UTF-8 string (may be empty)
+     */
+    private static String readUtf8(DynamicByteBuffer b) {
+        int len = b.readByte() & 0xFF;
+        return b.readString((byte) len);
+    }
+
+    /**
+     * Computes a CRC32 value for the provided byte array.
+     *
+     * <p>
+     * This uses {@link CRC32} and returns the lower 32 bits as a signed int.
+     * </p>
+     *
+     * @param bytes input bytes
+     * @return CRC32 as int
+     */
+    private static int crc32(byte[] bytes) {
+        CRC32 crc = new CRC32();
+        crc.update(bytes);
+        return (int) crc.getValue();
+    }
+
+    /**
+     * Returns the {@link CacheStore} version that this table corresponds to.
+     *
+     * <p>
+     * This is whatever {@link CacheStore#getVersion()} returned at build time, or what was decoded from bytes.
+     * </p>
+     *
+     * @return store version
+     */
+    public int getStoreVersion() {
+        return storeVersion;
+    }
+
+    /**
+     * Returns the CRC32 of the encoded payload portion of this table.
+     *
+     * <p>
+     * This is the value written during {@link #encode(ChecksumTable)} and verified during {@link #decode(byte[])}.
+     * </p>
+     *
+     * @return payload CRC32
+     */
+    public int getTableCrc32() {
+        return tableCrc32;
+    }
+
+    /**
+     * Returns the archive rows contained in this table.
+     *
+     * <p>
+     * The returned array is the internal backing array. Treat it as read-only.
+     * </p>
+     *
+     * @return archive rows (never null)
+     */
+    public ArchiveRow[] getArchiveRows() {
+        return archives;
+    }
+
+    /**
      * Finds an archive row by name using case-insensitive comparison.
      *
      * <p>
@@ -439,59 +484,5 @@ public final class ChecksumTable {
         String[] out = new String[count];
         System.arraycopy(tmp, 0, out, 0, count);
         return out;
-    }
-
-    /**
-     * Writes a UTF-8 string with an unsigned byte length prefix.
-     *
-     * <p>
-     * The maximum encoded length is {@link #MAX_NAME_BYTES}. Null strings are encoded as empty.
-     * </p>
-     *
-     * @param b output buffer writer
-     * @param s string to write (null becomes "")
-     * @throws IllegalArgumentException if the UTF-8 encoding exceeds {@link #MAX_NAME_BYTES}
-     */
-    private static void writeUtf8(DynamicByteBuffer b, String s) {
-        if (s == null) s = "";
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-
-        if (bytes.length > MAX_NAME_BYTES) {
-            throw new IllegalArgumentException("String too long (max " + MAX_NAME_BYTES + " bytes): " + bytes.length);
-        }
-
-        b.writeByte((byte) bytes.length);
-        b.writeBytes(bytes);
-    }
-
-    /**
-     * Reads a UTF-8 string that was written with {@link #writeUtf8(DynamicByteBuffer, String)}.
-     *
-     * <p>
-     * The stored length prefix is treated as unsigned (0..255).
-     * </p>
-     *
-     * @param b buffer reader
-     * @return decoded UTF-8 string (may be empty)
-     */
-    private static String readUtf8(DynamicByteBuffer b) {
-        int len = b.readByte() & 0xFF;
-        return b.readString((byte) len);
-    }
-
-    /**
-     * Computes a CRC32 value for the provided byte array.
-     *
-     * <p>
-     * This uses {@link CRC32} and returns the lower 32 bits as a signed int.
-     * </p>
-     *
-     * @param bytes input bytes
-     * @return CRC32 as int
-     */
-    private static int crc32(byte[] bytes) {
-        CRC32 crc = new CRC32();
-        crc.update(bytes);
-        return (int) crc.getValue();
     }
 }

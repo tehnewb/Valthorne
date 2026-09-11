@@ -17,12 +17,24 @@ import valthorne.event.events.KeyReleaseEvent;
  */
 public class KeyAdapter implements KeyListener {
 
-    /** Default no-op key-press callback. */
+    /**
+     * Default no-op key-press callback.
+     * This implementation does not inspect, retain, or consume the event. Override
+     * this callback to handle the notification while leaving other callbacks inactive.
+     *
+     * @param event notification ignored by this default implementation
+     */
     @Override
     public void keyPressed(KeyPressEvent event) {
     }
 
-    /** Default no-op key-release callback. */
+    /**
+     * Default no-op key-release callback.
+     * This implementation does not inspect, retain, or consume the event. Override
+     * this callback to handle the notification while leaving other callbacks inactive.
+     *
+     * @param event notification ignored by this default implementation
+     */
     @Override
     public void keyReleased(KeyReleaseEvent event) {
     }

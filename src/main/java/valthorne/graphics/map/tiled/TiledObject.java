@@ -10,6 +10,11 @@ import java.util.Map;
 /**
  * Represents an object within a Tiled map with a variety of properties.
  *
+ * <p>Geometry retains TMX coordinates and degree rotation without converting to the renderer's
+ * coordinate system. Polygon/polyline points are packed x,y pairs local to the object.
+ * The property map and point array are retained by reference and remain mutable;
+ * null names/types become empty strings and a null shape type becomes RECT.</p>
+ *
  * @param id             The unique identifier for the object.
  * @param name           The name of the object, which may be an empty string if not specified.
  * @param type           The type of the object, which is used to define its category and may be an empty string if not specified.
@@ -24,6 +29,8 @@ import java.util.Map;
  * @param tiledShapeType The shape type of the object (e.g., RECT, POINT, ELLIPSE, etc.) as defined by {@link TiledShapeType}.
  * @param points         An array of points representing polygons or polylines, or null if the object does not use points.
  * @param text           The text content of the object (if it is a text object), or null if no text is associated.
+ *
+ * @author Albert Beaupre
  */
 public record TiledObject(int id, String name, String type, float x, float y, float width, float height, float rotation, boolean visible, int gid, Map<String, String> properties, TiledShapeType tiledShapeType, float[] points, String text) {
 
@@ -128,6 +135,15 @@ public record TiledObject(int id, String name, String type, float x, float y, fl
         return new TiledObject(id, name, type, x, y, w, h, rotation, visible, gid, objectProperties, tiledShapeType, points, text);
     }
 
+    /**
+     * Parses whitespace-separated x,y pairs into interleaved object-local coordinates.
+     * Tokens without exactly two comma-separated components are skipped; malformed
+     * numeric components become zero. Coordinates retain TMX units and orientation.
+     *
+     * @param points polygon or polyline point attribute, possibly null
+     * @return packed x,y coordinates, null for absent/blank text, or an empty array
+     *         when every nonblank token is skipped
+     */
     private static float[] parsePoints(String points) {
         if (points == null) return null;
         String p = points.trim();
@@ -148,6 +164,14 @@ public record TiledObject(int id, String name, String type, float x, float y, fl
         return Arrays.copyOf(out, idx);
     }
 
+    /**
+     * Parses a trimmed coordinate while tolerating malformed or missing values.
+     * Parsing exceptions return zero. Values accepted by Float.parseFloat, including
+     * NaN and infinities, are retained rather than checked for finiteness.
+     *
+     * @param s coordinate text, possibly null
+     * @return parsed float, or zero if parsing throws
+     */
     private static float parseFloatSafe(String s) {
         try {
             return Float.parseFloat(s.trim());

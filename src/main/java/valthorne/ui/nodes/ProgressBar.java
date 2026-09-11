@@ -42,8 +42,12 @@ import valthorne.ui.theme.StyleKey;
  * </p>
  *
  * <p>
- * When percentage display is enabled and a font is available, the bar updates
- * the font's text content to show the current progress as a percentage.
+ * When percentage display is enabled and a font is available, the bar caches
+ * a percentage string based on the animated value and draws it explicitly.
+ * Disabling percentage display clears the borrowed font's legacy text property.
+ * Drawable and font resources are borrowed from resolved style and are not disposed
+ * here. Although this class extends Panel, its update and draw overrides do not
+ * traverse children.
  * </p>
  *
  * <h2>Example Usage</h2>
@@ -64,8 +68,8 @@ import valthorne.ui.theme.StyleKey;
  * boolean showingPercent = bar.isDisplayPercentage();
  * Font font = bar.getFont();
  *
- * bar.update(delta);
- * bar.draw(batch);
+ * root.add(bar);
+ * // The root's normal update and draw lifecycle visits the progress bar.
  * }</pre>
  *
  * <p>
@@ -104,6 +108,7 @@ public class ProgressBar extends Panel {
 
     private Drawable background; // Resolved background drawable from the active style
     private Drawable foreground; // Resolved foreground drawable from the active style
+    private String displayText = "0%"; // Cached formatted percentage drawn without changing the font's text during painting.
     private Font font; // Resolved font used for percentage text rendering
 
     /**
@@ -114,6 +119,9 @@ public class ProgressBar extends Panel {
      * <p>
      * The initial target and displayed progress values are both set to the minimum,
      * meaning the bar starts completely empty relative to the configured range.
+     * Bounds are stored without validation or reordering; supply finite min and max
+     * with max greater than min for ordinary progress. Equal bounds always display
+     * zero percent. Initial orientation is horizontal and percentage text is disabled.
      * </p>
      *
      * @param min the minimum allowed progress value
@@ -133,18 +141,21 @@ public class ProgressBar extends Panel {
      *
      * <p>
      * The displayed progress is smoothly interpolated toward the target progress.
-     * If percentage display is enabled and a font is available, the font text is
-     * updated to the current visible percentage value.
+     * Interpolation uses the factor 1 - exp(-max(0, delta) * 20), giving exponential
+     * smoothing for finite frame intervals. Negative delta produces no movement;
+     * NaN is not rejected. If percentage display and a font are available, the
+     * cached string is refreshed to two decimal places using the default locale.
+     * This override does not call the inherited child-update implementation.
      * </p>
      *
      * @param delta the elapsed frame time in seconds
      */
     @Override
     public void update(float delta) {
-        displayedProgress = MathUtils.lerp(displayedProgress, progress, delta * 20f);
+        displayedProgress = MathUtils.lerp(displayedProgress, progress, (float) (1 - Math.exp(-Math.max(0, delta) * 20f)));
 
         if (displayPercentage && font != null)
-            font.setText(String.format("%.2f%%", getPercentage() * 100f));
+            displayText = String.format("%.2f%%", getPercentage() * 100f);
     }
 
     /**
@@ -155,6 +166,8 @@ public class ProgressBar extends Panel {
      * <p>
      * The value is clamped into the configured {@code [min, max]} range. If percentage
      * display is enabled and a font is available, the displayed text is also updated.
+     * The animated value does not jump to the new target, so that text still
+     * reflects the current displayed value until subsequent updates advance it.
      * </p>
      *
      * @param progress the new target progress value
@@ -164,7 +177,7 @@ public class ProgressBar extends Panel {
         this.progress = MathUtils.clamp(progress, min, max);
 
         if (displayPercentage && font != null)
-            font.setText(String.format("%.2f%%", getPercentage() * 100f));
+            displayText = String.format("%.2f%%", getPercentage() * 100f);
         return this;
     }
 
@@ -185,8 +198,9 @@ public class ProgressBar extends Panel {
      * </p>
      *
      * <p>
-     * If a font is currently available, its text is updated immediately to either
-     * the current percentage string or an empty string depending on the new state.
+     * With a font available, enabling refreshes the cached percentage string.
+     * Disabling instead clears the font's legacy text property, which can affect
+     * another user of that shared Font. No layout invalidation is performed.
      * </p>
      *
      * @param displayPercentage whether percentage text should be shown
@@ -197,7 +211,7 @@ public class ProgressBar extends Panel {
 
         if (font != null) {
             if (displayPercentage)
-                font.setText(String.format("%.2f%%", getPercentage() * 100f));
+                displayText = String.format("%.2f%%", getPercentage() * 100f);
             else
                 font.setText("");
         }
@@ -260,6 +274,7 @@ public class ProgressBar extends Panel {
     /**
      * <p>
      * Returns the font currently resolved for this progress bar.
+     * This is a borrowed reference refreshed during layout, not an owned copy.
      * </p>
      *
      * @return the resolved font, or {@code null} if none is available
@@ -275,8 +290,9 @@ public class ProgressBar extends Panel {
      *
      * <p>
      * The current style is resolved and used to update the background drawable,
-     * foreground drawable, and optional font. If a font is available, its text is
-     * updated according to whether percentage display is enabled. If no style exists,
+     * foreground drawable, and optional font. With percentage display enabled,
+     * the cached string is refreshed; otherwise a present font's legacy text is
+     * cleared. If no style exists,
      * all resolved visual references are cleared.
      * </p>
      */
@@ -291,7 +307,7 @@ public class ProgressBar extends Panel {
 
             if (font != null) {
                 if (displayPercentage)
-                    font.setText(String.format("%.2f%%", getPercentage() * 100f));
+                    displayText = String.format("%.2f%%", getPercentage() * 100f);
                 else
                     font.setText("");
             }
@@ -314,6 +330,11 @@ public class ProgressBar extends Panel {
      * drawn using the current fill percentage, either horizontally or vertically.
      * If percentage display is enabled and a font is available, centered text is
      * rendered on top of the bar.
+     * Horizontal fill grows from the left; vertical fill grows from the bottom
+     * in render coordinates. Label.COLOR_KEY supplies text color when present,
+     * otherwise white is used. The cached percentage is passed directly to Font.draw.
+     * This method does not call Panel.draw or render children, and it relies on
+     * the root for visibility checks and a prepared batch.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -336,9 +357,10 @@ public class ProgressBar extends Panel {
         }
 
         if (displayPercentage && font != null) {
-            float textX = getRenderX() + (getWidth() - font.getWidth(font.getText())) * 0.5f;
-            float textY = getRenderY() + (getHeight() - font.getHeight(font.getText())) * 0.5f;
-            font.draw(batch, font.getText(), textX, textY);
+            float textX = getRenderX() + (getWidth() - font.getWidth(displayText)) * 0.5f;
+            float textY = getRenderY() + (getHeight() - font.getHeight(displayText)) * 0.5f;
+            font.draw(batch, displayText, textX, textY, getStyle() != null && getStyle().get(Label.COLOR_KEY) != null
+                    ? getStyle().get(Label.COLOR_KEY) : valthorne.graphics.Color.WHITE);
         }
     }
 

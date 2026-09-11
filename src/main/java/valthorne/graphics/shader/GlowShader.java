@@ -51,78 +51,10 @@ import valthorne.graphics.Sprite;
  */
 public class GlowShader extends TexturedQuadShader {
 
-    private static final String FRAG_SRC = """
-            #version 330 core
-            uniform sampler2D u_texture;
-            uniform vec2 u_texelSize;
-            uniform float u_radiusPx;
-            uniform float u_intensity;
-            uniform vec4 u_glowColor;
-            
-            in vec2 v_uv;
-            in vec4 v_color;
-            out vec4 fragColor;
-            
-            float aAt(vec2 uv) {
-                return texture(u_texture, uv).a;
-            }
-            
-            void main() {
-                vec4 center = texture(u_texture, v_uv);
-                float a = center.a;
-            
-                // Sprite pixels: draw normally.
-                if (a > 0.001) {
-                    fragColor = center * v_color;
-                    return;
-                }
-            
-                // Glow for transparent pixels: sample nearby alpha.
-                float r1 = max(1.0, u_radiusPx * 0.35);
-                float r2 = max(1.0, u_radiusPx * 0.70);
-                float r3 = max(1.0, u_radiusPx);
-            
-                vec2 o1 = u_texelSize * r1;
-                vec2 o2 = u_texelSize * r2;
-                vec2 o3 = u_texelSize * r3;
-            
-                float s = 0.0;
-            
-                // 4-way + diagonals at 3 radii
-                s += aAt(v_uv + vec2( o1.x, 0.0));
-                s += aAt(v_uv + vec2(-o1.x, 0.0));
-                s += aAt(v_uv + vec2(0.0,  o1.y));
-                s += aAt(v_uv + vec2(0.0, -o1.y));
-                s += aAt(v_uv + vec2( o1.x,  o1.y));
-                s += aAt(v_uv + vec2(-o1.x,  o1.y));
-                s += aAt(v_uv + vec2( o1.x, -o1.y));
-                s += aAt(v_uv + vec2(-o1.x, -o1.y));
-            
-                s += aAt(v_uv + vec2( o2.x, 0.0)) * 0.75;
-                s += aAt(v_uv + vec2(-o2.x, 0.0)) * 0.75;
-                s += aAt(v_uv + vec2(0.0,  o2.y)) * 0.75;
-                s += aAt(v_uv + vec2(0.0, -o2.y)) * 0.75;
-                s += aAt(v_uv + vec2( o2.x,  o2.y)) * 0.75;
-                s += aAt(v_uv + vec2(-o2.x,  o2.y)) * 0.75;
-                s += aAt(v_uv + vec2( o2.x, -o2.y)) * 0.75;
-                s += aAt(v_uv + vec2(-o2.x, -o2.y)) * 0.75;
-            
-                s += aAt(v_uv + vec2( o3.x, 0.0)) * 0.45;
-                s += aAt(v_uv + vec2(-o3.x, 0.0)) * 0.45;
-                s += aAt(v_uv + vec2(0.0,  o3.y)) * 0.45;
-                s += aAt(v_uv + vec2(0.0, -o3.y)) * 0.45;
-                s += aAt(v_uv + vec2( o3.x,  o3.y)) * 0.45;
-                s += aAt(v_uv + vec2(-o3.x,  o3.y)) * 0.45;
-                s += aAt(v_uv + vec2( o3.x, -o3.y)) * 0.45;
-                s += aAt(v_uv + vec2(-o3.x, -o3.y)) * 0.45;
-            
-                // Normalize and shape the glow.
-                float glow = clamp(s / 17.6, 0.0, 1.0);
-                glow = pow(glow, 1.8) * u_intensity;
-            
-                fragColor = vec4(u_glowColor.rgb, u_glowColor.a * glow);
-            }
-            """;
+    /**
+     * Fragment source loaded from the packaged glow effect shader resource.
+     */
+    private static final String FRAG_SRC = ShaderSources.load("effects/glow.frag");
 
     /**
      * Creates a new {@code GlowShader} using the built-in GLSL sources.
@@ -131,6 +63,20 @@ public class GlowShader extends TexturedQuadShader {
         super(FRAG_SRC);
     }
 
+    /**
+     * Binds the glow effect using the sprite's backing texture dimensions, draws
+     * the sprite immediately, and unbinds the program on normal completion. Requires
+     * a current OpenGL context. The previous shader is not restored, and exceptions
+     * can leave this program bound.
+     *
+     * @param sprite sprite with a valid backing texture
+     * @param radiusPx glow sampling extent in texture pixels
+     * @param intensity glow strength multiplier
+     * @param r glow red component
+     * @param g glow green component
+     * @param b glow blue component
+     * @param a glow alpha component
+     */
     public void apply(Sprite sprite, float radiusPx, float intensity, float r, float g, float b, float a) {
         bind(sprite.getTexture().getData().width(), sprite.getTexture().getData().height(), radiusPx, intensity, r, g, b, a);
         sprite.draw();

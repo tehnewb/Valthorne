@@ -26,7 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>
  * The registry guarantees that repeated calls using the same key name return the
- * same shared {@code StyleKey} instance. This is important because the key ID is
+ * same shared {@code StyleKey} instance when the declared type matches; a conflicting
+ * type is rejected. The first registration's default value is retained. This matters because the key ID is
  * used as the storage index in {@link StyleMap}. If multiple different key objects
  * were created for the same conceptual property, style lookup would become inconsistent.
  * </p>
@@ -72,22 +73,18 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @since March 9th, 2026
  */
 public final class StyleKey<T> {
-
     /**
      * Counter used to assign unique IDs to newly created style keys.
      */
     private static final AtomicInteger NEXT_ID = new AtomicInteger();
-
     /**
      * Global registry mapping key names to shared key instances.
      */
     private static final Map<String, StyleKey<?>> REGISTRY = new HashMap<>();
-
     private final int id; // Unique numeric ID used for indexed storage in StyleMap
     private final String name; // Global string name of this style key
     private final Class<T> type; // Declared Java type for values stored under this key
     private final T defaultValue; // Default value returned when no explicit value is stored
-
     /**
      * <p>
      * Creates a new {@code StyleKey}.
@@ -112,6 +109,15 @@ public final class StyleKey<T> {
     }
 
     /**
+     * Captures the currently registered keys while holding the registration lock.
+     * The returned list is unmodifiable and does not reflect later registrations;
+     * its elements are the shared keys, and their order is unspecified.
+     *
+     * @return an unmodifiable snapshot of all registered key instances
+     */
+    public static synchronized java.util.List<StyleKey<?>> registeredKeys() {return java.util.List.copyOf(REGISTRY.values());}
+
+    /**
      * <p>
      * Returns a shared {@code StyleKey} for the given name and type with no explicit
      * default value.
@@ -127,6 +133,9 @@ public final class StyleKey<T> {
      * @param type the Java type associated with the key
      * @param <T>  the value type associated with the key
      * @return the shared style key instance for the given name
+     * @throws NullPointerException     if a new key is requested with null name or type
+     * @throws IllegalArgumentException if the registered name has a different type,
+     *                                  including a null requested type
      */
     public static synchronized <T> StyleKey<T> of(String name, Class<T> type) {
         return of(name, type, null);
@@ -139,14 +148,15 @@ public final class StyleKey<T> {
      *
      * <p>
      * If a key with the supplied name already exists in the registry, that existing
-     * instance is returned immediately. Otherwise a new key is created, assigned a new
+     * instance is returned after verifying the declared type. Otherwise a new key is created, assigned a new
      * ID, stored in the registry, and returned.
      * </p>
      *
      * <p>
      * The registry is keyed only by name, so repeated calls using the same name but
-     * different type arguments or default values will still return the original key
-     * instance that was first registered for that name.
+     * different types are rejected. A different default value with the same type
+     * is ignored: the original key and its default remain in effect. Defaults are
+     * retained by reference without copying or additional runtime type validation.
      * </p>
      *
      * @param name         the unique key name
@@ -154,12 +164,17 @@ public final class StyleKey<T> {
      * @param defaultValue the default value returned when the key is absent
      * @param <T>          the value type associated with the key
      * @return the shared style key instance for the given name
+     * @throws NullPointerException     if a new key is requested with null name or type
+     * @throws IllegalArgumentException if the registered name has a different type,
+     *                                  including a null requested type
      */
     @SuppressWarnings("unchecked")
     public static synchronized <T> StyleKey<T> of(String name, Class<T> type, T defaultValue) {
         StyleKey<?> existing = REGISTRY.get(name);
 
         if (existing != null) {
+            if (existing.type != type)
+                throw new IllegalArgumentException("Style key '" + name + "' already has type " + existing.type.getName());
             return (StyleKey<T>) existing;
         }
 
@@ -176,6 +191,9 @@ public final class StyleKey<T> {
      * <p>
      * This method performs a registry lookup without creating a new key. If no key with
      * the given name exists, {@code null} is returned.
+     * The generic result is unchecked because no type token is supplied; callers
+     * must request the registered value type. Unlike registration and snapshots,
+     * this lookup is not synchronized, so coordinate it with concurrent registration.
      * </p>
      *
      * @param name the key name to look up
@@ -185,6 +203,19 @@ public final class StyleKey<T> {
     @SuppressWarnings("unchecked")
     public static <T> StyleKey<T> get(String name) {
         return (StyleKey<T>) REGISTRY.get(name);
+    }
+
+    /**
+     * Classifies whether changing this property should conservatively invalidate
+     * node layout. Keys declared exactly as Color or NodeAction are treated as
+     * paint/action changes; all other declared types, including subclasses of
+     * those types, are classified as potentially affecting geometry. This checks
+     * the declared type, not the current value or a callback's eventual effects.
+     *
+     * @return whether a node override change should mark layout dirty
+     */
+    public boolean affectsLayout() {
+        return type != valthorne.graphics.Color.class && type != valthorne.ui.NodeAction.class;
     }
 
     /**
@@ -232,6 +263,8 @@ public final class StyleKey<T> {
      * <p>
      * This value is typically used by {@link StyleMap#get(StyleKey)} when no explicit
      * value is stored for the key.
+     * The original default is returned by reference; mutable defaults are shared
+     * by every consumer that falls back to this key and are not defensively copied.
      * </p>
      *
      * @return the default value, which may be {@code null}

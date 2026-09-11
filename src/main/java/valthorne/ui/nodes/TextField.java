@@ -10,16 +10,11 @@ import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.math.MathUtils;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.ui.NodeAction;
-import valthorne.ui.UIRoot;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
-import valthorne.viewport.Viewport;
 
-import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.StringSelection;
 import java.nio.ByteBuffer;
 
 /**
@@ -198,9 +193,9 @@ public class TextField extends Panel {
      * Shared 1x1 white texture used for drawing caret and selection rectangles.
      */
     private static Texture CARET_PIXEL;
-
+    private final valthorne.ui.behavior.TextEditModel editor = new valthorne.ui.behavior.TextEditModel(); // Editing model holding text, selection, and caret state.
     private Color defaultSelectionColor = new Color(1f, 1f, 1f, 0.35f); // Fallback selection color when style does not provide one
-
+    // Renderer snapshot; all mutations are owned by the shared editor.
     private String text = ""; // Raw logical text stored by the field
     private String placeholder = ""; // Placeholder text shown when the field is empty
     private String displayText = ""; // Cached masked display text when masking is enabled
@@ -250,6 +245,7 @@ public class TextField extends Panel {
      * </p>
      */
     public TextField() {
+        editor.onChange(this::syncEditor);
         setBit(CLICKABLE_BIT, true);
         setBit(FOCUSABLE_BIT, true);
         this.markLayoutDirty();
@@ -265,6 +261,31 @@ public class TextField extends Panel {
     public TextField(String placeholder) {
         this();
         placeholder(placeholder);
+    }
+
+    /**
+     * <p>
+     * Returns the shared 1x1 white texture used for drawing the caret and selection.
+     * </p>
+     *
+     * <p>
+     * The texture is lazily created on first use from a single white RGBA pixel.
+     * </p>
+     *
+     * @return the shared caret pixel texture
+     */
+    private static Texture getCaretPixel() {
+        if (CARET_PIXEL == null) {
+            ByteBuffer buffer = BufferUtils.createByteBuffer(4);
+            buffer.put((byte) 255);
+            buffer.put((byte) 255);
+            buffer.put((byte) 255);
+            buffer.put((byte) 255);
+            buffer.flip();
+            CARET_PIXEL = new Texture(new TextureData(buffer, 1, 1));
+        }
+
+        return CARET_PIXEL;
     }
 
     /**
@@ -300,30 +321,7 @@ public class TextField extends Panel {
      * @return this text field
      */
     public TextField text(String text) {
-        if (text == null) {
-            this.text = "";
-        } else {
-            StringBuilder builder = new StringBuilder(text.length());
-
-            for (int i = 0; i < text.length(); i++) {
-                char c = text.charAt(i);
-
-                if (c == '\r' || c == '\n' || c == '\t' || Character.isISOControl(c)) {
-                    if (builder.isEmpty() || builder.charAt(builder.length() - 1) != ' ')
-                        builder.append(' ');
-                } else {
-                    builder.append(c);
-                }
-            }
-
-            this.text = builder.toString();
-        }
-
-        caretIndex = MathUtils.clamp(caretIndex, 0, this.text.length());
-        clearSelection();
-        markDisplayTextDirty();
-        markLayoutDirty();
-        updateScroll();
+        editor.text(text);
         return this;
     }
 
@@ -377,10 +375,7 @@ public class TextField extends Panel {
      * @return this text field
      */
     public TextField caretIndex(int caretIndex) {
-        this.caretIndex = MathUtils.clamp(caretIndex, 0, text.length());
-        clearSelection();
-        resetCursorBlink();
-        updateScroll();
+        editor.move(caretIndex, false);
         return this;
     }
 
@@ -539,6 +534,7 @@ public class TextField extends Panel {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
+        if (event.getButton() != valthorne.Mouse.LEFT) return;
         float mouseX = getEventX(event);
 
         if (pendingClick && doubleClickTimer <= doubleClickWindow) {
@@ -555,9 +551,7 @@ public class TextField extends Panel {
         doubleClickTimer = 0f;
 
         selecting = true;
-        caretIndex = getIndexAtMouseX(mouseX);
-        selectionStart = caretIndex;
-        selectionEnd = caretIndex;
+        editor.move(getIndexAtMouseX(mouseX), event.isShiftDown());
 
         resetCursorBlink();
         updateScroll();
@@ -581,8 +575,7 @@ public class TextField extends Panel {
 
         float mouseX = getEventX(event);
 
-        caretIndex = getIndexAtMouseX(mouseX);
-        selectionEnd = caretIndex;
+        editor.move(getIndexAtMouseX(mouseX), true);
 
         resetCursorBlink();
         updateScroll();
@@ -626,62 +619,17 @@ public class TextField extends Panel {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        if (!isFocused()) return;
-
-        resetCursorBlink();
-
-        boolean shift = event.isShiftDown();
-        boolean ctrl = event.isCtrlDown();
-        int key = event.getKey();
-
-        if (ctrl) {
-            switch (key) {
-                case Keyboard.A -> selectAll();
-                case Keyboard.C -> copySelection();
-                case Keyboard.X -> cutSelection();
-                case Keyboard.V -> pasteClipboard();
-                case Keyboard.LEFT -> moveCursor(prevWord(caretIndex), shift);
-                case Keyboard.RIGHT -> moveCursor(nextWord(caretIndex), shift);
+        if (!isFocused() || isDisabled()) return;
+        if (valthorne.ui.behavior.TextEditing.key(editor, event, masking)) {
+            event.consume();
+        } else if (event.getKey() == Keyboard.ENTER) {
+            if (editor.isValid()) {
+                NodeAction<TextField> resolved = action;
+                if (resolved == null && getStyle() != null) resolved = getStyle().get(ACTION_KEY);
+                if (resolved != null) resolved.perform(this);
             }
-            return;
+            event.consume();
         }
-
-        switch (key) {
-            case Keyboard.BACKSPACE -> deleteBackward();
-            case Keyboard.DELETE -> deleteForward();
-            case Keyboard.LEFT -> moveCursor(caretIndex - 1, shift);
-            case Keyboard.RIGHT -> moveCursor(caretIndex + 1, shift);
-            case Keyboard.HOME -> moveCursor(0, shift);
-            case Keyboard.END -> moveCursor(text.length(), shift);
-            case Keyboard.ENTER -> {
-                if (action != null) {
-                    action.perform(this);
-                } else {
-                    ResolvedStyle style = getStyle();
-                    if (style != null) {
-                        NodeAction<TextField> resolved = style.get(ACTION_KEY);
-                        if (resolved != null) resolved.perform(this);
-                    }
-                }
-                return;
-            }
-            default -> {
-                char c = event.getChar();
-
-                if (c == 0 || c == '\n' || c == '\r')
-                    return;
-
-                if (hasSelection()) deleteSelection();
-
-                text = text.substring(0, caretIndex) + c + text.substring(caretIndex);
-                caretIndex++;
-            }
-
-        }
-
-        updateScroll();
-        markDisplayTextDirty();
-        markLayoutDirty();
     }
 
     /**
@@ -783,7 +731,7 @@ public class TextField extends Panel {
         float scissorX = getRenderX() + padding - scissorFudge * 0.5f;
         float scissorW = Math.max(0f, getWidth() - padding * 2f + scissorFudge);
 
-        batch.beginScissor(scissorX, getRenderY(), scissorW, getHeight());
+        batch.beginScissor(scissorX + batch.getTranslationX(), getRenderY() + batch.getTranslationY(), scissorW, getHeight());
 
         if (isFocused() && hasSelection())
             drawSelection(batch);
@@ -912,7 +860,7 @@ public class TextField extends Panel {
      * @return the resolved X coordinate
      */
     private float getEventX(MousePressEvent event) {
-        return getEventPosition(event.getX(), event.getY()).getX();
+        return getEventPosition(event.getX(), event.getY()).x();
     }
 
     /**
@@ -924,7 +872,7 @@ public class TextField extends Panel {
      * @return the resolved X coordinate
      */
     private float getEventX(MouseDragEvent event) {
-        return getEventPosition(event.getX(), event.getY()).getX();
+        return getEventPosition(event.getToX(), event.getToY()).x();
     }
 
     /**
@@ -938,17 +886,16 @@ public class TextField extends Panel {
      * @return the resolved interaction position
      */
     private Vector2f getEventPosition(float screenX, float screenY) {
-        UIRoot root = getRoot();
-        if (root != null) {
-            Viewport viewport = root.getViewport();
-            if (viewport != null) {
-                Vector2f world = viewport.screenToWorld(screenX, screenY);
-                if (world != null) return world;
-            }
-        }
-
-        return new Vector2f(screenX, screenY);
+        return screenToContent(screenX, screenY);
     }
+
+    /**
+     * <p>
+     * Returns whether a non-empty text selection currently exists.
+     * </p>
+     *
+     * @return {@code true} if the selection range is non-empty
+     */
 
     /**
      * <p>
@@ -961,14 +908,63 @@ public class TextField extends Panel {
     }
 
     /**
-     * <p>
-     * Returns whether a non-empty text selection currently exists.
-     * </p>
+     * Editing, validation and undo/redo API shared by both field families.
+     */
+    public valthorne.ui.behavior.TextEditModel getEditor() {return editor;}
+
+    /**
+     * Copies text, caret, and selection from the shared editing model into rendering
+     * state. Resets caret blinking and adjusts horizontal scrolling. Text changes also
+     * invalidate display-text and layout caches; caret-only changes avoid those rebuilds.
+     */
+    private void syncEditor() {
+        boolean changed = !text.equals(editor.text());
+        text = editor.text();
+        caretIndex = editor.caret();
+        selectionStart = editor.anchor();
+        selectionEnd = editor.caret();
+        resetCursorBlink();
+        if (changed) {
+            markDisplayTextDirty();
+            markLayoutDirty();
+        }
+        updateScroll();
+    }
+
+    /**
+     * Inserts routed text through the editing model only when focused and enabled.
+     * Accepted routing consumes the event even if model validation rejects the edit;
+     * model listeners synchronize rendering state when an edit succeeds.
      *
-     * @return {@code true} if the selection range is non-empty
+     * @param event text-input event to insert and consume
+     */
+    @Override
+    public void onTextInput(valthorne.event.events.TextInputEvent event) {
+        if (isFocused() && isEnabled()) {
+            editor.insert(event.getText());
+            event.consume();
+        }
+    }
+
+    /**
+     * Clears inherited press/drag state and stops local selection and pending-click
+     * handling. Current text, caret, and selection contents are preserved.
+     */
+    @Override
+    public void onPointerCancel() {
+        super.onPointerCancel();
+        selecting = false;
+        pendingClick = false;
+    }
+
+    /**
+     * Queries the editing model rather than cached render indices to determine
+     * whether a nonempty text range is selected.
+     *
+     * @return whether the model's caret and selection anchor differ
      */
     private boolean hasSelection() {
-        return selectionStart != selectionEnd;
+        return editor.hasSelection();
     }
 
     /**
@@ -977,8 +973,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void clearSelection() {
-        selectionStart = caretIndex;
-        selectionEnd = caretIndex;
+        editor.move(editor.caret(), false);
     }
 
     /**
@@ -991,10 +986,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void selectAll() {
-        selectionStart = 0;
-        selectionEnd = text.length();
-        caretIndex = text.length();
-        updateScroll();
+        editor.selectAll();
     }
 
     /**
@@ -1011,18 +1003,7 @@ public class TextField extends Panel {
      * @param extend whether selection should be extended
      */
     private void moveCursor(int index, boolean extend) {
-        index = MathUtils.clamp(index, 0, text.length());
-
-        if (extend) {
-            if (!hasSelection()) selectionStart = caretIndex;
-            selectionEnd = index;
-        } else {
-            selectionStart = index;
-            selectionEnd = index;
-        }
-
-        caretIndex = index;
-        updateScroll();
+        editor.move(index, extend);
     }
 
     /**
@@ -1031,19 +1012,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void deleteBackward() {
-        if (hasSelection()) {
-            deleteSelection();
-            return;
-        }
-
-        if (caretIndex <= 0) return;
-
-        text = text.substring(0, caretIndex - 1) + text.substring(caretIndex);
-        caretIndex--;
-        clearSelection();
-
-        markDisplayTextDirty();
-        markLayoutDirty();
+        editor.deleteBackward(false);
     }
 
     /**
@@ -1052,18 +1021,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void deleteForward() {
-        if (hasSelection()) {
-            deleteSelection();
-            return;
-        }
-
-        if (caretIndex >= text.length()) return;
-
-        text = text.substring(0, caretIndex) + text.substring(caretIndex + 1);
-        clearSelection();
-
-        markDisplayTextDirty();
-        markLayoutDirty();
+        editor.deleteForward(false);
     }
 
     /**
@@ -1077,16 +1035,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void deleteSelection() {
-        int a = Math.min(selectionStart, selectionEnd);
-        int b = Math.max(selectionStart, selectionEnd);
-
-        text = text.substring(0, a) + text.substring(b);
-        caretIndex = a;
-        selectionStart = a;
-        selectionEnd = a;
-
-        markDisplayTextDirty();
-        markLayoutDirty();
+        editor.deleteSelection();
     }
 
     /**
@@ -1095,11 +1044,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void copySelection() {
-        if (!hasSelection()) return;
-
-        int a = Math.min(selectionStart, selectionEnd);
-        int b = Math.max(selectionStart, selectionEnd);
-        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text.substring(a, b)), null);
+        valthorne.ui.behavior.TextEditing.copy(editor, masking);
     }
 
     /**
@@ -1112,10 +1057,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void cutSelection() {
-        if (!hasSelection()) return;
-
-        copySelection();
-        deleteSelection();
+        if (valthorne.ui.behavior.TextEditing.copy(editor, masking)) editor.deleteSelection();
     }
 
     /**
@@ -1130,38 +1072,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void pasteClipboard() {
-        try {
-            String value = (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-            if (value == null || value.isEmpty())
-                return;
-
-            if (hasSelection())
-                deleteSelection();
-
-            StringBuilder builder = new StringBuilder(value.length());
-
-            for (int i = 0; i < value.length(); i++) {
-                char c = value.charAt(i);
-
-                if (c == '\r' || c == '\n' || c == '\t' || Character.isISOControl(c)) {
-                    if (builder.isEmpty() || builder.charAt(builder.length() - 1) != ' ')
-                        builder.append(' ');
-                } else {
-                    builder.append(c);
-                }
-            }
-
-            value = builder.toString();
-
-            text = text.substring(0, caretIndex) + value + text.substring(caretIndex);
-            caretIndex += value.length();
-            clearSelection();
-
-            markDisplayTextDirty();
-            markLayoutDirty();
-            updateScroll();
-        } catch (Throwable ignored) {
-        }
+        valthorne.ui.behavior.TextEditing.paste(editor);
     }
 
     /**
@@ -1237,7 +1148,7 @@ public class TextField extends Panel {
         String visibleText = getDisplayText();
         int length = visibleText.length();
 
-        for (int i = 1; i <= length; i++) {
+        for (int i = editor.next(0); i <= length && i > 0; i = i == length ? length + 1 : editor.next(i)) {
             if (font.getWidth(visibleText, 0, i) >= local) return i;
         }
 
@@ -1258,9 +1169,7 @@ public class TextField extends Panel {
      * @return the previous word boundary
      */
     private int prevWord(int index) {
-        while (index > 0 && Character.isWhitespace(text.charAt(index - 1))) index--;
-        while (index > 0 && Character.isLetterOrDigit(text.charAt(index - 1))) index--;
-        return index;
+        return editor.previousWord(index);
     }
 
     /**
@@ -1277,9 +1186,7 @@ public class TextField extends Panel {
      * @return the next word boundary
      */
     private int nextWord(int index) {
-        while (index < text.length() && Character.isWhitespace(text.charAt(index))) index++;
-        while (index < text.length() && Character.isLetterOrDigit(text.charAt(index))) index++;
-        return index;
+        return editor.nextWord(index);
     }
 
     /**
@@ -1323,30 +1230,5 @@ public class TextField extends Panel {
         }
 
         textOffsetX = MathUtils.clamp(textOffsetX, minOffset, maxOffset);
-    }
-
-    /**
-     * <p>
-     * Returns the shared 1x1 white texture used for drawing the caret and selection.
-     * </p>
-     *
-     * <p>
-     * The texture is lazily created on first use from a single white RGBA pixel.
-     * </p>
-     *
-     * @return the shared caret pixel texture
-     */
-    private static Texture getCaretPixel() {
-        if (CARET_PIXEL == null) {
-            ByteBuffer buffer = BufferUtils.createByteBuffer(4);
-            buffer.put((byte) 255);
-            buffer.put((byte) 255);
-            buffer.put((byte) 255);
-            buffer.put((byte) 255);
-            buffer.flip();
-            CARET_PIXEL = new Texture(new TextureData(buffer, 1, 1));
-        }
-
-        return CARET_PIXEL;
     }
 }

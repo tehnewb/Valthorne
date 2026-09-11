@@ -240,7 +240,7 @@ public class Grid extends UIContainer {
      * Sets both cell width and cell height using fixed point values.
      * </p>
      *
-     * @param cellWidth the fixed cell width in points
+     * @param cellWidth  the fixed cell width in points
      * @param cellHeight the fixed cell height in points
      * @return this grid
      */

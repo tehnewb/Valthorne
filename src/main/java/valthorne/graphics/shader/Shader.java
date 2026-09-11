@@ -57,17 +57,15 @@ import static org.lwjgl.opengl.GL31.glUniformBlockBinding;
  */
 public class Shader {
 
-    private int programID; // OpenGL program object id (0 if not created/disposed).
-    private int vertexID; // OpenGL vertex shader object id (0 if not created/disposed).
-    private int fragmentID; // OpenGL fragment shader object id (0 if not created/disposed).
-
-    private String vertexSource; // Last stored vertex shader source string (used by reload()).
-    private String fragmentSource; // Last stored fragment shader source string (used by reload()).
-
     private final Map<String, Integer> uniformCache = new HashMap<>(); // Cache: uniform name -> location (glGetUniformLocation).
     private final Map<String, Integer> attribCache = new HashMap<>(); // Cache: attribute name -> location (glGetAttribLocation).
     private final Map<String, Integer> uniformBlockCache = new HashMap<>(); // Cache: uniform block name -> index (glGetUniformBlockIndex).
     private final Map<String, Integer> attribBindings = new HashMap<>(); // Requested attribute bindings applied during link: name -> index.
+    private int programID; // OpenGL program object id (0 if not created/disposed).
+    private int vertexID; // OpenGL vertex shader object id (0 if not created/disposed).
+    private int fragmentID; // OpenGL fragment shader object id (0 if not created/disposed).
+    private String vertexSource; // Last stored vertex shader source string (used by reload()).
+    private String fragmentSource; // Last stored fragment shader source string (used by reload()).
 
     /**
      * Creates and builds a shader program from the provided GLSL sources.
@@ -442,7 +440,7 @@ public class Shader {
      * @param name   uniform name (must not be null)
      * @param values matrix values in column-major order (must contain at least 16 floats)
      * @return this shader for chaining
-     * @throws NullPointerException if {@code name} or {@code values} is null
+     * @throws NullPointerException     if {@code name} or {@code values} is null
      * @throws IllegalArgumentException if {@code values.length < 16}
      */
     public Shader setUniformMatrix4(String name, float[] values) {

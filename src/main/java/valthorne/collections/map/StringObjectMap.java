@@ -92,13 +92,12 @@ public class StringObjectMap<T> {
      * Default load factor used when none is specified.
      */
     private static final float DEFAULT_LOAD_FACTOR = 0.8f;
-
+    private final float loadFactor; // Configured load factor for resize calculations
     private String[] keyTable; // Backing array storing keys
     private Object[] valueTable; // Backing array storing values parallel to the key table
     private int size; // Number of entries currently stored in the map
     private int threshold; // Size limit that triggers a resize based on load factor
     private int mask; // Bitmask used for wrapping probe indices
-    private final float loadFactor; // Configured load factor for resize calculations
 
     /**
      * <p>
@@ -136,7 +135,7 @@ public class StringObjectMap<T> {
      * </p>
      *
      * @param initialCapacity the requested initial capacity
-     * @param loadFactor the load factor used to determine resize thresholds
+     * @param loadFactor      the load factor used to determine resize thresholds
      * @throws IllegalArgumentException if {@code initialCapacity} is negative
      * @throws IllegalArgumentException if {@code loadFactor} is not greater than 0 and less than 1
      */
@@ -156,6 +155,27 @@ public class StringObjectMap<T> {
 
     /**
      * <p>
+     * Computes the backing table size needed to support a desired logical capacity
+     * under the given load factor.
+     * </p>
+     *
+     * <p>
+     * The returned value is always a power of two and at least {@code 2}.
+     * </p>
+     *
+     * @param capacity   the desired logical capacity
+     * @param loadFactor the load factor to satisfy
+     * @return the computed power-of-two table size
+     */
+    private static int tableSize(int capacity, float loadFactor) {
+        int target = Math.max(2, (int) Math.ceil(capacity / loadFactor));
+        int tableSize = 1;
+        while (tableSize < target) tableSize <<= 1;
+        return tableSize;
+    }
+
+    /**
+     * <p>
      * Inserts or replaces a value associated with the given key.
      * </p>
      *
@@ -170,7 +190,7 @@ public class StringObjectMap<T> {
      * insertion occurs.
      * </p>
      *
-     * @param key the non-null key to insert
+     * @param key   the non-null key to insert
      * @param value the value to store, which may be null
      * @return the previous value associated with the key, or null if the key was not present
      * @throws NullPointerException if {@code key} is null
@@ -228,7 +248,7 @@ public class StringObjectMap<T> {
      * if the key is not present or resolves to null.
      * </p>
      *
-     * @param key the key to look up
+     * @param key          the key to look up
      * @param defaultValue the fallback value to return when lookup yields null
      * @return the stored value if non-null, otherwise {@code defaultValue}
      */
@@ -601,26 +621,5 @@ public class StringObjectMap<T> {
             keyTable[index] = key;
             valueTable[index] = oldValues[i];
         }
-    }
-
-    /**
-     * <p>
-     * Computes the backing table size needed to support a desired logical capacity
-     * under the given load factor.
-     * </p>
-     *
-     * <p>
-     * The returned value is always a power of two and at least {@code 2}.
-     * </p>
-     *
-     * @param capacity the desired logical capacity
-     * @param loadFactor the load factor to satisfy
-     * @return the computed power-of-two table size
-     */
-    private static int tableSize(int capacity, float loadFactor) {
-        int target = Math.max(2, (int) Math.ceil(capacity / loadFactor));
-        int tableSize = 1;
-        while (tableSize < target) tableSize <<= 1;
-        return tableSize;
     }
 }

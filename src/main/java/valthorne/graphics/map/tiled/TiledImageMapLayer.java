@@ -11,15 +11,23 @@ import java.util.Map;
  * Represents a tiled image map layer in a map. This class extends the base functionality
  * of the MapLayer class, providing additional capabilities to work with an image
  * as a part of the map layer.
+ * The texture reference is retained directly and may be null when no image was
+ * specified. This class has no disposal method; the owning map or caller manages
+ * texture lifetime. The static loader constructs a GPU texture synchronously and
+ * therefore requires the appropriate current graphics context.
+ *
+ * @author Albert Beaupre
  */
 public class TiledImageMapLayer extends MapLayer {
 
-    public final Texture image; // The texture associated with the layer
+    public final Texture image; // Retained layer texture, or null when no image source was provided.
 
     /**
      * Creates a new instance of TiledImageMapLayer, a layer that includes an image
      * as part of the map layout. This class extends the MapLayer class and
      * incorporates additional features specific to tiled images.
+     * The texture is neither copied nor validated, and scalar metadata uses the
+     * base layer's unchecked storage semantics.
      *
      * @param name       the name of the layer
      * @param visible    a boolean indicating whether the layer is visible
@@ -38,6 +46,10 @@ public class TiledImageMapLayer extends MapLayer {
      * Loads a Tiled image map layer from the provided XML stream reader, TMX data, and associated dependencies.
      * This method parses the relevant attributes and properties of an image layer, including its image source,
      * and constructs a {@link TiledImageMapLayer} instance.
+     * Start on the opening imagelayer element. Missing attributes default to an empty
+     * name, visible state, opacity one, and zero offsets. Nonblank image sources are
+     * resolved and uploaded immediately; no source leaves a null image. Unknown
+     * elements are skipped and the reader remains open at the closing layer element.
      *
      * @param tmxBytes the byte content of the TMX file, used for resolving dependencies
      * @param tmxPath  the path to the TMX file, serving as the base for resolving relative paths

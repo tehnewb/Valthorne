@@ -1,6 +1,6 @@
 package valthorne.math.geometry;
 
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 
 /**
  * Represents a rectangle defined by its top-left corner coordinates and its dimensions.
@@ -14,9 +14,9 @@ import valthorne.math.Vector2f;
  */
 public class Rectangle extends Shape {
 
-    private float x, y, width, height;
-    private final Vector2f center = new Vector2f();
-    private final Vector2f[] points = {new Vector2f(), new Vector2f(), new Vector2f(), new Vector2f()};
+    private final Vector2f center = new Vector2f(); // Reusable geometric center computed from the rectangle's current dimensions.
+    private final Vector2f[] points = {new Vector2f(), new Vector2f(), new Vector2f(), new Vector2f()}; // Reusable corner vectors updated from the rectangle bounds.
+    private float x, y, width, height; // Rectangle origin and extent in world units.
 
     /**
      * Constructs a new {@code Rectangle} with uninitialized position and dimensions.
@@ -53,33 +53,6 @@ public class Rectangle extends Shape {
     }
 
     /**
-     * Retrieves the y-coordinate of the rectangle's top-left corner.
-     *
-     * @return the y-coordinate of the rectangle
-     */
-    public float getY() {
-        return y;
-    }
-
-    /**
-     * Retrieves the width of the rectangle.
-     *
-     * @return the width of the rectangle
-     */
-    public float getWidth() {
-        return width;
-    }
-
-    /**
-     * Retrieves the height of the rectangle.
-     *
-     * @return the height of the rectangle
-     */
-    public float getHeight() {
-        return height;
-    }
-
-    /**
      * Updates the x-coordinate of the rectangle's top-left corner
      * and recalculates its corner points.
      *
@@ -88,6 +61,15 @@ public class Rectangle extends Shape {
     public void setX(float x) {
         this.x = x;
         updatePoints();
+    }
+
+    /**
+     * Retrieves the y-coordinate of the rectangle's top-left corner.
+     *
+     * @return the y-coordinate of the rectangle
+     */
+    public float getY() {
+        return y;
     }
 
     /**
@@ -102,16 +84,12 @@ public class Rectangle extends Shape {
     }
 
     /**
-     * Sets the position of the rectangle by updating its x and y coordinates.
-     * Recalculates the rectangle's corner points after the position is updated.
+     * Retrieves the width of the rectangle.
      *
-     * @param x the new x-coordinate of the rectangle's top-left corner
-     * @param y the new y-coordinate of the rectangle's top-left corner
+     * @return the width of the rectangle
      */
-    public void setPosition(float x, float y) {
-        this.x = x;
-        this.y = y;
-        updatePoints();
+    public float getWidth() {
+        return width;
     }
 
     /**
@@ -125,12 +103,34 @@ public class Rectangle extends Shape {
     }
 
     /**
+     * Retrieves the height of the rectangle.
+     *
+     * @return the height of the rectangle
+     */
+    public float getHeight() {
+        return height;
+    }
+
+    /**
      * Updates the height of the rectangle and recalculates its corner points.
      *
      * @param height the new height of the rectangle
      */
     public void setHeight(float height) {
         this.height = height;
+        updatePoints();
+    }
+
+    /**
+     * Sets the position of the rectangle by updating its x and y coordinates.
+     * Recalculates the rectangle's corner points after the position is updated.
+     *
+     * @param x the new x-coordinate of the rectangle's top-left corner
+     * @param y the new y-coordinate of the rectangle's top-left corner
+     */
+    public void setPosition(float x, float y) {
+        this.x = x;
+        this.y = y;
         updatePoints();
     }
 
@@ -157,18 +157,37 @@ public class Rectangle extends Shape {
         return center;
     }
 
+    /**
+     * Adds the supplied translation to the origin and refreshes all cached corners.
+     * Dimensions are preserved, and the offset vector is read before the corner cache
+     * is updated, allowing cached corner values to be used as an offset.
+     *
+     * @param offset translation in rectangle coordinate units
+     */
     @Override
     public void move(Vector2f offset) {
-        x += offset.getX();
-        y += offset.getY();
+        x += offset.x();
+        y += offset.y();
         updatePoints();
     }
 
+    /**
+     * Returns the reusable four-corner array in boundary order, beginning at the
+     * stored origin. Mutating these vectors does not change rectangle bounds and is
+     * overwritten by the next bounds update; copy values when retaining a snapshot.
+     *
+     * @return live cached corner array
+     */
     @Override
     public Vector2f[] points() {
         return points;
     }
 
+    /**
+     * Rewrites cached corners from the stored origin and dimensions without allocating.
+     * Order is origin, x-plus-width, opposite corner, then y-plus-height. Negative
+     * extents are retained rather than normalized.
+     */
     private void updatePoints() {
         points[0].set(x, y);
         points[1].set(x + width, y);

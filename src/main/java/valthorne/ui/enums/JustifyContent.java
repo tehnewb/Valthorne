@@ -33,14 +33,32 @@ import org.lwjgl.util.yoga.Yoga;
  */
 public enum JustifyContent {
 
+    /**
+     * Packs children at the main-axis start.
+     */
     FLEX_START(Yoga.YGJustifyFlexStart),
+    /**
+     * Centers the group of children along the main axis.
+     */
     CENTER(Yoga.YGJustifyCenter),
+    /**
+     * Packs children at the main-axis end.
+     */
     FLEX_END(Yoga.YGJustifyFlexEnd),
+    /**
+     * Places available main-axis space between children with no extra outer gaps.
+     */
     SPACE_BETWEEN(Yoga.YGJustifySpaceBetween),
+    /**
+     * Places space around each child, leaving half-sized gaps at the outer edges.
+     */
     SPACE_AROUND(Yoga.YGJustifySpaceAround),
+    /**
+     * Uses equal gaps between children and at both main-axis edges.
+     */
     SPACE_EVENLY(Yoga.YGJustifySpaceEvenly);
 
-    private final int yoga;
+    private final int yoga; // Native Yoga enum value corresponding to this layout option.
 
     /**
      * Creates a justify-content value mapped to the Yoga constant.

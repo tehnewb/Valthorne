@@ -79,6 +79,28 @@ public class ShortBits {
     }
 
     /**
+     * Validates that a bit index falls within the valid short range.
+     *
+     * @param index the index to validate
+     * @throws IndexOutOfBoundsException if the index is outside {@code 0..15}
+     */
+    private static void validateIndex(int index) {
+        if (index < 0 || index >= BIT_COUNT) {
+            throw new IndexOutOfBoundsException("Bit index must be between 0 and 15: " + index);
+        }
+    }
+
+    /**
+     * Returns the mask for the specified bit index.
+     *
+     * @param index the validated bit index
+     * @return an integer mask with that bit enabled
+     */
+    private static int mask(int index) {
+        return 1 << index;
+    }
+
+    /**
      * Returns whether the bit at the specified index is currently set.
      *
      * @param index the bit index to query
@@ -271,11 +293,6 @@ public class ShortBits {
         return (((this.bits & 0xFFFF) & (other.bits & 0xFFFF)) != 0);
     }
 
-
-    public void setBits(short bits) {
-        this.bits = bits;
-    }
-
     /**
      * Returns the raw short value currently stored by this container.
      *
@@ -286,24 +303,12 @@ public class ShortBits {
     }
 
     /**
-     * Validates that a bit index falls within the valid short range.
+     * Replaces all sixteen stored flags with the supplied bit pattern. No individual
+     * bit positions are validated, and the sign bit is retained like any other flag.
      *
-     * @param index the index to validate
-     * @throws IndexOutOfBoundsException if the index is outside {@code 0..15}
+     * @param bits complete replacement bit pattern
      */
-    private static void validateIndex(int index) {
-        if (index < 0 || index >= BIT_COUNT) {
-            throw new IndexOutOfBoundsException("Bit index must be between 0 and 15: " + index);
-        }
-    }
-
-    /**
-     * Returns the mask for the specified bit index.
-     *
-     * @param index the validated bit index
-     * @return an integer mask with that bit enabled
-     */
-    private static int mask(int index) {
-        return 1 << index;
+    public void setBits(short bits) {
+        this.bits = bits;
     }
 }

@@ -13,15 +13,21 @@ import java.util.Map;
  * and introduces a collection of TiledObject elements that belong
  * to the layer. Each object in the layer can have its own attributes
  * and properties.
+ * Object membership is a live mutable list, and layer properties follow the shared
+ * map semantics of {@link MapLayer}. This data layer does not render the objects or
+ * instantiate physics bodies from their shapes.
+ *
+ * @author Albert Beaupre
  */
 public class TiledObjectMapLayer extends MapLayer {
 
-    private final List<TiledObject> objects;
+    private final List<TiledObject> objects; // Live object list, retained directly or allocated when absent.
 
     /**
      * Constructs a new TiledObjectMapLayer with the specified parameters.
      * The layer represents a collection of tiled objects and inherits properties
      * from the base MapLayer class.
+     * A non-null object list is retained directly; no object or collection copy is made.
      *
      * @param name       the name of the layer
      * @param visible    the visibility state of the layer
@@ -40,6 +46,10 @@ public class TiledObjectMapLayer extends MapLayer {
      * Loads a TiledObjectMapLayer from the given XML stream reader.
      * This method processes the XML representation of a tiled object group,
      * parsing its properties and objects to instantiate a TiledObjectMapLayer.
+     * Missing attributes default to an empty name, visible state, full opacity, and
+     * zero pixel offsets. Objects append in document order and property groups merge.
+     * Unknown elements are skipped; the reader stays open at the closing objectgroup
+     * element or end of input.
      *
      * @param r the XML stream reader positioned at the object group element
      * @return a TiledObjectMapLayer instance populated with data from the XML
@@ -77,6 +87,8 @@ public class TiledObjectMapLayer extends MapLayer {
 
     /**
      * Retrieves the list of TiledObject instances associated with this layer.
+     * The returned list is live and mutable; additions and removals directly change
+     * this layer's contents and any caller-owned list supplied to the constructor.
      *
      * @return a list of TiledObject instances contained in this TiledObjectMapLayer
      */

@@ -3,7 +3,12 @@ package valthorne.utility;
 import java.util.Objects;
 
 /**
- * Utility class that provides methods for reflection-based operations.
+ * Provides JavaBean-style accessor names and exact-signature method discovery.
+ * Name generation does not verify that an accessor exists or invoke it. Discovery
+ * includes methods declared directly on a class and public inherited methods, without
+ * changing accessibility or performing argument conversion.
+ *
+ * @author Albert Beaupre
  */
 public class ReflectionUtility {
 
@@ -41,12 +46,17 @@ public class ReflectionUtility {
     }
 
     /**
-     * Checks if a method exists in the given class with the specified name and parameter types.
+     * Checks for an exact method signature, first among declared methods of any
+     * visibility and then among public inherited methods. Parameter types must match
+     * the declaration exactly; boxing and assignable argument types are not resolved.
+     * A security failure in the initial lookup is reported to standard error and
+     * returns false; a security failure during the inherited lookup can propagate.
      *
      * @param clazz          the class to inspect
      * @param methodName     the name of the method
      * @param parameterTypes the parameter types of the method
      * @return true if the method exists, false otherwise
+     * @throws NullPointerException if the class or method name is null
      */
     public static boolean hasMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
         Objects.requireNonNull(clazz, "Class cannot be null");

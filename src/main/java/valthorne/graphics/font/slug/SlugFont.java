@@ -17,31 +17,75 @@ import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
-import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL21.GL_PIXEL_UNPACK_BUFFER;
+import static org.lwjgl.opengl.GL21.GL_PIXEL_UNPACK_BUFFER_BINDING;
+import static org.lwjgl.opengl.GL30.GL_RG32UI;
+import static org.lwjgl.opengl.GL30.GL_RGBA16F;
+import static org.lwjgl.opengl.GL30.GL_RG_INTEGER;
 import static org.lwjgl.stb.STBTruetype.*;
 
 /**
- * GPU outline font based on Eric Lengyel's public Slug shader reference.
- *
- * <p>This version is optimized for live rendering compared to the original integration:</p>
- * <ul>
- *     <li>glyphs are compiled into real horizontal and vertical bands, not one giant band</li>
- *     <li>kerning is precomputed into a dense table for the configured codepoint range</li>
- *     <li>text can be pre-laid out into a {@link SlugTextRun}</li>
- *     <li>the curve texture uses 16-bit floats to reduce bandwidth</li>
- * </ul>
- *
+ * Owns GPU outline data and font metrics for a contiguous character range,
+ * using Slug-style banded curve evaluation. Loading compiles glyph outlines into
+ * quadratic segments, horizontal/vertical curve lookup bands, and a dense kerning
+ * table, then uploads RGBA16F curve and RG32UI band textures. It therefore requires
+ * a current OpenGL context even though font decoding uses STB on the CPU.
+ * <p>
+ * Text drawing and measurement iterate UTF-16 characters, recognize newline and
+ * tab, and use a quarter-em advance for characters outside the compiled range.
+ * They do not perform script shaping or surrogate-pair composition. Cubic outlines
+ * are approximated by short line sequences; small segments are omitted according
+ * to the configured thresholds.
+ * </p>
+ * <p>
+ * The font retains backing bytes for STB fallback kerning queries and owns its two
+ * GPU textures. Dispose them with the context current after all drawing completes.
+ * Measurement data remains stored after disposal, but drawing then has no valid
+ * texture resources. Optional retained text, baseline position, size, and color
+ * support Dimensional usage; explicit width/height setters only override measured
+ * metadata and do not scale rendered glyphs.
+ * </p>
+ * <pre>{@code
+ * SlugFont font = SlugFont.load("assets/font.ttf");
+ * try {
+ *     font.setText("Hello").setSize(32);
+ *     font.setPosition(20, 60);
+ *     font.draw(batch); // Inside the caller's SlugBatch drawing lifecycle.
+ * } finally {
+ *     font.dispose();
+ * }
+ * }</pre>
  * @author Albert Beaupre
  * @since July 7th, 2026
  */
 public final class SlugFont implements Dimensional {
+    private SlugTextRun retainedRun;
 
+    /**
+     * Fixed data-texture row width. Shader address packing and CPU row shifts assume 4096.
+     */
     static final int TEXTURE_WIDTH = 4096; // Fixed Slug data texture width used by the shader.
 
+    /**
+     * Band-count cap read once from valthorne.slug.maxBands; defaults to 48.
+     */
     private static final int MAX_BANDS_PER_AXIS = Integer.getInteger("valthorne.slug.maxBands", 48);
+    /**
+     * Em-span band density read once from valthorne.slug.bandsPerEm; defaults to 40.
+     */
     private static final float BANDS_PER_EM = Float.parseFloat(System.getProperty("valthorne.slug.bandsPerEm", "40"));
+    /**
+     * Squared em-space endpoint threshold below which curve segments are omitted.
+     */
     private static final float MIN_CURVE_LENGTH_SQUARED = Float.parseFloat(System.getProperty("valthorne.slug.minCurveLengthSquared", "0.00000025"));
+    /**
+     * Squared em-space flatness threshold used to simplify quadratic and cubic outlines.
+     */
     private static final float QUADRATIC_FLATNESS_SQUARED = Float.parseFloat(System.getProperty("valthorne.slug.quadraticFlatnessSquared", "0.00000009"));
+    /**
+     * Em-space expansion on each band edge to retain near-boundary curves.
+     */
     private static final float BAND_EPSILON = 0.00005f;
 
     private final STBTTFontinfo info; // STB font info kept alive for fallback queries.
@@ -56,20 +100,37 @@ public final class SlugFont implements Dimensional {
     private final float lineGap; // Line gap in em units.
     private final float lineHeight; // Line height in em units.
     private final float fallbackAdvance; // Advance used when a glyph is not present.
-
+    private final Color color = new Color(1f, 1f, 1f, 1f); // Optional retained color for Font-like usage.
     private int curveTexture; // OpenGL texture id storing curve control points.
     private int bandTexture; // OpenGL texture id storing band lookup data.
     private int curveTextureHeight; // Height of the curve texture in texels.
     private int bandTextureHeight; // Height of the band texture in texels.
-
     private String text = ""; // Optional retained text for Font-like usage.
     private float x; // Optional retained x position for Font-like usage.
     private float y; // Optional retained y position for Font-like usage.
     private float size = 32f; // Optional retained size in world units per em.
-    private final Color color = new Color(1f, 1f, 1f, 1f); // Optional retained color for Font-like usage.
     private float width; // Cached measured width of retained text.
     private float height; // Cached measured height of retained text.
 
+    /**
+     * Takes ownership of compiled glyph tables and uploaded textures, retaining the
+     * font bytes that back STB metric queries. Initializes retained-text measurement.
+     *
+     * @param info initialized STB font information
+     * @param fontBuffer backing bytes that must outlive info
+     * @param glyphs compiled character table
+     * @param kerning dense pair advances in em units
+     * @param firstCodepoint first table codepoint
+     * @param characterCount number of compiled entries
+     * @param emScale font-unit to em multiplier
+     * @param ascent ascent in em units
+     * @param descent descent in em units
+     * @param lineGap additional line spacing in em units
+     * @param curveTexture owned curve texture name
+     * @param curveTextureHeight curve texture rows
+     * @param bandTexture owned band texture name
+     * @param bandTextureHeight band texture rows
+     */
     private SlugFont(STBTTFontinfo info, ByteBuffer fontBuffer, SlugGlyph[] glyphs, float[] kerning,
                      int firstCodepoint, int characterCount, float emScale, float ascent, float descent, float lineGap,
                      int curveTexture, int curveTextureHeight, int bandTexture, int bandTextureHeight) {
@@ -93,22 +154,27 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Loads a Slug font from disk using the printable ASCII range.
+     * Loads and uploads the 95 printable ASCII characters beginning at codepoint 32.
+     * Requires a current OpenGL context for data texture creation.
      *
-     * @param path path to a TrueType/OpenType font file
-     * @return loaded Slug font
+     * @param path TrueType/OpenType filesystem path
+     * @return newly owned font
+     * @throws RuntimeException if reading or STB initialization fails
      */
     public static SlugFont load(String path) {
         return load(path, 32, 95);
     }
 
     /**
-     * Loads a Slug font from disk using a configurable contiguous character range.
+     * Reads a font file and compiles the requested contiguous character range,
+     * including its pairwise kerning table and GPU data textures.
      *
-     * @param path           path to a TrueType/OpenType font file
-     * @param firstCodepoint first codepoint to compile
-     * @param characterCount number of codepoints to compile
-     * @return loaded Slug font
+     * @param path TrueType/OpenType filesystem path
+     * @param firstCodepoint first character to compile
+     * @param characterCount range length from 1 through 256
+     * @return newly owned font
+     * @throws IllegalArgumentException if characterCount is outside its supported range
+     * @throws RuntimeException if reading or STB initialization fails
      */
     public static SlugFont load(String path, int firstCodepoint, int characterCount) {
         try {
@@ -119,12 +185,17 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Loads a Slug font from raw font bytes using a configurable contiguous character range.
+     * Copies source bytes into retained direct storage, initializes STB, compiles
+     * glyphs and kerning, and uploads the two owned data textures. The caller may
+     * reuse its byte array afterward. Character-count validation does not validate
+     * the first codepoint. Texture creation preserves texture and pixel-unpack state.
      *
-     * @param fontBytes      TrueType/OpenType font bytes
-     * @param firstCodepoint first codepoint to compile
-     * @param characterCount number of codepoints to compile
-     * @return loaded Slug font
+     * @param fontBytes nonnull, nonempty font data
+     * @param firstCodepoint first codepoint in the lookup table
+     * @param characterCount table length from 1 through 256
+     * @return newly owned font
+     * @throws IllegalArgumentException if bytes are absent or characterCount is invalid
+     * @throws RuntimeException if STB cannot initialize the font
      */
     public static SlugFont load(byte[] fontBytes, int firstCodepoint, int characterCount) {
         if (fontBytes == null || fontBytes.length == 0) {
@@ -172,6 +243,16 @@ public final class SlugFont implements Dimensional {
         return new SlugFont(info, fontBuffer, glyphs, kerning, firstCodepoint, characterCount, emScale, ascent, descent, lineGap, curveTexture, curveHeight, bandTexture, bandHeight);
     }
 
+    /**
+     * Precomputes every ordered pair's STB kerning advance in em units. Rows index
+     * the previous character and columns index the current character.
+     *
+     * @param info initialized font information
+     * @param firstCodepoint first table codepoint
+     * @param characterCount row and column count
+     * @param emScale raw-unit to em multiplier
+     * @return dense characterCount-squared table
+     */
     private static float[] compileKerning(STBTTFontinfo info, int firstCodepoint, int characterCount, float emScale) {
         float[] table = new float[characterCount * characterCount];
         for (int p = 0; p < characterCount; p++) {
@@ -184,6 +265,19 @@ public final class SlugFont implements Dimensional {
         return table;
     }
 
+    /**
+     * Reads metrics and outlines, appends curve texels, and builds horizontal and
+     * vertical band headers followed by curve-address lists. Empty outlines or empty
+     * bounds retain advance metrics but produce a nondrawable glyph. Packed glyph
+     * metadata maps em-space coordinates into the selected bands.
+     *
+     * @param info initialized STB font
+     * @param codepoint character to compile
+     * @param emScale raw-unit to em multiplier
+     * @param curveWriter shared curve-data destination
+     * @param bandWriter shared band-data destination
+     * @return compiled metrics and GPU lookup metadata
+     */
     private static SlugGlyph compileGlyph(STBTTFontinfo info, int codepoint, float emScale, FloatTexelWriter curveWriter, UIntTexelWriter bandWriter) {
         IntBuffer advanceRaw = BufferUtils.createIntBuffer(1);
         IntBuffer lsbRaw = BufferUtils.createIntBuffer(1);
@@ -253,6 +347,14 @@ public final class SlugFont implements Dimensional {
         return new SlugGlyph(codepoint, advance, lsb, x0, y0, x1, y1, glyphPack, glyphInfo, bandScaleX, bandScaleY, bandOffsetX, bandOffsetY, true);
     }
 
+    /**
+     * Chooses one band for empty spans or at most two curves; otherwise combines
+     * curve-count and em-span heuristics and clamps to the configured band limit.
+     *
+     * @param span axis extent in em units
+     * @param curveCount outline segment count
+     * @return band count for one axis
+     */
     private static int chooseBandCount(float span, int curveCount) {
         if (span <= 0f || curveCount <= 2) {
             return 1;
@@ -262,6 +364,18 @@ public final class SlugFont implements Dimensional {
         return clamp(Math.max(byCurves, bySpan), 1, MAX_BANDS_PER_AXIS);
     }
 
+    /**
+     * Assigns overlapping curves to each expanded axis band, then sorts each list
+     * by descending maximum extent on the perpendicular axis for shader traversal.
+     *
+     * @param curves source quadratic segments
+     * @param curveLocations matching packed curve texture addresses
+     * @param bandCount number of bands
+     * @param min minimum em-space axis coordinate
+     * @param max maximum em-space axis coordinate
+     * @param horizontal true for Y bands traversed along X, false for X bands
+     * @return packed curve-address list per band
+     */
     private static int[][] buildBands(List<SlugCurve> curves, int[] curveLocations, int bandCount, float min, float max, boolean horizontal) {
         int[][] result = new int[bandCount][];
         float span = Math.max(max - min, 1.0e-6f);
@@ -298,6 +412,16 @@ public final class SlugFont implements Dimensional {
         return result;
     }
 
+    /**
+     * Converts STB outline commands to em-space quadratic records, closing each
+     * contour. Lines become midpoint quadratics; cubic segments are approximated.
+     * Always frees the borrowed native outline buffer after processing.
+     *
+     * @param info initialized font information
+     * @param codepoint character whose outline is requested
+     * @param emScale raw-unit to em multiplier
+     * @return compiled segments, possibly empty
+     */
     private static List<SlugCurve> loadCurves(STBTTFontinfo info, int codepoint, float emScale) {
         List<SlugCurve> curves = new ArrayList<>();
         STBTTVertex.Buffer vertices = stbtt_GetCodepointShape(info, codepoint);
@@ -362,6 +486,16 @@ public final class SlugFont implements Dimensional {
         return curves;
     }
 
+    /**
+     * Appends a line encoded as a quadratic with midpoint control, unless endpoint
+     * distance squared is below the configured minimum.
+     *
+     * @param curves destination segment list
+     * @param x0 start X in em units
+     * @param y0 start Y in em units
+     * @param x1 end X in em units
+     * @param y1 end Y in em units
+     */
     private static void addLine(List<SlugCurve> curves, float x0, float y0, float x1, float y1) {
         float dx = x1 - x0;
         float dy = y1 - y0;
@@ -371,6 +505,19 @@ public final class SlugFont implements Dimensional {
         curves.add(new SlugCurve(x0, y0, (x0 + x1) * 0.5f, (y0 + y1) * 0.5f, x1, y1));
     }
 
+    /**
+     * Appends a quadratic unless its endpoint separation is below the minimum.
+     * A control point sufficiently close to the endpoint midpoint is replaced by
+     * that midpoint, encoding a straight segment.
+     *
+     * @param curves destination segments
+     * @param x0 start X
+     * @param y0 start Y
+     * @param cx control X
+     * @param cy control Y
+     * @param x1 end X
+     * @param y1 end Y
+     */
     private static void addQuadratic(List<SlugCurve> curves, float x0, float y0, float cx, float cy, float x1, float y1) {
         float dx = x1 - x0;
         float dy = y1 - y0;
@@ -390,6 +537,21 @@ public final class SlugFont implements Dimensional {
         curves.add(new SlugCurve(x0, y0, cx, cy, x1, y1));
     }
 
+    /**
+     * Approximates a cubic in em space. Very short endpoint spans are omitted,
+     * nearly collinear controls become one line, and other curves become five or
+     * eight line segments according to control-point distance from the endpoint line.
+     *
+     * @param curves destination quadratic/line records
+     * @param x0 start X
+     * @param y0 start Y
+     * @param cx0 first control X
+     * @param cy0 first control Y
+     * @param cx1 second control X
+     * @param cy1 second control Y
+     * @param x1 end X
+     * @param y1 end Y
+     */
     private static void approximateCubic(List<SlugCurve> curves, float x0, float y0, float cx0, float cy0, float cx1, float cy1, float x1, float y1) {
         float dx = x1 - x0;
         float dy = y1 - y0;
@@ -419,6 +581,18 @@ public final class SlugFont implements Dimensional {
         }
     }
 
+    /**
+     * Measures squared perpendicular distance to the infinite endpoint line.
+     * For a near-zero line length, returns squared distance to its first endpoint.
+     *
+     * @param px point X
+     * @param py point Y
+     * @param x0 first line point X
+     * @param y0 first line point Y
+     * @param x1 second line point X
+     * @param y1 second line point Y
+     * @return squared distance in the input coordinate units
+     */
     private static float distanceToLineSquared(float px, float py, float x0, float y0, float x1, float y1) {
         float dx = x1 - x0;
         float dy = y1 - y0;
@@ -432,7 +606,16 @@ public final class SlugFont implements Dimensional {
         return (cross * cross) / len2;
     }
 
+    /**
+     * Creates an owned 4096-wide RGBA16F texture from four-float texels using nearest
+     * sampling and edge clamping. Height follows buffer capacity, with at least one
+     * row. Preserves the active unit's texture binding and pixel-unpack state.
+     *
+     * @param buffer complete row-padded curve data
+     * @return owned OpenGL texture name
+     */
     private static int uploadCurveTexture(FloatBuffer buffer) {
+        try (UploadState ignored = new UploadState()) {
         int texture = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -441,11 +624,19 @@ public final class SlugFont implements Dimensional {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         int height = Math.max(1, buffer.capacity() / (TEXTURE_WIDTH * 4));
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, TEXTURE_WIDTH, height, 0, GL_RGBA, GL_FLOAT, buffer);
-        glBindTexture(GL_TEXTURE_2D, 0);
         return texture;
+        }
     }
 
+    /**
+     * Creates an owned 4096-wide RG32UI texture from two-integer texels, with nearest
+     * sampling and edge clamping. Preserves texture and pixel-unpack state.
+     *
+     * @param buffer complete row-padded band headers and curve locations
+     * @return owned OpenGL texture name
+     */
     private static int uploadBandTexture(IntBuffer buffer) {
+        try (UploadState ignored = new UploadState()) {
         int texture = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -454,14 +645,58 @@ public final class SlugFont implements Dimensional {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         int height = Math.max(1, buffer.capacity() / (TEXTURE_WIDTH * 2));
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32UI, TEXTURE_WIDTH, height, 0, GL_RG_INTEGER, GL_UNSIGNED_INT, buffer);
-        glBindTexture(GL_TEXTURE_2D, 0);
         return texture;
+        }
     }
 
+    /** Isolates uploads from texture streaming/PBO state owned by other renderers. */
+    private static final class UploadState implements AutoCloseable {
+        private final int texture = glGetInteger(GL_TEXTURE_BINDING_2D);
+        private final int pbo = glGetInteger(GL_PIXEL_UNPACK_BUFFER_BINDING);
+        private final int alignment = glGetInteger(GL_UNPACK_ALIGNMENT);
+        private final int rowLength = glGetInteger(GL_UNPACK_ROW_LENGTH);
+        private final int skipRows = glGetInteger(GL_UNPACK_SKIP_ROWS);
+        private final int skipPixels = glGetInteger(GL_UNPACK_SKIP_PIXELS);
+        private final int swapBytes = glGetInteger(GL_UNPACK_SWAP_BYTES);
+        UploadState() {
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+            glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+            glPixelStorei(GL_UNPACK_SWAP_BYTES, 0);
+        }
+        @Override public void close() {
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength);
+            glPixelStorei(GL_UNPACK_SKIP_ROWS, skipRows);
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels);
+            glPixelStorei(GL_UNPACK_SWAP_BYTES, swapBytes);
+        }
+    }
+
+    /**
+     * Packs texel coordinates into low and high 16-bit halves without range checks.
+     *
+     * @param x horizontal coordinate stored in the low half
+     * @param y vertical coordinate stored in the high half
+     * @return packed texture address
+     */
     static int packLocation(int x, int y) {
         return (y << 16) | (x & 0xFFFF);
     }
 
+    /**
+     * Packs zero-based band maxima and the optional even-odd fill flag for the shader.
+     * Only eight bits of each band maximum are retained.
+     *
+     * @param bandMaxX last vertical-band index
+     * @param bandMaxY last horizontal-band index
+     * @param evenOdd whether to set the even-odd fill bit
+     * @return packed glyph metadata
+     */
     private static int packGlyphInfo(int bandMaxX, int bandMaxY, boolean evenOdd) {
         int value = (bandMaxX & 0xFF) | ((bandMaxY & 0xFF) << 16);
         if (evenOdd) {
@@ -470,18 +705,44 @@ public final class SlugFont implements Dimensional {
         return value;
     }
 
+    /**
+     * Extracts the unsigned low-half texel coordinate.
+     *
+     * @param packed packed texture address
+     * @return X from 0 through 65535
+     */
     private static int unpackX(int packed) {
         return packed & 0xFFFF;
     }
 
+    /**
+     * Extracts the unsigned high-half texel coordinate.
+     *
+     * @param packed packed texture address
+     * @return Y from 0 through 65535
+     */
     private static int unpackY(int packed) {
         return (packed >>> 16) & 0xFFFF;
     }
 
+    /**
+     * Clamps an integer to inclusive limits, assuming min does not exceed max.
+     *
+     * @param value candidate value
+     * @param min lower limit
+     * @param max upper limit
+     * @return bounded value
+     */
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
 
+    /**
+     * Looks up a compiled character without substituting another glyph.
+     *
+     * @param codepoint requested character value
+     * @return compiled entry, or null outside the configured range
+     */
     SlugGlyph glyph(int codepoint) {
         int index = codepoint - firstCodepoint;
         if (index < 0 || index >= characterCount) {
@@ -490,14 +751,32 @@ public final class SlugFont implements Dimensional {
         return glyphs[index];
     }
 
+    /**
+     * Returns the owned curve texture name for batch binding.
+     *
+     * @return texture name, or zero after disposal
+     */
     int curveTexture() {
         return curveTexture;
     }
 
+    /**
+     * Returns the owned band-data texture name for batch binding.
+     *
+     * @return texture name, or zero after disposal
+     */
     int bandTexture() {
         return bandTexture;
     }
 
+    /**
+     * Returns an em-space pair adjustment from the dense table when both characters
+     * are compiled, otherwise queries the retained STB font information.
+     *
+     * @param previousCodepoint preceding character
+     * @param codepoint current character
+     * @return pair advance adjustment in em units
+     */
     float kerning(int previousCodepoint, int codepoint) {
         int previousIndex = previousCodepoint - firstCodepoint;
         int index = codepoint - firstCodepoint;
@@ -508,25 +787,30 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Creates a reusable pre-laid-out text run. This removes per-frame text layout and kerning work.
+     * Creates a reusable layout tied to this font, avoiding repeated glyph and kerning
+     * layout during drawing. Keep the font's GPU resources alive while drawing the run.
      *
-     * @param text text to layout
+     * @param text text to lay out
      * @param size world units per em
-     * @return reusable text run
+     * @return new reusable run
      */
     public SlugTextRun createRun(String text, float size) {
         return new SlugTextRun(this, text, size);
     }
 
     /**
-     * Draws text using this Slug font.
+     * Appends drawable glyphs at a baseline origin, applying kerning and advances.
+     * Newlines reset X and move the baseline down one line height; tabs advance four
+     * spaces and reset kerning. Uncompiled UTF-16 characters advance a quarter em.
+     * Null/empty text or zero size emits nothing. The batch manages actual submission.
      *
-     * @param batch batch that receives glyph instances
-     * @param text  text to draw
-     * @param x     baseline x position
-     * @param y     baseline y position
-     * @param size  world units per em
-     * @param color text color
+     * @param batch nonnull destination batch
+     * @param text text to draw
+     * @param x baseline origin X
+     * @param y baseline origin Y
+     * @param size world units per em; not validated here
+     * @param color copied draw tint, or null for white
+     * @throws NullPointerException if batch is null
      */
     public void draw(SlugBatch batch, String text, float x, float y, float size, Color color) {
         if (batch == null) throw new NullPointerException("batch");
@@ -576,18 +860,22 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Draws the retained text at the retained position, size, and color.
+     * Appends the retained text using its current baseline, size, and mutable tint.
      *
-     * @param batch batch that receives glyph instances
+     * @param batch nonnull destination batch
+     * @throws NullPointerException if batch is null
      */
     public void draw(SlugBatch batch) {
-        draw(batch, text, x, y, size, color);
+        if (retainedRun == null) retainedRun = createRun(text, size);
+        else retainedRun.rebuild(text, size);
+        retainedRun.draw(batch, x, y, color);
     }
 
     /**
-     * Sets retained text for Font-like usage.
+     * Replaces retained text, normalizing null to empty, and recalculates measured
+     * width and height at the retained font size.
      *
-     * @param text text to retain
+     * @param text new retained text
      * @return this font
      */
     public SlugFont setText(String text) {
@@ -596,36 +884,63 @@ public final class SlugFont implements Dimensional {
         return this;
     }
 
+    /**
+     * Sets the retained baseline origin without changing layout or measurements.
+     *
+     * @param x baseline X
+     * @param y baseline Y
+     */
     @Override
     public void setPosition(float x, float y) {
         this.x = x;
         this.y = y;
     }
 
-    @Override
-    public void setX(float x) {
-        this.x = x;
-    }
-
-    @Override
-    public void setY(float y) {
-        this.y = y;
-    }
-
+    /**
+     * Returns the retained baseline X coordinate.
+     *
+     * @return baseline X
+     */
     @Override
     public float getX() {
         return x;
     }
 
+    /**
+     * Sets retained baseline X without changing measured width.
+     *
+     * @param x baseline X
+     */
+    @Override
+    public void setX(float x) {
+        this.x = x;
+    }
+
+    /**
+     * Returns the retained baseline Y coordinate.
+     *
+     * @return baseline Y
+     */
     @Override
     public float getY() {
         return y;
     }
 
     /**
-     * Sets retained size in world units per em.
+     * Sets retained baseline Y without changing measured height.
      *
-     * @param size font size
+     * @param y baseline Y
+     */
+    @Override
+    public void setY(float y) {
+        this.y = y;
+    }
+
+    /**
+     * Sets retained world units per em and recomputes measured dimensions.
+     * The value is stored without sign or finiteness validation.
+     *
+     * @param size new font scale
      * @return this font
      */
     public SlugFont setSize(float size) {
@@ -635,29 +950,22 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Sets retained color.
-     *
-     * @param color color to copy
-     * @return this font
+     * Replaces cached retained dimensions with current text measurements. Overrides
+     * any width/height values previously set through the Dimensional interface.
      */
-    public SlugFont setColor(Color color) {
-        if (color != null) {
-            this.color.set(color);
-        }
-        return this;
-    }
-
     private void recalcSize() {
         width = getWidth(text, size);
         height = getHeight(text, size);
     }
 
     /**
-     * Measures text width without mutating retained state.
+     * Measures the maximum line advance using the same UTF-16 kerning, tab, and
+     * fallback rules as draw. This measures pen advances rather than tight ink bounds.
+     * Does not change retained state; null or empty text returns zero.
      *
      * @param text text to measure
      * @param size world units per em
-     * @return measured width
+     * @return maximum line advance in world units
      */
     public float getWidth(String text, float size) {
         if (text == null || text.isEmpty()) {
@@ -699,11 +1007,13 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Measures text height without mutating retained state.
+     * Measures line-box height as newline count plus one times font line height and
+     * size. A trailing newline adds an empty line; null or empty text returns zero.
+     * This is not a tight glyph-ink measurement.
      *
      * @param text text to measure
      * @param size world units per em
-     * @return measured height
+     * @return total line-box height
      */
     public float getHeight(String text, float size) {
         if (text == null || text.isEmpty()) {
@@ -718,79 +1028,123 @@ public final class SlugFont implements Dimensional {
         return lines * lineHeight * size;
     }
 
+    /**
+     * Returns cached retained width, either measured or explicitly overridden.
+     *
+     * @return retained width metadata
+     */
     @Override
     public float getWidth() {
         return width;
     }
 
-    @Override
-    public float getHeight() {
-        return height;
-    }
-
-    @Override
-    public void setSize(float width, float height) {
-        this.width = width;
-        this.height = height;
-    }
-
+    /**
+     * Overrides cached width metadata without scaling glyphs or changing font size.
+     * A later text or single-argument size change recomputes it.
+     *
+     * @param width width metadata to store
+     */
     @Override
     public void setWidth(float width) {
         this.width = width;
     }
 
+    /**
+     * Returns cached retained height, either measured or explicitly overridden.
+     *
+     * @return retained height metadata
+     */
+    @Override
+    public float getHeight() {
+        return height;
+    }
+
+    /**
+     * Overrides cached height metadata without scaling glyphs or changing line spacing.
+     * A later text or single-argument size change recomputes it.
+     *
+     * @param height height metadata to store
+     */
     @Override
     public void setHeight(float height) {
         this.height = height;
     }
 
     /**
-     * Returns the retained font size in world units per em.
+     * Overrides both cached dimensions without changing the font scale used to draw.
+     * Use the single-argument font-size setter to resize glyphs and recalculate bounds.
      *
-     * @return font size
+     * @param width width metadata
+     * @param height height metadata
+     */
+    @Override
+    public void setSize(float width, float height) {
+        this.width = width;
+        this.height = height;
+    }
+
+    /**
+     * Returns the retained drawing scale, independent of overridden width/height metadata.
+     *
+     * @return world units per em
      */
     public float getFontSize() {
         return size;
     }
 
     /**
-     * Returns the mutable retained color object.
+     * Returns the live retained tint. Direct mutations affect subsequent retained draws.
      *
-     * @return retained color
+     * @return mutable font-owned color
      */
     public Color getColor() {
         return color;
     }
 
     /**
-     * Returns the font ascent in em units.
+     * Copies a supplied color into the retained tint, leaving it unchanged for null.
      *
-     * @return ascent
+     * @param color tint to copy, or null
+     * @return this font
+     */
+    public SlugFont setColor(Color color) {
+        if (color != null) {
+            this.color.set(color);
+        }
+        return this;
+    }
+
+    /**
+     * Returns STB ascent converted from font units to em units.
+     *
+     * @return baseline-to-ascent metric in em units
      */
     public float ascent() {
         return ascent;
     }
 
     /**
-     * Returns the font descent in em units.
+     * Returns STB descent in em units, normally a negative baseline-relative value.
      *
-     * @return descent
+     * @return descent metric in em units
      */
     public float descent() {
         return descent;
     }
 
     /**
-     * Returns the line height in em units.
+     * Returns ascent minus descent plus line gap, used for baseline spacing.
      *
-     * @return line height
+     * @return line height in em units
      */
     public float lineHeight() {
         return lineHeight;
     }
 
     /**
-     * Deletes the GPU data textures owned by this font.
+     * Deletes owned curve and band textures with the GL context current, replacing
+     * their IDs with zero. Repeated calls are harmless. Retains CPU glyph, kerning,
+     * and font-byte data, so measurement still works while drawing is no longer valid.
      */
     public void dispose() {
         if (curveTexture != 0) {
@@ -803,16 +1157,35 @@ public final class SlugFont implements Dimensional {
         }
     }
 
+    /**
+     * CPU staging writer for four-float curve texels. Each quadratic occupies two
+     * adjacent texels, with row-end padding to keep the pair on the same row.
+     * Address packing assumes the production width of 4096.
+     * @author Albert Beaupre
+     */
     private static final class FloatTexelWriter {
-        private final int width;
-        private final List<Float> values = new ArrayList<>();
+        private final int width; // Texture row width in texels.
+        private float[] values = new float[4096];
+        private int count;
 
+        /**
+         * Creates empty curve staging storage.
+         *
+         * @param width row width; address packing requires 4096
+         */
         FloatTexelWriter(int width) {
             this.width = width;
         }
 
+        /**
+         * Appends two texels containing a quadratic's three control points. Pads the
+         * last texel of a row when necessary so the two-texel record stays together.
+         *
+         * @param curve quadratic control points
+         * @return packed address of the first texel
+         */
         int writeCurve(SlugCurve curve) {
-            int texel = values.size() / 4;
+            int texel = count / 4;
             if ((texel & (width - 1)) == width - 1) {
                 write(0f, 0f, 0f, 0f);
                 texel++;
@@ -825,24 +1198,40 @@ public final class SlugFont implements Dimensional {
             return packLocation(x, y);
         }
 
+        /**
+         * Appends one four-component texel to curve staging storage.
+         *
+         * @param r first component
+         * @param g second component
+         * @param b third component
+         * @param a fourth component
+         */
         void write(float r, float g, float b, float a) {
-            values.add(r);
-            values.add(g);
-            values.add(b);
-            values.add(a);
+            if (count + 4 > values.length) values = java.util.Arrays.copyOf(values, values.length * 2);
+            values[count++] = r; values[count++] = g; values[count++] = b; values[count++] = a;
         }
 
+        /**
+         * Computes the complete row count needed for staged texels, with at least one row.
+         *
+         * @return required texture height
+         */
         int height() {
-            int texels = Math.max(1, (values.size() + 3) / 4);
+            int texels = Math.max(1, (count + 3) / 4);
             return Math.max(1, (texels + width - 1) / width);
         }
 
+        /**
+         * Copies staged floats into a direct buffer padded with zeros to the requested
+         * row count, then flips it for upload.
+         *
+         * @param height row count at least the required height
+         * @return upload-ready RGBA float buffer
+         */
         FloatBuffer toBuffer(int height) {
             int capacity = width * height * 4;
             FloatBuffer buffer = BufferUtils.createFloatBuffer(capacity);
-            for (Float value : values) {
-                buffer.put(value);
-            }
+            buffer.put(values, 0, count);
             while (buffer.position() < capacity) {
                 buffer.put(0f);
             }
@@ -851,34 +1240,70 @@ public final class SlugFont implements Dimensional {
         }
     }
 
+    /**
+     * CPU staging writer for two-integer band headers and curve-address texels.
+     * Tracks linear texel offsets before padding rows for an RG32UI upload.
+     * <p>The writer owns CPU staging values only. Generated integer buffers feed band-texture
+     * uploads; texture creation and disposal belong to SlugFont rather than this helper.</p>
+     *
+     * @author Albert Beaupre
+     */
     private static final class UIntTexelWriter {
-        private final int width;
-        private final List<Integer> values = new ArrayList<>();
+        private final int width; // Texture row width in texels.
+        private int[] values = new int[4096];
+        private int count;
 
+        /**
+         * Creates empty integer band staging storage.
+         *
+         * @param width number of texels per row
+         */
         UIntTexelWriter(int width) {
             this.width = width;
         }
 
+        /**
+         * Returns the next linear texel index before final row padding.
+         *
+         * @return number of two-component texels already staged
+         */
         int position() {
-            return values.size() / 2;
+            return count / 2;
         }
 
+        /**
+         * Appends one two-integer band header or curve-address texel.
+         *
+         * @param r first unsigned-integer bit pattern
+         * @param g second unsigned-integer bit pattern
+         */
         void write(int r, int g) {
-            values.add(r);
-            values.add(g);
+            if (count + 2 > values.length) values = java.util.Arrays.copyOf(values, values.length * 2);
+            values[count++] = r; values[count++] = g;
         }
 
+        /**
+         * Computes the rows required for staged two-integer texels, with a minimum
+         * of one row even when no band data has been written.
+         *
+         * @return required texture height
+         */
         int height() {
-            int texels = Math.max(1, (values.size() + 1) / 2);
+            int texels = Math.max(1, (count + 1) / 2);
             return Math.max(1, (texels + width - 1) / width);
         }
 
+        /**
+         * Copies staged integers into a direct buffer padded with zeros to the requested
+         * row count, then flips it for upload.
+         *
+         * @param height row count at least the required height
+         * @return upload-ready RG integer buffer
+         */
         IntBuffer toBuffer(int height) {
             int capacity = width * height * 2;
             IntBuffer buffer = BufferUtils.createIntBuffer(capacity);
-            for (Integer value : values) {
-                buffer.put(value);
-            }
+            buffer.put(values, 0, count);
             while (buffer.position() < capacity) {
                 buffer.put(0);
             }

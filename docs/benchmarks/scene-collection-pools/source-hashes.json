@@ -1,0 +1,38 @@
+[
+  {
+    "path": "src/main/java/valthorne/graphics/model/Material3D.java",
+    "sha256": "93EBE972DD5CCA27CE5D14C8426DD5CAF09787EFC601C1573B545488CC8E7CCC"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/PathTracingScene.java",
+    "sha256": "326783B588C81A255F3E98397C196B136B30B48F132A20BFAB214D1A1B04B34E"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/SceneNode3D.java",
+    "sha256": "22B970C1A792E76895F40B6C729E176CB8C656230CF6463401BFAA8929261498"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/Scene3D.java",
+    "sha256": "D9DA3A884DE8E7068AFDBE681AD600ECACF12684E36C0823B001B1F50764E66B"
+  },
+  {
+    "path": "src/benchmark/java/valthorne/graphics/model/SceneSnapshotBenchmark.java",
+    "sha256": "163BF5DF617541E3862B69B2E1376098814629DCDF253132AD686C884E26F6F3"
+  },
+  {
+    "path": "src/test/java/valthorne/model3d/PathTracingSceneSnapshotTest.java",
+    "sha256": "D40E13B8C85D0D19573FB2323153121AAC16F3C218C868856A39DA1B1010767C"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArena.java",
+    "sha256": "54E0BA8892E4BF29FFD516698A81B54A3BA350678CDF27DE0E363F29F817D778"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArenaEffects.java",
+    "sha256": "4E1FD46A996270624705BCFE5091C17912A8741F567AD6A8A9E5800CB78287BF"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArenaValidation.java",
+    "sha256": "76BAD3213AA6F62C7852417D4737EF0DC9C5DF8CE503FBCFDC6A715037B1163E"
+  }
+]

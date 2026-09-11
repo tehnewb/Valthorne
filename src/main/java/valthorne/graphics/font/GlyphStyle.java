@@ -30,11 +30,25 @@ public class GlyphStyle {
     public float getOffsetX() {return offsetX;}
 
     /**
+     * Sets the horizontal offset for the glyph.
+     *
+     * @param offsetX the value to set as the horizontal offset.
+     */
+    public void setOffsetX(float offsetX) {this.offsetX = offsetX;}
+
+    /**
      * Retrieves the vertical offset of the glyph.
      *
      * @return the vertical offset.
      */
     public float getOffsetY() {return offsetY;}
+
+    /**
+     * Sets the vertical offset for the glyph.
+     *
+     * @param offsetY the value to set as the vertical offset.
+     */
+    public void setOffsetY(float offsetY) {this.offsetY = offsetY;}
 
     /**
      * Retrieves the horizontal scale of the glyph.
@@ -44,11 +58,25 @@ public class GlyphStyle {
     public float getScaleX() {return scaleX;}
 
     /**
+     * Sets the horizontal scale of the glyph.
+     *
+     * @param scaleX the value to set as the horizontal scale.
+     */
+    public void setScaleX(float scaleX) {this.scaleX = scaleX;}
+
+    /**
      * Retrieves the vertical scale of the glyph.
      *
      * @return the vertical scale.
      */
     public float getScaleY() {return scaleY;}
+
+    /**
+     * Sets the vertical scale of the glyph.
+     *
+     * @param scaleY the value to set as the vertical scale.
+     */
+    public void setScaleY(float scaleY) {this.scaleY = scaleY;}
 
     /**
      * Checks if the glyph is visible.
@@ -58,25 +86,18 @@ public class GlyphStyle {
     public boolean isVisible() {return visible;}
 
     /**
+     * Sets the visibility of the glyph.
+     *
+     * @param visible {@code true} to make the glyph visible, {@code false} to hide it.
+     */
+    public void setVisible(boolean visible) {this.visible = visible;}
+
+    /**
      * Checks if the glyph has a custom color set.
      *
      * @return {@code true} if a custom color is applied, otherwise {@code false}.
      */
     public boolean hasColor() {return hasColor;}
-
-    /**
-     * Sets the horizontal offset for the glyph.
-     *
-     * @param offsetX the value to set as the horizontal offset.
-     */
-    public void setOffsetX(float offsetX) {this.offsetX = offsetX;}
-
-    /**
-     * Sets the vertical offset for the glyph.
-     *
-     * @param offsetY the value to set as the vertical offset.
-     */
-    public void setOffsetY(float offsetY) {this.offsetY = offsetY;}
 
     /**
      * Sets both horizontal and vertical offsets for the glyph.
@@ -90,20 +111,6 @@ public class GlyphStyle {
     }
 
     /**
-     * Sets the horizontal scale of the glyph.
-     *
-     * @param scaleX the value to set as the horizontal scale.
-     */
-    public void setScaleX(float scaleX) {this.scaleX = scaleX;}
-
-    /**
-     * Sets the vertical scale of the glyph.
-     *
-     * @param scaleY the value to set as the vertical scale.
-     */
-    public void setScaleY(float scaleY) {this.scaleY = scaleY;}
-
-    /**
      * Sets both horizontal and vertical scales for the glyph.
      *
      * @param scaleX the value to set as the horizontal scale.
@@ -113,13 +120,6 @@ public class GlyphStyle {
         this.scaleX = scaleX;
         this.scaleY = scaleY;
     }
-
-    /**
-     * Sets the visibility of the glyph.
-     *
-     * @param visible {@code true} to make the glyph visible, {@code false} to hide it.
-     */
-    public void setVisible(boolean visible) {this.visible = visible;}
 
     /**
      * Hides the glyph by setting its visibility to {@code false}.
@@ -143,6 +143,20 @@ public class GlyphStyle {
     }
 
     /**
+     * Sets a custom color for the glyph by copying the values from another {@link Color} instance.
+     * If the provided color is {@code null}, the custom color is cleared.
+     *
+     * @param color the {@link Color} instance to copy values from, or {@code null} to clear the color.
+     */
+    public void setColor(Color color) {
+        if (color == null) {
+            clearColor();
+            return;
+        }
+        setColor(color.r(), color.g(), color.b(), color.a());
+    }
+
+    /**
      * Clears the custom color of the glyph, resetting it to the default state.
      * Sets {@code hasColor} to {@code false}.
      */
@@ -159,20 +173,6 @@ public class GlyphStyle {
     public void setColor(float r, float g, float b, float a) {
         this.hasColor = true;
         this.color.set(r, g, b, a);
-    }
-
-    /**
-     * Sets a custom color for the glyph by copying the values from another {@link Color} instance.
-     * If the provided color is {@code null}, the custom color is cleared.
-     *
-     * @param color the {@link Color} instance to copy values from, or {@code null} to clear the color.
-     */
-    public void setColor(Color color) {
-        if (color == null) {
-            clearColor();
-            return;
-        }
-        setColor(color.r(), color.g(), color.b(), color.a());
     }
 
     /**

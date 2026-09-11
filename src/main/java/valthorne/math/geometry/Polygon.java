@@ -1,6 +1,6 @@
 package valthorne.math.geometry;
 
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 
 /**
  * Represents a polygon defined by a sequence of vertices in 2D space.
@@ -13,7 +13,7 @@ import valthorne.math.Vector2f;
  */
 public class Polygon extends Shape {
 
-    private Vector2f[] points;
+    private Vector2f[] points; // Live vertex array defining the polygon's boundary.
 
     /**
      * Creates a polygon from the given vertices.
@@ -37,14 +37,28 @@ public class Polygon extends Shape {
         this.points = points;
     }
 
+    /**
+     * Translates each non-null vertex in place, preserving array order and identity.
+     * The offset is read for each vertex, so use an independent vector: aliasing a
+     * stored vertex can change the offset while the traversal is still in progress.
+     *
+     * @param offset translation in the polygon's coordinate units
+     */
     @Override
     public void move(Vector2f offset) {
         for (Vector2f p : points) {
             if (p == null) continue;
-            p.set(p.getX() + offset.getX(), p.getY() + offset.getY());
+            p.set(p.x() + offset.x(), p.y() + offset.y());
         }
     }
 
+    /**
+     * Exposes the live boundary array retained by construction or setPoints.
+     * Neither the array nor its vectors are copied; caller mutations affect the polygon.
+     * Null entries are possible because vertex elements are not validated.
+     *
+     * @return live ordered vertex array
+     */
     @Override
     public Vector2f[] points() {
         return points;

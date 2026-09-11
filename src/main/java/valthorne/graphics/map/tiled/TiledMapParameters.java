@@ -168,6 +168,16 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
         return fromClasspath(tmxResourcePath, normalize(tmxResourcePath));
     }
 
+    /**
+     * Recursively loads a resource and its TMX/TSX image and tileset dependencies.
+     * The visited set prevents repeated reads and cycles. Every reference still gains
+     * aliases when bytes are already available; arrays stored under aliases are shared.
+     *
+     * @param resourcePath resource location to normalize and load
+     * @param rawReference optional original reference used as an additional lookup key
+     * @param files mutable output map of lookup keys to resource bytes
+     * @param visited mutable set of normalized paths already encountered
+     */
     private static void collectClasspathDependencies(String resourcePath, String rawReference, Map<String, byte[]> files, Set<String> visited) {
         String normalizedPath = normalize(resourcePath);
 
@@ -192,6 +202,16 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
         }
     }
 
+    /**
+     * Registers shared bytes under normalized and working-directory-prefixed keys.
+     * These two keys are overwritten, while an optional raw-reference alias preserves
+     * any earlier value so ambiguous relative names keep their first mapping.
+     *
+     * @param files mutable dependency lookup table
+     * @param normalizedPath canonical slash-separated resource key
+     * @param rawReference optional relative source attribute
+     * @param bytes bytes shared by every newly registered alias
+     */
     private static void addAliases(Map<String, byte[]> files, String normalizedPath, String rawReference, byte[] bytes) {
         files.put(normalizedPath, bytes);
         files.put(toAbsoluteAlias(normalizedPath), bytes);
@@ -201,11 +221,27 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
         }
     }
 
+    /**
+     * Recognizes TMX and TSX filenames for recursive dependency scanning.
+     * Matching uses a lowercased filename suffix rather than inspecting file contents.
+     *
+     * @param path non-null resource path
+     * @return whether the path ends in a supported XML map or tileset extension
+     */
     private static boolean isXmlDependency(String path) {
         String lower = path.toLowerCase();
         return lower.endsWith(".tmx") || lower.endsWith(".tsx");
     }
 
+    /**
+     * Scans XML start elements for nonblank source attributes on tileset and image
+     * elements. References retain document order and may repeat; resolution and cycle
+     * handling are performed by the caller.
+     *
+     * @param bytes complete XML resource contents
+     * @return newly allocated list of unmodified source references
+     * @throws RuntimeException if the XML stream cannot be parsed
+     */
     private static List<String> readDependencyPaths(byte[] bytes) {
         List<String> dependencies = new ArrayList<>();
 
@@ -238,6 +274,16 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
         }
     }
 
+    /**
+     * Resolves a resource reference against the directory of its parent resource.
+     * A colon-containing reference is returned after normalization; a leading slash
+     * selects the resource root. Relative dot segments are collapsed, and parent
+     * segments beyond the root are discarded rather than retained.
+     *
+     * @param parentPath path of the referring resource
+     * @param childPath source reference from that resource
+     * @return slash-separated resolved resource key
+     */
     private static String resolveRelative(String parentPath, String childPath) {
         String normalizedChild = normalize(childPath);
 
@@ -271,24 +317,29 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
         return String.join("/", parts);
     }
 
+    /**
+     * Extracts everything before the last slash after path normalization.
+     * The final path segment is treated as a filename; no filesystem access occurs.
+     *
+     * @param path resource path
+     * @return parent resource directory, or an empty string when no slash exists
+     */
     private static String directoryOf(String path) {
         String normalized = normalize(path);
         int index = normalized.lastIndexOf('/');
         return index == -1 ? "" : normalized.substring(0, index);
     }
 
+    /**
+     * Builds a lookup alias by prefixing the normalized working directory.
+     * This is string-based alias construction rather than filesystem canonicalization;
+     * it does not check that the resource exists or resolve symbolic links.
+     *
+     * @param path resource key to append
+     * @return slash-separated working-directory alias
+     */
     private static String toAbsoluteAlias(String path) {
         return normalize(System.getProperty("user.dir")) + "/" + normalize(path);
-    }
-
-    /**
-     * Returns the asset-manager cache key for this map.
-     *
-     * @return the asset key
-     */
-    @Override
-    public String key() {
-        return name;
     }
 
     /**
@@ -304,5 +355,15 @@ public record TiledMapParameters(TiledMapSource source, TiledDependencySource de
      */
     private static String normalize(String path) {
         return path.replace('\\', '/');
+    }
+
+    /**
+     * Returns the asset-manager cache key for this map.
+     *
+     * @return the asset key
+     */
+    @Override
+    public String key() {
+        return name;
     }
 }

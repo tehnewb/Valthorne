@@ -27,6 +27,10 @@ import valthorne.ui.theme.StyleKey;
  * from the panel's style using {@link #BACKGROUND_KEY}. If a theme and resolved
  * style are available, the background is drawn to the panel's current render
  * bounds before any children are rendered.
+ * The drawable is borrowed from the resolved style and is neither copied nor
+ * disposed by the panel. A missing background leaves the container transparent;
+ * children still render. Child traversal uses the root's shared backend dispatch
+ * when attached, allowing NanoVG and texture-based children to coexist.
  * </p>
  *
  * <p>
@@ -53,13 +57,14 @@ import valthorne.ui.theme.StyleKey;
  * panel.add(new Label("Settings"));
  * panel.add(new Button("Apply"));
  *
- * panel.update(delta);
- * panel.draw(batch);
+ * root.add(panel);
+ * // Let the root's normal layout, update and draw lifecycle visit the panel.
  * }</pre>
  *
  * <p>
  * This example demonstrates the complete intended use of the class: creating a
- * panel, assigning layout values, adding child nodes, updating it, and drawing it.
+ * panel, assigning layout values, adding child nodes and attaching it for root
+ * traversal. Render on the graphics thread with the root's active batch and context.
  * </p>
  *
  * @author Albert Beaupre
@@ -69,6 +74,9 @@ public class Panel extends UIContainer {
 
     /**
      * Style key used to resolve the panel background drawable.
+     * Registered globally as "background" with no default. A null resolved value
+     * paints no panel surface. The drawable receives the full render rectangle,
+     * including the area behind layout padding, and remains owned by its provider.
      */
     public static final StyleKey<Drawable> BACKGROUND_KEY = StyleKey.of("background", Drawable.class);
 
@@ -80,6 +88,8 @@ public class Panel extends UIContainer {
      * <p>
      * This implementation delegates directly to the superclass update logic so
      * child nodes continue to receive their normal update calls.
+     * This panel adds no animation or background-specific update work. Structural
+     * changes to children should follow the inherited container lifecycle policy.
      * </p>
      *
      * @param delta the elapsed frame time in seconds
@@ -99,13 +109,18 @@ public class Panel extends UIContainer {
      * attempts to resolve a background drawable using {@link #BACKGROUND_KEY}.
      * If one exists, it is drawn across the panel's full render bounds. After that,
      * the container's children are drawn through the superclass implementation.
+     * Padding does not inset the background. Rendering does not resize the panel
+     * from drawable dimensions or add a clip of its own. Root traversal supplies
+     * visibility checks and rendering scopes; callers invoking draw directly must
+     * provide a prepared batch. A background failure propagates before children
+     * are visited, with no resource disposal by this method.
      * </p>
      *
      * @param batch the texture batch used for rendering
      */
     @Override
     public void draw(TextureBatch batch) {
-        if (this.getTheme() != null) {
+        if (this.getStyle() != null) {
 
             ResolvedStyle style = this.getStyle();
             if (style != null) {

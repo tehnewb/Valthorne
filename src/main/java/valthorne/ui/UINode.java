@@ -5,7 +5,7 @@ import valthorne.Window;
 import valthorne.collections.bits.ShortBits;
 import valthorne.event.events.*;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.math.geometry.Rectangle;
 import valthorne.ui.nodes.Tooltip;
 import valthorne.ui.theme.*;
@@ -113,7 +113,7 @@ import valthorne.viewport.Viewport;
  * @author Albert Beaupre
  * @since March 13th, 2026
  */
-public abstract class UINode implements Dimensional{
+public abstract class UINode implements Dimensional {
 
     /**
      * Bit index used to mark whether the node is visible.
@@ -175,21 +175,23 @@ public abstract class UINode implements Dimensional{
      */
     public static final int DRAGGING_BIT = 11;
 
+    /**
+     * Shared zero translation used where no content offset is required.
+     */
     private static final Vector2f ZERO_VECTOR = new Vector2f();
-
-    private final Layout layout = new Layout(); // Layout configuration owned by this node.
     private final ShortBits bits = new ShortBits(); // Compact bitset holding node interaction and state flags.
+    private final Rectangle bounds = new Rectangle(); // Cached bounds built from Yoga layout results.
     private Tooltip tooltip; // Optional tooltip displayed for this node.
 
     private UIContainer parent; // Parent container that owns this node.
+    private final Layout layout = new Layout(this::markLayoutDirty); // Layout configuration owned by this node.
     private UIRoot root; // Root UI tree that this node belongs to.
     private ThemeData theme; // Optional local theme override for this node.
     private String styleName; // Optional named style used during theme resolution.
     private StyleMap styleOverrides; // Per-node style overrides layered on top of the theme.
     private ResolvedStyle cachedStyle; // Cached resolved style for the current theme and state.
-
     private long yogaMemoryAddress; // Native Yoga node pointer used for layout calculations.
-    private final Rectangle bounds = new Rectangle(); // Cached bounds built from Yoga layout results.
+    private boolean styleRefreshNeeded = true; // Whether the next style access must resolve inherited and local styling again.
 
     /**
      * Creates a new UI node with its default state initialized.
@@ -208,6 +210,20 @@ public abstract class UINode implements Dimensional{
     }
 
     /**
+     * Transforms a mutable hit-test point through ancestor content transforms in
+     * root-to-leaf order. A null container ends recursion. Coordinates are overwritten
+     * in place, allowing scroll containers to adjust child hit positions consistently.
+     *
+     * @param container deepest ancestor whose content transform is required
+     * @param point mutable point in the coordinate system preceding these transforms
+     */
+    private static void transformContentPoint(UIContainer container, Vector2f point) {
+        if (container == null) return;
+        transformContentPoint(container.getParent(), point);
+        point.set(container.transformChildHitX(point.x()), container.transformChildHitY(point.y()));
+    }
+
+    /**
      * Called when a key is pressed while this node is the active receiver of keyboard input.
      *
      * <p>
@@ -221,6 +237,32 @@ public abstract class UINode implements Dimensional{
     public void onKeyPress(KeyPressEvent event) {}
 
     /**
+     * Root-to-target filter, before the control's normal input handler.
+     */
+    public void onInputPreview(UIInputEvent event) {}
+
+    /**
+     * Target-to-root notification. Consume to stop parent propagation.
+     */
+    public void onInputBubble(UIInputEvent event) {}
+
+    /**
+     * Ends interaction without activating the control.
+     */
+    public void onPointerCancel() {
+        setPressed(false);
+        setDragging(false);
+    }
+
+    /**
+     * Screen pixels (bottom-left) to this node's local top-left coordinates.
+     */
+    public final Vector2f screenToLocal(float x, float y) {
+        Vector2f point = screenToLayout(x, y);
+        return new Vector2f(point.x() - getAbsoluteX(), point.y() - getAbsoluteY());
+    }
+
+    /**
      * Called when a key is released while this node is the active receiver of keyboard input.
      *
      * <p>
@@ -232,6 +274,15 @@ public abstract class UINode implements Dimensional{
      * @param event the key release event containing the released key and modifier state
      */
     public void onKeyRelease(KeyReleaseEvent event) {}
+
+    /**
+     * Receives routed Unicode text input for controls that accept text. The base
+     * implementation performs no editing and does not consume the event; subclasses
+     * may update their editing model and consume accepted input.
+     *
+     * @param event routed text-input event
+     */
+    public void onTextInput(valthorne.event.events.TextInputEvent event) {}
 
     /**
      * Called when a mouse button is pressed on this node.
@@ -716,15 +767,19 @@ public abstract class UINode implements Dimensional{
      *
      * <p>
      * The result is cached after the first resolution. The cache is invalidated whenever state,
-     * theme, style name, or overrides change. If no theme is available, this method returns null.
+     * theme, style name, or overrides change. Local overrides also work without a theme.
      * </p>
      *
-     * @return the resolved style for this node, or null if no theme is available
+     * @return the resolved style, or null when neither a theme nor local overrides exist
      */
     protected final ResolvedStyle getStyle() {
         ThemeData theme = getTheme();
 
-        if (theme == null) return null;
+        if (theme == null) {
+            if (styleOverrides == null) return null;
+            if (cachedStyle == null) cachedStyle = new ResolvedStyle(styleOverrides.copy());
+            return cachedStyle;
+        }
 
         if (cachedStyle == null) cachedStyle = theme.resolve(getClass(), styleName, getStyleState(), styleOverrides);
 
@@ -768,9 +823,10 @@ public abstract class UINode implements Dimensional{
      */
     public final <T> void setStyle(StyleKey<T> key, T value) {
         if (styleOverrides == null) styleOverrides = new StyleMap();
-
+        if (styleOverrides.contains(key) && java.util.Objects.equals(styleOverrides.get(key), value)) return;
         styleOverrides.set(key, value);
         invalidateStyle();
+        if (key.affectsLayout()) markLayoutDirty();
     }
 
     /**
@@ -783,10 +839,10 @@ public abstract class UINode implements Dimensional{
      * @param key the style key whose override should be removed
      */
     public final void clearStyle(StyleKey<?> key) {
-        if (styleOverrides == null) return;
-
+        if (styleOverrides == null || !styleOverrides.contains(key)) return;
         styleOverrides.remove(key);
         invalidateStyle();
+        if (key.affectsLayout()) markLayoutDirty();
     }
 
     /**
@@ -802,6 +858,7 @@ public abstract class UINode implements Dimensional{
 
         styleOverrides.clear();
         invalidateStyle();
+        markLayoutDirty();
     }
 
     /**
@@ -822,19 +879,6 @@ public abstract class UINode implements Dimensional{
     }
 
     /**
-     * Returns the local theme assigned directly to this node.
-     *
-     * <p>
-     * Unlike {@link #getTheme()}, this method does not inherit from the parent.
-     * </p>
-     *
-     * @return the local theme assigned to this node, or null if none is assigned
-     */
-    public final ThemeData getLocalTheme() {
-        return theme;
-    }
-
-    /**
      * Assigns a local theme to this node.
      *
      * <p>
@@ -850,6 +894,19 @@ public abstract class UINode implements Dimensional{
         this.theme = theme;
         invalidateStyleTree();
         markLayoutDirty();
+    }
+
+    /**
+     * Returns the local theme assigned directly to this node.
+     *
+     * <p>
+     * Unlike {@link #getTheme()}, this method does not inherit from the parent.
+     * </p>
+     *
+     * @return the local theme assigned to this node, or null if none is assigned
+     */
+    public final ThemeData getLocalTheme() {
+        return theme;
     }
 
     /**
@@ -879,13 +936,32 @@ public abstract class UINode implements Dimensional{
     }
 
     /**
-     * Invalidates the cached resolved style for this node.
-     *
-     * <p>
-     * The next call to {@link #getStyle()} will perform a fresh resolution.
-     * </p>
+     * Applies layout once when a style refresh is pending. Clears the pending flag
+     * before calling applyLayout so invalidations triggered during application can
+     * schedule another pass. Does nothing when styling is already synchronized.
+     */
+    final void refreshStyle() {
+        if (!styleRefreshNeeded) return;
+        styleRefreshNeeded = false;
+        applyLayout();
+    }
+
+    /**
+     * Apply only changed inputs during automatic layout; explicit root.layout() forces all.
+     */
+    final void synchronizeLayout(boolean force) {
+        if (!force && !isLayoutDirty() && !styleRefreshNeeded) return;
+        styleRefreshNeeded = false;
+        applyLayout();
+    }
+
+    /**
+     * Discards this node's resolved style and marks style application as pending.
+     * Does not immediately perform layout or recursively invalidate descendants;
+     * callers use the tree invalidation path when descendant styles are affected.
      */
     protected void invalidateStyle() {
+        styleRefreshNeeded = true;
         cachedStyle = null;
     }
 
@@ -1075,7 +1151,15 @@ public abstract class UINode implements Dimensional{
         float height = Yoga.YGNodeLayoutGetHeight(yogaMemoryAddress);
 
         bounds.setSize(width, height);
-        bounds.setPosition(getRenderX(), getRenderY());
+        // Parent-first layout traversal makes absolute bounds an O(1) calculation.
+        // Reuse the existing rectangle: no additional per-node coordinate storage.
+        float x = Yoga.YGNodeLayoutGetLeft(yogaMemoryAddress);
+        float y = Yoga.YGNodeLayoutGetTop(yogaMemoryAddress);
+        if (parent != null) {
+            x += parent.getAbsoluteX();
+            y += parent.getAbsoluteY();
+        }
+        bounds.setPosition(x, getRenderSpaceHeight() - y - height);
     }
 
     /**
@@ -1088,7 +1172,7 @@ public abstract class UINode implements Dimensional{
      * @return the render-space X coordinate
      */
     public final float getRenderX() {
-        return getAbsoluteX();
+        return bounds.getX();
     }
 
     /**
@@ -1102,7 +1186,7 @@ public abstract class UINode implements Dimensional{
      * @return the render-space Y coordinate
      */
     public final float getRenderY() {
-        return getRenderSpaceHeight() - getAbsoluteY() - getHeight();
+        return bounds.getY();
     }
 
     /**
@@ -1115,12 +1199,35 @@ public abstract class UINode implements Dimensional{
     }
 
     /**
+     * Sets the layout's left offset in layout units. Computed position changes during
+     * a subsequent layout pass; this does not directly rewrite cached render bounds.
+     *
+     * @param x requested left offset
+     */
+    @Override
+    public void setX(float x) {
+        this.getLayout().left(x);
+    }
+
+    /**
      * Returns the node's local Y position from Yoga layout results.
      *
      * @return the local Y position relative to the parent
      */
     public final float getY() {
         return Yoga.YGNodeLayoutGetTop(yogaMemoryAddress);
+    }
+
+    /**
+     * Sets the layout top offset to y minus the node's current computed height.
+     * This preserves this setter's bottom-edge convention; it is not a direct assignment
+     * to the top offset returned by getY. Updated bounds require a layout pass.
+     *
+     * @param y requested vertical position before subtracting current height
+     */
+    @Override
+    public void setY(float y) {
+        this.getLayout().top(y - getHeight());
     }
 
     /**
@@ -1137,6 +1244,17 @@ public abstract class UINode implements Dimensional{
     }
 
     /**
+     * Sets the requested layout width in layout units. The computed width returned
+     * by getWidth is refreshed by layout rather than changed immediately here.
+     *
+     * @param width requested layout width
+     */
+    @Override
+    public void setWidth(float width) {
+        this.getLayout().width(width);
+    }
+
+    /**
      * Returns the computed height of this node.
      *
      * <p>
@@ -1150,57 +1268,63 @@ public abstract class UINode implements Dimensional{
     }
 
     /**
+     * Sets the requested layout height in layout units. The computed height returned
+     * by getHeight is refreshed by layout rather than changed immediately here.
+     *
+     * @param height requested layout height
+     */
+    @Override
+    public void setHeight(float height) {
+        this.getLayout().height(height);
+    }
+
+    /**
      * Returns the absolute X position of this node in the UI tree.
      *
      * <p>
-     * This is computed by accumulating this node's local X position with all ancestor X positions.
+     * This is cached during the parent-first layout traversal.
      * </p>
      *
      * @return the absolute X position
      */
     public final float getAbsoluteX() {
-        return parent == null ? getX() : parent.getAbsoluteX() + getX();
+        return bounds.getX();
     }
 
     /**
      * Returns the absolute Y position of this node in the UI tree.
      *
      * <p>
-     * This is computed by accumulating this node's local Y position with all ancestor Y positions.
+     * This is converted from cached render bounds without walking ancestors or calling Yoga.
      * </p>
      *
      * @return the absolute Y position
      */
     public final float getAbsoluteY() {
-        return parent == null ? getY() : parent.getAbsoluteY() + getY();
+        return getRenderSpaceHeight() - bounds.getY() - bounds.getHeight();
     }
 
+    /**
+     * Updates horizontal and vertical layout offsets through setX and setY.
+     * The vertical setter subtracts the current computed height. This schedules layout
+     * inputs without directly updating cached bounds.
+     *
+     * @param x requested left offset
+     * @param y vertical position before the current-height adjustment
+     */
     @Override
     public void setPosition(float x, float y) {
         setX(x);
         setY(y);
     }
 
-    @Override
-    public void setWidth(float width) {
-        this.getLayout().width(width);
-    }
-
-    @Override
-    public void setHeight(float height) {
-        this.getLayout().height(height);
-    }
-
-    @Override
-    public void setX(float x) {
-        this.getLayout().left(x);
-    }
-
-    @Override
-    public void setY(float y) {
-        this.getLayout().top(y - getHeight());
-    }
-
+    /**
+     * Updates requested layout width and height through the individual setters.
+     * Computed bounds remain unchanged until layout applies the new inputs.
+     *
+     * @param width requested width in layout units
+     * @param height requested height in layout units
+     */
     @Override
     public void setSize(float width, float height) {
         setWidth(width);
@@ -1252,13 +1376,38 @@ public abstract class UINode implements Dimensional{
      * returns a vector with the input screen coordinates adjusted.
      */
     public Vector2f screenToWorld(float x, float y) {
-        Viewport viewport = this.root.getViewport();
+        Viewport viewport = root == null ? null : root.getViewport();
         if (viewport != null) {
-            Vector2f translation = viewport.screenToWorld(x, y);
+            Vector2f translation = viewport.screenToWorldUnclipped(x, y);
             if (translation != null)
-                return ZERO_VECTOR.set(translation.getX(), getRenderSpaceHeight() - translation.getY());
+                return new Vector2f(translation.x(), translation.y());
         }
-        return ZERO_VECTOR.set(x, y);
+        return new Vector2f(x, y);
+    }
+
+    /**
+     * Converts a pointer to this node's unscrolled bottom-left content space.
+     */
+    public final Vector2f screenToContent(float x, float y) {
+        Vector2f point = screenToWorld(x, y);
+        transformContentPoint(parent, point);
+        return point;
+    }
+
+    /**
+     * Same pointer conversion, expressed in Yoga/NanoVG's top-left coordinates.
+     */
+    public final Vector2f screenToLayout(float x, float y) {
+        Vector2f point = screenToContent(x, y);
+        return point.set(point.x(), getRenderSpaceHeight() - point.y());
+    }
+
+    /**
+     * True for a primary-button release over this control's visible hit target.
+     */
+    public final boolean isActivationRelease(valthorne.event.events.MouseReleaseEvent event) {
+        return event.getButton() == valthorne.Mouse.LEFT && isEnabled() && root != null
+                && root.findNodeAt(event.getX(), event.getY(), CLICKABLE_BIT) == this;
     }
 
     /**
@@ -1306,6 +1455,22 @@ public abstract class UINode implements Dimensional{
     public abstract void draw(TextureBatch batch);
 
     /**
+     * Renders this node using its backend within the root's shared UI frame.
+     */
+    public final void render(TextureBatch batch) {
+        UIRoot owner = getRoot();
+        UIRenderContext context = owner == null ? null : owner.getRenderContext();
+        if (context != null) {
+            if (context.getBatch() != batch) throw new IllegalArgumentException("Use the active UI batch.");
+            context.draw(this);
+        } else if (this instanceof valthorne.ui.nodes.nano.NanoNode) {
+            throw new IllegalStateException("Render Nano nodes through UIRoot.draw().");
+        } else if (isVisible()) {
+            draw(batch);
+        }
+    }
+
+    /**
      * Applies this node's {@link Layout} data to its native Yoga node.
      *
      * <p>
@@ -1315,6 +1480,13 @@ public abstract class UINode implements Dimensional{
      */
     protected void applyLayout() {
         UIConstants.applyLayout(yogaMemoryAddress, layout);
+        ResolvedStyle style = getStyle();
+        if (style != null && layout.getMinHeight().isAuto() && layout.getHeight().isAuto()
+                && (this instanceof valthorne.ui.nodes.Button || this instanceof valthorne.ui.nodes.TextField
+                || this instanceof valthorne.ui.nodes.nano.NanoButton || this instanceof valthorne.ui.nodes.nano.NanoTextField)) {
+            Float height = style.get(valthorne.ui.theme.UITokens.CONTROL_HEIGHT);
+            if (height != null) Yoga.YGNodeStyleSetMinHeight(yogaMemoryAddress, height);
+        }
     }
 
     /**

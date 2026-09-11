@@ -10,10 +10,9 @@ import valthorne.event.listeners.MouseListener;
 import valthorne.event.listeners.MouseScrollListener;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.math.Vector2f;
+import org.joml.Vector2f;
 import valthorne.ui.nodes.Panel;
 import valthorne.ui.nodes.Tooltip;
-import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.viewport.Viewport;
 
 import java.io.IOException;
@@ -26,7 +25,6 @@ import java.util.List;
 
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
 import static org.lwjgl.nanovg.NanoVG.nvgCreateFont;
-import static org.lwjgl.nanovg.NanoVG.nvgEndFrame;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
@@ -145,29 +143,41 @@ import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
  */
 public class UIRoot extends UIContainer {
 
+    /**
+     * System property naming an optional filesystem override for the default NanoVG font.
+     */
     private static final String DEFAULT_NANO_FONT_PROPERTY = "valthorne.ui.defaultFont";
-    private static final String[] DEFAULT_NANO_FONT_RESOURCES = {"ui/font.otf"};
-
-    private long nanoVGHandle;
+    /**
+     * Bundled default-font candidates tried in order when no valid override file exists.
+     */
+    private static final String[] DEFAULT_NANO_FONT_RESOURCES = {"ui/AtkinsonHyperlegible-Regular.ttf", "ui/font.otf"};
+    private final valthorne.event.EventHandler<valthorne.ui.theme.ThemeDataChangeEvent> themeListener = event -> refreshTheme(this, event.getData()); // Persistent listener invalidating nodes that use changed theme data.
+    private final UIInspector inspector = new UIInspector(); // Root-owned optional draw inspection controller.
+    private final List<FocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final List<Path> extractedNanoFonts = new ArrayList<>(); // Temporary font files extracted from bundled resources when NanoVG requires a filesystem path.
-
-    private UINode focused; // Node that currently owns keyboard focus
-    private UINode pressed; // Node currently being pressed by the mouse
-    private UINode hovered; // Node currently being hovered by the mouse
-    private UINode found; // Temporary node reference used during focus traversal searches
-    private boolean seenFrom; // Temporary traversal flag used while searching for the next focusable node
-    private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
-
-    private float hoverTime; // Time accumulated while hovering the current node
-    private Tooltip activeTooltip; // Tooltip currently being displayed in the overlay layer
-
     private final RootKeyListener keyListener = new RootKeyListener(); // Root-level keyboard listener instance
     private final RootMouseListener mouseListener = new RootMouseListener(); // Root-level mouse listener instance
     private final RootScrollListener scrollListener = new RootScrollListener(); // Root-level scroll listener instance
     private final RootWindowListener windowListener = new RootWindowListener(); // Root-level window resize listener instance
+    private long nanoVGHandle; // Stored NanoVG context deleted by this root on disposal, or zero when unavailable.
+    private UIRenderContext renderContext; // Borrowed active mixed-backend drawing context, null outside drawing.
+    private boolean disposed; // Whether root resource disposal has been requested.
+    private UIFrameStats frameStats = new UIFrameStats(0, 0, 0, 0, 0, 0, 0); // Latest immutable drawing and layout statistics.
+    private long pendingLayoutPasses, pendingLayoutNanos; // Layout work accumulated until the next recorded draw.
+    private UINode focused; // Node that currently owns keyboard focus
+    private final valthorne.event.EventHandler<TextInputEvent> textListener = event -> route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false); // Persistent committed-text listener targeting the current focus.
+    private UINode pressed; // Node currently being pressed by the mouse
+    private int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
+    private UINode hovered; // Node currently being hovered by the mouse
+    private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
+    private float hoverTime; // Time accumulated while hovering the current node
+    private Tooltip activeTooltip; // Tooltip currently being displayed in the overlay layer
+    private final valthorne.event.EventHandler<WindowFocusEvent> focusListener = event -> {
+        if (!event.isFocused()) cancelInput();
+    }; // Persistent window-focus listener cancelling UI input on focus loss.
 
     /**
      * <p>
@@ -205,7 +215,57 @@ public class UIRoot extends UIContainer {
         Mouse.addMouseListener(mouseListener);
         Mouse.addScrollListener(scrollListener);
         Window.addWindowResizeListener(windowListener);
+        valthorne.JGL.subscribe(valthorne.event.EventTypes.WINDOW_FOCUS, focusListener);
+        valthorne.JGL.subscribe(valthorne.event.EventTypes.TEXT_INPUT, textListener);
+        valthorne.JGL.subscribe(valthorne.event.EventTypes.THEME_DATA_CHANGE, themeListener);
     }
+
+    /**
+     * Tests identity ancestry, including the node itself. A null node is outside
+     * every scope.
+     *
+     * @param node candidate descendant
+     * @param ancestor scope root to match
+     * @return true if ancestor occurs in the parent chain
+     */
+    private static boolean within(UINode node, UINode ancestor) {
+        for (UINode current = node; current != null; current = current.getParent())
+            if (current == ancestor) return true;
+        return false;
+    }
+
+    /**
+     * Traverses the tree and invalidates style/layout for nodes resolving to the
+     * changed ThemeData object. Uses identity matching so unrelated themes are left
+     * to their own change events.
+     *
+     * @param node subtree to inspect
+     * @param data changed theme data
+     */
+    private void refreshTheme(UINode node, valthorne.ui.theme.ThemeData data) {
+        if (node.getTheme() == data) {
+            node.invalidateStyle();
+            node.markLayoutDirty();
+        }
+        if (node instanceof UIContainer container)
+            for (UINode child : container.getChildren()) refreshTheme(child, data);
+    }
+
+    /**
+     * Returns the live root-owned inspector used to capture optional drawing
+     * diagnostics. Its lifetime follows this root.
+     *
+     * @return mutable inspection controller
+     */
+    public UIInspector getInspector() {return inspector;}
+
+    /**
+     * Returns the last recorded frame's immutable statistics, initially all zero.
+     * Layout counters accumulate until a drawing context is recorded.
+     *
+     * @return latest frame statistics
+     */
+    public UIFrameStats getFrameStats() {return frameStats;}
 
     /**
      * <p>
@@ -269,6 +329,9 @@ public class UIRoot extends UIContainer {
                 viewport.getCamera().setCenter(viewport.getWorldWidth() * .5f, viewport.getWorldHeight() * .5f);
             setSize(viewport.getWorldWidth(), viewport.getWorldHeight());
             layout();
+        } else {
+            setSize(Window.getWidth(), Window.getHeight());
+            layout();
         }
     }
 
@@ -287,6 +350,7 @@ public class UIRoot extends UIContainer {
      * @param height the new root height
      */
     public void setSize(float width, float height) {
+        getLayout().width(width).height(height);
         Yoga.YGNodeStyleSetWidth(getYogaMemoryAddress(), width);
         Yoga.YGNodeStyleSetHeight(getYogaMemoryAddress(), height);
         overlayLayer.getLayout().width(width).height(height);
@@ -300,15 +364,35 @@ public class UIRoot extends UIContainer {
      *
      * <p>
      * This method first synchronizes layout properties from nodes into Yoga by
-     * calling {@link #syncTree(UINode)}, then asks Yoga to calculate layout for the
+     * calling {@link #syncTree(UINode, boolean)}, then asks Yoga to calculate layout for the
      * entire hierarchy, and finally applies the results back into the node tree by
      * calling {@code updateLayoutTree()}.
      * </p>
      */
     public void layout() {
-        syncTree(this);
-        Yoga.YGNodeCalculateLayout(getYogaMemoryAddress(), Float.NaN, Float.NaN, Yoga.YGDirectionLTR);
-        updateLayoutTree();
+        layout(true);
+    }
+
+    /**
+     * Synchronizes styles into Yoga, calculates layout, copies computed geometry,
+     * and repeats when afterLayout hooks dirty the tree. Stops after eight passes,
+     * recording pass count and elapsed nanoseconds for frame statistics.
+     *
+     * @param force whether node layout values must be reapplied even when locally clean
+     * @throws IllegalStateException if layout remains dirty after eight passes
+     */
+    private void layout(boolean force) {
+        long started = System.nanoTime();
+        int passes = 0;
+        do {
+            syncTree(this, force);
+            Yoga.YGNodeCalculateLayout(getYogaMemoryAddress(), Float.NaN, Float.NaN, Yoga.YGDirectionLTR);
+            updateLayoutTree();
+            pendingLayoutPasses++;
+        } while (isLayoutDirty() && ++passes < 8);
+        pendingLayoutNanos += System.nanoTime() - started;
+        if (isLayoutDirty())
+            throw new IllegalStateException("UI layout did not stabilize after 8 passes; check afterLayout mutations.");
     }
 
     /**
@@ -352,9 +436,23 @@ public class UIRoot extends UIContainer {
     public void hideOverlay(UINode node) {
         if (node == null) return;
 
+        UINode restore = null;
+        boolean restoreFocus = false;
+        for (int i = focusScopes.size() - 1; i >= 0; i--) {
+            if (focusScopes.get(i).node() == node) {
+                restoreFocus = i == focusScopes.size() - 1;
+                restore = focusScopes.remove(i).previous();
+                break;
+            }
+        }
+        if (within(pressed, node)) cancelPointer();
         node.setVisible(false);
 
         if (node.getParent() == overlayLayer) overlayLayer.remove(node);
+        if (restoreFocus) {
+            setFocusTo(restore);
+            if (focused == null) focusNext();
+        }
 
         layout();
     }
@@ -376,7 +474,11 @@ public class UIRoot extends UIContainer {
      */
     @Override
     public void update(float delta) {
+        if (pressed != null && !isNodeInteractiveNow(pressed)) cancelPointer();
+        if (focused != null && !isNodeFocusableNow(focused)) setFocusTo(null);
+        if (isLayoutDirty()) layout(false);
         super.update(delta);
+        if (isLayoutDirty()) layout(false);
 
         if (hovered == null) {
             hideActiveTooltip();
@@ -432,83 +534,77 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public void draw() {
-        if (viewport != null)
-            viewport.bind();
-
-        batch.begin();
-        draw(batch);
-        batch.end();
-
-        if (nanoVGHandle != 0L) {
-            beginNanoFrame(nanoVGHandle);
-
-            for (int i = 0; i < size(); i++) {
-                UINode child = get(i);
-                if (child == null)
-                    continue;
-                if (!child.isVisible())
-                    continue;
-                if (child == overlayLayer)
-                    continue;
-
-                if (child instanceof NanoNode nano)
-                    nano.draw(nanoVGHandle);
+        if (disposed) throw new IllegalStateException("UIRoot has been disposed.");
+        if (renderContext != null) throw new IllegalStateException("UIRoot is already drawing.");
+        refreshStyles(this);
+        if (isLayoutDirty() || Yoga.YGNodeIsDirty(getYogaMemoryAddress())) layout(false);
+        long renderStarted = System.nanoTime();
+        long textureCallsBefore = batch.getTotalDrawCalls();
+        inspector.beginFrame();
+        if (viewport != null) viewport.bind();
+        try {
+            batch.begin();
+            try {
+                if (nanoVGHandle != 0L) beginNanoFrame(nanoVGHandle);
+                renderContext = new UIRenderContext(batch, nanoVGHandle, this);
+                draw(batch);
+                overlayLayer.render(batch);
+                renderContext.drawInspection();
+            } finally {
+                UIRenderContext completed = renderContext;
+                renderContext = null;
+                batch.end();
+                if (completed != null) {
+                    frameStats = new UIFrameStats(pendingLayoutPasses, pendingLayoutNanos, System.nanoTime() - renderStarted, completed.getNodesDrawn(), completed.getBackendSwitches(), completed.getNanoFlushes(), batch.getTotalDrawCalls() - textureCallsBefore);
+                    pendingLayoutPasses = pendingLayoutNanos = 0;
+                }
             }
-
-            if (overlayLayer.isVisible())
-                drawNanoTree(overlayLayer, nanoVGHandle);
-
-            endNanoFrame(nanoVGHandle);
+        } finally {
+            if (viewport != null) viewport.unbind();
         }
-
-        batch.begin();
-        if (overlayLayer.isVisible())
-            overlayLayer.draw(batch);
-        batch.end();
-
-        if (viewport != null)
-            viewport.unbind();
     }
 
+    /**
+     * Draws normal visible children while excluding the overlay layer, which the
+     * root's no-argument draw method renders afterward. Uses the active mixed context
+     * when present; otherwise delegates each child directly to the supplied batch.
+     * Does not begin/end the batch or create a NanoVG frame.
+     *
+     * @param batch prepared destination batch
+     */
     @Override
     public void draw(TextureBatch batch) {
-        for (int i = 0; i < size(); i++) {
-            UINode child = get(i);
-
-            if (child == null)
-                continue;
-            if (!child.isVisible())
-                continue;
-            if (child == overlayLayer)
-                continue;
-
-            child.draw(batch);
+        if (renderContext != null) {
+            renderContext.drawChildren(this, overlayLayer);
+            return;
         }
+        for (UINode child : getChildren())
+            if (child != overlayLayer && child.isVisible()) child.render(batch);
     }
 
-    private void drawNanoTree(UINode node, long vg) {
-        if (node == null)
-            return;
-        if (!node.isVisible())
-            return;
+    /**
+     * Returns the borrowed mixed-backend context while the root is drawing.
+     * The reference is cleared when the drawing scope exits and must not be retained
+     * as a reusable context.
+     *
+     * @return active context, or null outside draw
+     */
+    public UIRenderContext getRenderContext() {return renderContext;}
 
-        if (node instanceof NanoNode nano)
-            nano.draw(vg);
-
-        if (node instanceof UIContainer container) {
-            for (int i = 0; i < container.size(); i++)
-                drawNanoTree(container.get(i), vg);
-        }
-    }
-
+    /**
+     * Begins NanoVG with root/viewport world dimensions and a pixel ratio derived
+     * from the current GL viewport. Uses the larger axis ratio, bounded below by 0.01.
+     * The mixed rendering context coordinates later flushes.
+     *
+     * @param vg valid NanoVG context handle
+     */
     private void beginNanoFrame(long vg) {
         float width = viewport != null ? viewport.getWorldWidth() : getWidth();
         float height = viewport != null ? viewport.getWorldHeight() : getHeight();
-        nvgBeginFrame(vg, width, height, 1f);
-    }
-
-    private void endNanoFrame(long vg) {
-        nvgEndFrame(vg);
+        int[] pixels = new int[4];
+        org.lwjgl.opengl.GL11.glGetIntegerv(org.lwjgl.opengl.GL11.GL_VIEWPORT, pixels);
+        float ratio = Math.max(pixels[2] / Math.max(1f, width), pixels[3] / Math.max(1f, height));
+        nvgBeginFrame(vg, width, height, Math.max(0.01f, ratio));
     }
 
     /**
@@ -523,17 +619,25 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public void dispose() {
+        if (disposed) return;
+        disposed = true;
         hideActiveTooltip();
 
         Keyboard.removeKeyListener(keyListener);
         Mouse.removeMouseListener(mouseListener);
         Mouse.removeScrollListener(scrollListener);
         Window.removeWindowResizeListener(windowListener);
+        valthorne.JGL.unsubscribe(valthorne.event.EventTypes.WINDOW_FOCUS, focusListener);
+        valthorne.JGL.unsubscribe(valthorne.event.EventTypes.TEXT_INPUT, textListener);
+        valthorne.JGL.unsubscribe(valthorne.event.EventTypes.THEME_DATA_CHANGE, themeListener);
+        cancelInput();
+        focusScopes.clear();
 
         detachFromRoot();
         Yoga.YGConfigFree(yogaConfig);
         batch.dispose();
-        nvgDelete(nanoVGHandle);
+        if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
+        nanoVGHandle = 0L;
         cleanupExtractedNanoFonts();
     }
 
@@ -584,8 +688,7 @@ public class UIRoot extends UIContainer {
      * </p>
      */
     public void focusNext() {
-        UINode next = findNextFocusable(focused);
-        setFocusTo(next);
+        moveFocus(1);
     }
 
     /**
@@ -610,10 +713,13 @@ public class UIRoot extends UIContainer {
         if (viewport != null) {
             Vector2f world = viewport.screenToWorld(x, y);
             if (world == null) return null;
-            x = world.getX();
-            y = world.getY();
+            x = world.x();
+            y = world.y();
         }
 
+        UINode scope = activeFocusScope();
+        if (scope != this)
+            return scope instanceof UIContainer container ? container.findNodeAt(x, y, requiredBit) : scope.contains(x, y) && (requiredBit < 0 || scope.getBit(requiredBit)) ? scope : null;
         UINode node = overlayLayer.findNodeAt(x, y, requiredBit);
         if (node != null) return node;
 
@@ -632,141 +738,227 @@ public class UIRoot extends UIContainer {
      */
     @Override
     protected void applyLayout() {
+        super.applyLayout();
     }
 
     /**
-     * <p>
-     * Synchronizes the full node tree into Yoga before layout calculation.
-     * </p>
+     * Refreshes resolved style caches for a node and all descendants before drawing.
+     * Style application may mark layout dirty; layout synchronization happens afterward.
      *
-     * <p>
-     * This recursively calls {@link UINode#applyLayout()} on the supplied node and
-     * all descendants so Yoga receives the latest style and layout values.
-     * </p>
-     *
-     * @param node the node whose subtree should be synchronized
+     * @param node subtree to refresh
      */
-    private void syncTree(UINode node) {
-        node.applyLayout();
+    private void refreshStyles(UINode node) {
+        node.refreshStyle();
+        if (node instanceof UIContainer container)
+            for (int i = 0; i < container.size(); i++) refreshStyles(container.get(i));
+    }
+
+    /**
+     * Synchronizes each node's layout settings into Yoga before calculation.
+     * Recurses through all container children in stored order.
+     *
+     * @param node subtree to synchronize
+     * @param force whether to reapply clean layout settings
+     */
+    private void syncTree(UINode node, boolean force) {
+        node.synchronizeLayout(force);
 
         if (node instanceof UIContainer container) {
             for (int i = 0; i < container.size(); i++)
-                syncTree(container.get(i));
+                syncTree(container.get(i), force);
         }
     }
 
     /**
-     * <p>
-     * Finds the next currently focusable node after the supplied node.
-     * </p>
-     *
-     * <p>
-     * If {@code from} is {@code null}, the first focusable node in the tree is returned.
-     * Otherwise the tree is traversed in order until the node after {@code from} that
-     * is currently focusable is found. If no later focusable node exists, traversal
-     * wraps to the first focusable node in the tree.
-     * </p>
-     *
-     * @param from the node to search after
-     * @return the next focusable node, or {@code null} if none exist
+     * Move backwards through the active focus scope, wrapping at its start.
      */
-    private UINode findNextFocusable(UINode from) {
-        if (from == null) return findFirstFocusable(this);
-
-        found = null;
-        seenFrom = false;
-
-        traverseNextFocusable(this, from);
-        return found != null ? found : findFirstFocusable(this);
-    }
+    public void focusPrevious() {moveFocus(-1);}
 
     /**
-     * <p>
-     * Recursively traverses the tree looking for the next focusable node after a given node.
-     * </p>
+     * Collects eligible nodes inside the current modal scope and moves focus with
+     * wraparound. Excludes the scope node itself when eligible descendants exist.
+     * An empty candidate list clears focus.
      *
-     * <p>
-     * The traversal uses the {@code seenFrom} flag to detect when the starting node
-     * has been encountered. After that point, the first node that passes
-     * {@link #isNodeFocusableNow(UINode)} is stored in {@code found}.
-     * </p>
-     *
-     * @param node the current node being visited
-     * @param from the node after which traversal should find the next focus target
+     * @param direction positive for forward traversal, negative for backward traversal
      */
-    private void traverseNextFocusable(UINode node, UINode from) {
-        if (node == null || found != null) return;
-
-        if (seenFrom && isNodeFocusableNow(node)) {
-            found = node;
+    private void moveFocus(int direction) {
+        List<UINode> nodes = new ArrayList<>();
+        UINode scope = activeFocusScope();
+        collectFocus(scope, nodes);
+        if (nodes.size() > 1 && nodes.getFirst() == scope) nodes.removeFirst();
+        if (nodes.isEmpty()) {
+            setFocusTo(null);
             return;
         }
-
-        if (node == from) seenFrom = true;
-
-        if (node instanceof UIContainer container) {
-            for (int i = 0; i < container.size(); i++) {
-                UINode child = container.get(i);
-                if (child.isDisabled())
-                    continue;
-                traverseNextFocusable(child, from);
-                if (found != null) return;
-            }
-        }
+        int index = nodes.indexOf(focused);
+        setFocusTo(nodes.get(index < 0 ? (direction > 0 ? 0 : nodes.size() - 1) : Math.floorMod(index + direction, nodes.size())));
     }
 
     /**
-     * <p>
-     * Finds the first currently focusable node in the provided subtree.
-     * </p>
+     * Appends focusable nodes in depth-first child order, skipping entire subtrees
+     * whose nodes or ancestors are hidden, disabled, or detached from this root.
      *
-     * @param root the subtree root
-     * @return the first focusable node, or {@code null} if none were found
+     * @param node subtree candidate
+     * @param nodes mutable traversal list
      */
-    private UINode findFirstFocusable(UINode root) {
-        found = null;
-        traverseFirstFocusable(root);
-        return found;
+    private void collectFocus(UINode node, List<UINode> nodes) {
+        if (!isNodeInteractiveNow(node)) return;
+        if (node.isFocusable()) nodes.add(node);
+        if (node instanceof UIContainer container)
+            for (UINode child : container.getChildren()) collectFocus(child, nodes);
     }
 
     /**
-     * <p>
-     * Recursively traverses the tree searching for the first currently focusable node.
-     * </p>
+     * Removes scopes whose nodes are detached or directly hidden, then returns the
+     * topmost remaining modal node or this root when no modal scope remains.
      *
-     * @param node the current node being visited
+     * @return current input/focus boundary
      */
-    private void traverseFirstFocusable(UINode node) {
-        if (node == null || found != null) return;
+    private UINode activeFocusScope() {
+        focusScopes.removeIf(scope -> scope.node().getRoot() != this || !scope.node().isVisible());
+        return focusScopes.isEmpty() ? this : focusScopes.getLast().node();
+    }
 
-        if (isNodeFocusableNow(node)) {
-            found = node;
-            return;
-        }
+    /**
+     * Moves a nonnull node into the overlay layer, remembers prior focus, and pushes
+     * a modal scope. Cancels pointer capture, clears focus, and selects the first
+     * eligible node in the scope. Reopening an already registered scope has no effect.
+     *
+     * @param node nonnull modal subtree
+     */
+    public void showModal(UINode node) {
+        if (focusScopes.stream().anyMatch(scope -> scope.node() == node)) return;
+        UINode previous = focused;
+        showOverlay(node);
+        focusScopes.add(new FocusScope(node, previous));
+        cancelPointer();
+        setFocusTo(null);
+        focusNext();
+    }
 
-        if (node instanceof UIContainer container) {
-            for (int i = 0; i < container.size(); i++) {
-                traverseFirstFocusable(container.get(i));
-                if (found != null) return;
-            }
+    /**
+     * Hides/removes a modal through hideOverlay. Removing the top scope restores
+     * its saved focus when eligible, otherwise traversal chooses a replacement.
+     *
+     * @param node modal node to hide; null has no effect
+     */
+    public void hideModal(UINode node) {hideOverlay(node);}
+
+    /**
+     * Clear captured gestures and focus without synthesizing a release/click.
+     */
+    public void cancelInput() {
+        cancelPointer();
+        if (hovered != null) hovered.setHovered(false);
+        hovered = null;
+        setFocusTo(null);
+        hideActiveTooltip();
+    }
+
+    /**
+     * Clears capture, focus, hover, and tooltip state referring to a subtree before
+     * it loses its parent/root references. Pointer cancellation is delivered without
+     * synthesizing a click or release.
+     *
+     * @param node subtree about to detach
+     */
+    void nodeWillDetach(UINode node) {
+        if (within(pressed, node)) cancelPointer();
+        if (within(focused, node)) setFocusTo(null);
+        if (within(hovered, node)) {
+            hovered.setHovered(false);
+            hovered = null;
+            hideActiveTooltip();
         }
     }
 
     /**
-     * <p>
-     * Returns whether the provided node is currently eligible to receive focus.
-     * </p>
+     * Returns the node currently captured by a mouse press, independently of current
+     * pointer location.
      *
-     * <p>
-     * A node is considered focusable only when it is non-null, visible, enabled,
-     * and marked focusable.
-     * </p>
+     * @return captured node, or null
+     */
+    public UINode getCaptured() {return pressed;}
+
+    /**
+     * Returns the last node selected by pointer hover handling.
      *
-     * @param node the node to test
-     * @return {@code true} if the node can currently receive focus
+     * @return hovered node, or null
+     */
+    public UINode getHovered() {return hovered;}
+
+    /**
+     * Clears the captured node and button before notifying the former target through
+     * onPointerCancel. Does not synthesize a release or click event.
+     */
+    private void cancelPointer() {
+        UINode previous = pressed;
+        pressed = null;
+        pressedButton = -1;
+        if (previous != null) previous.onPointerCancel();
+    }
+
+    /**
+     * Routes an unconsumed event through a snapshot of the target's ancestor path
+     * up to the active scope. Preview hooks run from boundary to target; handler and
+     * bubble hooks then run outward until consumption. Rechecks interactivity while
+     * bubbling so detached/disabled targets stop delivery.
+     *
+     * @param target candidate input recipient
+     * @param event shared consumable event
+     * @param x event X coordinate, or NaN for nonpointer input
+     * @param y event Y coordinate, or NaN for nonpointer input
+     * @param handler event-specific node callback
+     * @param bubbleHandlers whether ancestor event-specific handlers also run
+     * @return true if delivery reached the target phase, even if its callback consumes the event
+     */
+    private boolean route(UINode target, valthorne.event.Event event, float x, float y, java.util.function.Consumer<UINode> handler, boolean bubbleHandlers) {
+        if (!isNodeInteractiveNow(target) || event.isConsumed()) return false;
+        List<UINode> path = new ArrayList<>();
+        UINode boundary = activeFocusScope();
+        for (UINode node = target; node != null; node = node.getParent()) {
+            path.add(node);
+            if (node == boundary) break;
+        }
+        for (int i = path.size() - 1; i >= 0 && !event.isConsumed(); i--) {
+            UINode node = path.get(i);
+            node.onInputPreview(new UIInputEvent(event, target, node, x, y));
+        }
+        boolean delivered = false;
+        for (int i = 0; i < path.size() && !event.isConsumed(); i++) {
+            UINode node = path.get(i);
+            if (!isNodeInteractiveNow(node)) break;
+            if (i == 0) delivered = true;
+            if (i == 0 || bubbleHandlers) handler.accept(node);
+            if (!event.isConsumed()) node.onInputBubble(new UIInputEvent(event, target, node, x, y));
+        }
+        return delivered;
+    }
+
+    /**
+     * Requires an attached interactive node, its focusable flag, and membership in
+     * the active modal scope.
+     *
+     * @param node candidate focus target
+     * @return whether focus may currently be assigned
      */
     private boolean isNodeFocusableNow(UINode node) {
-        return node != null && node.isVisible() && node.isEnabled() && node.isFocusable();
+        return isNodeInteractiveNow(node) && node.isFocusable() && within(node, activeFocusScope());
+    }
+
+    /**
+     * Requires attachment to this root and visible/enabled state for the node and
+     * every ancestor. Does not check hit bounds, input capability bits, or modal scope.
+     *
+     * @param node candidate input node
+     * @return whether attachment and ancestor state permit interaction
+     */
+    private boolean isNodeInteractiveNow(UINode node) {
+        if (node == null || node.getRoot() != this) return false;
+        for (UINode ancestor = node; ancestor != null; ancestor = ancestor.getParent()) {
+            if (!ancestor.isVisible() || !ancestor.isEnabled()) return false;
+        }
+        return true;
     }
 
     /**
@@ -814,8 +1006,8 @@ public class UIRoot extends UIContainer {
             Vector2f world = viewport.screenToWorld(mouseX, mouseY);
             if (world == null) return;
 
-            mouseX = world.getX();
-            mouseY = world.getY();
+            mouseX = world.x();
+            mouseY = world.y();
         }
 
         tooltip.getLayout().absolute().left(mouseX).top(getRenderSpaceHeight() - mouseY - tooltip.getHeight());
@@ -859,13 +1051,16 @@ public class UIRoot extends UIContainer {
      */
     private void handleKeyPressed(KeyPressEvent event) {
         hideActiveTooltip();
+        if (!isNodeFocusableNow(focused)) setFocusTo(null);
 
         if (event.getKey() == Keyboard.TAB) {
-            focusNext();
+            if (event.isShiftDown()) focusPrevious();
+            else focusNext();
+            event.consume();
             return;
         }
 
-        if (focused != null) focused.onKeyPress(event);
+        route(focused, event, Float.NaN, Float.NaN, node -> node.onKeyPress(event), true);
     }
 
     /**
@@ -880,7 +1075,8 @@ public class UIRoot extends UIContainer {
      * @param event the key release event
      */
     private void handleKeyReleased(KeyReleaseEvent event) {
-        if (focused != null) focused.onKeyRelease(event);
+        if (!isNodeFocusableNow(focused)) setFocusTo(null);
+        route(focused, event, Float.NaN, Float.NaN, node -> node.onKeyRelease(event), true);
     }
 
     /**
@@ -899,6 +1095,7 @@ public class UIRoot extends UIContainer {
      */
     private void handleMousePressed(MousePressEvent event) {
         hideActiveTooltip();
+        if (pressed != null) return;
 
         UINode target = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
 
@@ -906,12 +1103,14 @@ public class UIRoot extends UIContainer {
             if (target.isFocusable()) setFocusTo(target);
             else setFocusTo(null);
 
-            if (target.isDisabled())
-                return;
+            if (target.isDisabled()) return;
 
             pressed = target;
+            pressedButton = event.getButton();
             pressed.setPressed(true);
-            pressed.onMousePress(event);
+            if (!route(pressed, event, event.getX(), event.getY(), node -> node.onMousePress(event), false))
+                cancelPointer();
+
         } else {
             setFocusTo(null);
         }
@@ -930,10 +1129,12 @@ public class UIRoot extends UIContainer {
      * @param event the mouse release event
      */
     private void handleMouseReleased(MouseReleaseEvent event) {
-        if (pressed != null) {
-            pressed.setPressed(false);
-            pressed.onMouseRelease(event);
+        if (pressed != null && event.getButton() == pressedButton) {
+            UINode target = pressed;
             pressed = null;
+            pressedButton = -1;
+            target.setPressed(false);
+            route(target, event, event.getX(), event.getY(), node -> node.onMouseRelease(event), false);
         }
     }
 
@@ -953,7 +1154,8 @@ public class UIRoot extends UIContainer {
         hideActiveTooltip();
         hoverTime = 0f;
 
-        if (pressed != null) pressed.onMouseDrag(event);
+        if (event.getButton() == pressedButton)
+            route(pressed, event, event.getToX(), event.getToY(), node -> node.onMouseDrag(event), false);
     }
 
     /**
@@ -971,7 +1173,7 @@ public class UIRoot extends UIContainer {
      * @param event the mouse move event
      */
     private void handleMouseMoved(MouseMoveEvent event) {
-        UINode target = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
+        UINode target = findNodeAt(event.getToX(), event.getToY(), UINode.CLICKABLE_BIT);
 
         if (target != hovered) {
             hideActiveTooltip();
@@ -985,12 +1187,11 @@ public class UIRoot extends UIContainer {
             return;
         }
 
-        if (target.isDisabled())
-            return;
+        if (target.isDisabled()) return;
 
         hovered = target;
         hovered.setHovered(true);
-        hovered.onMouseMove(event);
+        route(hovered, event, event.getToX(), event.getToY(), node -> node.onMouseMove(event), false);
     }
 
     /**
@@ -1011,7 +1212,9 @@ public class UIRoot extends UIContainer {
         hoverTime = 0f;
 
         UINode target = findNodeAt(Mouse.getX(), Mouse.getY(), UINode.SCROLLABLE_BIT);
-        if (target != null) target.onMouseScroll(event);
+        route(target, event, Mouse.getX(), Mouse.getY(), node -> {
+            if (node.isScrollable()) node.onMouseScroll(event);
+        }, true);
     }
 
     /**
@@ -1070,14 +1273,133 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * <p>
-     * Root keyboard listener that forwards keyboard events into the owning root.
-     * </p>
+     * Returns the stored NanoVG handle. It is zero when creation failed or disposal
+     * cleared it; callers borrow the context and must coordinate with root rendering.
      *
-     * <p>
-     * This inner listener exists so the root can register a persistent listener
-     * instance with the global keyboard subsystem.
-     * </p>
+     * @return current native NanoVG context handle
+     */
+    public long getNanoVGHandle() {
+        return nanoVGHandle;
+    }
+
+    /**
+     * Replaces the stored NanoVG handle without deleting the old one or registering
+     * fonts on the replacement. The root will delete the stored nonzero handle during
+     * disposal, so callers must arrange ownership of both contexts.
+     *
+     * @param nanoVGHandle replacement handle, or zero to disable NanoVG rendering
+     */
+    public void setNanoVGHandle(long nanoVGHandle) {
+        this.nanoVGHandle = nanoVGHandle;
+    }
+
+    /**
+     * Registers the default NanoVG font from a valid override path, otherwise tries
+     * bundled resources in order. A valid override path prevents fallback even if
+     * registration fails. Logs a diagnostic when all bundled candidates fail.
+     */
+    private void registerDefaultNanoFont() {
+        Path overridePath = getOverrideNanoFontPath();
+        if (overridePath != null) {
+            registerNanoFont("default", overridePath.toString());
+            return;
+        }
+
+        for (String resource : DEFAULT_NANO_FONT_RESOURCES) {
+            Path fontPath = extractBundledNanoFont(resource);
+            if (fontPath == null) continue;
+            if (registerNanoFont("default", fontPath.toString())) return;
+        }
+
+        System.err.println("UIRoot could not register a default NanoVG font. Set -D" + DEFAULT_NANO_FONT_PROPERTY + "=<font-path> to override it.");
+    }
+
+    /**
+     * Reads the default-font system property and resolves a nonblank value to a
+     * normalized absolute path, accepting only an existing regular file.
+     *
+     * @return override path, or null when unset, blank, or not a regular file
+     */
+    private Path getOverrideNanoFontPath() {
+        String override = System.getProperty(DEFAULT_NANO_FONT_PROPERTY);
+        if (override == null || override.isBlank()) return null;
+
+        Path path = Path.of(override).toAbsolutePath().normalize();
+        return Files.isRegularFile(path) ? path : null;
+    }
+
+    /**
+     * Registers a filesystem font under a NanoVG name in the current stored context.
+     *
+     * @param name NanoVG font name
+     * @param path readable font file
+     * @return whether NanoVG returned a valid font identifier
+     */
+    private boolean registerNanoFont(String name, String path) {
+        return nvgCreateFont(nanoVGHandle, name, path) != -1;
+    }
+
+    /**
+     * Copies a classpath font to a temporary file for NanoVG's path-based loader.
+     * Tracks successful extractions for cleanup and also schedules deletion on JVM
+     * exit. Missing resources or I/O failures return null; failures are logged.
+     *
+     * @param resourcePath classpath resource name
+     * @return extracted file path, or null
+     */
+    private Path extractBundledNanoFont(String resourcePath) {
+        try (InputStream stream = UIRoot.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (stream == null) return null;
+
+            String suffix = resourcePath.contains(".") ? resourcePath.substring(resourcePath.lastIndexOf('.')) : ".ttf";
+            Path tempFile = Files.createTempFile("valthorne-nano-font-", suffix);
+            Files.copy(stream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            tempFile.toFile().deleteOnExit();
+            extractedNanoFonts.add(tempFile);
+            return tempFile;
+        } catch (IOException ex) {
+            System.err.println("Failed to extract bundled NanoVG font resource '" + resourcePath + "': " + ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Attempts to delete each tracked temporary font and clears the list.
+     * Deletion failures are ignored; successfully extracted files also have JVM-exit
+     * deletion registered.
+     */
+    private void cleanupExtractedNanoFonts() {
+        for (Path extractedNanoFont : extractedNanoFonts) {
+            try {
+                Files.deleteIfExists(extractedNanoFont);
+            } catch (IOException ignored) {
+            }
+        }
+        extractedNanoFonts.clear();
+    }
+
+    /**
+     * One modal input boundary and the focus target that preceded it. Both nodes
+     * are borrowed references; eligibility is rechecked when restoring focus.
+     *
+     * <p>The stack of these entries constrains routing to the active modal subtree. Removing
+     * a scope may restore its previous focus only if that node is still attached and eligible.</p>
+     *
+     * @param node modal subtree root
+     * @param previous focus target to restore, possibly null
+     * @author Albert Beaupre
+     */
+    private record FocusScope(UINode node, UINode previous) {
+    }
+
+    /**
+     * Persistent global keyboard adapter owned by this root. Forwards press and
+     * release events into scoped root routing and is unregistered during disposal.
+     * <p>The adapter retains its enclosing root and forwards the original event objects, allowing
+     * consumption to remain visible to subsequent routing. Keyboard policy stays in the
+     * root handlers rather than in the adapter.</p>
+     *
+     * @author Albert Beaupre
      */
     private final class RootKeyListener implements KeyListener {
 
@@ -1107,9 +1429,13 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * <p>
-     * Root mouse listener that forwards mouse events into the owning root.
-     * </p>
+     * Persistent pointer adapter forwarding presses, releases, drags, and movement
+     * to the owning root's capture and hover logic.
+     * <p>The original event object is passed through so capture, hit testing, and consumption
+     * share one routing decision. Registration and removal follow the enclosing root's
+     * lifecycle; the adapter owns no native cursor resources.</p>
+     *
+     * @author Albert Beaupre
      */
     private final class RootMouseListener implements MouseListener {
 
@@ -1163,9 +1489,13 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * <p>
-     * Root scroll listener that forwards scroll events into the owning root.
-     * </p>
+     * Persistent global scroll adapter forwarding events into the owning root's
+     * hit testing and bubbling path.
+     * <p>It forwards the same event object so a consuming scroll target can stop further
+     * propagation. Scroll offsets belong to controls, while this adapter only connects
+     * global delivery to root routing.</p>
+     *
+     * @author Albert Beaupre
      */
     private final class RootScrollListener implements MouseScrollListener {
 
@@ -1183,9 +1513,13 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * <p>
-     * Root window resize listener that forwards resize events into the owning root.
-     * </p>
+     * Persistent resize adapter updating the root and optional viewport when the
+     * window dimensions change. Unregistered with the root lifecycle.
+     * <p>The resize event is forwarded to the root's sizing policy instead of directly mutating
+     * individual children. Layout and viewport decisions remain centralized in the owning
+     * root, and this listener allocates no window resources.</p>
+     *
+     * @author Albert Beaupre
      */
     private final class RootWindowListener implements WindowResizeListener {
 
@@ -1200,77 +1534,5 @@ public class UIRoot extends UIContainer {
         public void windowResized(WindowResizeEvent event) {
             handleWindowResized(event);
         }
-    }
-
-    /**
-     * Retrieves the handle for the NanoVG context.
-     *
-     * @return the handle corresponding to the NanoVG context as a long.
-     */
-    public long getNanoVGHandle() {
-        return nanoVGHandle;
-    }
-
-    /**
-     * Sets the NanoVG handle.
-     *
-     * @param nanoVGHandle the handle to be assigned, represented as a long value.
-     */
-    public void setNanoVGHandle(long nanoVGHandle) {
-        this.nanoVGHandle = nanoVGHandle;
-    }
-
-    private void registerDefaultNanoFont() {
-        Path overridePath = getOverrideNanoFontPath();
-        if (overridePath != null) {
-            registerNanoFont("default", overridePath.toString());
-            return;
-        }
-
-        for (String resource : DEFAULT_NANO_FONT_RESOURCES) {
-            Path fontPath = extractBundledNanoFont(resource);
-            if (fontPath == null) continue;
-            if (registerNanoFont("default", fontPath.toString())) return;
-        }
-
-        System.err.println("UIRoot could not register a default NanoVG font. Set -D" + DEFAULT_NANO_FONT_PROPERTY + "=<font-path> to override it.");
-    }
-
-    private Path getOverrideNanoFontPath() {
-        String override = System.getProperty(DEFAULT_NANO_FONT_PROPERTY);
-        if (override == null || override.isBlank()) return null;
-
-        Path path = Path.of(override).toAbsolutePath().normalize();
-        return Files.isRegularFile(path) ? path : null;
-    }
-
-    private boolean registerNanoFont(String name, String path) {
-        return nvgCreateFont(nanoVGHandle, name, path) != -1;
-    }
-
-    private Path extractBundledNanoFont(String resourcePath) {
-        try (InputStream stream = UIRoot.class.getClassLoader().getResourceAsStream(resourcePath)) {
-            if (stream == null) return null;
-
-            String suffix = resourcePath.contains(".") ? resourcePath.substring(resourcePath.lastIndexOf('.')) : ".ttf";
-            Path tempFile = Files.createTempFile("valthorne-nano-font-", suffix);
-            Files.copy(stream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-            tempFile.toFile().deleteOnExit();
-            extractedNanoFonts.add(tempFile);
-            return tempFile;
-        } catch (IOException ex) {
-            System.err.println("Failed to extract bundled NanoVG font resource '" + resourcePath + "': " + ex.getMessage());
-            return null;
-        }
-    }
-
-    private void cleanupExtractedNanoFonts() {
-        for (Path extractedNanoFont : extractedNanoFonts) {
-            try {
-                Files.deleteIfExists(extractedNanoFont);
-            } catch (IOException ignored) {
-            }
-        }
-        extractedNanoFonts.clear();
     }
 }

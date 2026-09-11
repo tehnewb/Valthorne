@@ -5,6 +5,8 @@ package valthorne.graphics.animation;
  *
  * <p>All callbacks are invoked from within {@link Animation#update(float)}.</p>
  * <p>Keep implementations lightweight to avoid stalling your frame loop.</p>
+ *
+ * @author Albert Beaupre
  */
 public interface AnimationListener {
 

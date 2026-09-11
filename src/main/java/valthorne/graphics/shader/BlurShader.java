@@ -47,30 +47,10 @@ import valthorne.graphics.Sprite;
  */
 public class BlurShader extends TexturedQuadShader {
 
-    private static final String FRAG_SRC = """
-            #version 330 core
-            uniform sampler2D u_texture;
-            uniform vec2 u_texelSize;
-            uniform float u_radiusPx;
-            in vec2 v_uv;
-            in vec4 v_color;
-            out vec4 fragColor;
-            void main() {
-                float r = max(0.0, u_radiusPx);
-                vec2 o = u_texelSize * r;
-                vec4 sum = vec4(0.0);
-                sum += texture(u_texture, v_uv + vec2(-o.x, -o.y));
-                sum += texture(u_texture, v_uv + vec2( 0.0, -o.y));
-                sum += texture(u_texture, v_uv + vec2( o.x, -o.y));
-                sum += texture(u_texture, v_uv + vec2(-o.x,  0.0));
-                sum += texture(u_texture, v_uv);
-                sum += texture(u_texture, v_uv + vec2( o.x,  0.0));
-                sum += texture(u_texture, v_uv + vec2(-o.x,  o.y));
-                sum += texture(u_texture, v_uv + vec2( 0.0,  o.y));
-                sum += texture(u_texture, v_uv + vec2( o.x,  o.y));
-                fragColor = (sum / 9.0) * v_color;
-            }
-            """; // GLSL fragment shader source (3x3 box blur around v_uv).
+    /**
+     * Fragment source loaded from the packaged blur effect shader resource.
+     */
+    private static final String FRAG_SRC = ShaderSources.load("effects/blur.frag");
 
     /**
      * Creates a new blur shader using the built-in GLSL sources.
@@ -79,6 +59,15 @@ public class BlurShader extends TexturedQuadShader {
         super(FRAG_SRC);
     }
 
+    /**
+     * Binds the blur effect using the sprite's backing texture dimensions, draws
+     * the sprite immediately, and unbinds the program on normal completion. Requires
+     * a current OpenGL context. The previous shader is not restored, and exceptions
+     * can leave this program bound.
+     *
+     * @param sprite sprite with a valid backing texture
+     * @param radiusPx blur sampling extent in texture pixels
+     */
     public void apply(Sprite sprite, float radiusPx) {
         bind(sprite.getTexture().getData().width(), sprite.getTexture().getData().height(), radiusPx);
         sprite.draw();

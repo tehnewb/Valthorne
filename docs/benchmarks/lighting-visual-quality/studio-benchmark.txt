@@ -1,0 +1,22 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/albert/.gradle/wrapper/dists/gradle-9.3.1-bin/23ovyewtku6u96viwx3xl3oks/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :compileVerification3DJava
+> Task :processVerification3DResources NO-SOURCE
+> Task :verification3DClasses
+> Task :verify3D
+> Task :compileExamplesJava UP-TO-DATE
+> Task :processExamplesResources NO-SOURCE
+> Task :examplesClasses UP-TO-DATE
+
+> Task :runLightingStudio
+STUDIO: mean 13.491 ms, median 13.365 ms, p95 14.238 ms
+
+BUILD SUCCESSFUL in 5s
+6 actionable tasks: 3 executed, 3 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

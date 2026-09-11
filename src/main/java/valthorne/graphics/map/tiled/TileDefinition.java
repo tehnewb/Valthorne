@@ -13,6 +13,10 @@ import java.util.Map;
  * objects. Each tile has a set of properties in key-value format, optional animation
  * frames defining its animated behavior, and optional tiled objects representing
  * associated metadata or interactive features.
+ * Collections are retained and exposed directly, so their contents remain mutable.
+ * Null properties and objects become empty mutable collections; null animation is
+ * preserved to represent the absence of an animation declaration. No resource
+ * loading or playback is performed by direct construction.
  *
  * @param id         The unique identifier of the tile.
  * @param properties A map of properties associated with the tile in key-value format.
@@ -20,6 +24,7 @@ import java.util.Map;
  *                   or null if the tile has no animation.
  * @param objects    A list of tiled objects representing metadata or interactive features
  *                   of the tile.
+ * @author Albert Beaupre
  */
 public record TileDefinition(int id, Map<String, String> properties, List<TileAnimationFrame> animation, List<TiledObject> objects) {
 
@@ -28,6 +33,8 @@ public record TileDefinition(int id, Map<String, String> properties, List<TileAn
      * This constructor initializes the {@code properties} and {@code objects} fields
      * to default non-null values if they are passed as null.
      *
+     * @param id tileset-local identifier retained without validation
+     * @param animation frame list retained directly, including null
      * @param properties a {@code Map} representing the properties of the tile, or null to initialize with an empty map
      * @param objects    a {@code List} representing the associated objects of the tile, or null to initialize with an empty list
      */
@@ -40,6 +47,10 @@ public record TileDefinition(int id, Map<String, String> properties, List<TileAn
      * Loads a {@code TileDefinition} object from the given {@code XMLStreamReader}.
      * This method reads tile properties, animations, and objects from the XML data, and
      * returns a new {@code TileDefinition} instance encapsulating the parsed information.
+     * Start on the opening tile element. Properties merge, the last animation
+     * declaration replaces earlier ones, and object groups append their objects.
+     * Unknown elements are skipped. The reader is left open at the closing tile
+     * element or end of input, and the supplied ID is not read again from XML.
      *
      * @param r  the {@code XMLStreamReader} used to read the XML data
      * @param id the unique identifier for the tile
@@ -73,6 +84,15 @@ public record TileDefinition(int id, Map<String, String> properties, List<TileAn
         return new TileDefinition(id, props, anim, objects);
     }
 
+    /**
+     * Appends objects from the current object-group element in document order.
+     * Group-level properties are parsed and discarded; unknown children are skipped.
+     * Leaves the reader open at the closing group element or end of input.
+     *
+     * @param r reader positioned on the opening objectgroup element
+     * @param objects mutable destination list
+     * @throws Exception if an object or XML content cannot be parsed
+     */
     private static void readObjectGroup(XMLStreamReader r, List<TiledObject> objects) throws Exception {
         while (r.hasNext()) {
             int ev = r.next();

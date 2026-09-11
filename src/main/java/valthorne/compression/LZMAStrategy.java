@@ -27,6 +27,16 @@ import java.io.IOException;
  */
 public class LZMAStrategy implements CompressionStrategy {
 
+    /**
+     * Encodes the complete input as a LZMA stream using the compressor's default
+     * settings. The output stream is finalized before its bytes are returned. Input
+     * contents remain unchanged, and each call uses independent temporary buffers.
+     *
+     * @param data non-null uncompressed bytes
+     *
+     * @return newly allocated, finalized LZMA payload
+     * @throws RuntimeException if the compressor reports an I/O failure; the cause is retained
+     */
     @Override
     public byte[] compress(byte[] data) {
         try {
@@ -40,6 +50,16 @@ public class LZMAStrategy implements CompressionStrategy {
         }
     }
 
+    /**
+     * Expands a LZMA payload into a new in-memory byte array. Bytes are copied
+     * until the decoder reports end of input, with no configured output-size limit.
+     * The supplied encoded array is not modified.
+     *
+     * @param data non-null LZMA bytes
+     *
+     * @return newly allocated decompressed contents
+     * @throws RuntimeException if malformed data or another decoder I/O failure prevents decoding
+     */
     @Override
     public byte[] decompress(byte[] data) {
         try {

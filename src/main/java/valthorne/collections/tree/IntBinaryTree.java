@@ -3,12 +3,19 @@ package valthorne.collections.tree;
 import java.util.Arrays;
 
 /**
- * A simple implementation of a binary tree that stores integers.
- * This implementation allows insertion and search operations on the binary tree.
+ * Array-backed integer search tree whose nodes refer to children by array index.
+ * Greater values follow the left link and other values follow the right link;
+ * search uses the same ordering. There is no balancing, removal, or synchronization.
+ * <p>The current root insertion does not increment the storage counter. Consequently,
+ * a subsequent insertion overwrites the root slot and can discard the first value;
+ * this implementation does not provide ordinary set-preservation semantics.
+ * <pre>{@code
+ * IntBinaryTree tree = new IntBinaryTree();
+ * tree.insert(7);
+ * boolean found = tree.search(7);
+ * }</pre>
  *
  * @author Albert Beaupre
- * @version 1.0
- * @since May 1st, 2024
  */
 public class IntBinaryTree {
 
@@ -16,9 +23,11 @@ public class IntBinaryTree {
     private int size; // Current size of the binary tree
 
     /**
-     * Inserts a new integer value into the binary tree.
+     * Adds a node by following the tree's greater-left ordering and expands storage
+     * when full. The initial root path returns without advancing size; the next
+     * insertion therefore replaces slot zero. Duplicate values are not rejected.
      *
-     * @param value the integer value to be inserted
+     * @param value integer to insert
      */
     public void insert(int value) {
         // Resize the nodes array if it's full
@@ -86,7 +95,11 @@ public class IntBinaryTree {
     }
 
     /**
-     * Inner class representing a node in the binary tree.
+     * Mutable array-stored tree node containing an integer and child indices.
+     * Minus one denotes a missing child. Links refer to the enclosing tree's storage
+     * rather than directly owning child objects, and insertion mutates those links.
+     *
+     * @author Albert Beaupre
      */
     private static class Node {
         int value; // Value stored in the node

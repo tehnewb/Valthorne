@@ -28,8 +28,14 @@ package valthorne.utility;
  */
 public final class TimeUtility {
 
-    private static final float MILLIS_PER_SECOND = 1000f;     // 1 second = 1000 ms
-    private static final float EPSILON = 1e-6f;               // Small float tolerance for time comparisons
+    /**
+     * Conversion factor from seconds to milliseconds.
+     */
+    private static final float MILLIS_PER_SECOND = 1000f;
+    /**
+     * Small tolerance used when comparing floating-point time values.
+     */
+    private static final float EPSILON = 1e-6f;
 
     /**
      * Converts float seconds to milliseconds.
@@ -96,7 +102,7 @@ public final class TimeUtility {
      * Calculates FPS (frames per second) from delta seconds.
      *
      * @param deltaSeconds dt in seconds
-     * @return fps, or 0 if dt <= 0
+     * @return fps, or 0 if dt &lt;= 0
      */
     public static int fpsFromDelta(float deltaSeconds) {
         if (deltaSeconds <= 0f) return 0;

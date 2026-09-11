@@ -6,6 +6,20 @@ package valthorne.graphics.font;
  * This class is a record that stores data about a glyph's character, its
  * bounding box coordinates, and its positional offsets.
  * It is used to describe glyphs for rendering text in graphical applications.
+ * Atlas bounds are pixel coordinates from packed font data; offsets and advance
+ * describe placement relative to the text pen. Values are retained without validation.
+ *
+ * @param character UTF-16 character represented by the packed glyph
+ * @param x0        left atlas pixel coordinate
+ * @param y0        top atlas pixel coordinate
+ * @param x1        exclusive right atlas pixel coordinate
+ * @param y1        exclusive bottom atlas pixel coordinate
+ * @param xOffset   horizontal offset of the first quad corner from the pen
+ * @param yOffset   vertical offset of the first quad corner from the baseline
+ * @param xOffset2  horizontal offset of the opposite quad corner from the pen
+ * @param yOffset2  vertical offset of the opposite quad corner from the baseline
+ * @param xAdvance  horizontal pen advance in pixels after this glyph
+ * @author Albert Beaupre
  */
 public record Glyph(char character, int x0, int y0, int x1, int y1, float xOffset, float yOffset, float xOffset2, float yOffset2, float xAdvance) {
 

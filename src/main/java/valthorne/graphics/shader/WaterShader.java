@@ -57,27 +57,10 @@ import valthorne.graphics.Sprite;
  */
 public class WaterShader extends TexturedQuadShader {
 
-    public static final String FRAG_SRC = """
-            #version 330 core
-            uniform sampler2D u_texture;
-            uniform vec2 u_texelSize;
-            uniform float u_time;
-            uniform float u_amp;
-            uniform float u_freq;
-            uniform float u_speed;
-            in vec2 v_uv;
-            in vec4 v_color;
-            out vec4 fragColor;
-            void main() {
-                vec2 amp = u_texelSize * u_amp;
-                float w1 = sin(v_uv.x * u_freq + u_time * u_speed);
-                float w2 = sin(v_uv.y * (u_freq * 0.8) - u_time * (u_speed * 1.15));
-                vec2 uv = v_uv;
-                uv.y += w1 * amp.y;
-                uv.x += w2 * amp.x;
-                fragColor = texture(u_texture, uv) * v_color;
-            }
-            """;
+    /**
+     * Fragment source loaded from the packaged water effect shader resource.
+     */
+    public static final String FRAG_SRC = ShaderSources.load("effects/water.frag");
 
     /**
      * Creates a new {@code WaterShader} using the built-in GLSL sources.
@@ -86,6 +69,18 @@ public class WaterShader extends TexturedQuadShader {
         super(FRAG_SRC);
     }
 
+    /**
+     * Binds the water program and configures distortion uniforms from the sprite's
+     * backing texture dimensions. Leaves the shader bound for a subsequent draw;
+     * this method does not itself render the sprite or unbind the program. Requires
+     * a current OpenGL context and a sprite with a valid, nonzero-size texture.
+     *
+     * @param sprite sprite supplying texture dimensions
+     * @param timeSeconds animation time in seconds
+     * @param ampPx distortion amplitude in texture pixels
+     * @param freq spatial wave frequency supplied to the shader
+     * @param speed temporal wave speed supplied to the shader
+     */
     public void apply(Sprite sprite, float timeSeconds, float ampPx, float freq, float speed) {
         bind();
         setUniform1i(UNIFORM_TEXTURE, 0);

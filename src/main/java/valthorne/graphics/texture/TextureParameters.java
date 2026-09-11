@@ -11,6 +11,16 @@ import valthorne.io.file.ValthorneFiles;
  * <p>
  * This record implements the {@link AssetParameters} interface, allowing it to
  * define a unique identifier for managing texture assets.
+ *
+ * <p>Only name supplies the shared asset-cache key; source and flip setting
+ * do not distinguish cached requests. Use different names for variants that must
+ * coexist. Path factories defer file reads, byte factories defensively copy input,
+ * and classpath factories read the resource immediately before wrapping its bytes.</p>
+ *
+ * @param source validated path or encoded-byte source
+ * @param name nonblank cache identity
+ * @param flipVertically whether decoding reverses image row order
+ * @author Albert Beaupre
  */
 public record TextureParameters(TextureSource source, String name, boolean flipVertically) implements AssetParameters {
 
@@ -107,6 +117,8 @@ public record TextureParameters(TextureSource source, String name, boolean flipV
      * @param name         the unique name of the texture. Must not be null or blank.
      * @return a {@code TextureParameters} instance configured with the specified classpath resource and name.
      * @throws IllegalArgumentException if {@code resourcePath} is null or blank, or if {@code name} is null or blank.
+     * @throws valthorne.io.file.ValthorneFileException if the classpath resource
+     *         is missing or cannot be read; resource bytes are read synchronously
      */
     public static TextureParameters fromClasspath(String resourcePath, String name) {
         return fromBytes(ValthorneFiles.readBytes(resourcePath), name, true);
@@ -121,11 +133,20 @@ public record TextureParameters(TextureSource source, String name, boolean flipV
      * @param flipVertically a boolean indicating whether the texture should be flipped vertically during loading.
      * @return a {@code TextureParameters} instance configured with the specified classpath resource, name, and flip vertically option.
      * @throws IllegalArgumentException if {@code resourcePath} is null or blank, or if {@code name} is null or blank.
+     * @throws valthorne.io.file.ValthorneFileException if the classpath resource
+     *         is missing or cannot be read; resource bytes are read synchronously
      */
     public static TextureParameters fromClasspath(String resourcePath, String name, boolean flipVertically) {
         return fromBytes(ValthorneFiles.readBytes(resourcePath), name, flipVertically);
     }
 
+    /**
+     * Returns name as the asset-cache identity without including source contents
+     * or loading options. Equal names can therefore reuse an existing cached load
+     * even when other parameters differ.
+     *
+     * @return nonblank cache key supplied at construction
+     */
     @Override
     public String key() {
         return name;

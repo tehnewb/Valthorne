@@ -105,6 +105,32 @@ public class LongBits {
     }
 
     /**
+     * Validates that a bit index falls within the valid long bit range.
+     *
+     * @param index the index to validate
+     * @throws IndexOutOfBoundsException if the index is outside {@code 0..63}
+     */
+    private static void validateIndex(int index) {
+        if (index < 0 || index >= BIT_COUNT) {
+            throw new IndexOutOfBoundsException("Bit index must be between 0 and 63: " + index);
+        }
+    }
+
+    /**
+     * Returns the mask for the specified bit index.
+     *
+     * <p>
+     * This method assumes the index has already been validated.
+     * </p>
+     *
+     * @param index the validated bit index
+     * @return a long mask with that bit position enabled
+     */
+    private static long mask(int index) {
+        return 1L << index;
+    }
+
+    /**
      * Returns whether the bit at the specified index is currently set.
      *
      * <p>
@@ -423,31 +449,5 @@ public class LongBits {
      */
     public long getBits() {
         return bits;
-    }
-
-    /**
-     * Validates that a bit index falls within the valid long bit range.
-     *
-     * @param index the index to validate
-     * @throws IndexOutOfBoundsException if the index is outside {@code 0..63}
-     */
-    private static void validateIndex(int index) {
-        if (index < 0 || index >= BIT_COUNT) {
-            throw new IndexOutOfBoundsException("Bit index must be between 0 and 63: " + index);
-        }
-    }
-
-    /**
-     * Returns the mask for the specified bit index.
-     *
-     * <p>
-     * This method assumes the index has already been validated.
-     * </p>
-     *
-     * @param index the validated bit index
-     * @return a long mask with that bit position enabled
-     */
-    private static long mask(int index) {
-        return 1L << index;
     }
 }

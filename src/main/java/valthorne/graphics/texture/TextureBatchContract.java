@@ -1,6 +1,7 @@
 package valthorne.graphics.texture;
 
 import valthorne.graphics.shader.Shader;
+import valthorne.graphics.shader.ShaderSources;
 
 /**
  * <p>
@@ -220,48 +221,7 @@ public final class TextureBatchContract {
      * @return the default vertex shader source code
      */
     public static String defaultVertexShader() {
-        return """
-                #version 330 core
-                
-                uniform mat4 u_mvp;
-                in vec2 a_local;
-                in vec2 a_uv;
-                in vec4 i_xywh;
-                in vec4 i_col;
-                in float i_tex;
-                in vec4 i_uvRect;
-                in vec2 i_origin;
-                in vec2 i_rot;
-                in vec4 i_clipRect;
-                in float i_clipEnabled;
-                
-                out vec2 v_uv;
-                out vec4 v_col;
-                out float v_tex;
-                out vec2 v_world;
-                out vec4 v_clipRect;
-                out float v_clipEnabled;
-                
-                void main() {
-                    vec2 local = a_local * i_xywh.zw;
-                    local -= i_origin;
-                
-                    vec2 rotated = vec2(
-                        local.x * i_rot.y - local.y * i_rot.x,
-                        local.x * i_rot.x + local.y * i_rot.y
-                    );
-                
-                    vec2 world = i_xywh.xy + i_origin + rotated;
-                
-                    gl_Position = u_mvp * vec4(world.xy, 0.0, 1.0);
-                    v_uv = mix(i_uvRect.xy, i_uvRect.zw, a_uv);
-                    v_col = i_col;
-                    v_tex = i_tex;
-                    v_world = world;
-                    v_clipRect = i_clipRect;
-                    v_clipEnabled = i_clipEnabled;
-                }
-                """;
+        return ShaderSources.load("texture/batch.vert");
     }
 
     /**
@@ -286,44 +246,7 @@ public final class TextureBatchContract {
      * @return the default fragment shader source code
      */
     public static String buildDefaultFragmentShader(int maxTextureUnits) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("#version 330 core\n");
-        for (int i = 0; i < maxTextureUnits; i++) {
-            sb.append("uniform sampler2D u_tex").append(i).append(";\n");
-        }
-        sb.append("""
-                in vec2 v_uv;
-                in vec4 v_col;
-                in float v_tex;
-                in vec2 v_world;
-                in vec4 v_clipRect;
-                in float v_clipEnabled;
-                
-                out vec4 fragColor;
-                
-                void main() {
-                    if (v_clipEnabled > 0.5) {
-                        if (v_world.x < v_clipRect.x || v_world.y < v_clipRect.y ||
-                            v_world.x > v_clipRect.x + v_clipRect.z ||
-                            v_world.y > v_clipRect.y + v_clipRect.w) {
-                            discard;
-                        }
-                    }
-                
-                    vec4 c;
-                """);
-
-        sb.append("    float t = v_tex;\n");
-        sb.append("    if (t < 0.5) c = texture(u_tex0, v_uv);\n");
-        for (int i = 1; i < maxTextureUnits; i++) {
-            sb.append("    else if (t < ").append(i).append(".5) c = texture(u_tex").append(i).append(", v_uv);\n");
-        }
-        sb.append("""
-                    else c = texture(u_tex0, v_uv);
-                    fragColor = c * v_col;
-                }
-                """);
-        return sb.toString();
+        return buildFragment("texture/batch.frag", "color", maxTextureUnits);
     }
 
     /**
@@ -351,42 +274,7 @@ public final class TextureBatchContract {
      * @return a fragment shader preamble string that can be concatenated with custom shader logic
      */
     public static String buildFragmentPreamble(int maxTextureUnits) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("#version 330 core\n");
-        for (int i = 0; i < maxTextureUnits; i++) {
-            sb.append("uniform sampler2D u_tex").append(i).append(";\n");
-        }
-        sb.append("""
-                in vec2 v_uv;
-                in vec4 v_col;
-                in float v_tex;
-                in vec2 v_world;
-                in vec4 v_clipRect;
-                in float v_clipEnabled;
-                
-                vec4 sampleBatchTexture(vec2 uv) {
-                    float t = v_tex;
-                """);
-
-        sb.append("    if (t < 0.5) return texture(u_tex0, uv);\n");
-        for (int i = 1; i < maxTextureUnits; i++) {
-            sb.append("    else if (t < ").append(i).append(".5) return texture(u_tex").append(i).append(", uv);\n");
-        }
-
-        sb.append("""
-                    return texture(u_tex0, uv);
-                }
-                
-                bool batchClipped() {
-                    return v_clipEnabled > 0.5 &&
-                           (v_world.x < v_clipRect.x ||
-                            v_world.y < v_clipRect.y ||
-                            v_world.x > v_clipRect.x + v_clipRect.z ||
-                            v_world.y > v_clipRect.y + v_clipRect.w);
-                }
-                
-                """);
-        return sb.toString();
+        return buildFragment("texture/batch-preamble.glsl", "sample", maxTextureUnits);
     }
 
     /**
@@ -441,4 +329,38 @@ public final class TextureBatchContract {
         }
         shader.unbind();
     }
+
+    /**
+     * Expands a packaged fragment template with sampler declarations and texture
+     * selection branches. The selection name chooses the first/next branch templates;
+     * subsequent units are numbered from one while declarations start at zero.
+     * No GL compilation occurs here and the unit count is not validated.
+     *
+     * @param resource fragment template resource path
+     * @param selection selection-template variant name
+     * @param maxTextureUnits number of sampler declarations to generate
+     * @return fragment source with SAMPLERS and SELECTION tokens expanded
+     */
+    private static String buildFragment(String resource, String selection, int maxTextureUnits) {
+        String sampler = ShaderSources.load("texture/templates/sampler.glsl");
+        String first = ShaderSources.load("texture/templates/select-" + selection + "-first.glsl");
+        String next = ShaderSources.load("texture/templates/select-" + selection + "-next.glsl");
+        StringBuilder samplers = new StringBuilder();
+        StringBuilder branches = new StringBuilder(first);
+        for (int i = 0; i < maxTextureUnits; i++) {
+            String index = Integer.toString(i);
+            samplers.append(replaceToken(sampler, "INDEX", index));
+            if (i > 0) branches.append(replaceToken(next, "INDEX", index));
+        }
+        return replaceToken(replaceToken(ShaderSources.load(resource), "SAMPLERS", samplers.toString()), "SELECTION", branches.toString());
+    }
+    /**
+     * Substitutes a template token while tolerating whitespace inserted by GLSL
+     * formatters inside its braces. Replacement text is treated literally.
+     * @param source template text
+     * @param name fixed token name supplied by this class
+     * @param value generated shader text
+     * @return substituted source, without modifying other shader whitespace
+     */
+    private static String replaceToken(String source,String name,String value){return source.replaceAll("\\$\\{\\s*"+name+"\\s*\\}",java.util.regex.Matcher.quoteReplacement(value));}
 }

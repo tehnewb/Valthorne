@@ -9,7 +9,7 @@ import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
 import valthorne.graphics.ImmediateTextureRenderer;
 import valthorne.graphics.texture.TextureData;
-import valthorne.math.Matrix4f;
+import org.joml.Matrix4f;
 import valthorne.ui.Dimensional;
 
 import java.nio.IntBuffer;
@@ -45,79 +45,197 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  */
 public final class Window {
 
-    private static final Matrix4f projectionMatrix = new Matrix4f();                     // Engine-managed projection used by modern shader paths.
+    /**
+     * Engine-managed projection matrix used by shader rendering paths.
+     */
+    private static final Matrix4f projectionMatrix = new Matrix4f();
+    /**
+     * Reusable column-major projection values refreshed whenever the engine matrix changes.
+     */
+    private static final float[] projectionValues = projectionMatrix.get(new float[16]);
 
-    private static final WindowResizeEvent resizeEvent = new WindowResizeEvent(0, 0, 0, 0); // Reused resize event instance to avoid allocations.
+    /**
+     * Reused resize event; listeners must copy values instead of retaining it as a historical snapshot.
+     */
+    private static final WindowResizeEvent resizeEvent = new WindowResizeEvent(0, 0, 0, 0);
 
-    private static GLFWFramebufferSizeCallback fbCallback;                                   // Framebuffer resize callback handle (free() on dispose).
-    private static GLFWWindowFocusCallback focusCallback;                                    // Focus callback handle (free() on dispose).
-    private static GLFWWindowIconifyCallback iconifyCallback;                                // Minimize/iconify callback handle (free() on dispose).
-    private static GLFWWindowMaximizeCallback maximizeCallback;                              // Maximize callback handle (free() on dispose).
-    private static GLFWWindowCloseCallback closeCallback;                                    // Close callback handle (free() on dispose).
-    private static GLFWWindowPosCallback posCallback;                                        // Position callback handle (free() on dispose).
-    private static GLFWWindowSizeCallback sizeCallback;                                      // Window size callback handle (free() on dispose).
-    private static GLFWWindowContentScaleCallback scaleCallback;                             // Content scale callback handle (free() on dispose).
+    /**
+     * Native framebuffer-size callback reference retained for cleanup.
+     */
+    private static GLFWFramebufferSizeCallback fbCallback;
+    /**
+     * Native focus callback reference; focus loss clears keyboard and pointer state.
+     */
+    private static GLFWWindowFocusCallback focusCallback;
+    /**
+     * Native iconify callback reference retained for cleanup.
+     */
+    private static GLFWWindowIconifyCallback iconifyCallback;
+    /**
+     * Native maximize callback reference retained for cleanup.
+     */
+    private static GLFWWindowMaximizeCallback maximizeCallback;
+    /**
+     * Native close callback reference that requests window closure.
+     */
+    private static GLFWWindowCloseCallback closeCallback;
+    /**
+     * Native position callback reference that refreshes cached desktop coordinates.
+     */
+    private static GLFWWindowPosCallback posCallback;
+    /**
+     * Native logical-size callback reference that updates projection and publishes resize events.
+     */
+    private static GLFWWindowSizeCallback sizeCallback;
+    /**
+     * Native content-scale callback reference retained for cleanup.
+     */
+    private static GLFWWindowContentScaleCallback scaleCallback;
 
-    private static SwapInterval swapInterval = SwapInterval.OFF;                             // Current swap interval (vsync mode) cached for init.
-    private static long address;                                                             // GLFW window handle (0/NULL means not created).
-    private static int x, y;                                                               // Cached window position in screen coordinates.
-    private static int width, height;                                                      // Cached window size in screen coordinates.
-    private static boolean fullscreen = false;                                               // Cached fullscreen state.
-    private static boolean borderless = false;                                               // Cached borderless/undecorated state.
-    private static boolean resizable = true;                                                 // Cached resizable state.
-
-    private static final Dimensional dimensional = new Dimensional() {                       // Dimensional adapter for treating the window as a UI rectangle.
+    /**
+     * Cached swap-interval preference, initially disabled.
+     */
+    private static SwapInterval swapInterval = SwapInterval.OFF;
+    /**
+     * Owned GLFW window handle, or zero when no window is registered.
+     */
+    private static long address;
+    /**
+     * Cached desktop X and Y coordinates in GLFW screen-coordinate units.
+     */
+    private static int x, y;
+    /**
+     * Cached logical content width and height, rather than a separate framebuffer pixel size.
+     */
+    private static int width, height;
+    /**
+     * Shared content-rectangle adapter; position setters move the window while origin getters return zero.
+     */
+    private static final Dimensional dimensional = new Dimensional() {
+        /**
+         * Returns zero for the adapter's content-space origin, rather than the native
+         * window's desktop X position.
+         *
+         * @return content origin X, always zero
+         */
         @Override
         public float getX() {
             return 0;
         }
 
-        @Override
-        public float getY() {
-            return 0;
-        }
-
-        @Override
-        public void setPosition(float x, float y) {
-            Window.setPosition((int) x, (int) y);
-        }
-
+        /**
+         * Moves the native window horizontally, retaining its cached desktop Y coordinate.
+         * Truncates the supplied coordinate to an integer.
+         *
+         * @param x desktop X position
+         */
         @Override
         public void setX(float x) {
             Window.setPosition((int) x, Window.getY());
         }
 
+        /**
+         * Returns zero for the adapter's content-space origin, rather than the native
+         * window's desktop Y position.
+         *
+         * @return content origin Y, always zero
+         */
+        @Override
+        public float getY() {
+            return 0;
+        }
+
+        /**
+         * Moves the native window vertically, retaining its cached desktop X coordinate.
+         * Truncates the supplied coordinate to an integer.
+         *
+         * @param y desktop Y position
+         */
         @Override
         public void setY(float y) {
             Window.setPosition(Window.getX(), (int) y);
         }
 
+        /**
+         * Moves the native window using integer-truncated desktop coordinates. The
+         * adapter's position getters still represent the zero content origin.
+         *
+         * @param x desktop X position
+         * @param y desktop Y position
+         */
+        @Override
+        public void setPosition(float x, float y) {
+            Window.setPosition((int) x, (int) y);
+        }
+
+        /**
+         * Returns the cached window content width in screen-coordinate units.
+         *
+         * @return current content width
+         */
         @Override
         public float getWidth() {
             return Window.getWidth();
         }
 
-        @Override
-        public float getHeight() {
-            return Window.getHeight();
-        }
-
-        @Override
-        public void setSize(float width, float height) {
-            Window.setSize((int) width, (int) height);
-        }
-
+        /**
+         * Requests an integer-truncated window width while retaining cached height.
+         *
+         * @param width requested content width
+         */
         @Override
         public void setWidth(float width) {
             Window.setSize((int) width, Window.getHeight());
         }
 
+        /**
+         * Returns the cached window content height in screen-coordinate units.
+         *
+         * @return current content height
+         */
+        @Override
+        public float getHeight() {
+            return Window.getHeight();
+        }
+
+        /**
+         * Requests an integer-truncated window height while retaining cached width.
+         *
+         * @param height requested content height
+         */
         @Override
         public void setHeight(float height) {
             Window.setSize(Window.getWidth(), (int) height);
         }
-    };
 
+        /**
+         * Requests integer-truncated native window dimensions through the static window
+         * size API.
+         *
+         * @param width requested content width
+         * @param height requested content height
+         */
+        @Override
+        public void setSize(float width, float height) {
+            Window.setSize((int) width, (int) height);
+        }
+    };
+    /**
+     * Cached fullscreen preference/state.
+     */
+    private static boolean fullscreen = false;
+    /**
+     * Cached undecorated window preference/state.
+     */
+    private static boolean borderless = false;
+    /**
+     * Cached resizability preference/state.
+     */
+    private static boolean resizable = true;
+
+    /**
+     * Prevents construction of the process-wide GLFW window utility.
+     */
     private Window() {
     }
 
@@ -186,6 +304,11 @@ public final class Window {
         });
 
         focusCallback = glfwSetWindowFocusCallback(address, (win, focused) -> {
+            if (!focused) {
+                Mouse.cancelButtons();
+                Keyboard.resetState();
+            }
+            JGL.publish(new valthorne.event.events.WindowFocusEvent(focused));
         });
 
         iconifyCallback = glfwSetWindowIconifyCallback(address, (win, iconified) -> {
@@ -230,8 +353,13 @@ public final class Window {
         updateDefaultProjectionMatrix();
     }
 
+    /**
+     * Rebuilds the engine's bottom-left-origin orthographic projection from cached
+     * window dimensions, with depth limits -1 and 1, and refreshes the reusable
+     * column-major upload array. Does not modify a fixed-function GL matrix stack.
+     */
     private static void updateDefaultProjectionMatrix() {
-        projectionMatrix.ortho(0f, Window.width, 0f, Window.height, -1f, 1f);
+        projectionMatrix.setOrtho(0f, Window.width, 0f, Window.height, -1f, 1f).get(projectionValues);
     }
 
     /**
@@ -245,6 +373,23 @@ public final class Window {
     public static void clear(Color color) {
         glClearColor(color.r(), color.g(), color.b(), color.a());
         glClear(GL_COLOR_BUFFER_BIT);
+    }
+
+    /**
+     * Clears color and depth for a new 3D frame, even after a pass disabled depth writes.
+     */
+    public static void clear3D(Color color) {
+        boolean depthWrite = glGetBoolean(GL_DEPTH_WRITEMASK);
+        double clearDepth = glGetDouble(GL_DEPTH_CLEAR_VALUE);
+        try {
+            glDepthMask(true);
+            glClearDepth(1.0);
+            glClearColor(color.r(), color.g(), color.b(), color.a());
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        } finally {
+            glDepthMask(depthWrite);
+            glClearDepth(clearDepth);
+        }
     }
 
     /**
@@ -302,58 +447,6 @@ public final class Window {
      */
     public static void setTitle(String newTitle) {
         glfwSetWindowTitle(address, newTitle);
-    }
-
-    /**
-     * Sets whether the window is resizable.
-     *
-     * <p>This updates both the cached {@link #resizable} flag and the GLFW window attribute.</p>
-     *
-     * @param resizable true to allow resizing, false to lock the window size
-     */
-    public static void setResizable(boolean resizable) {
-        if (address == NULL) return;
-        Window.resizable = resizable;
-        glfwSetWindowAttrib(address, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
-    }
-
-    /**
-     * Sets whether the window is borderless (undecorated).
-     *
-     * <p>This updates both the cached {@link #borderless} flag and the GLFW window attribute.</p>
-     *
-     * @param borderless true for borderless, false for normal window decorations
-     */
-    public static void setBorderless(boolean borderless) {
-        if (address == NULL) return;
-        Window.borderless = borderless;
-        glfwSetWindowAttrib(address, GLFW_DECORATED, borderless ? GLFW_FALSE : GLFW_TRUE);
-    }
-
-    /**
-     * Sets fullscreen mode using the primary monitor.
-     *
-     * <p>When entering fullscreen, this sets the window monitor to the primary monitor and uses the monitor's
-     * current video mode dimensions and refresh rate.</p>
-     *
-     * <p>When leaving fullscreen, this restores the window to its cached position and size.</p>
-     *
-     * @param fullscreen true for fullscreen, false for windowed
-     * @throws RuntimeException if the primary monitor video mode cannot be queried
-     */
-    public static void setFullscreen(boolean fullscreen) {
-        if (address == NULL) return;
-
-        GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        if (vid == null) throw new RuntimeException("Failed to get video mode");
-
-        Window.fullscreen = fullscreen;
-
-        if (fullscreen) {
-            glfwSetWindowMonitor(address, glfwGetPrimaryMonitor(), 0, 0, vid.width(), vid.height(), vid.refreshRate());
-        } else {
-            glfwSetWindowMonitor(address, NULL, getX(), getY(), getWidth(), getHeight(), vid.refreshRate());
-        }
     }
 
     /**
@@ -469,6 +562,32 @@ public final class Window {
     }
 
     /**
+     * Sets fullscreen mode using the primary monitor.
+     *
+     * <p>When entering fullscreen, this sets the window monitor to the primary monitor and uses the monitor's
+     * current video mode dimensions and refresh rate.</p>
+     *
+     * <p>When leaving fullscreen, this restores the window to its cached position and size.</p>
+     *
+     * @param fullscreen true for fullscreen, false for windowed
+     * @throws RuntimeException if the primary monitor video mode cannot be queried
+     */
+    public static void setFullscreen(boolean fullscreen) {
+        if (address == NULL) return;
+
+        GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        if (vid == null) throw new RuntimeException("Failed to get video mode");
+
+        Window.fullscreen = fullscreen;
+
+        if (fullscreen) {
+            glfwSetWindowMonitor(address, glfwGetPrimaryMonitor(), 0, 0, vid.width(), vid.height(), vid.refreshRate());
+        } else {
+            glfwSetWindowMonitor(address, NULL, getX(), getY(), getWidth(), getHeight(), vid.refreshRate());
+        }
+    }
+
+    /**
      * Returns whether the window is currently marked borderless/undecorated.
      *
      * @return true if borderless
@@ -478,12 +597,38 @@ public final class Window {
     }
 
     /**
+     * Sets whether the window is borderless (undecorated).
+     *
+     * <p>This updates both the cached {@link #borderless} flag and the GLFW window attribute.</p>
+     *
+     * @param borderless true for borderless, false for normal window decorations
+     */
+    public static void setBorderless(boolean borderless) {
+        if (address == NULL) return;
+        Window.borderless = borderless;
+        glfwSetWindowAttrib(address, GLFW_DECORATED, borderless ? GLFW_FALSE : GLFW_TRUE);
+    }
+
+    /**
      * Returns whether the window is currently marked resizable.
      *
      * @return true if resizable
      */
     public static boolean isResizable() {
         return resizable;
+    }
+
+    /**
+     * Sets whether the window is resizable.
+     *
+     * <p>This updates both the cached {@link #resizable} flag and the GLFW window attribute.</p>
+     *
+     * @param resizable true to allow resizing, false to lock the window size
+     */
+    public static void setResizable(boolean resizable) {
+        if (address == NULL) return;
+        Window.resizable = resizable;
+        glfwSetWindowAttrib(address, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
     }
 
     /**
@@ -700,6 +845,11 @@ public final class Window {
         }
     }
 
+    /**
+     * Clears cached window and callback references and restores default flags,
+     * swap interval, and identity projection. Performs no native cleanup itself;
+     * call only after owned resources have been released or during safe reset.
+     */
     static void resetState() {
         fbCallback = null;
         focusCallback = null;
@@ -718,7 +868,7 @@ public final class Window {
         borderless = false;
         resizable = true;
         swapInterval = SwapInterval.OFF;
-        projectionMatrix.identity();
+        projectionMatrix.identity().get(projectionValues);
     }
 
     /**
@@ -733,26 +883,13 @@ public final class Window {
     /**
      * Returns the engine-managed projection matrix values used by shader-based render paths.
      *
-     * <p>The returned array is the live backing storage for the current projection state.
+     * <p>The returned array is a reused snapshot of the current projection state.
      * Callers should treat it as read-only.</p>
      *
      * @return the current projection matrix values in column-major order
      */
     public static float[] getProjectionMatrix() {
-        return projectionMatrix.get();
-    }
-
-    /**
-     * Copies the current engine-managed projection matrix into the supplied destination array.
-     *
-     * @param destination destination array that must contain room for 16 floats
-     * @throws NullPointerException     if {@code destination} is null
-     * @throws IllegalArgumentException if {@code destination.length < 16}
-     */
-    public static void copyProjectionMatrix(float[] destination) {
-        if (destination == null) throw new NullPointerException("destination");
-        if (destination.length < 16) throw new IllegalArgumentException("destination must contain at least 16 floats");
-        projectionMatrix.get(destination);
+        return projectionValues;
     }
 
     /**
@@ -769,20 +906,40 @@ public final class Window {
     public static void setProjectionMatrix(float[] matrixData) {
         if (matrixData == null) throw new NullPointerException("matrixData");
         if (matrixData.length < 16) throw new IllegalArgumentException("matrixData must contain at least 16 floats");
-        System.arraycopy(matrixData, 0, projectionMatrix.m, 0, 16);
+        projectionMatrix.set(matrixData).get(projectionValues);
     }
 
     /**
-     * Retrieves a {@link Dimensional} adapter representing the window.
+     * Copies the current engine-managed projection matrix into the supplied destination array.
      *
-     * <p>This is useful for treating the window like a UI rectangle (size + movable position).</p>
+     * @param destination destination array that must contain room for 16 floats
+     * @throws NullPointerException     if {@code destination} is null
+     * @throws IllegalArgumentException if {@code destination.length < 16}
+     */
+    public static void copyProjectionMatrix(float[] destination) {
+        if (destination == null) throw new NullPointerException("destination");
+        if (destination.length < 16) throw new IllegalArgumentException("destination must contain at least 16 floats");
+        projectionMatrix.get(destination);
+    }
+
+    /**
+     * Returns the shared window adapter. Its getters expose a zero content origin
+     * and current content dimensions, while position setters move the desktop window
+     * and size setters resize it, truncating float inputs to integers.
      *
-     * @return dimensional adapter bound to the window
+     * @return live shared dimensional adapter
      */
     public static Dimensional getDimensional() {
         return dimensional;
     }
 
+    /**
+     * Runs one cleanup action and captures any thrown failure so later cleanup
+     * actions can still be attempted.
+     *
+     * @param action cleanup operation
+     * @return thrown failure, or null on success
+     */
     private static Throwable runSafe(Runnable action) {
         try {
             action.run();
@@ -792,6 +949,14 @@ public final class Window {
         }
     }
 
+    /**
+     * Keeps the first cleanup failure and attaches a later nonnull failure as
+     * suppressed. Callers must avoid passing the same throwable as both arguments.
+     *
+     * @param primary earlier failure, possibly null
+     * @param next later failure, possibly null
+     * @return first available failure
+     */
     private static Throwable appendSuppressed(Throwable primary, Throwable next) {
         if (next == null) {
             return primary;
@@ -803,6 +968,12 @@ public final class Window {
         return primary;
     }
 
+    /**
+     * Rethrows runtime exceptions and errors unchanged, wrapping other throwable
+     * types so cleanup can report them without a checked throws declaration.
+     *
+     * @param throwable nonnull failure to propagate
+     */
     private static void rethrowUnchecked(Throwable throwable) {
         if (throwable instanceof RuntimeException runtimeException) {
             throw runtimeException;

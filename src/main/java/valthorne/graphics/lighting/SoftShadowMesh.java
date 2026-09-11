@@ -2,14 +2,52 @@ package valthorne.graphics.lighting;
 
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 
+/**
+ * Reusable GPU triangle mesh for radially fading shadow fringes. Each qualifying
+ * edge between cyclic light-ray endpoints becomes a quad fading from its hit
+ * alpha to zero. Geometry is replaced on every upload; the inherited mesh owns
+ * the CPU staging buffer and OpenGL objects. Use on the owning rendering thread
+ * with a current context and dispose after the last draw.
+ *
+ * @author Albert Beaupre
+ */
 public final class SoftShadowMesh extends DynamicMesh2D {
 
+    /**
+     * Fractions below this threshold count as blocked rays when constructing fringes.
+     */
     private static final float HIT_EPSILON = 0.999f;
 
+    /**
+     * Allocates the CPU and OpenGL triangle storage used by subsequent rebuilds.
+     * A current OpenGL context is required; release it with inherited dispose.
+     * @param maxVertices initial vertex capacity
+     */
     public SoftShadowMesh(int maxVertices) {
         super(maxVertices, GL_TRIANGLES);
     }
 
+    /**
+     * Replaces and uploads the fringe geometry around cyclic ray endpoints.
+     * Each adjacent pair emits two triangles when at least one fraction is below
+     * 0.999 and neither endpoint coincides with the center. Inner alpha is zero
+     * for unblocked endpoints; outer alpha is always zero. Extrusion follows
+     * the radial direction by softnessLength, with no sign or range validation.
+     * Local shader coordinates are divided by radius, or zero when radius is zero.
+     *
+     * @param centerX world-space light center X
+     * @param centerY world-space light center Y
+     * @param radius scale for local shader coordinates
+     * @param softnessLength radial fringe length in world units
+     * @param endX ordered endpoint X values; determines the number of pairs
+     * @param endY corresponding endpoint Y values, at least as long as endX
+     * @param fractions corresponding ray fractions, at least as long as endX
+     * @param r red component written to every vertex
+     * @param g green component written to every vertex
+     * @param b blue component written to every vertex
+     * @param a inner alpha for blocked endpoints
+     * @throws NullPointerException if a required endpoint array is null
+     */
     public void setTriangles(float centerX, float centerY, float radius, float softnessLength, float[] endX, float[] endY, float[] fractions, float r, float g, float b, float a) {
         beginWrite();
 

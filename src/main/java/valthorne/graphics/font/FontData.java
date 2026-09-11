@@ -31,8 +31,17 @@ import static org.lwjgl.stb.STBTruetype.*;
  */
 public record FontData(TextureData textureData, int fontSize, char startChar, char endChar, int atlasWidth, int atlasHeight, float ascent, float descent, float scale, float baseline, float lineHeight, Glyph[] glyphs, STBTTFontinfo stbInfo, ByteBuffer stbFontBuffer) {
 
+    /**
+     * Shared native output buffer for STB ascent metrics.
+     */
     private static final IntBuffer ASC_BUF = BufferUtils.createIntBuffer(1);
+    /**
+     * Shared native output buffer for STB descent metrics.
+     */
     private static final IntBuffer DESC_BUF = BufferUtils.createIntBuffer(1);
+    /**
+     * Shared native output buffer for STB line-gap metrics.
+     */
     private static final IntBuffer GAP_BUF = BufferUtils.createIntBuffer(1);
 
     /**

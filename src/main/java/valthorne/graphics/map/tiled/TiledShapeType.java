@@ -6,6 +6,10 @@ package valthorne.graphics.map.tiled;
  * This enumeration is used to define the types of shapes that can be associated
  * with objects or areas within a Tiled map. Each type corresponds to specific
  * geometric properties or visual appearances.
+ * Geometry and text data live in the associated {@link TiledObject}; this enum only
+ * identifies how to interpret them and does not perform rendering or collision tests.
+ *
+ * @author Albert Beaupre
  */
 public enum TiledShapeType {
     /**

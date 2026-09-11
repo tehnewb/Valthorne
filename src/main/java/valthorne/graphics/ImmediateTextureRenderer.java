@@ -6,27 +6,11 @@ import valthorne.graphics.shader.TexturedQuadShader;
 
 import java.nio.FloatBuffer;
 
-import static org.lwjgl.opengl.GL11.GL_FLOAT;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
-import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
-import static org.lwjgl.opengl.GL11.glBindTexture;
-import static org.lwjgl.opengl.GL11.glDrawArrays;
-import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
-import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.GL_STREAM_DRAW;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
-import static org.lwjgl.opengl.GL15.glBufferData;
-import static org.lwjgl.opengl.GL15.glBufferSubData;
-import static org.lwjgl.opengl.GL15.glDeleteBuffers;
-import static org.lwjgl.opengl.GL15.glGenBuffers;
-import static org.lwjgl.opengl.GL20.GL_CURRENT_PROGRAM;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glGetUniformLocation;
-import static org.lwjgl.opengl.GL20.glUniform1i;
-import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
+import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
@@ -43,20 +27,55 @@ import static org.lwjgl.opengl.GL30.glGenVertexArrays;
  */
 public final class ImmediateTextureRenderer {
 
+    /**
+     * Interleaved width: XY position, UV coordinates, and RGBA tint.
+     */
     private static final int FLOATS_PER_VERTEX = 8;
+    /**
+     * Six triangle vertices emitted for each four-corner quad.
+     */
     private static final int VERTICES_PER_QUAD = 6;
+    /**
+     * Total staged float count per expanded quad.
+     */
     private static final int FLOATS_PER_QUAD = FLOATS_PER_VERTEX * VERTICES_PER_QUAD;
+    /**
+     * Byte width of an interleaved floating-point component.
+     */
     private static final int BYTES_PER_FLOAT = 4;
 
+    /**
+     * Shared owned vertex-array name, zero before initialization or after disposal.
+     */
     private static int vao;
+    /**
+     * Shared owned streaming vertex-buffer name.
+     */
     private static int vbo;
+    /**
+     * Current staging and GPU capacity in quads.
+     */
     private static int quadCapacity;
+    /**
+     * Shared direct CPU triangle staging storage.
+     */
     private static FloatBuffer vertexBuffer;
+    /**
+     * Owned fallback shader used when no program is bound.
+     */
     private static TexturedQuadShader defaultShader;
 
+    /**
+     * Prevents construction of this shared context-bound quad renderer.
+     */
     private ImmediateTextureRenderer() {
     }
 
+    /**
+     * Deletes the shared fallback program, vertex array, and buffer, then clears
+     * CPU staging state. Repeated successful disposal is harmless. The next draw
+     * lazily allocates a new set; call with the owning GL context current.
+     */
     public static void dispose() {
         if (defaultShader != null) {
             defaultShader.dispose();
@@ -74,6 +93,26 @@ public final class ImmediateTextureRenderer {
         vertexBuffer = null;
     }
 
+    /**
+     * Expands each four-corner quad to triangles (0,1,2) and (2,3,0), uploads copied
+     * positions/UVs and a uniform vertex tint, then draws with the current program
+     * or a fallback textured-quad shader when no program is bound.
+     * <p>
+     * Buffers are read by absolute indices starting at zero; their current positions
+     * are ignored and preserved. Each must contain at least eight floats per quad.
+     * The method sets standard sampler/projection uniforms when present, binds the
+     * texture on unit zero, and leaves array bindings at zero. It does not generally
+     * restore GL state or configure blending/depth policy.
+     * </p>
+     *
+     * @param textureID borrowed 2D texture name
+     * @param positions four XY corners per quad, starting at index zero
+     * @param uvs corresponding UV pairs
+     * @param quadCount number of quads; nonpositive values return immediately
+     * @param color tint copied to each vertex, or null for white
+     * @throws NullPointerException if a required buffer is null for positive quadCount
+     * @throws IndexOutOfBoundsException if an input buffer has insufficient readable elements
+     */
     public static void drawQuads(int textureID, FloatBuffer positions, FloatBuffer uvs, int quadCount, Color color) {
         if (quadCount <= 0) return;
         if (positions == null) throw new NullPointerException("positions");
@@ -109,6 +148,11 @@ public final class ImmediateTextureRenderer {
         }
     }
 
+    /**
+     * Lazily creates the shared fallback shader, one-quad CPU/GPU capacity, and
+     * position/UV/color attributes. Uses the current context; shared static storage
+     * is not suitable for unsynchronized or unrelated-context access.
+     */
     private static void ensureInitialized() {
         if (vao != 0) return;
 
@@ -138,6 +182,12 @@ public final class ImmediateTextureRenderer {
         glBindVertexArray(0);
     }
 
+    /**
+     * Grows shared CPU and GPU storage to exactly the requested quad capacity when
+     * the current allocation is too small. Existing staging data is discarded.
+     *
+     * @param quadCount required quad capacity
+     */
     private static void ensureCapacity(int quadCount) {
         if (quadCount <= quadCapacity) return;
 
@@ -149,6 +199,12 @@ public final class ImmediateTextureRenderer {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
+    /**
+     * Sets the active program's texture sampler to unit zero and projection to
+     * Window's current matrix, skipping uniform names absent from the program.
+     *
+     * @param programID currently bound program name
+     */
     private static void applyStandardUniforms(int programID) {
         int textureLocation = glGetUniformLocation(programID, TexturedQuadShader.UNIFORM_TEXTURE);
         if (textureLocation != -1) {
@@ -161,6 +217,15 @@ public final class ImmediateTextureRenderer {
         }
     }
 
+    /**
+     * Builds interleaved triangle vertices from absolute input-buffer coordinates,
+     * using white for a null tint, and flips shared staging storage for upload.
+     *
+     * @param positions four XY corners per quad
+     * @param uvs matching UV pairs
+     * @param quadCount number of quads
+     * @param color common tint, or null
+     */
     private static void uploadVertices(FloatBuffer positions, FloatBuffer uvs, int quadCount, Color color) {
         vertexBuffer.clear();
 
@@ -182,6 +247,19 @@ public final class ImmediateTextureRenderer {
         vertexBuffer.flip();
     }
 
+    /**
+     * Copies one selected corner's position/UV and supplied RGBA into shared staging.
+     * Input buffer positions are not changed.
+     *
+     * @param positions absolute-index position source
+     * @param uvs absolute-index UV source
+     * @param quadBase float offset of the quad
+     * @param vertexIndex corner index from zero through three
+     * @param r red tint
+     * @param g green tint
+     * @param b blue tint
+     * @param a alpha tint
+     */
     private static void putIndexedVertex(FloatBuffer positions, FloatBuffer uvs, int quadBase, int vertexIndex, float r, float g, float b, float a) {
         int index = quadBase + vertexIndex * 2;
         vertexBuffer.put(positions.get(index));

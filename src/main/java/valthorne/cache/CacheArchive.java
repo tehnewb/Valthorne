@@ -59,11 +59,26 @@ import java.nio.charset.StandardCharsets;
  */
 public class CacheArchive {
 
-    private static final byte NO_COMPRESSION = 0; // Compression id meaning "store raw bytes".
-    private static final byte GZIP = 1; // Compression id meaning "gzip compressed payload".
-    private static final byte BZIP2 = 2; // Compression id meaning "bzip2 compressed payload"
-    private static final byte LZMA = 3; // Compression id meaning "lzma compressed payload"
-    private static final byte XZ = 4; // Compression id meaning "xz compressed payload"
+    /**
+     * Archive compression identifier for a raw, uncompressed payload.
+     */
+    private static final byte NO_COMPRESSION = 0;
+    /**
+     * Archive compression identifier for a gzip payload.
+     */
+    private static final byte GZIP = 1;
+    /**
+     * Archive compression identifier for a BZIP2 payload.
+     */
+    private static final byte BZIP2 = 2;
+    /**
+     * Archive compression identifier for an LZMA payload.
+     */
+    private static final byte LZMA = 3;
+    /**
+     * Archive compression identifier for an XZ payload.
+     */
+    private static final byte XZ = 4;
 
     private String name; // Archive name (stored as UTF-8 in payload).
     private byte compression; // Compression id used when storing this archive in a CacheStore.
@@ -83,26 +98,6 @@ public class CacheArchive {
     public CacheArchive(String name, CacheFile... files) {
         this.name = name;
         this.files = files;
-    }
-
-    /**
-     * Appends a file to this archive, resizing the internal file array.
-     *
-     * <p>
-     * This performs an array grow-by-one and copies all existing references. The archive enforces
-     * {@code Short.MAX_VALUE} because file counts are stored as a {@code short} in the payload.
-     * </p>
-     *
-     * @param file file to add
-     * @throws IllegalArgumentException if file count would exceed {@code Short.MAX_VALUE}
-     */
-    public void addFile(CacheFile file) {
-        if (files.length >= Short.MAX_VALUE)
-            throw new IllegalArgumentException("Archive cannot contain more than " + Short.MAX_VALUE + " files");
-        CacheFile[] newFiles = new CacheFile[files.length + 1];
-        System.arraycopy(files, 0, newFiles, 0, files.length);
-        newFiles[files.length] = file;
-        files = newFiles;
     }
 
     /**
@@ -185,6 +180,49 @@ public class CacheArchive {
         } else {
             return strategy.compress(data);
         }
+    }
+
+    /**
+     * Maps compression id to a {@link CompressionStrategy}.
+     *
+     * <p>
+     * Returning {@code null} indicates NO_COMPRESSION. If you add new compression types, update this
+     * method to return their strategy.
+     * </p>
+     *
+     * @param compression compression id
+     * @return strategy or null for no compression
+     * @throws IllegalStateException if id is unknown
+     */
+    private static CompressionStrategy getStrategy(int compression) {
+        return switch (compression) {
+            case NO_COMPRESSION -> null;
+            case GZIP -> CompressionStrategy.GZIP;
+            case BZIP2 -> CompressionStrategy.BZIP2;
+            case LZMA -> CompressionStrategy.LZMA;
+            case XZ -> CompressionStrategy.XZ;
+            default -> throw new IllegalStateException("Unexpected value: " + compression);
+        };
+    }
+
+    /**
+     * Appends a file to this archive, resizing the internal file array.
+     *
+     * <p>
+     * This performs an array grow-by-one and copies all existing references. The archive enforces
+     * {@code Short.MAX_VALUE} because file counts are stored as a {@code short} in the payload.
+     * </p>
+     *
+     * @param file file to add
+     * @throws IllegalArgumentException if file count would exceed {@code Short.MAX_VALUE}
+     */
+    public void addFile(CacheFile file) {
+        if (files.length >= Short.MAX_VALUE)
+            throw new IllegalArgumentException("Archive cannot contain more than " + Short.MAX_VALUE + " files");
+        CacheFile[] newFiles = new CacheFile[files.length + 1];
+        System.arraycopy(files, 0, newFiles, 0, files.length);
+        newFiles[files.length] = file;
+        files = newFiles;
     }
 
     /**
@@ -300,28 +338,5 @@ public class CacheArchive {
         if (compression < NO_COMPRESSION || compression > XZ)
             throw new IllegalArgumentException("Compression must be either 1=NONE, 2=GZIP, 3=BZIP2, 4=LZMA, or 5=XZ");
         this.compression = compression;
-    }
-
-    /**
-     * Maps compression id to a {@link CompressionStrategy}.
-     *
-     * <p>
-     * Returning {@code null} indicates NO_COMPRESSION. If you add new compression types, update this
-     * method to return their strategy.
-     * </p>
-     *
-     * @param compression compression id
-     * @return strategy or null for no compression
-     * @throws IllegalStateException if id is unknown
-     */
-    private static CompressionStrategy getStrategy(int compression) {
-        return switch (compression) {
-            case NO_COMPRESSION -> null;
-            case GZIP -> CompressionStrategy.GZIP;
-            case BZIP2 -> CompressionStrategy.BZIP2;
-            case LZMA -> CompressionStrategy.LZMA;
-            case XZ -> CompressionStrategy.XZ;
-            default -> throw new IllegalStateException("Unexpected value: " + compression);
-        };
     }
 }

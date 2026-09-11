@@ -100,6 +100,37 @@ public class ByteBits {
     }
 
     /**
+     * Validates that a bit index is within the valid byte range.
+     *
+     * <p>
+     * The valid inclusive range is {@code 0..7}. Any value outside that range causes an
+     * {@link IndexOutOfBoundsException}.
+     * </p>
+     *
+     * @param index the bit index to validate
+     * @throws IndexOutOfBoundsException if the index is outside {@code 0..7}
+     */
+    private static void validateIndex(int index) {
+        if (index < 0 || index >= BIT_COUNT) {
+            throw new IndexOutOfBoundsException("Bit index must be between 0 and 7: " + index);
+        }
+    }
+
+    /**
+     * Returns the bit mask for the specified index.
+     *
+     * <p>
+     * This method assumes the index has already been validated.
+     * </p>
+     *
+     * @param index the validated bit index
+     * @return the integer mask representing that bit position
+     */
+    private static int mask(int index) {
+        return 1 << index;
+    }
+
+    /**
      * Returns whether the bit at the specified index is currently set.
      *
      * <p>
@@ -155,7 +186,7 @@ public class ByteBits {
      * </p>
      *
      * @param index the bit index to modify
-     * @param set {@code true} to set the bit, {@code false} to clear it
+     * @param set   {@code true} to set the bit, {@code false} to clear it
      * @throws IndexOutOfBoundsException if {@code index} is outside {@code 0..7}
      */
     public void set(int index, boolean set) {
@@ -387,36 +418,5 @@ public class ByteBits {
      */
     public byte getBits() {
         return bits;
-    }
-
-    /**
-     * Validates that a bit index is within the valid byte range.
-     *
-     * <p>
-     * The valid inclusive range is {@code 0..7}. Any value outside that range causes an
-     * {@link IndexOutOfBoundsException}.
-     * </p>
-     *
-     * @param index the bit index to validate
-     * @throws IndexOutOfBoundsException if the index is outside {@code 0..7}
-     */
-    private static void validateIndex(int index) {
-        if (index < 0 || index >= BIT_COUNT) {
-            throw new IndexOutOfBoundsException("Bit index must be between 0 and 7: " + index);
-        }
-    }
-
-    /**
-     * Returns the bit mask for the specified index.
-     *
-     * <p>
-     * This method assumes the index has already been validated.
-     * </p>
-     *
-     * @param index the validated bit index
-     * @return the integer mask representing that bit position
-     */
-    private static int mask(int index) {
-        return 1 << index;
     }
 }

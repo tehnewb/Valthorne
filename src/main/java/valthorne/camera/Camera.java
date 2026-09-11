@@ -1,7 +1,7 @@
 package valthorne.camera;
 
-import valthorne.math.Matrix4f;
-import valthorne.math.Vector2f;
+import org.joml.Matrix4f;
+import org.joml.Vector2f;
 
 /**
  * The {@code Camera} class serves as the abstract foundation for all 2D camera
@@ -37,21 +37,9 @@ import valthorne.math.Vector2f;
  */
 public abstract class Camera {
 
-    /**
-     * The world-space center position of the camera. Rendering is typically
-     * performed relative to this point.
-     */
-    protected final Vector2f center = new Vector2f(0, 0);
-    /**
-     * The projection matrix used by the camera. Concrete implementations rebuild
-     * this matrix when camera settings or world dimensions change.
-     */
-    protected final Matrix4f projection = new Matrix4f();
-    /**
-     * Current zoom level of the camera. Higher values zoom in; lower values zoom out.
-     * Cannot be set below {@code 0.001f}.
-     */
-    protected float zoom = 1f;
+    protected final Vector2f center = new Vector2f(0, 0); // Live world-space camera center used by concrete projection implementations.
+    protected final Matrix4f projection = new Matrix4f(); // Reusable projection matrix rebuilt by concrete camera implementations.
+    protected float zoom = 1f; // Camera zoom factor, initially one; setters enforce a minimum of 0.001.
 
     /**
      * Returns the current center of the camera.

@@ -12,6 +12,8 @@ import valthorne.event.EventHandler;
  * <p>
  * Implementing classes should override {@code onThemeChanged} to define custom behavior when
  * a theme change occurs.
+ *
+ * @author Albert Beaupre
  */
 public interface ThemeListener extends EventHandler<ThemeDataChangeEvent> {
 

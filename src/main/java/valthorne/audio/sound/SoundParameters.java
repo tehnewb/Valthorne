@@ -13,6 +13,13 @@ import valthorne.io.file.ValthorneFiles;
  * @param source The source of the sound data, which can be from a path or in-memory bytes.
  *               Must not be null.
  * @param name   The unique name or identifier for the sound. Must not be null or blank.
+ *
+ * <p>Only name supplies the shared asset-cache key; source
+ * do not distinguish cached requests. Use different names for variants that must
+ * coexist. Path factories defer file reads, byte factories defensively copy input,
+ * and classpath factories read the resource immediately before wrapping its bytes.</p>
+ *
+ * @author Albert Beaupre
  */
 public record SoundParameters(SoundSource source, String name) implements AssetParameters {
 
@@ -86,6 +93,8 @@ public record SoundParameters(SoundSource source, String name) implements AssetP
      * the resource bytes and the name set to the resource path.
      * @throws IllegalArgumentException If the {@code resourcePath} is null or empty,
      *                                  or if the resource could not be loaded.
+     * @throws valthorne.io.file.ValthorneFileException if the classpath resource
+     *         is missing or cannot be read; resource bytes are read synchronously
      */
     public static SoundParameters fromClasspath(String resourcePath) {
         return fromBytes(ValthorneFiles.readBytes(resourcePath), resourcePath);
@@ -103,11 +112,20 @@ public record SoundParameters(SoundSource source, String name) implements AssetP
      * @throws IllegalArgumentException If the {@code resourcePath} is null or empty,
      *                                  or if the resource could not be loaded,
      *                                  or if {@code name} is null or blank.
+     * @throws valthorne.io.file.ValthorneFileException if the classpath resource
+     *         is missing or cannot be read; resource bytes are read synchronously
      */
     public static SoundParameters fromClasspath(String resourcePath, String name) {
         return fromBytes(ValthorneFiles.readBytes(resourcePath), name);
     }
 
+    /**
+     * Returns name as the asset-cache identity without including source contents
+     * or loading options. Equal names can therefore reuse an existing cached load
+     * even when other parameters differ.
+     *
+     * @return nonblank cache key supplied at construction
+     */
     @Override
     public String key() {
         return name;

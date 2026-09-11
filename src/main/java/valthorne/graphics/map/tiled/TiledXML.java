@@ -14,6 +14,8 @@ import java.util.Objects;
  * Utility class for handling XML-related operations specific to Tiled map structures. This includes
  * reading and resolving paths, extracting XML element contents, handling attributes, and processing
  * properties or other common behaviors found in Tiled TMX/TSX files.
+ *
+ * @author Albert Beaupre
  */
 public class TiledXML {
 

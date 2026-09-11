@@ -9,7 +9,10 @@ import valthorne.event.EventType;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.glfw.GLFW.glfwGetTime;
+import static org.lwjgl.glfw.GLFW.glfwInit;
+import static org.lwjgl.glfw.GLFW.glfwPollEvents;
+import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
 
 
 /**
@@ -39,10 +42,25 @@ import static org.lwjgl.glfw.GLFW.*;
  */
 public class JGL {
 
+    /**
+     * Shared engine event registry cleared during lifecycle reset.
+     */
     private static final EventPublisher events = new EventPublisher();
+    /**
+     * Thread-safe pending tasks drained by the application loop.
+     */
     private static final BlockingDeque<Runnable> tasks = new LinkedBlockingDeque<>();
+    /**
+     * Most recently recorded frame duration in seconds.
+     */
     private static float deltaTime;
+    /**
+     * Cached frame-rate estimate stored as a short.
+     */
     private static short framesPerSecond;
+    /**
+     * Application-loop continuation flag.
+     */
     private static boolean running;
 
     /**
@@ -100,18 +118,18 @@ public class JGL {
             Mouse.init();
             Keyboard.init();
 
-            float lastTime = (float) glfwGetTime();
             double fpsTime = 0;
             short frames = 0;
 
             application.init();
             applicationInitialized = true;
+            double lastTime = glfwGetTime();
 
             while (!Window.shouldClose()) {
                 drainTasks();
 
-                float now = (float) glfwGetTime();
-                deltaTime = now - lastTime;
+                double now = glfwGetTime();
+                deltaTime = (float) (now - lastTime);
                 lastTime = now;
 
                 glfwPollEvents();
@@ -266,26 +284,11 @@ public class JGL {
     }
 
     /**
-     * Releases all resources associated with the application, including input devices
-     * and the application window. This method ensures that resources such as the keyboard,
-     * mouse, and window are properly disposed of, and terminates GLFW to clean up
-     * native resources.
-     * <p>
-     * This method is called as part of the shutdown process to ensure proper cleanup
-     * and prevent resource leaks. It invokes the dispose methods of the {@code Keyboard},
-     * {@code Mouse}, and {@code Window} classes, followed by the termination of GLFW.
-     * <p>
-     * Usage:
-     * - This method is intended for internal use and is invoked at the end of the
-     * application's lifecycle.
-     * - It ensures that GLFW and other application-level resources are completely
-     * released.
-     * <p>
-     * Steps performed:
-     * 1. Disposes of resources associated with the {@code Keyboard}.
-     * 2. Disposes of resources associated with the {@code Mouse}.
-     * 3. Disposes of resources associated with the {@code Window}.
-     * 4. Terminates GLFW to release any remaining native resources.
+     * Invokes the application's own cleanup and captures any failure for combination
+     * with subsequent engine cleanup.
+     *
+     * @param application application being shut down
+     * @return failure, or null on success
      */
     private static Throwable disposeApplication(Application application) {
         try {
@@ -296,6 +299,12 @@ public class JGL {
         }
     }
 
+    /**
+     * Attempts keyboard, mouse, window, audio, and GLFW shutdown in order even when
+     * an earlier action fails, then resets Java event/task/timing state.
+     *
+     * @return first cleanup failure with later failures suppressed, or null
+     */
     private static Throwable dispose() {
         Throwable failure = null;
 
@@ -309,6 +318,10 @@ public class JGL {
         return failure;
     }
 
+    /**
+     * Clears queued tasks and event subscriptions and resets frame timing/running
+     * flags. Does not perform native resource cleanup.
+     */
     static void resetState() {
         tasks.clear();
         events.clear();
@@ -317,6 +330,11 @@ public class JGL {
         running = false;
     }
 
+    /**
+     * Runs queued tasks in polling order until the queue is observed empty. Tasks
+     * added during draining may run in the same pass. A task exception propagates
+     * and leaves remaining queued work for the surrounding lifecycle to handle.
+     */
     private static void drainTasks() {
         Runnable task;
         while ((task = tasks.poll()) != null) {
@@ -324,6 +342,13 @@ public class JGL {
         }
     }
 
+    /**
+     * Runs one cleanup action and captures any thrown failure so later cleanup
+     * actions can still be attempted.
+     *
+     * @param action cleanup operation
+     * @return thrown failure, or null on success
+     */
     private static Throwable runSafe(Runnable action) {
         try {
             action.run();
@@ -333,6 +358,14 @@ public class JGL {
         }
     }
 
+    /**
+     * Keeps the first cleanup failure and attaches a later nonnull failure as
+     * suppressed. Callers must avoid passing the same throwable as both arguments.
+     *
+     * @param primary earlier failure, possibly null
+     * @param next later failure, possibly null
+     * @return first available failure
+     */
     private static Throwable appendSuppressed(Throwable primary, Throwable next) {
         if (next == null) {
             return primary;
@@ -344,6 +377,12 @@ public class JGL {
         return primary;
     }
 
+    /**
+     * Rethrows runtime exceptions and errors unchanged, wrapping other throwable
+     * types so cleanup can report them without a checked throws declaration.
+     *
+     * @param throwable nonnull failure to propagate
+     */
     private static void rethrowUnchecked(Throwable throwable) {
         if (throwable instanceof RuntimeException runtimeException) {
             throw runtimeException;

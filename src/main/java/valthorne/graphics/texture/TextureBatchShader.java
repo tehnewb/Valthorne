@@ -55,14 +55,7 @@ import valthorne.graphics.shader.Shader;
  * <pre>{@code
  * TextureBatchShader shader = new TextureBatchShader(
  *     8,
- *     """
- *     void main() {
- *         if (batchClipped()) discard;
- *
- *         vec4 color = sampleBatchTexture(v_uv);
- *         gl_FragColor = color * v_col;
- *     }
- *     """
+ *     ShaderSources.load("examples/batch-tint.frag.glsl")
  * );
  *
  * TextureBatch batch = new TextureBatch(4096, 8);
@@ -171,20 +164,6 @@ public class TextureBatchShader extends Shader {
     }
 
     /**
-     * Returns the number of texture units this shader was built to support.
-     *
-     * <p>
-     * This value should match the texture unit configuration expected by the
-     * {@link TextureBatch} that uses this shader.
-     * </p>
-     *
-     * @return the supported texture unit count
-     */
-    public int getMaxTextureUnits() {
-        return maxTextureUnits;
-    }
-
-    /**
      * Normalizes the supplied vertex shader source.
      *
      * <p>
@@ -226,5 +205,19 @@ public class TextureBatchShader extends Shader {
         }
 
         return TextureBatchContract.buildFragmentPreamble(maxTextureUnits) + fragmentSource;
+    }
+
+    /**
+     * Returns the number of texture units this shader was built to support.
+     *
+     * <p>
+     * This value should match the texture unit configuration expected by the
+     * {@link TextureBatch} that uses this shader.
+     * </p>
+     *
+     * @return the supported texture unit count
+     */
+    public int getMaxTextureUnits() {
+        return maxTextureUnits;
     }
 }

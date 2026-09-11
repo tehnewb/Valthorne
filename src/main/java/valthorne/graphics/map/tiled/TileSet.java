@@ -148,6 +148,38 @@ public final class TileSet {
     }
 
     /**
+     * Creates a runtime {@code TileSet} from CPU-side {@link TileSetData}.
+     *
+     * <p>
+     * This method is typically called on the OpenGL thread after the tileset image bytes
+     * have already been decoded into {@link valthorne.graphics.texture.TextureData} on a
+     * background thread. It converts that CPU-side data into a GPU {@link Texture} and then
+     * builds a fully renderable tileset instance.
+     * </p>
+     *
+     * @param data the CPU-side tileset data
+     * @return a runtime tileset backed by a GPU texture
+     * @throws NullPointerException if {@code data} is null or if its texture data is invalid
+     */
+    public static TileSet fromData(TileSetData data) {
+        return new TileSet(
+                data.firstGlobalTileID(),
+                data.name(),
+                new Texture(data.textureData()),
+                data.tileWidth(),
+                data.tileHeight(),
+                data.spacing(),
+                data.margin(),
+                data.tileCount(),
+                data.columns(),
+                data.imageWidth(),
+                data.imageHeight(),
+                data.properties(),
+                data.tileDefs()
+        );
+    }
+
+    /**
      * Returns the cached or newly created texture region for the specified local tile ID.
      *
      * <p>
@@ -229,38 +261,6 @@ public final class TileSet {
         }
 
         return def.animation().get(def.animation().size() - 1).tileID();
-    }
-
-    /**
-     * Creates a runtime {@code TileSet} from CPU-side {@link TileSetData}.
-     *
-     * <p>
-     * This method is typically called on the OpenGL thread after the tileset image bytes
-     * have already been decoded into {@link valthorne.graphics.texture.TextureData} on a
-     * background thread. It converts that CPU-side data into a GPU {@link Texture} and then
-     * builds a fully renderable tileset instance.
-     * </p>
-     *
-     * @param data the CPU-side tileset data
-     * @return a runtime tileset backed by a GPU texture
-     * @throws NullPointerException if {@code data} is null or if its texture data is invalid
-     */
-    public static TileSet fromData(TileSetData data) {
-        return new TileSet(
-                data.firstGlobalTileID(),
-                data.name(),
-                new Texture(data.textureData()),
-                data.tileWidth(),
-                data.tileHeight(),
-                data.spacing(),
-                data.margin(),
-                data.tileCount(),
-                data.columns(),
-                data.imageWidth(),
-                data.imageHeight(),
-                data.properties(),
-                data.tileDefs()
-        );
     }
 
     /**

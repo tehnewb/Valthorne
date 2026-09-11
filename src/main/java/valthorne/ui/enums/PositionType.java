@@ -44,10 +44,16 @@ import org.lwjgl.util.yoga.Yoga;
  */
 public enum PositionType {
 
+    /**
+     * Keeps the node in normal flex flow, with relative position offsets applied.
+     */
     RELATIVE(Yoga.YGPositionTypeRelative),
+    /**
+     * Removes the node from normal flex flow and positions it using its containing block.
+     */
     ABSOLUTE(Yoga.YGPositionTypeAbsolute);
 
-    private final int yoga;
+    private final int yoga; // Native Yoga enum value corresponding to this layout option.
 
     /**
      * Creates a position type mapped to the Yoga constant.
