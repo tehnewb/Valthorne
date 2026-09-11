@@ -267,7 +267,15 @@ public final class Window {
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
 
         address = glfwCreateWindow(config.getWidth(), config.getHeight(), config.getTitle(), monitor, NULL);
-        if (address == NULL) throw new RuntimeException("Failed to create the GLFW window");
+        if (address == NULL) {
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                var description = stack.mallocPointer(1);
+                int error = glfwGetError(description);
+                String detail = description.get(0) == NULL ? "No native description"
+                        : org.lwjgl.system.MemoryUtil.memUTF8(description.get(0));
+                throw new IllegalStateException("Failed to create the GLFW window (error " + error + "): " + detail);
+            }
+        }
 
         glfwMakeContextCurrent(address);
         GL.createCapabilities();

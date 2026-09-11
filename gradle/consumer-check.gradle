@@ -52,6 +52,13 @@ import static org.lwjgl.opengl.GL11.*;
 
 public final class ReleaseProbe {
     public static void main(String[] args) throws Exception {
+        try (var callback = org.lwjgl.glfw.GLFWErrorCallback.createPrint(System.err)) {
+            org.lwjgl.glfw.GLFW.glfwSetErrorCallback(callback);
+            run(args);
+            org.lwjgl.glfw.GLFW.glfwSetErrorCallback(null);
+        }
+    }
+    private static void run(String[] args) throws Exception {
         var position = new Vector3f(0, 0, 5);
         var camera = new PerspectiveCamera();
         camera.setPosition(position.x, position.y, position.z);
