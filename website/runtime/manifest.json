@@ -1,0 +1,37 @@
+{
+  "description": "Compiled Valthorne website UI runtime; rebuild with the development portable target.",
+  "mainClass": "valthorne.website.WebsiteApplication",
+  "files": {
+    "LICENSE-Valthorne.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "canvas.js": "d03710fcba04e3bf0dee2f331c6f1a5261ad2a111d6a039a8982f1094e592434",
+    "fonts.js": "09afe69c88ebc563b9e4f6734188e77b381e50bb92cfc78d76c374f5cd653cb1",
+    "graphics.js": "d9484123300be38a428d5782aa5d43a6ad1e2c0e3002ce4f20182befe058d5fb",
+    "nano-backend.js": "cb17c10616f06be3d27fab2cecc5c6c04a7e9beb38755ad4a50b5e4ed63b5e6c",
+    "pathtrace.js": "eb85872e0db23bfb4b83b0618c8e2db8c6ef555408887b10fec445e066847ebe",
+    "platform.js": "42f5cf3abac26064dfffcd29f54cae7be14ae1669830c8ac2aafecf8912eeb29",
+    "ui/AtkinsonHyperlegible-Regular.ttf": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
+    "ui/OFL-AtkinsonHyperlegible.txt": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+    "valthorne.js": "e0ca3e9f7349c392edd0a248e5560c9f68d258ed92496a405f5192d5ca0101b6",
+    "vendor/opentype/LICENSE": "a5b87c9bc191e7f9c06b07bd7cbbed3ed846dfdb50e859484b2c245aa1ab2e61",
+    "vendor/opentype/opentype.module.js": "8d79d17388114a29d74681dfaed84068b1d7d9b4e39a9544fb6406d25579ad8f",
+    "vendor/yoga/dist/binaries/yoga-wasm-base64-esm.js": "2cfeda49ae87f57bcd4a5fe433940edefc531a69bd0f83e32759fb5837df205c",
+    "vendor/yoga/dist/src/generated/YGEnums.d.ts": "e0c394ad75777f77b761a10d69c0c9f9dd7afb04c910758dcb0a50bcaae08527",
+    "vendor/yoga/dist/src/generated/YGEnums.js": "f9cdfa4247cf5954c0323c2edcb0190320014251afb5197d9935c1dc3e2d0fc6",
+    "vendor/yoga/dist/src/generated/YGEnums.js.map": "81f214d6ee82b91986211dbd895a11cfae591ec8f4b9df643a1385c018669bec",
+    "vendor/yoga/dist/src/index.d.ts": "753b64b831aa731751b352e7bc9ef4d95b8c25df769dd629f8ec6a84478a85c7",
+    "vendor/yoga/dist/src/index.js": "0c89ff0c01ee90b081b369119f972d72f71eb8882263d94ef0824500817d5de1",
+    "vendor/yoga/dist/src/index.js.map": "47b9a274b7c2dd5d18f9134c389c0acc919dce80e9d9536b8875ce9ed09aa3bc",
+    "vendor/yoga/dist/src/load.d.ts": "66c5d8e45c122a72a672582e9ce01e4b71217e6309ba70bf990c00f305661716",
+    "vendor/yoga/dist/src/load.js": "87c293f7926ccaabbd1026c3dce86326fa9ce02e9b216781b84b6431825b5df4",
+    "vendor/yoga/dist/src/load.js.map": "4ce0f9ea380a553bc0d9f15b11567ec6e4fbbd247e8d853569b53bcb23b9e403",
+    "vendor/yoga/dist/src/wrapAssembly.d.ts": "5c187cdbece8ad89247f507b3f6b04aad849d4b3fd8108289e19e9d452714882",
+    "vendor/yoga/dist/src/wrapAssembly.js": "b9615fdf7bc03e9014a25f478dd3004e231f28c11968b6e5668aee5cb390ff19",
+    "vendor/yoga/dist/src/wrapAssembly.js.map": "2979248f95f0854f364c8bbc1998705fd19f4347d374e0f92ed9d5f2ae950944",
+    "window-backend.js": "55a69ad4b3d53278daad322828758325d2d793f6d86b170c74bdad2643d0b1a8",
+    "yoga-backend.js": "fbec4093bfb77f276c0a73c82d513b1dd2c9b7454b324d916ccb78f6f401fa25"
+  },
+  "sources": {
+    "src/main/java/valthorne/website/BrowserBridge.java": "48fbdf02cd9b9746fbeca65d4ffda21b9269420051a81b0eb3276bce1e55899c",
+    "src/main/java/valthorne/website/WebsiteApplication.java": "dcee8dd577865f3d86c6bb41fbf35671518e7338575e29c141b50a9466e08385"
+  }
+}

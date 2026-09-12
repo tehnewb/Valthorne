@@ -1,0 +1,150 @@
+# Valthorne website
+
+The public website is a **Java Valthorne application**, compiled to JavaScript
+with TeaVM and hosted at **https://tehnewb.github.io/Valthorne/**.
+It contains the engine overview, platform requirements, ten demo downloads,
+47 system guides, integration instructions, a live canvas lab, and project links.
+
+## Architecture
+
+| Part | Responsibility |
+| --- | --- |
+| `src/main/java/valthorne/website/WebsiteApplication.java` | Valthorne application lifecycle, responsive layout, text wrapping, cards, navigation painting, and the procedural canvas lab |
+| `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, and semantic link placement |
+| `content.json`, `guides.json` | Shared content for the engine view and complete semantic HTML companion |
+| `site-host.js` | On-demand frame scheduling, native links, search input, clipboard, browser history, and rendering failure recovery |
+| `boot.js`, `shell.css` | Engine startup and accessible HTML presentation |
+| `runtime/` | Verified, compiled website UI runtime and bundled dependency notices |
+| `assets/` | Branding and real engine screenshots; no runnable examples or game asset trees |
+| `tools/site.mjs` | Validation, static packaging, preview, guide import, and runtime capture |
+| `tools/verify.mjs` | Browser acceptance checks; output is written to ignored `build/` |
+
+`JGL` owns the normal init/update/render/dispose lifecycle. `UIRoot` and
+`NanoContainer` provide the engine UI context, and `Canvas2D` paints the visible
+site. The host uses the portable vector, WebGL, and Yoga backends. It does not
+initialize Filament, Jolt, audio, or a game scene.
+
+The browser retains ordinary scrolling, links, focus, and native text input.
+Each page has its own URL; a search query is preserved in `?q=...`. A complete
+HTML document is generated from the same content. **Text version** switches to
+`?view=text`, which does not load the engine. The HTML is also readable without
+JavaScript or when engine startup fails. Code copying uses the original source,
+not the visually wrapped canvas text.
+
+Frames are requested for viewport changes, scrolling, image loads, and actions.
+The canvas lab starts paused and animates only after explicit activation.
+Hidden tabs stop scheduling frames. Device pixel ratio is capped at two to keep
+high-density text sharp without unbounded surface allocation.
+
+## Build and preview
+
+Node.js 24 is sufficient to package the checked-in runtime. No npm installation,
+Java installation, Gradle run, credentials, or network access is needed for this:
+
+```sh
+node website/tools/site.mjs build
+node website/tools/site.mjs serve
+```
+
+Open **http://127.0.0.1:8097/Valthorne/**. The preview deliberately includes the
+repository prefix used by Pages. Set `PORT` to use a different local port.
+Opening an HTML file directly is unsupported because JavaScript modules and
+font loading require HTTP. Publish only `website/dist/`.
+
+The checker validates content references, script syntax, runtime checksums, and
+the Java source fingerprints. `dist/`, `build/`, and `node_modules/` are ignored.
+
+## Editing content
+
+Edit `content.json` for page copy, code snippets, and feature cards. Edit
+`guides.json` for the manual directory. The explicit import command below reads
+the **committed** manual index so local engine work cannot silently alter the
+published website:
+
+```sh
+node website/tools/site.mjs update-guides
+node website/tools/site.mjs build
+```
+
+The demo catalog and release filenames are maintained in `demoCards()` in
+`tools/site.mjs`. Update the release tag and filenames together after verifying
+the release assets. Screenshots are actual engine captures; captions should not
+imply that desktop screenshots are playable browser demos.
+
+## Editing Java and rebuilding the runtime
+
+The browser target is currently development code in `portable/`, separate from
+the stable Maven library. This module intentionally checks in its small compiled
+UI runtime so a fresh website checkout can be packaged and deployed independently
+of that ongoing port. **Recompiling Java currently requires the development
+checkout containing `portable/`; the 2.0.0 Maven artifact alone is insufficient.**
+The deployment workflow verifies and packages the snapshot; it does not compile
+Java. Replace this bootstrap arrangement with source compilation once the web
+target is versioned and available to consumers.
+
+With that checkout, Java 25, and the portable web npm dependencies installed:
+
+```sh
+./gradlew -p portable :web:webDist '-PapplicationMain=valthorne.website.WebsiteApplication' '-PapplicationSources=website/src/main/java'
+node website/tools/site.mjs capture-runtime
+node website/tools/site.mjs build
+```
+
+On Windows use `./gradlew.bat`, retaining the quotes around `-P` arguments.
+This replaces the portable module's generated distribution with the website
+application; it does not modify its sources. Run the normal portable build to
+select another application afterward.
+
+Commit the Java source and captured runtime together. The manifest makes stale
+compiled website code a build error. Browser backend files in `runtime/` are
+snapshots: make backend fixes upstream and recapture rather than patching them
+only in the website. The manifest records SHA-256 fingerprints of every captured
+file; bundled licenses must remain present.
+
+## Browser verification
+
+The site uses no front-end framework. The sole npm development dependency is
+Playwright for browser verification:
+
+```sh
+npm ci --prefix website
+npx --prefix website playwright install chromium
+node website/tools/site.mjs serve
+# In another terminal:
+node website/tools/verify.mjs
+```
+
+Use `TEST_BROWSER=chrome` or `TEST_BROWSER=msedge` for installed Chrome or Edge.
+`SITE_URL` can target another served deployment. Checks cover all seven pages,
+mobile overflow, visible engine pixels, navigation, search and filters, idle
+rendering, animation, clipboard, and text/no-JavaScript fallback. Reports and
+screenshots are written to `website/build/`, not a test directory. The Chromium
+check is also required before Pages deployment. Other browsers are not claimed
+as verified by that check.
+
+## GitHub Pages
+
+`.github/workflows/pages.yml` builds and verifies this module on changes to
+`website/` or the workflow. Pull requests run verification without deployment.
+Successful pushes to `main` deploy `website/dist/` through the GitHub Pages
+environment. The repository Pages source must be **GitHub Actions**. There is
+no deployment branch or custom domain requirement.
+
+All assets are relative to the document, so the site works under `/Valthorne/`.
+Canonical metadata and the sitemap use the public URL. If the repository is
+renamed, update `publicURL`, the preview prefix, the 404 home link, and the
+workflow preview URL together. No application server, CDN, analytics, cookies,
+or cross-origin isolation headers are required.
+
+## Assets and licenses
+
+Valthorne code and website source use the repository's Apache-2.0 license.
+Branding comes from `images/logo-transparent.png`. The FPS, physics studio, and
+UI captures come from `Valthorne-examples/docs/images/`; the other screenshots
+come from that project's local capture outputs. They show the actual examples,
+not invented game scenes. Example model and environment provenance remains in
+the [examples notices](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
+
+Atkinson Hyperlegible uses SIL OFL 1.1; Yoga, JOML, and OpenType.js use MIT;
+TeaVM uses Apache-2.0. License copies are distributed in `runtime/` and
+`licenses/`. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

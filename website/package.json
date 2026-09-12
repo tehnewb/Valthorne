@@ -1,0 +1,12 @@
+{
+  "name": "valthorne-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/site.mjs build",
+    "check": "node tools/site.mjs check",
+    "serve": "node tools/site.mjs serve",
+    "verify": "node tools/verify.mjs"
+  },
+  "devDependencies": { "@playwright/test": "1.58.2" }
+}

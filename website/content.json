@@ -1,0 +1,81 @@
+{
+  "version": "2.0.0",
+  "pages": [
+    {"id":"index","title":"Your world. Your rules.","eyebrow":"OPEN SOURCE JAVA GAME ENGINE","description":"Build 2D and 3D games with a Java library that brings rendering, physics, audio, and UI together.","sections":[
+      {"title":"A complete toolkit. A world of possibilities.","description":"Keep your game in Java. Choose the systems you need, own your application loop, and build from a small scene to a complete game.","cards":[
+        {"title":"Render your vision","text":"Sprites, tiled maps, 3D models, materials, cameras, particles, and multiple lighting paths.","href":"engine.html","label":"Explore rendering"},
+        {"title":"Make it move","text":"Jolt rigid bodies, collision shapes, joints, raycasts, and physics-driven particles.","href":"docs.html?q=physics","label":"Explore physics"},
+        {"title":"Build the whole experience","text":"Flexible UI layouts, vector controls, text editing, themes, sound, and asset management.","href":"docs.html","label":"Explore the systems"}
+      ]},
+      {"title":"Made with Valthorne","description":"Real engine captures. Download the desktop demos, explore their source, and use them as a starting point.","cards":[
+        {"title":"Physics studio","text":"Inspect a scene, manipulate objects, and explore rigid-body interactions.","image":"physics-studio.png","href":"examples.html","label":"Explore the demos"},
+        {"title":"Lighting studio","text":"Experiment with lights, materials, and a richly detailed 3D scene.","image":"lighting-studio.png","href":"examples.html","label":"Explore the demos"}
+      ]},
+      {"title":"This website is the demo.","description":"The visible interface is drawn by a Java Valthorne application compiled for the browser with TeaVM. A small HTML companion keeps the content accessible and the links usable.","cards":[
+        {"title":"Java, all the way to the browser","text":"Valthorne owns the application lifecycle and UI drawing. Browser integration supplies scrolling, URLs, accessible links, and native text entry.","href":"lab.html","label":"Try the live canvas"},
+        {"title":"Start with one dependency","text":"io.github.tehnewb:Valthorne:2.0.0\nJava 25. Native dependencies included.","href":"start.html","label":"Start building"}
+      ]}
+    ]},
+    {"id":"engine","title":"A library for the whole game.","eyebrow":"THE ENGINE","description":"An explicit Java application lifecycle, a broad set of game systems, and control over how they fit together.","sections":[
+      {"title":"Graphics, from sprites to scenes","cards":[
+        {"title":"2D graphics","text":"Texture batching, sprites, TrueType fonts, Slug vector fonts, animation, Tiled maps, viewport scaling, and particle emitters.","href":"docs.html?q=2d","label":"Read the graphics guides"},
+        {"title":"3D rendering","text":"Models and materials, scene graphs, billboards, perspective and orthographic cameras, raster lighting, shadow maps, and an optional Filament renderer.","href":"docs.html?q=3d","label":"Read the 3D guides"},
+        {"title":"Lighting and effects","text":"Batched 2D lights, raycast shadows, radiance cascades, custom shaders, and optional path tracing. Availability depends on the graphics backend.","href":"docs.html?q=lighting","label":"Explore lighting"}
+      ]},
+      {"title":"Systems that work together","cards":[
+        {"title":"Physics and motion","text":"Jolt 3D physics provides rigid bodies, collision layers, contacts, shapes, distance joints, and raycasts. Particle emitters can interact with physics.","href":"docs.html?q=physics","label":"Physics documentation"},
+        {"title":"Interface and input","text":"Yoga layouts, texture and NanoVG controls, virtual lists and tables, shared editing behavior, themes, keyboard and mouse routing.","href":"docs.html?q=ui","label":"UI documentation"},
+        {"title":"Sound and assets","text":"WAV, MP3, and Vorbis sound; playback, queues, streaming, and attenuation. Asset loaders support asynchronous preparation and explicit disposal.","href":"docs.html?q=audio","label":"Audio documentation"},
+        {"title":"Application foundations","text":"Events, scenes, state machines, scheduling, plugins, diagnostics, collections, pooling, binary buffers, file utilities, compression, and hashing.","href":"docs.html","label":"Browse every system"}
+      ]},
+      {"title":"Choose your target","description":"The stable desktop library is 2.0.0. The browser target is in active development and does not provide every desktop API or native integration.","cards":[
+        {"title":"Windows, Linux, macOS","text":"Java 25 with a matching CPU architecture and OpenGL 3.3 core for standard rendering. macOS needs -XstartOnFirstThread; Linux needs a graphical session and the documented native system libraries.","href":"https://github.com/tehnewb/Valthorne/blob/main/docs/platforms.md","label":"Desktop requirements"},
+        {"title":"Browser · in development","text":"TeaVM compiles Java to JavaScript. Browser backends support UI and graphics, with WebGL 2 and optional WebAssembly libraries for systems such as Yoga, Filament, and Jolt. Cross-browser validation is ongoing.","href":"lab.html","label":"See Valthorne in your browser"},
+        {"title":"Optional renderer limits","text":"The packaged desktop Filament path targets Windows x64. Compute-based desktop effects require OpenGL 4.3 and are unavailable on macOS OpenGL. Android is future work.","href":"https://github.com/tehnewb/Valthorne/blob/main/docs/platforms.md","label":"Check backend support"}
+      ]}
+    ]},
+    {"id":"examples","title":"Download. Run. Explore.","eyebrow":"THE DEMO COLLECTION","description":"Ten focused examples, from an empty application to a playable FPS arena. Windows x64 packages include Java: extract a ZIP and open Start.bat.","sections":[
+      {"title":"Find your starting point","description":"These are desktop downloads, not embedded browser games. No Gradle or separate Java installation is needed for the Windows packages. Each guide includes controls and source context.","catalog":"examples","cards":[]},
+      {"title":"Other ways to explore","cards":[
+        {"title":"The complete collection","text":"Get all examples together, including the bundled Windows x64 Java runtime.","href":"https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-examples-windows-x64-2.0.1.zip","label":"Download all demos"},
+        {"title":"Other operating systems","text":"The compiled universal package requires Java 25 and a supported native graphics environment. Follow the release instructions for your platform.","href":"https://github.com/tehnewb/Valthorne-examples/releases/tag/v2.0.1","label":"View all release packages"},
+        {"title":"Learn from the source","text":"The examples live in their own repository, with resources, per-demo guides, launch instructions, and asset credits.","href":"https://github.com/tehnewb/Valthorne-examples","label":"Browse example source"}
+      ]}
+    ]},
+    {"id":"docs","title":"Know your engine.","eyebrow":"DOCUMENTATION","description":"Practical workflows, ownership rules, component examples, and API behavior. Search the system manual or start with the integration guide.","sections":[
+      {"title":"The essentials","cards":[
+        {"title":"Get started","text":"Add the library, configure Java 25, and write your first application.","href":"start.html","label":"Installation guide"},
+        {"title":"Migrating from 1.4.6","text":"Version 2.0.0 changes public math types to JOML. Review the migration before updating an existing application.","href":"https://github.com/tehnewb/Valthorne/blob/main/docs/joml-migration.md","label":"Migration notes"},
+        {"title":"Platform requirements","text":"Check your operating system, CPU architecture, graphics backend, and runtime flags.","href":"https://github.com/tehnewb/Valthorne/blob/main/docs/platforms.md","label":"Platform guide"}
+      ]},
+      {"title":"The system manual","description":"Guides open in the source repository. Match documentation to your dependency version; main may include ongoing development.","catalog":"guides","cards":[]}
+    ]},
+    {"id":"start","title":"Your first frame starts here.","eyebrow":"GET STARTED","description":"Use Java 25, a desktop graphics driver with OpenGL 3.3 core, and your preferred Java build tool.","sections":[
+      {"title":"01 / Add Valthorne","description":"Native dependencies are included automatically. Use the complete integration guide for equivalent Kotlin and Maven configuration.","code":"plugins { id 'application' }\nrepositories { mavenCentral() }\ndependencies {\n    implementation 'io.github.tehnewb:Valthorne:2.0.0'\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(25) } }\napplication {\n    mainClass = 'game.Main'\n    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']\n    if (System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('mac')) {\n        applicationDefaultJvmArgs += '-XstartOnFirstThread'\n    }\n}","cards":[{"title":"Gradle, Kotlin, or Maven","text":"The complete guide includes both Gradle DSLs, Maven configuration, native access, and launch instructions.","href":"https://github.com/tehnewb/Valthorne/blob/main/docs/getting-started.md","label":"Open the integration guide"}]},
+      {"title":"02 / Create an application","description":"Save this as src/main/java/game/Main.java. Allocate resources in init, advance the game in update, draw in render, and release owned resources in dispose.","code":"package game;\n\nimport valthorne.Application;\nimport valthorne.JGL;\nimport valthorne.Window;\nimport valthorne.graphics.Color;\n\npublic final class Main implements Application {\n    private final Color background = new Color(0xFF101211);\n\n    public static void main(String[] args) {\n        JGL.init(new Main(), \"My Game\", 960, 540);\n    }\n\n    public void init() { }\n    public void update(float delta) { }\n    public void render() { Window.clear(background); }\n    public void dispose() { }\n}"},
+      {"title":"03 / Make it yours","cards":[
+        {"title":"Run the application","text":"Use the Gradle wrapper from the repository. Run ./gradlew run, or ./gradlew.bat run in Windows PowerShell. Keep the documented native access and macOS flags.","href":"https://github.com/tehnewb/Valthorne/blob/main/docs/getting-started.md","label":"Full launch instructions"},
+        {"title":"Build your first scene","text":"Add a texture, a camera, and input. Keep resource ownership explicit and dispose graphics resources while the graphics context is alive.","href":"docs.html?q=runtime","label":"Understand the lifecycle"},
+        {"title":"Start from an example","text":"Explore the starter application or a focused graphics, physics, audio, or UI demo in the examples repository.","href":"examples.html","label":"Choose an example"}
+      ]}
+    ]},
+    {"id":"lab","title":"Built with the engine. Including this.","eyebrow":"LIVE CANVAS LAB","description":"This page is drawn by Valthorne's UI renderer. Start the animation to explore a Java-driven wireframe scene, then pause it to return to rendering only when something changes.","sections":[
+      {"title":"A little world in Java","description":"A procedural UI drawing experiment: projected geometry and motion calculated in Java, painted through Valthorne Canvas2D. This is not a physics or 3D-renderer benchmark.","lab":true},
+      {"title":"How this website works","cards":[
+        {"title":"A real Valthorne application","text":"JGL runs the application lifecycle. UIRoot manages the drawing context, a NanoContainer paints the site, and Canvas2D draws the layout, typography, and scene.","href":"https://github.com/tehnewb/Valthorne/tree/main/website","label":"View the website module"},
+        {"title":"A browser companion","text":"Native links, scrolling, keyboard focus, editable search, and copyable code remain available through HTML. Switch to Text version at any time for the full semantic document.","href":"?view=text","label":"Read the text version"},
+        {"title":"Idle means idle","text":"The host schedules a frame when content, input, images, or the viewport change. Only the opt-in animation requests continuous frames, and it pauses in hidden tabs.","href":"about.html","label":"About the project"}
+      ]}
+    ]},
+    {"id":"about","title":"Open source. Yours to build with.","eyebrow":"ABOUT VALTHORNE","description":"Valthorne is a Java game engine library by Albert Beaupre. Explore the implementation, learn from the examples, and help improve the tools.","sections":[
+      {"title":"Be part of the project","cards":[
+        {"title":"Explore the source","text":"Inspect the engine, read its system documentation, and follow development on GitHub.","href":"https://github.com/tehnewb/Valthorne","label":"Engine repository"},
+        {"title":"Report an issue","text":"Include your engine version, OS, Java version, graphics hardware, and a small reproduction when possible.","href":"https://github.com/tehnewb/Valthorne/issues","label":"Issue tracker"},
+        {"title":"Contribute","text":"Read the contribution guide before proposing a change. Clear documentation and reproducible reports are useful contributions too.","href":"https://github.com/tehnewb/Valthorne/blob/main/CONTRIBUTING.md","label":"Contribution guide"},
+        {"title":"Join the conversation","text":"Discuss the engine, ask questions, and share what you are building with the community.","href":"https://discord.gg/APqcDzppDv","label":"Join Discord"},
+        {"title":"Apache License 2.0","text":"Engine code is distributed under Apache-2.0. Bundled dependencies, fonts, and example assets retain their respective licenses and notices.","href":"https://github.com/tehnewb/Valthorne/blob/main/LICENSE","label":"Read the license"},
+        {"title":"Releases and changes","text":"The stable desktop library is 2.0.0; the downloadable demo collection is 2.0.1. Browser support continues to evolve in the development checkout.","href":"https://github.com/tehnewb/Valthorne/releases","label":"View engine releases"}
+      ]}
+    ]}
+  ]
+}

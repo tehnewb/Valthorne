@@ -1,0 +1,24 @@
+/* The engine paints the visual site. These styles supply its native browser companion. */
+:root{color-scheme:dark;font-family:system-ui,sans-serif;color:#f1f0e6;background:#101211}
+*{box-sizing:border-box}body{margin:0}a{color:#d5ec84}a:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid #d5ec84;outline-offset:3px}
+[hidden]{display:none!important}#scene{display:none;width:100vw;height:100vh;touch-action:pan-y}#valthorne-window{visibility:hidden}
+.engine-ready #scene{display:block}.engine-ready #valthorne-window{visibility:visible}
+#engine-links{display:none;position:fixed;inset:0;pointer-events:none;z-index:3}
+.engine-ready #engine-links{display:block}.engine-link{position:absolute;pointer-events:auto;color:transparent;text-decoration:none;overflow:hidden;white-space:nowrap;border-radius:2px}
+.engine-link:hover{box-shadow:inset 0 0 0 1px #d5ec8466;background:#d5ec8409}.engine-link:focus-visible{background:#d5ec8416;outline-offset:-2px}
+.engine-link[role=button]{cursor:pointer}#engine-search{position:fixed;z-index:4;height:44px;padding:0 15px;border:1px solid #56614e;background:#191c19;color:#f1f0e6;font:16px system-ui,sans-serif;border-radius:0;display:none}
+.engine-ready #engine-search{display:block}#scroll-space{display:none}.engine-ready #scroll-space{display:block}
+#access-bar{position:fixed;right:12px;bottom:10px;z-index:6;display:flex;gap:14px;align-items:center;background:#101211ed;border:1px solid #343b32;padding:7px 12px;font-size:11px}
+#status{color:#aeb6a8}#access-bar a{white-space:nowrap}.skip-link{position:fixed;top:-100px;left:16px;z-index:10;padding:12px;background:#d5ec84;color:#101211}.skip-link:focus{top:12px}
+#content{max-width:1180px;margin:0 auto;padding:55px 28px 100px;line-height:1.7}
+#content>nav{display:flex;gap:22px;flex-wrap:wrap;border-bottom:1px solid #343b32;padding-bottom:24px;margin-bottom:40px}
+#content h1{font-size:clamp(40px,7vw,80px);line-height:1.04;letter-spacing:-.045em;max-width:920px;margin:28px 0}
+#content h2{font-size:32px;line-height:1.2;margin:0 0 22px}#content h3{font-size:21px;line-height:1.3;margin-top:0}
+#content .eyebrow{font-size:12px;letter-spacing:.14em;color:#d5ec84}#content .intro{max-width:840px;font-size:20px;color:#aeb6a8}
+#content section{border-top:1px solid #343b32;margin-top:55px;padding-top:35px}#content .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:22px}
+#content article{padding:22px;background:#191c19}#content article img{width:100%;aspect-ratio:1.7;object-fit:cover;margin-bottom:20px}#content article a{display:inline-block;margin:8px 18px 0 0}
+#content p{color:#aeb6a8}#content pre{overflow:auto;background:#191c19;border:1px solid #343b32;padding:25px;font:14px/1.7 monospace;color:#d5ec84}
+/* The full semantic document remains in the accessibility tree, with its own links available to screen readers. */
+.engine-ready #content{position:absolute;left:0;top:0;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:500px){#status{display:none}#content{padding:30px 22px 90px}#access-bar{font-size:10px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
