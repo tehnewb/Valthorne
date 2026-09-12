@@ -94,7 +94,7 @@ function html(page, revision) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(page.id === 'index' ? 'Valthorne — Java game engine' : page.title + ' — Valthorne')}</title>
-<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#070e19"><meta name="valthorne-build" content="${revision}">
+<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#030a12"><meta name="valthorne-build" content="${revision}">
 <link rel="canonical" href="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}">
 <meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:type" content="website"><meta property="og:url" content="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}"><meta property="og:image" content="${publicURL}assets/banner.png">
 <link rel="icon" href="assets/valthorne.png" type="image/png"><link rel="stylesheet" href="shell.css?v=${revision}"></head>

@@ -11,9 +11,35 @@ project links.
 The original `images/banner.png` is the centered homepage centerpiece.
 `images/logo-transparent.png` is used in the navigation and browser icon.
 Both images retain their original transparency, proportions, and colors.
-The site uses dark steel blue surfaces, warm gold accents, electric blue links,
-and ivory text to match that artwork. Serif display headings echo its lettering;
-body text uses the engine's bundled Atkinson Hyperlegible font.
+The surrounding theme follows the supplied dark cosmic reference: nearly black
+surfaces, bright white text, luminous cyan actions, blue links, and gold details
+that connect it to the original artwork. Rounded panels, pill-shaped controls,
+and a subtle atmosphere of grid lines, stars, and curved edge ribbons establish
+depth while keeping the center of each page clear for reading.
+
+The Java view uses bold system-ui display headings (`display`, weight 700),
+semibold card titles and controls (`ui-medium`, weight 600), and the engine's
+bundled Atkinson Hyperlegible font for body copy. Card titles are 21 pixels and
+card body text is 16 pixels.
+Only the navigation wordmark retains Georgia. Panels have 16-pixel corners;
+buttons and search inputs use pill-shaped outlines. The original logo and
+banner remain unchanged and uncropped.
+
+| Role | Color | Measured contrast |
+| --- | --- | --- |
+| Page background | `#030a12` | — |
+| Panel surface | `#0d202b` | — |
+| Primary text | `#f7fcff` | 16.15:1 against the panel |
+| Secondary text | `#c5d7e2` | 11.28:1 against the panel |
+| Primary action | `#58eee0` | 13.94:1 with `#030a12` button text |
+| Link blue | `#70cbff` | 9.28:1 against the panel |
+| Brand gold | `#efca88` | — |
+| Opaque control border | `#497487` | 3.28:1 against the panel |
+
+These measurements describe the listed palette pairs, not a claim of complete
+WCAG conformance. Input placeholders retain the full secondary-text color, and
+keyboard focus uses a bright white outline outside controls. Reveals never
+reduce text opacity.
 
 Headings, introductory copy, actions, filters, and cards are centered. Incomplete
 card rows also center within the content column. Code retains left alignment and
@@ -37,6 +63,7 @@ websites and the rationale for Valthorne's layout, motion, and scene controls.
 | Part | Responsibility |
 | --- | --- |
 | `src/main/java/valthorne/website/WebsiteApplication.java` | Valthorne application lifecycle, responsive layout, text wrapping, cards, navigation painting, and placement of the interactive scene |
+| `src/main/java/valthorne/website/Atmosphere.java` | Static grid, stars, teal glow, and curved edge ribbons painted through the engine UI without an additional animation loop |
 | `src/main/java/valthorne/website/CrystalScene.java` | Procedural meshes, perspective projection, face lighting, and depth-sorted Canvas2D painting for the crystal illustration |
 | `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, motion state, scene input, and semantic link placement |
 | `content.json`, `guides.json` | Shared content for the engine view and complete semantic HTML companion |
@@ -62,10 +89,12 @@ not the visually wrapped canvas text.
 ## Motion and the interactive scene
 
 The entrance and section/card reveals last 600 milliseconds and play once as
-content enters the viewport. The layout stays fixed while the drawing fades and
-moves a short distance; its native links follow the same offset. CSS supplies
+content enters the viewport. The layout stays fixed while the drawing moves a
+short distance at full opacity; its native links follow the same offset. This
+translation-only reveal preserves text contrast throughout. CSS supplies
 brief hover and focus feedback. Content and navigation remain available during
-the transitions.
+the transitions. The atmospheric background is static and adds no continuous
+animation work; the HTML companion provides a matching static CSS treatment.
 
 The home page and lab contain the **Valthorne Core**: a blue faceted crystal,
 orbital bands, and a layered pedestal generated in Java. `CrystalScene` rotates

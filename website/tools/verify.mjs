@@ -70,6 +70,34 @@ try {
   assert.equal(identity.banner, 'assets/banner.png');
   assert.equal(identity.logo, 'assets/valthorne.png');
   assert.equal(identity.unwantedScreenshot, false);
+  // Check the shipped CSS palette and actual engine pixels, not just design documentation.
+  const theme = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    const palette = Object.fromEntries(['ink','muted','teal','blue','panel','border'].map(key => [key, style.getPropertyValue('--' + key).trim()]));
+    palette.background = style.backgroundColor;
+    const surface = valthorneHost.nano.get(1), data = surface.ctx.getImageData(0, 0, surface.canvas.width, surface.canvas.height).data;
+    let cyan = 0, white = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] === 88 && data[i + 1] === 238 && data[i + 2] === 224) cyan++;
+      if (data[i] === 247 && data[i + 1] === 252 && data[i + 2] === 255) white++;
+    }
+    return { palette, cyan, white };
+  });
+  function luminance(color) {
+    const rgb = color.startsWith('#') ? color.slice(1).match(/../g).map(value => parseInt(value,16)) : color.match(/[\d.]+/g).slice(0,3).map(Number);
+    const linear = rgb.map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+    return linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
+  }
+  function contrast(a, b) { const first = luminance(a), second = luminance(b); return (Math.max(first,second) + .05) / (Math.min(first,second) + .05); }
+  const colors = theme.palette;
+  report.contrast = {
+    primaryText: contrast(colors.ink, colors.panel), secondaryText: contrast(colors.muted, colors.panel),
+    links: contrast(colors.blue, colors.panel), primaryButton: contrast(colors.background, colors.teal),
+    controlBorder: contrast(colors.border, colors.panel)
+  };
+  for (const [name, ratio] of Object.entries(report.contrast)) assert.ok(ratio >= (name === 'controlBorder' ? 3 : 4.5), 'Insufficient contrast: ' + name);
+  assert.ok(theme.cyan > 500 && theme.white > 50, 'The engine did not paint the new cyan/white theme');
+  report.checks.push('High-contrast text, links, primary buttons and control borders; matching engine theme pixels');
   const primary = await page.locator('#engine-links a[aria-label="Start building"]:visible').first().boundingBox();
   const secondary = await page.locator('#engine-links a[aria-label="Explore demos"]:visible').boundingBox();
   assert.ok(Math.abs((primary.x + secondary.x + secondary.width) / 2 - 720) < 2, 'Hero actions are not centered');

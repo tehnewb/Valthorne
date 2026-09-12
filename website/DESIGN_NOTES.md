@@ -28,20 +28,48 @@ logos, code, customer claims, or testimonials are reused.
 
 ## Visual direction
 
-The original Valthorne artwork is the identity: warm gold metal, electric-blue
-flame, ivory lettering, and dark steel. The website should support that artwork
-with navy surfaces, restrained gold emphasis, and blue interaction accents.
-Display the original banner and logo without recoloring or cropping them.
+The user-supplied visual reference adds a dark cosmic direction: a centered
+composition, near-black backdrop, luminous teal accents, bold bright headings,
+pill-shaped controls, and restrained grid, star, and curved-ribbon details.
+The reference informs the treatment of the page; its brand, artwork, copy, and
+customer claims are not used. Valthorne's original banner and logo retain their
+colors, proportions, and transparency without cropping or recoloring.
+
+The background is `#030a12`, with `#0d202b` panels and `#497487` opaque control
+borders. Primary text is `#f7fcff`; supporting text is `#c5d7e2`. Cyan `#58eee0`
+identifies primary actions, blue `#70cbff` identifies links, and gold `#efca88`
+connects the interface to the original artwork. Strong separation between text,
+controls, and surfaces takes precedence over the reference's dimmer typography.
+
+System-ui headings use weight 700 through the Java `display` alias. Card titles
+and controls use the `ui-medium` alias at weight 600; card titles are 21 pixels
+and body copy is 16-pixel Atkinson Hyperlegible. Georgia is reserved for the
+navigation wordmark. Rounded
+16-pixel panels and pill-shaped buttons and inputs replace the earlier square
+surface treatment. Keyboard focus uses an external white outline that remains
+distinct from a cyan button, and placeholders use the full secondary-text color.
+
+Measured palette contrast against the panel is 16.15:1 for primary text,
+11.28:1 for secondary text, 9.28:1 for links, and 3.28:1 for the opaque control
+border. Dark primary-button text against cyan measures 13.94:1. These are checks
+of specific color pairs, not a claim of complete WCAG conformance.
+
+`Atmosphere` paints the static grid, stars, teal glow, and curved ribbons through
+the Java UI. Decorative detail stays near the page edges so headings, body copy,
+and artwork remain legible. The text-mode companion uses CSS for a matching
+static atmosphere. Neither treatment adds an animation loop.
 
 Use a common center line for the hero, section headings, calls to action, and
 partially filled card rows. Centering is a composition rule; source code and
 long-form technical instructions still need conventional reading alignment.
-Limit text width, keep consistent vertical spacing, and let the logo and engine
-captures supply visual detail rather than decorating every surface.
+Limit text width, keep consistent vertical spacing, and preserve clear space
+around the logo, engine captures, and reading areas.
 
 ## Motion and 3D direction
 
-- Use a short entrance and restrained section reveals to establish hierarchy.
+- Use a 600-millisecond translation-only entrance and section/card reveals.
+  Keep text at full opacity throughout to preserve contrast; native links follow
+  the same movement while the underlying layout remains fixed.
   Hover and focus feedback should make actions easier to recognize. Navigation,
   reading, and downloads must never wait for an animation to finish.
 - Keep 3D inside a clearly bounded showcase. A faceted blue crystal and gold

@@ -27,6 +27,13 @@ const images = new Map(), measurements = new Map(), anchorPool = new Map(), occu
 let anchors = [];
 // Generic font families are CSS keywords. Quoting "monospace" changes it into a missing named font.
 const cssFamily = family => ['serif','sans-serif','monospace','system-ui'].includes(family) ? family : JSON.stringify(family);
+/** Display aliases use the platform's sans-serif font with the same weight for drawing and measurement. */
+function fontSpec(context, size) {
+  const face = context.state.face;
+  if (face === 'display' || face === 'ui-medium') return `${face === 'display' ? 700 : 600} ${size}px system-ui`;
+  const family = context.fonts.get(face)?.family || face || 'sans-serif';
+  return `${size}px ${cssFamily(family)}`;
+}
 
 /** Finite reveals settle completely. Only an on-screen, unpaused scene keeps drawing. */
 function invalidate(continuous = false) {
@@ -118,7 +125,8 @@ globalThis.site = {
     }
     const progress = Math.min(1, Math.max(0, (motion.now - started) / 600));
     const eased = 1 - Math.pow(1 - progress, 3);
-    motion.opacity = .18 + eased * .82; motion.offset = (1 - eased) * 20;
+    // Keep text at its full contrast throughout the entrance; only position changes.
+    motion.opacity = 1; motion.offset = (1 - eased) * 20;
     if (progress < 1) motion.active = true;
   },
   clearEffect() { motion.opacity = 1; motion.offset = 0; },
@@ -130,10 +138,10 @@ globalThis.site = {
   },
   measure(vg, text, size) {
     const context = valthorneHost.nano.get(vg);
-    const family = context.fonts.get(context.state.face)?.family || context.state.face || 'sans-serif';
-    const key = `${family}:${size}:${text}`;
+    const font = fontSpec(context, size);
+    const key = `${font}:${text}`;
     if (measurements.has(key)) return measurements.get(key);
-    context.ctx.font = `${size}px ${cssFamily(family)}`;
+    context.ctx.font = font;
     const width = context.ctx.measureText(text).width;
     if (measurements.size > 15000) measurements.clear();
     measurements.set(key, width); return width;
@@ -177,6 +185,7 @@ globalThis.site = {
     if (href === page.id + '.html' || (page.id === 'index' && href === 'index.html')) anchor.setAttribute('aria-current', 'page');
     else anchor.removeAttribute('aria-current');
     anchor.classList.toggle('primary-action', label === 'Start building');
+    anchor.classList.toggle('pill-action', height === 44);
     Object.assign(anchor.style, { left: `${x}px`, top: `${y}px`, width: `${width}px`, height: `${height}px` });
   },
   search(x, y, width) {
@@ -196,7 +205,9 @@ globalThis.site = {
     const context = valthorneHost.nano.get(vg), ctx = valthorneHost.nano.prepare(context);
     const branding = file === 'banner.png' || file === 'valthorne.png';
     const scale = (branding ? Math.min : Math.max)(width / image.naturalWidth, height / image.naturalHeight);
-    ctx.beginPath(); ctx.rect(x, y, width, height); ctx.clip();
+    ctx.beginPath();
+    if (branding) ctx.rect(x, y, width, height); else ctx.roundRect(x, y, width, height, 10);
+    ctx.clip();
     ctx.drawImage(image, x + (width - image.naturalWidth * scale) / 2, y + (height - image.naturalHeight * scale) / 2,
       image.naturalWidth * scale, image.naturalHeight * scale);
     context.dirty = true; ctx.restore();
@@ -297,8 +308,7 @@ try {
   const font = host.nano.font.bind(host.nano);
   host.nano.font = context => {
     font(context);
-    const family = context.fonts.get(context.state.face)?.family || context.state.face || 'sans-serif';
-    context.ctx.font = `${context.state.size}px ${cssFamily(family)}`;
+    context.ctx.font = fontSpec(context, context.state.size);
   };
   // Compose finite motion around the existing vector backend without changing the engine snapshot.
   const prepare = host.nano.prepare.bind(host.nano);
