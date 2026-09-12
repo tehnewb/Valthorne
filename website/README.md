@@ -69,11 +69,13 @@ websites and the rationale for Valthorne's layout, motion, and scene controls.
 | `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, motion state, scene input, and semantic link placement |
 | `content.json`, `guides.json` | Shared content for the engine view and complete semantic HTML companion |
 | `site-host.js` | Frame scheduling, finite reveals, motion preferences, scene interaction, native links, search input, clipboard, browser history, and rendering failure recovery |
+| `navigation.js` | Internal page loading, prepared media, persistent engine navigation, browser history restoration, and brief page transitions |
 | `boot.js`, `shell.css` | Engine startup and accessible HTML presentation |
 | `runtime/` | Verified, compiled website UI runtime and bundled dependency notices |
 | `assets/` | Original branding, real engine screenshots, and the self-hosted Urbanist font; no runnable examples or game asset trees |
 | `tools/site.mjs` | Validation, static packaging, preview, guide import, and runtime capture |
 | `tools/verify.mjs` | Browser acceptance checks; output is written to ignored `build/` |
+| `tools/verify-navigation.mjs` | Actual link navigation, engine continuity, keyboard focus, scroll restoration, and overlapping navigation checks |
 
 `JGL` owns the normal init/update/render/dispose lifecycle. `UIRoot` and
 `NanoContainer` provide the engine UI context, and `Canvas2D` paints the visible
@@ -86,6 +88,16 @@ HTML document is generated from the same content. **Text version** switches to
 `?view=text`, which does not load the engine. The HTML is also readable without
 JavaScript or when engine startup fails. Code copying uses the original source,
 not the visually wrapped canvas text.
+
+Internal page links keep the Java application, font, and graphics context alive.
+The current page stays visible while the next document and opening images load.
+Java paints the destination in one update; a 200-millisecond transition through
+charcoal avoids overlapping headlines and leaves the fixed header in place.
+Reduced motion disables the transition. Back and Forward restore scroll,
+search, category, and scene controls. Modified clicks, external links, downloads,
+and Text version retain normal browser navigation. A failed page load or a new
+deployment version falls back to ordinary document navigation. The HTML companion
+and page metadata update with the visible page.
 
 ## Motion and the interactive scene
 
@@ -204,14 +216,18 @@ npx --prefix website playwright install chromium
 node website/tools/site.mjs serve
 # In another terminal:
 node website/tools/verify.mjs
+node website/tools/verify-navigation.mjs
 ```
 
 Use `TEST_BROWSER=chrome` or `TEST_BROWSER=msedge` for installed Chrome or Edge.
 `SITE_URL` can target another served deployment. Checks cover all seven pages,
 mobile overflow, visible engine pixels, navigation, search and filters, idle
-rendering, animation, clipboard, and text/no-JavaScript fallback. Reports and
+rendering, animation, clipboard, and text/no-JavaScript fallback. Navigation checks
+click the actual links at desktop and phone sizes, verify the same engine remains
+alive, and cover keyboard focus, Back/Forward restoration, rapid clicks, and
+reduced motion. Reports and
 screenshots are written to `website/build/`, not a test directory. The Chromium
-check is also required before Pages deployment. Other browsers are not claimed
+checks are also required before Pages deployment. Other browsers are not claimed
 as verified by that check.
 
 ## GitHub Pages

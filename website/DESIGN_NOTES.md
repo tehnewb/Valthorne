@@ -95,6 +95,13 @@ complete WCAG conformance.
 
 ## Review criteria
 
+Page navigation keeps the engine running. Do not show the HTML companion as an
+intermediate frame between two engine pages: its different layout produces a
+visible jump. Prepare the destination while retaining the current view, paint it
+once, and use a short fade through charcoal below the fixed header. Preserve
+native link gestures and browser history; the next Tab after navigation must
+remain in the visible navigation sequence. Reduced motion changes pages directly.
+
 Review every page at desktop and phone widths, including its middle and footer.
 Check that the fixed header and utility controls never obscure focused actions,
 search results, or copy buttons. Search and category filters should show useful

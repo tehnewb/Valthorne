@@ -4,8 +4,9 @@ import { BrowserPlatform } from './runtime/platform.js';
 import { BrowserNano } from './runtime/nano-backend.js';
 import { BrowserYoga } from './runtime/yoga-backend.js';
 import { BrowserFonts } from './runtime/fonts.js';
+const { installNavigation } = await import('./navigation.js?v=' + encodeURIComponent(document.querySelector('meta[name="valthorne-build"]').content));
 
-const page = JSON.parse(document.querySelector('#page-content').textContent);
+let page = JSON.parse(document.querySelector('#page-content').textContent);
 const params = new URLSearchParams(location.search);
 const semantic = document.querySelector('#content');
 const links = document.querySelector('#engine-links');
@@ -22,6 +23,7 @@ const motionEnabled = () => !motionPaused && !reducedMotion.matches;
 let frameCallback, shutdownCallback, raf = 0, lastFrame = 0, closed = false, frames = 0;
 let urgentFrame = false;
 let ready = false, linkIndex = 0, searchUsed = false, sceneUsed = false, sceneVisible = false;
+let navigation, settleReveals = false;
 const startupTimeout = setTimeout(() => { if (!ready) fail(new Error('Website engine startup timed out')); }, 20000);
 const images = new Map(), measurements = new Map(), anchorPool = new Map(), occurrences = new Map();
 let anchors = [];
@@ -106,16 +108,23 @@ globalThis.site = {
     status.textContent = 'Rendered with Valthorne';
     document.title = `${page.id === 'index' ? 'Valthorne — Java game engine' : page.title + ' — Valthorne'}`;
     globalThis.valthorneReady = true;
+    navigation = installNavigation({
+      getState: () => ({ scroll: scrollY, category: site.category, orbit: site.orbit, tilt: site.tilt, animating: site.animating }),
+      render: changePage, prepare: preparePage, motionEnabled,
+      surface: () => valthorneHost.nano.get(1).canvas
+    });
     // These metrics allow the verification tool to check actual rendering and idle behavior.
     globalThis.websiteMetrics = {
       get frames() { return frames; }, get animations() { return site.running(); },
       get revealing() { return motion.active; }, get sceneVisible() { return sceneVisible; },
-      get reducedMotion() { return reducedMotion.matches; }, get motionEnabled() { return motionEnabled(); }
+      get reducedMotion() { return reducedMotion.matches; }, get motionEnabled() { return motionEnabled(); },
+      get navigating() { return navigation.navigating; }, get navigations() { return navigation.navigations; }
     };
   },
   /** Reveal each visible group once. Logical layout never shifts; links follow the painted offset. */
   reveal(key, y) {
     site.clearEffect();
+    if (settleReveals) { if (y < innerHeight) motion.groups.set(key, motion.now - 600); return; }
     if (!motionEnabled()) return;
     let started = motion.groups.get(key);
     if (started === undefined) {
@@ -197,9 +206,7 @@ globalThis.site = {
     if (y + height < 0 || y > innerHeight) return;
     let image = images.get(file);
     if (!image) {
-      image = new Image(); image.decoding = 'async';
-      image.onload = invalidate; image.onerror = invalidate;
-      image.src = 'assets/' + file; images.set(file, image);
+      image = loadImage(file);
     }
     if (!image.complete || !image.naturalWidth) return;
     const context = valthorneHost.nano.get(vg), ctx = valthorneHost.nano.prepare(context);
@@ -213,6 +220,40 @@ globalThis.site = {
     context.dirty = true; ctx.restore();
   }
 };
+
+/** Keep decoded opening images in the same cache as the Java painter. */
+function loadImage(file) {
+  if (images.has(file)) return images.get(file);
+  const image = new Image(); image.decoding = 'async';
+  image.onload = invalidate; image.onerror = invalidate;
+  image.src = 'assets/' + file; images.set(file, image); return image;
+}
+async function preparePage(data) {
+  const first = data.sections[0];
+  const files = [data.heroImage, first?.image, ...(first?.cards || []).slice(0, 2).map(card => card.image)].filter(Boolean);
+  await Promise.all(files.map(file => loadImage(file).decode().catch(() => {})));
+}
+
+/** Commit a route in one paint without reinitializing Java, flashing HTML, or replaying the entrance. */
+function changePage(data, url, restored = {}) {
+  clearTimeout(copyTimeout);
+  page = data; site.page = data;
+  site.query = url.searchParams.get('q') || ''; search.value = site.query;
+  site.category = restored.category || 'all'; site.copied = -1;
+  site.orbit = restored.orbit || 0; site.tilt = restored.tilt || 0; site.animating = restored.animating ?? true;
+  pointer = null; interaction.classList.remove('dragging');
+  motion.groups.clear(); motion.active = false; site.clearEffect();
+  lastFrame = 0; cancelAnimationFrame(raf); raf = 0;
+  const y = restored.scroll || 0;
+  // Give the browser enough scroll range before laying out a restored long page.
+  const spacer = document.querySelector('#scroll-space');
+  spacer.style.height = Math.max(parseFloat(spacer.style.height) || 0, y + innerHeight) + 'px';
+  scrollTo({ top: y, behavior: 'instant' });
+  motion.now = performance.now(); settleReveals = true;
+  try { frameCallback(0); frames++; }
+  finally { settleReveals = false; }
+  invalidate();
+}
 
 /** Pointer and keyboard controls only own the contained scene; vertical touch scrolling stays native. */
 let pointer = null;
@@ -248,6 +289,7 @@ function syncMotion() {
   motionToggle.setAttribute('aria-pressed', String(!enabled));
   motionToggle.disabled = reducedMotion.matches;
   if (!enabled) motion.groups.forEach((_, key) => motion.groups.set(key, -1000));
+  if (!enabled) navigation?.finishTransition();
   lastFrame = 0; invalidate();
 }
 motionToggle.addEventListener('click', () => {
@@ -278,7 +320,7 @@ search.addEventListener('input', () => {
   site.query = search.value;
   const url = new URL(location.href);
   if (site.query) url.searchParams.set('q', site.query); else url.searchParams.delete('q');
-  history.replaceState(null, '', url); invalidate();
+  history.replaceState(history.state, '', url); invalidate();
 });
 window.addEventListener('scroll', invalidate, { passive: true });
 window.addEventListener('resize', invalidate);

@@ -122,14 +122,14 @@ ${page.id === 'about' ? '<div class="project-identity"><img class="brand-banner"
 async function build() {
   const data = await content();
   // A revision ties the compiled Java, host, and stylesheet together across browser caches.
-  const revision = hash((await Promise.all(['runtime/manifest.json','site-host.js','boot.js','shell.css'].map(read))).join('\n')).slice(0, 16);
+  const revision = hash((await Promise.all(['runtime/manifest.json','site-host.js','navigation.js','boot.js','shell.css','content.json','guides.json','tools/site.mjs'].map(read))).join('\n')).slice(0, 16);
   // Clear only the verified output directory so deleted assets cannot leak into a later deployment.
   if (path.dirname(output) !== root || path.basename(output) !== 'dist') throw new Error('Unsafe output directory');
   await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(output, { recursive: true });
   // Output is a fixed child of this module; no computed recursive deletion is used.
   for (const page of data.pages) await fs.writeFile(path.join(output, page.id + '.html'), html(page, revision));
-  for (const name of ['shell.css', 'site-host.js', 'boot.js']) await fs.copyFile(path.join(root, name), path.join(output, name));
+  for (const name of ['shell.css', 'site-host.js', 'navigation.js', 'boot.js']) await fs.copyFile(path.join(root, name), path.join(output, name));
   await fs.cp(path.join(root, 'assets'), path.join(output, 'assets'), { recursive: true });
   await fs.cp(path.join(root, 'runtime'), path.join(output, 'runtime'), { recursive: true });
   await fs.cp(path.join(root, 'licenses'), path.join(output, 'licenses'), { recursive: true });
@@ -150,7 +150,7 @@ async function check() {
   for (const [file, digest] of Object.entries(manifest.sources)) if (fingerprint(file, await fs.readFile(path.join(root, file))) !== digest) throw new Error('Java changed; compile and capture the runtime again: ' + file);
   const javaFiles = (await files(path.join(root, 'src'))).map(file => path.relative(root, file).replaceAll('\\', '/'));
   if (JSON.stringify(javaFiles.sort()) !== JSON.stringify(Object.keys(manifest.sources).sort())) throw new Error('Java sources added or removed; compile and recapture the runtime.');
-  for (const file of ['boot.js','site-host.js','runtime/valthorne.js']) execFileSync(process.execPath, ['--check', path.join(root, file)]);
+  for (const file of ['boot.js','site-host.js','navigation.js','runtime/valthorne.js']) execFileSync(process.execPath, ['--check', path.join(root, file)]);
   const pages = new Set(data.pages.map(page => page.id + '.html'));
   let count = 0;
   for (const page of data.pages) {

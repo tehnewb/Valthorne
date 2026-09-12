@@ -22,6 +22,12 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; isolation: isolate; }
+.page-transition {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 6;
+  pointer-events: none; clip-path: inset(88px 0 0); overflow-anchor: none; background: #141414;
+}
+.page-transition canvas { display: block; width: 100%; height: 100%; }
+@media (max-width: 899px) { .page-transition { clip-path: inset(120px 0 0); } }
 a { color: var(--link); text-underline-offset: 4px; }
 a:hover { color: var(--ink); }
 a:focus-visible, input:focus-visible, button:focus-visible, #scene-interaction:focus-visible {
