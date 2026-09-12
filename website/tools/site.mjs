@@ -86,26 +86,34 @@ async function updateGuides() {
 }
 
 function html(page, revision) {
-  const nav = [['index','Home'],['engine','Engine'],['examples','Demos'],['docs','Docs'],['start','Start'],['lab','Lab'],['about','About']];
-  const body = page.sections.map((section,index) => `<section><h2>${escape(section.title)}</h2>${section.description ? `<p>${escape(section.description)}</p>` : ''}
+  const nav = [['engine','Engine'],['examples','Demos'],['docs','Docs'],['start','Get started'],['lab','Lab'],['about','About']];
+  // The semantic view uses the same page data as Java, including editorial media and resource lists.
+  const media = (file, caption, className) => `<figure class="${className}"><img src="assets/${escape(file)}" alt="${escape(caption || 'A scene rendered with Valthorne')}" width="800" height="460"${className === 'hero-media' ? ' fetchpriority="high"' : ' loading="lazy"'}>${caption ? `<figcaption>${escape(caption)}</figcaption>` : ''}</figure>`;
+  const body = page.sections.map((section,index) => {
+    const layout = section.layout || (section.catalog === 'guides' ? 'rows' : section.catalog === 'examples' ? 'examples' : 'cards');
+    const cards = (section.cards || []).map(card => `<article>${card.image ? `<img src="assets/${escape(card.image)}" alt="${escape(card.title)} running in Valthorne" loading="lazy" width="800" height="460">` : ''}<div class="card-copy">${card.category ? `<p class="card-category">${escape(card.category)}</p>` : ''}<h3>${escape(card.title)}</h3><p>${escape(card.text)}</p></div><div class="card-links"><a href="${escape(card.href)}">${escape(card.label)} <span aria-hidden="true">&nbsp;→</span></a>${card.guide ? `<a href="${escape(card.guide)}">Controls and source <span aria-hidden="true">&nbsp;↗</span></a>` : ''}</div></article>`).join('');
+    return `<section class="section-${escape(layout)}"><div class="section-copy"><header class="section-heading"><h2>${escape(section.title)}</h2>${section.description ? `<p>${escape(section.description)}</p>` : ''}</header>
     ${section.code ? `<p class="code-filename">${escape(section.filename || '')}</p><pre id="code-${index}" tabindex="0"><code>${escape(section.code)}</code></pre>` : ''}
-    ${section.lab ? '<p>The Valthorne Core is a faceted blue crystal with gold rings, projected from 3D geometry by Java and painted through Canvas2D. Open the engine view to drag or use arrow keys to rotate it. Playback can be paused; system reduced-motion settings are respected.</p>' : ''}
-    <div class="cards">${(section.cards || []).map(card => `<article>${card.image ? `<img src="assets/${escape(card.image)}" alt="${escape(card.title)} running in Valthorne" loading="lazy" width="800" height="460">` : ''}<h3>${escape(card.title)}</h3><p>${escape(card.text)}</p><a href="${escape(card.href)}">${escape(card.label)}</a>${card.guide ? `<a href="${escape(card.guide)}">Controls and source</a>` : ''}</article>`).join('')}</div></section>`).join('');
+    ${section.lab ? `<p class="lab-note">The interactive scene is available in the <a href="${page.id}.html">engine view</a>. Drag to orbit, use the arrow keys to rotate, or pause playback. System reduced-motion settings are respected.</p>` : ''}
+    ${cards ? `<div class="cards">${cards}</div>` : ''}</div>${section.image ? media(section.image, section.imageCaption || '', 'section-media') : ''}</section>`;
+  }).join('');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(page.id === 'index' ? 'Valthorne — Java game engine' : page.title + ' — Valthorne')}</title>
-<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#030a12"><meta name="valthorne-build" content="${revision}">
+<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#141414"><meta name="valthorne-build" content="${revision}">
 <link rel="canonical" href="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}">
 <meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:type" content="website"><meta property="og:url" content="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}"><meta property="og:image" content="${publicURL}assets/banner.png">
 <link rel="icon" href="assets/valthorne.png" type="image/png"><link rel="stylesheet" href="shell.css?v=${revision}"></head>
 <body><a class="skip-link" href="?view=text#content">Skip to text content</a>
 <canvas id="scene" aria-hidden="true"></canvas><div id="scroll-space" aria-hidden="true"></div>
 <nav id="engine-links" aria-label="Engine view navigation and actions"></nav>
-<div id="scene-interaction" role="group" tabindex="0" aria-label="Interactive Valthorne Core. Drag to orbit. Use arrow keys to rotate, or Home to reset the view." hidden></div>
+<div id="scene-interaction" role="group" tabindex="0" aria-label="Interactive geometry lab. Drag to orbit. Use arrow keys to rotate, or Home to reset the view." hidden></div>
 <input id="engine-search" type="search" aria-label="Search this collection" placeholder="Search titles and systems…" hidden>
 <button id="motion-toggle" type="button" aria-label="Pause motion" title="Pause motion"><span aria-hidden="true" class="pause-icon">Ⅱ</span><span aria-hidden="true" class="play-icon">▷</span></button>
 <button id="back-top" type="button" aria-label="Back to top" title="Back to top" hidden>↑</button>
-<main id="content"><a class="brand" href="index.html"><img src="assets/valthorne.png" alt="Valthorne logo" width="38" height="57">VALTHORNE</a><nav aria-label="Main navigation">${nav.map(([id,label]) => `<a href="${id}.html"${id === page.id ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav><div class="eyebrow">${escape(page.eyebrow)}</div>${page.id === 'index' ? '<img class="brand-banner" src="assets/banner.png" alt="Valthorne — gold lettering and blue flame" width="1511" height="623">' : ''}<h1>${escape(page.title)}</h1><p class="intro">${escape(page.description)}</p>${body}<section><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href="about.html">About the project</a></section></main>
+<main id="content"><header class="masthead"><a class="brand" href="index.html"${page.id === 'index' ? ' aria-current="page"' : ''}><img src="assets/valthorne.png" alt="Valthorne logo" width="31" height="48">Valthorne</a><nav aria-label="Main navigation">${nav.map(([id,label]) => `<a href="${id}.html"${id === page.id ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav></header>
+<header class="page-hero${page.heroImage ? ' has-media' : ''}"><div class="hero-copy"><p class="eyebrow">${escape(page.eyebrow)}</p><h1>${escape(page.title)}</h1><p class="intro">${escape(page.description)}</p>${page.id === 'index' ? '<div class="hero-actions"><a class="action primary" href="start.html">Start building</a><a class="action" href="examples.html">Explore demos</a></div>' : ''}</div>${page.heroImage ? media(page.heroImage, page.heroCaption || '', 'hero-media') : ''}</header>
+${page.id === 'about' ? '<div class="project-identity"><img class="brand-banner" src="assets/banner.png" alt="Valthorne — original gold lettering and blue flame" width="1511" height="623"></div>' : ''}${body}<div class="project-footer"><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href="about.html">About the project →</a></div></main>
 <footer id="access-bar"><span id="status" role="status">Loading Valthorne…</span><a id="view-toggle" href="?view=text">Text version</a><a href="https://github.com/tehnewb/Valthorne">GitHub ↗</a></footer>
 <script id="page-content" type="application/json">${json(page)}</script><script src="boot.js?v=${revision}"></script>
 </body></html>\n`;
@@ -147,6 +155,9 @@ async function check() {
   let count = 0;
   for (const page of data.pages) {
     if (!page.title || !page.description || !page.sections.length) throw new Error('Incomplete page: ' + page.id);
+    for (const image of [page.heroImage, ...page.sections.map(section => section.image)].filter(Boolean)) {
+      await fs.access(path.join(root, 'assets', image));
+    }
     for (const section of page.sections) for (const card of section.cards || []) {
       for (const href of [card.href,card.guide].filter(Boolean)) {
         if (/^https:\/\//.test(href)) { new URL(href); }

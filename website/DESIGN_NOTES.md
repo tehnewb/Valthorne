@@ -1,8 +1,10 @@
 # Website design notes
 
-Reviewed September 12, 2026. The goal is to make Valthorne's capabilities easy to
-understand, its examples easy to try, and its visual identity consistent with the
-original logo and banner.
+Reviewed September 12, 2026. The current direction is a professional product
+website: clear capabilities, substantial real engine imagery, straightforward
+installation and demo access, and an identifiable Valthorne brand. Unity's
+website and the supplied Urbanist and charcoal-purple references guide the
+hierarchy and visual system.
 
 ## Reference review
 
@@ -14,56 +16,59 @@ production history as another engine.
 | --- | --- | --- |
 | [Godot](https://godotengine.org/) | A short product explanation, prominent download action, and real game imagery establish purpose immediately. Navigation separates features, documentation, and community. | Keep “Start building” and “Explore demos” prominent. Show real Valthorne captures with links to working downloads. |
 | [Unreal Engine](https://www.unrealengine.com/en-US) | Showcase content leads into explicit installation steps, tutorials, documentation, and sample projects. | Connect the visual showcase to a practical next step: download a demo, read its guide, or copy the Java dependency. |
-| [Unity](https://unity.com/) | Large visual examples are organized around a small number of development goals. Learning resources remain a clear part of the journey. | Group the engine's many systems around rendering, interaction, and building the complete experience, with deeper detail on the engine and documentation pages. |
+| [Unity](https://unity.com/) | Compact black navigation precedes a large asymmetric hero. Real product media leads the page; charcoal cards, restrained controls, and generous spacing separate content. Feature sections and learning resources provide clear next steps. | Pair a concise Java product statement with a real engine capture. Use image-led showcases, distinct feature sections, resource rows, and direct integration actions. |
 | [Defold](https://defold.com/) | The hero combines clear product positioning with a compact gallery. Small capability cards provide a quick overview before longer explanations. | Retain a compact set of engine facts and a curated showcase. Avoid a long, undifferentiated feature list on the home page. |
-| [Bevy](https://bevy.org/) | A centered logo, concise language and licensing information, and a direct getting-started action suit a code-oriented engine. Feature sections pair an explanation with a relevant visual or code example. | Preserve Valthorne's centered composition and Java identity. Code stays readable and left aligned within a centered container. |
+| [Bevy](https://bevy.org/) | Concise language and licensing information, a direct getting-started action, and relevant visuals or code suit a code-oriented engine. | Keep Java requirements, licensing, and integration easy to find. Present readable code within the common content column. |
 | [Stride](https://www.stride3d.net/) | A large engine showcase includes visible playback controls. Product information, release access, and documentation are easy to identify. | Put pause controls next to moving content. Keep the viewer in control while making the current release and documentation discoverable. |
 | [PlayCanvas](https://playcanvas.com/) | A contained interactive 3D presentation includes a visible drag-to-rotate instruction. A compact quick-start code block follows the hero. | Give the lab a purposeful 3D object with discoverable interaction, a reset action, and keyboard controls. Keep it close to explanatory content and a path to building something. |
 
-Official page content was reviewed for all seven sites. Desktop browser captures
-were also inspected for Godot, Defold, Bevy, Stride, and PlayCanvas. Automated
-browser access to Unreal Engine and Unity was blocked, so their observations are
-limited to the accessible official page content. No reference-site artwork,
-logos, code, customer claims, or testimonials are reused.
+Official page content was reviewed for all seven sites. Desktop browser views
+were also inspected for Godot, Defold, Bevy, Stride, and PlayCanvas. For this
+redesign, Unity's hero, navigation, latest-content cards, and engine feature
+section were inspected in the browser. Automated browser access to Unreal Engine
+was blocked, so that review is limited to accessible official page content.
+No reference-site artwork, logos, code, customer claims, or testimonials are
+reused.
 
 ## Visual direction
 
-The user-supplied visual reference adds a dark cosmic direction: a centered
-composition, near-black backdrop, luminous teal accents, bold bright headings,
-pill-shaped controls, and restrained grid, star, and curved-ribbon details.
-The reference informs the treatment of the page; its brand, artwork, copy, and
-customer claims are not used. Valthorne's original banner and logo retain their
-colors, proportions, and transparency without cropping or recoloring.
+The supplied references establish Urbanist typography, neutral charcoal
+surfaces, bright text, and purple accents. The visible purple swatches inform
+the palette; the contradictory orange color labels in the supplied image do
+not define the implementation. Valthorne's original logo remains in the header
+and browser icon; its original banner appears in the footer. Their proportions,
+transparency, and colors are preserved.
 
-The background is `#030a12`, with `#0d202b` panels and `#497487` opaque control
-borders. Primary text is `#f7fcff`; supporting text is `#c5d7e2`. Cyan `#58eee0`
-identifies primary actions, blue `#70cbff` identifies links, and gold `#efca88`
-connects the interface to the original artwork. Strong separation between text,
-controls, and surfaces takes precedence over the reference's dimmer typography.
+The Java view centers a content column up to 1,240 pixels wide. Copy follows a
+consistent left edge within it. The homepage places the product statement and
+actions beside an actual lighting-studio capture, then introduces product facts,
+capabilities, example captures, and integration. Engine feature sections pair
+relevant media with explanatory content. Documentation and project links use
+compact rows where scanning is more useful than imagery. Examples use substantial
+captures and clear download links. Missing captures receive a labeled typographic
+panel, never an invented screenshot. Code retains conventional left alignment and
+indentation. Mobile layouts stack these compositions and preserve reading space.
 
-System-ui headings use weight 700 through the Java `display` alias. Card titles
-and controls use the `ui-medium` alias at weight 600; card titles are 21 pixels
-and body copy is 16-pixel Atkinson Hyperlegible. Georgia is reserved for the
-navigation wordmark. Rounded
-16-pixel panels and pill-shaped buttons and inputs replace the earlier square
-surface treatment. Keyboard focus uses an external white outline that remains
-distinct from a cyan button, and placeholders use the full secondary-text color.
+The background is `#141414`, with `#1a1a1a` panels, `#222222` secondary surfaces,
+and `#686868` opaque control borders. Primary text is white; supporting text is
+`#c7c7cc`. Purple `#703bf7` identifies primary actions, and the lighter `#b99bff`
+identifies links. Flat buttons, inputs, and panels use four-pixel corners.
+There is no atmospheric background painter or decorative grid, star field,
+ribbon, or glow. Product media provides the visual depth.
 
-Measured palette contrast against the panel is 16.15:1 for primary text,
-11.28:1 for secondary text, 9.28:1 for links, and 3.28:1 for the opaque control
-border. Dark primary-button text against cyan measures 13.94:1. These are checks
-of specific color pairs, not a claim of complete WCAG conformance.
+Urbanist is self-hosted as an unmodified normal variable font, supporting weights
+100–900. The Java host loads it before layout and uses matching font definitions
+for measurement and drawing: 400 for body text, 600 for card titles and controls,
+and 700 for display headings. The HTML companion uses the same family. Code uses
+the system monospace family. [Font provenance and license](assets/fonts/README.md)
+are included with the source and distributed assets; no font CDN is contacted.
 
-`Atmosphere` paints the static grid, stars, teal glow, and curved ribbons through
-the Java UI. Decorative detail stays near the page edges so headings, body copy,
-and artwork remain legible. The text-mode companion uses CSS for a matching
-static atmosphere. Neither treatment adds an animation loop.
-
-Use a common center line for the hero, section headings, calls to action, and
-partially filled card rows. Centering is a composition rule; source code and
-long-form technical instructions still need conventional reading alignment.
-Limit text width, keep consistent vertical spacing, and preserve clear space
-around the logo, engine captures, and reading areas.
+Measured palette contrast against the panel is 17.40:1 for primary text,
+10.33:1 for secondary text, 7.62:1 for links, and 3.12:1 for the opaque control
+border. White primary-button text against purple measures 5.74:1. Keyboard focus
+uses a separate pale-purple outline and input placeholders use the full
+secondary-text color. These are checks of specific color pairs, not a claim of
+complete WCAG conformance.
 
 ## Motion and 3D direction
 
@@ -72,9 +77,9 @@ around the logo, engine captures, and reading areas.
   the same movement while the underlying layout remains fixed.
   Hover and focus feedback should make actions easier to recognize. Navigation,
   reading, and downloads must never wait for an animation to finish.
-- Keep 3D inside a clearly bounded showcase. A faceted blue crystal and gold
-  geometry suit the existing art without imitating or replacing the logo.
-  A scene should communicate depth through perspective, lighting, and overlap.
+- Keep the interactive crystal on the standalone lab page. Its faceted blue
+  geometry, gold orbital bands, perspective, and shading illustrate the Java
+  website runtime. The homepage leads with real product captures.
 - Explain interactions beside the scene. Support pointer dragging and keyboard
   rotation, and provide visible animation and reset controls. Touch interaction
   should preserve the ability to scroll the page.

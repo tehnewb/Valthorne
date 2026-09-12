@@ -11,7 +11,7 @@
     "platform.js": "42f5cf3abac26064dfffcd29f54cae7be14ae1669830c8ac2aafecf8912eeb29",
     "ui/AtkinsonHyperlegible-Regular.ttf": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
     "ui/OFL-AtkinsonHyperlegible.txt": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
-    "valthorne.js": "f6254d32b3df6f8fd602cdab43c9b6bc5bac7a7eff2b091c38c401efee6509c2",
+    "valthorne.js": "fd89a144ea0cacdf78afc8b13ddec0b2d470d8ee42190737f954bf86fec75986",
     "vendor/opentype/LICENSE": "a5b87c9bc191e7f9c06b07bd7cbbed3ed846dfdb50e859484b2c245aa1ab2e61",
     "vendor/opentype/opentype.module.js": "8d79d17388114a29d74681dfaed84068b1d7d9b4e39a9544fb6406d25579ad8f",
     "vendor/yoga/dist/binaries/yoga-wasm-base64-esm.js": "2cfeda49ae87f57bcd4a5fe433940edefc531a69bd0f83e32759fb5837df205c",
@@ -31,9 +31,8 @@
     "yoga-backend.js": "fbec4093bfb77f276c0a73c82d513b1dd2c9b7454b324d916ccb78f6f401fa25"
   },
   "sources": {
-    "src/main/java/valthorne/website/Atmosphere.java": "d6cde5386c818e79822a3f1c8b14b5f826d984499bf5b40dc3680f8ab9799e9c",
     "src/main/java/valthorne/website/BrowserBridge.java": "3edb5b51534fd55ef0d651f585295ac6ea4bcd972cfbcd6d0bdc32de3af2b721",
     "src/main/java/valthorne/website/CrystalScene.java": "94e756a274e91b8e6dd0cb3f375de005cbcbfa647c4dcd8e4f81c3736bd09094",
-    "src/main/java/valthorne/website/WebsiteApplication.java": "83eed53de036248148ab90f822c8d6929a6ec605d06e00e27c4eb4061eeb655a"
+    "src/main/java/valthorne/website/WebsiteApplication.java": "8d7cd9072503fbd7001a9428a4c95fc4e2ce3698ee5106f60272376960720288"
   }
 }

@@ -27,10 +27,10 @@ const images = new Map(), measurements = new Map(), anchorPool = new Map(), occu
 let anchors = [];
 // Generic font families are CSS keywords. Quoting "monospace" changes it into a missing named font.
 const cssFamily = family => ['serif','sans-serif','monospace','system-ui'].includes(family) ? family : JSON.stringify(family);
-/** Display aliases use the platform's sans-serif font with the same weight for drawing and measurement. */
+/** UI aliases use the loaded Urbanist family with identical drawing and measurement weights. */
 function fontSpec(context, size) {
   const face = context.state.face;
-  if (face === 'display' || face === 'ui-medium') return `${face === 'display' ? 700 : 600} ${size}px system-ui`;
+  if (face === 'display' || face === 'ui-medium' || face === 'default') return `${face === 'display' ? 700 : face === 'ui-medium' ? 600 : 400} ${size}px UrbanistWebsite, sans-serif`;
   const family = context.fonts.get(face)?.family || face || 'sans-serif';
   return `${size}px ${cssFamily(family)}`;
 }
@@ -206,7 +206,7 @@ globalThis.site = {
     const branding = file === 'banner.png' || file === 'valthorne.png';
     const scale = (branding ? Math.min : Math.max)(width / image.naturalWidth, height / image.naturalHeight);
     ctx.beginPath();
-    if (branding) ctx.rect(x, y, width, height); else ctx.roundRect(x, y, width, height, 10);
+    if (branding) ctx.rect(x, y, width, height); else ctx.roundRect(x, y, width, height, 4);
     ctx.clip();
     ctx.drawImage(image, x + (width - image.naturalWidth * scale) / 2, y + (height - image.naturalHeight * scale) / 2,
       image.naturalWidth * scale, image.naturalHeight * scale);
@@ -288,6 +288,10 @@ window.addEventListener('pageshow', invalidate);
 
 try {
   if (!globalThis.WebAssembly) throw new Error('WebAssembly is required for Yoga layout');
+  // Load the exact self-hosted variable font before Java measures a single line.
+  // The semantic document remains readable with its fallback while loading.
+  const displayFont = new FontFace('UrbanistWebsite', 'url(assets/fonts/Urbanist-Variable.ttf)', { weight: '100 900', style: 'normal' });
+  await displayFont.load(); document.fonts.add(displayFont);
   class WebsitePlatform extends BrowserPlatform {
     // This application uses real HTML links and native text input. It does not capture browser keys or start audio.
     unlockAudio() { }

@@ -12,6 +12,7 @@ Valthorne classes, TeaVM runtime/class-library code, and reachable JOML math cod
 | Yoga | 3.2.1 | `licenses/Yoga-MIT.txt` | https://github.com/facebook/yoga/tree/v3.2.1 |
 | OpenType.js | 1.3.4 | `runtime/vendor/opentype/LICENSE` | https://github.com/opentypejs/opentype.js |
 | Atkinson Hyperlegible Regular | bundled engine font | `runtime/ui/OFL-AtkinsonHyperlegible.txt` | https://www.brailleinstitute.org/freefont/ |
+| Urbanist | normal variable, weights 100–900 | `assets/fonts/OFL-Urbanist.txt` | https://github.com/google/fonts/tree/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/urbanist |
 
 Screenshots are captures of Valthorne examples. The original game asset sources,
 authors, conversions, and licenses are recorded in the separate

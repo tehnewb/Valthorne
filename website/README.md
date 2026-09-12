@@ -8,44 +8,46 @@ project links.
 
 ## Visual identity
 
-The original `images/banner.png` is the centered homepage centerpiece.
-`images/logo-transparent.png` is used in the navigation and browser icon.
-Both images retain their original transparency, proportions, and colors.
-The surrounding theme follows the supplied dark cosmic reference: nearly black
-surfaces, bright white text, luminous cyan actions, blue links, and gold details
-that connect it to the original artwork. Rounded panels, pill-shaped controls,
-and a subtle atmosphere of grid lines, stars, and curved edge ribbons establish
-depth while keeping the center of each page clear for reading.
+The website follows an editorial product layout informed by Unity's hierarchy
+and the supplied Urbanist, charcoal, and purple design references. A centered
+content column, capped at 1,240 pixels in the Java view, provides a consistent
+left edge for headings, paragraphs, actions, and cards. The homepage pairs a
+large product statement with an actual lighting-studio capture. Feature sections,
+image-led showcases, compact resource rows, and code panels use distinct layouts
+suited to their content; narrow screens stack these layouts into one column.
 
-The Java view uses bold system-ui display headings (`display`, weight 700),
-semibold card titles and controls (`ui-medium`, weight 600), and the engine's
-bundled Atkinson Hyperlegible font for body copy. Card titles are 21 pixels and
-card body text is 16 pixels.
-Only the navigation wordmark retains Georgia. Panels have 16-pixel corners;
-buttons and search inputs use pill-shaped outlines. The original logo and
-banner remain unchanged and uncropped.
+The original `images/logo-transparent.png` identifies the navigation and browser
+icon. The original `images/banner.png` appears in the footer. Both retain their
+transparency, proportions, and colors. Flat charcoal surfaces, restrained purple
+actions, bright text, and four-pixel corners frame the product imagery. The
+background is plain; no atmospheric painter, stars, grid, or glow is used.
+
+Urbanist is served locally from `assets/fonts/Urbanist-Variable.ttf`, with its
+SIL OFL license and pinned source documented in [assets/fonts/README.md](assets/fonts/README.md).
+The host loads it before Java measures or draws text. The Java aliases use
+weight 400 for body copy (`default`), 600 for titles and controls (`ui-medium`),
+and 700 for display headings (`display`). The HTML companion uses the same
+variable family, `UrbanistWebsite`. Code uses the system monospace family.
 
 | Role | Color | Measured contrast |
 | --- | --- | --- |
-| Page background | `#030a12` | — |
-| Panel surface | `#0d202b` | — |
-| Primary text | `#f7fcff` | 16.15:1 against the panel |
-| Secondary text | `#c5d7e2` | 11.28:1 against the panel |
-| Primary action | `#58eee0` | 13.94:1 with `#030a12` button text |
-| Link blue | `#70cbff` | 9.28:1 against the panel |
-| Brand gold | `#efca88` | — |
-| Opaque control border | `#497487` | 3.28:1 against the panel |
+| Page background | `#141414` | — |
+| Panel surface | `#1a1a1a` | — |
+| Primary text | `#ffffff` | 17.40:1 against the panel |
+| Secondary text | `#c7c7cc` | 10.33:1 against the panel |
+| Primary action | `#703bf7` | 5.74:1 with white button text |
+| Link purple | `#b99bff` | 7.62:1 against the panel |
+| Opaque control border | `#686868` | 3.12:1 against the panel |
 
 These measurements describe the listed palette pairs, not a claim of complete
 WCAG conformance. Input placeholders retain the full secondary-text color, and
-keyboard focus uses a bright white outline outside controls. Reveals never
+keyboard focus uses a pale purple outline outside controls. Reveals never
 reduce text opacity.
 
-Headings, introductory copy, actions, filters, and cards are centered. Incomplete
-card rows also center within the content column. Code retains left alignment and
-its original indentation for readability and copying. The HTML companion follows
-the same visual identity. Demo cards without a representative capture use a
-labeled category illustration. These graphics are not presented as screenshots;
+Copy and incomplete card rows follow the left edge of the content column. Code
+retains its original indentation for readability and copying. The HTML companion
+follows the same visual identity. Demo cards without a representative capture
+use a labeled typographic panel. These panels are not presented as screenshots;
 the FPS demo remains available without the old incorrect-hand screenshot.
 
 The documentation page puts installation, migration, and platform quick links
@@ -63,14 +65,13 @@ websites and the rationale for Valthorne's layout, motion, and scene controls.
 | Part | Responsibility |
 | --- | --- |
 | `src/main/java/valthorne/website/WebsiteApplication.java` | Valthorne application lifecycle, responsive layout, text wrapping, cards, navigation painting, and placement of the interactive scene |
-| `src/main/java/valthorne/website/Atmosphere.java` | Static grid, stars, teal glow, and curved edge ribbons painted through the engine UI without an additional animation loop |
 | `src/main/java/valthorne/website/CrystalScene.java` | Procedural meshes, perspective projection, face lighting, and depth-sorted Canvas2D painting for the crystal illustration |
 | `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, motion state, scene input, and semantic link placement |
 | `content.json`, `guides.json` | Shared content for the engine view and complete semantic HTML companion |
 | `site-host.js` | Frame scheduling, finite reveals, motion preferences, scene interaction, native links, search input, clipboard, browser history, and rendering failure recovery |
 | `boot.js`, `shell.css` | Engine startup and accessible HTML presentation |
 | `runtime/` | Verified, compiled website UI runtime and bundled dependency notices |
-| `assets/` | Branding and real engine screenshots; no runnable examples or game asset trees |
+| `assets/` | Original branding, real engine screenshots, and the self-hosted Urbanist font; no runnable examples or game asset trees |
 | `tools/site.mjs` | Validation, static packaging, preview, guide import, and runtime capture |
 | `tools/verify.mjs` | Browser acceptance checks; output is written to ignored `build/` |
 
@@ -93,11 +94,11 @@ content enters the viewport. The layout stays fixed while the drawing moves a
 short distance at full opacity; its native links follow the same offset. This
 translation-only reveal preserves text contrast throughout. CSS supplies
 brief hover and focus feedback. Content and navigation remain available during
-the transitions. The atmospheric background is static and adds no continuous
-animation work; the HTML companion provides a matching static CSS treatment.
+the transitions. The plain background adds no animation work.
 
-The home page and lab contain the **Valthorne Core**: a blue faceted crystal,
-orbital bands, and a layered pedestal generated in Java. `CrystalScene` rotates
+The standalone lab contains a blue faceted crystal, orbital bands, and a layered
+pedestal generated in Java. The homepage presents real engine captures.
+`CrystalScene` rotates
 three-dimensional mesh vertices, computes face lighting, applies a perspective
 camera, and sorts faces before `Canvas2D` paints them. Its triangle pool is
 reused across frames. This is a custom UI illustration, not a demonstration or
@@ -236,6 +237,7 @@ come from that project's local capture outputs. They show the actual examples,
 not invented game scenes. Example model and environment provenance remains in
 the [examples notices](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
 
-Atkinson Hyperlegible uses SIL OFL 1.1; Yoga, JOML, and OpenType.js use MIT;
-TeaVM uses Apache-2.0. License copies are distributed in `runtime/` and
-`licenses/`. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Urbanist and the runtime's bundled Atkinson Hyperlegible use SIL OFL 1.1; Yoga,
+JOML, and OpenType.js use MIT; TeaVM uses Apache-2.0. Urbanist's license is in
+`assets/fonts/`; runtime dependency copies remain in `runtime/` and `licenses/`.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

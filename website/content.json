@@ -3,70 +3,76 @@
   "pages": [
     {
       "id": "index",
-      "title": "Build your next world.",
-      "eyebrow": "OPEN SOURCE JAVA GAME ENGINE",
-      "description": "Build 2D and 3D games with a Java library that brings rendering, physics, audio, and UI together.",
+      "title": "Build games.\nWrite Java.",
+      "eyebrow": "VALTHORNE GAME ENGINE",
+      "description": "2D and 3D rendering, physics, audio, and UI in one open-source Java library. Add Valthorne to your project and work directly with the systems that power your game.",
+      "heroImage": "lighting-studio.png",
+      "heroCaption": "Lighting studio · Valthorne desktop demo",
       "sections": [
         {
-          "title": "A complete toolkit. A world of possibilities.",
-          "description": "Keep your game in Java. Choose the systems you need, own your application loop, and build from a small scene to a complete game.",
+          "title": "A toolkit for game development.",
+          "description": "Start with a Java application. Bring in rendering, simulation, and interface systems as your game takes shape.",
+          "layout": "cards",
           "cards": [
             {
-              "title": "Render your vision",
-              "text": "Sprites, tiled maps, 3D models, materials, cameras, particles, and multiple lighting paths.",
+              "title": "2D and 3D graphics",
+              "text": "Build scenes with sprites, models, materials, cameras, particles, and lighting.",
               "href": "engine.html",
-              "label": "Explore rendering"
+              "label": "Explore the engine"
             },
             {
-              "title": "Make it move",
-              "text": "Jolt rigid bodies, collision shapes, joints, raycasts, and physics-driven particles.",
+              "title": "Physics and interaction",
+              "text": "Add Jolt rigid bodies, collision shapes, joints, and raycasts to your simulation.",
               "href": "docs.html?q=physics",
-              "label": "Explore physics"
+              "label": "Read the physics guides"
             },
             {
-              "title": "Build the whole experience",
-              "text": "Flexible UI layouts, vector controls, text editing, themes, sound, and asset management.",
+              "title": "UI, audio, and assets",
+              "text": "Create interfaces, play and stream sound, and manage the resources your game needs.",
               "href": "docs.html",
-              "label": "Explore the systems"
+              "label": "Browse the documentation"
             }
           ]
         },
         {
-          "title": "Made with Valthorne",
-          "description": "Real engine captures. Download the desktop demos, explore their source, and use them as a starting point.",
+          "title": "See the systems at work.",
+          "description": "Explore real Valthorne applications. Each demo includes its source, resources, and a guide to the controls.",
+          "layout": "showcase",
           "cards": [
             {
               "title": "Physics studio",
-              "text": "Inspect a scene, manipulate objects, and explore rigid-body interactions.",
+              "text": "Inspect a 3D scene, manipulate objects, and explore rigid-body interactions.",
               "image": "physics-studio.png",
-              "href": "examples.html",
-              "label": "Explore the demos"
+              "href": "examples.html?q=physics",
+              "label": "Explore physics demos"
             },
             {
-              "title": "Lighting studio",
-              "text": "Experiment with lights, materials, and a richly detailed 3D scene.",
-              "image": "lighting-studio.png",
-              "href": "examples.html",
-              "label": "Explore the demos"
+              "title": "Interface demo",
+              "text": "Explore layouts, controls, and text editing in an interactive UI example.",
+              "image": "ui.png",
+              "href": "examples.html?q=ui",
+              "label": "Explore the UI demo"
             }
           ]
         },
         {
-          "title": "This website is the demo.",
-          "description": "Meet the Valthorne Core. Drag the crystal to explore its facets, or let it rotate. The geometry, perspective, and shading are calculated in Java and painted by the engine's UI renderer.",
-          "lab": true,
+          "title": "Add Valthorne. Start building.",
+          "description": "Use your existing Java tools and project structure. The integration guide covers Gradle and Maven, native dependencies, and your first application.",
+          "layout": "feature",
+          "image": "lighting2d.png",
+          "imageCaption": "2D lighting · Valthorne desktop demo",
           "cards": [
             {
-              "title": "Java, all the way to the browser",
-              "text": "Valthorne owns the application lifecycle and UI drawing. Browser integration supplies scrolling, URLs, accessible links, and native text entry.",
-              "href": "lab.html",
-              "label": "Explore the 3D lab"
+              "title": "One dependency, Java 25",
+              "text": "io.github.tehnewb:Valthorne:2.0.0\nNative dependencies are included automatically.",
+              "href": "start.html",
+              "label": "Get started"
             },
             {
-              "title": "Start with one dependency",
-              "text": "io.github.tehnewb:Valthorne:2.0.0\nJava 25. Native dependencies included.",
-              "href": "start.html",
-              "label": "Start building"
+              "title": "Source you can work with",
+              "text": "Read the implementation, follow development, and use the engine under Apache License 2.0.",
+              "href": "https://github.com/tehnewb/Valthorne",
+              "label": "View the source"
             }
           ]
         }
@@ -74,12 +80,16 @@
     },
     {
       "id": "engine",
-      "title": "A library for the whole game.",
-      "eyebrow": "THE ENGINE",
-      "description": "An explicit Java application lifecycle, a broad set of game systems, and control over how they fit together.",
+      "title": "The engine behind your game.",
+      "eyebrow": "ENGINE",
+      "description": "A Java library for rendering, simulation, interfaces, and application infrastructure. Work directly with each system through an explicit application lifecycle.",
       "sections": [
         {
-          "title": "Graphics, from sprites to scenes",
+          "title": "Render in 2D and 3D.",
+          "description": "From sprite-based scenes to lit 3D environments, choose the rendering tools that fit your project.",
+          "layout": "feature",
+          "image": "lighting-studio.png",
+          "imageCaption": "Lighting studio · Materials, lights, and a 3D scene",
           "cards": [
             {
               "title": "2D graphics",
@@ -102,7 +112,11 @@
           ]
         },
         {
-          "title": "Systems that work together",
+          "title": "Connect every part of the game.",
+          "description": "Combine physics, interfaces, sound, and assets within the same application.",
+          "layout": "feature",
+          "image": "physics-studio.png",
+          "imageCaption": "Physics studio · Interactive rigid-body simulation",
           "cards": [
             {
               "title": "Physics and motion",
@@ -131,7 +145,8 @@
           ]
         },
         {
-          "title": "Choose your target",
+          "title": "Plan for your platform.",
+          "layout": "rows",
           "description": "The stable desktop library is 2.0.0. The browser target is in active development and does not provide every desktop API or native integration.",
           "cards": [
             {
@@ -158,18 +173,19 @@
     },
     {
       "id": "examples",
-      "title": "Download. Run. Explore.",
-      "eyebrow": "THE DEMO COLLECTION",
-      "description": "Ten focused examples, from an empty application to a playable FPS arena. Windows x64 packages include Java: extract a ZIP and open Start.bat.",
+      "title": "Download the demos.",
+      "eyebrow": "DEMOS",
+      "description": "Ten examples covering graphics, physics, audio, UI, and a playable FPS arena. Windows x64 downloads include Java. Extract a ZIP, open Start.bat, and explore.",
       "sections": [
         {
-          "title": "Find your starting point",
-          "description": "No Gradle required. Each desktop demo includes a guide with controls and source. Choose a category or search below.",
+          "title": "Choose a demo.",
+          "description": "Search by name or system. Every download includes a controls guide and source; running it does not require Gradle.",
           "catalog": "examples",
           "cards": []
         },
         {
-          "title": "Other ways to explore",
+          "title": "Packages and source.",
+          "layout": "rows",
           "cards": [
             {
               "title": "The complete collection",
@@ -195,12 +211,13 @@
     },
     {
       "id": "docs",
-      "title": "Know your engine.",
-      "eyebrow": "DOCUMENTATION",
-      "description": "Practical workflows, ownership rules, component examples, and API behavior. Search the system manual or start with the integration guide.",
+      "title": "Documentation.",
+      "eyebrow": "LEARN VALTHORNE",
+      "description": "Install the engine, understand its application lifecycle, and find practical guides for the systems in your game.",
       "sections": [
         {
-          "title": "The essentials",
+          "title": "Start here.",
+          "layout": "cards",
           "cards": [
             {
               "title": "Get started",
@@ -223,8 +240,8 @@
           ]
         },
         {
-          "title": "The system manual",
-          "description": "Guides open in the source repository. Match documentation to your dependency version; main may include ongoing development.",
+          "title": "System guides.",
+          "description": "Search the manual by system or topic. Guides open on GitHub; match the documentation to your dependency version, since main may include ongoing development.",
           "catalog": "guides",
           "cards": []
         }
@@ -232,12 +249,13 @@
     },
     {
       "id": "start",
-      "title": "Your first frame starts here.",
+      "title": "Add Valthorne to your project.",
       "eyebrow": "GET STARTED",
-      "description": "Use Java 25, a desktop graphics driver with OpenGL 3.3 core, and your preferred Java build tool.",
+      "description": "Install the Java 25 library, configure your application, and render your first frame. Standard desktop rendering requires an OpenGL 3.3 core graphics driver.",
       "sections": [
         {
           "title": "01 / Add Valthorne",
+          "layout": "rows",
           "filename": "build.gradle",
           "description": "Native dependencies are included automatically. Use the complete integration guide for equivalent Kotlin and Maven configuration.",
           "code": "plugins { id 'application' }\nrepositories { mavenCentral() }\ndependencies {\n    implementation 'io.github.tehnewb:Valthorne:2.0.0'\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(25) } }\napplication {\n    mainClass = 'game.Main'\n    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']\n    if (System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('mac')) {\n        applicationDefaultJvmArgs += '-XstartOnFirstThread'\n    }\n}",
@@ -252,12 +270,14 @@
         },
         {
           "title": "02 / Create an application",
+          "layout": "rows",
           "filename": "game/Main.java",
           "description": "Save this as src/main/java/game/Main.java. Allocate resources in init, advance the game in update, draw in render, and release owned resources in dispose.",
           "code": "package game;\n\nimport valthorne.Application;\nimport valthorne.JGL;\nimport valthorne.Window;\nimport valthorne.graphics.Color;\n\npublic final class Main implements Application {\n    private final Color background = new Color(0xFF101211);\n\n    public static void main(String[] args) {\n        JGL.init(new Main(), \"My Game\", 960, 540);\n    }\n\n    public void init() { }\n    public void update(float delta) { }\n    public void render() { Window.clear(background); }\n    public void dispose() { }\n}"
         },
         {
-          "title": "03 / Make it yours",
+          "title": "03 / Run and extend your application",
+          "layout": "rows",
           "cards": [
             {
               "title": "Run the application",
@@ -283,33 +303,34 @@
     },
     {
       "id": "lab",
-      "title": "A little world. Written in Java.",
-      "eyebrow": "THE INTERACTIVE LAB",
-      "description": "A blue crystal, gold orbits, and a world you can turn in your hands. Drag to explore, use the arrow keys, or pause and take a closer look.",
+      "title": "Interactive geometry lab.",
+      "eyebrow": "BROWSER EXAMPLE",
+      "description": "Explore a procedural 3D object drawn with Valthorne Canvas2D. Drag to rotate, use the arrow keys, or pause the animation to inspect the geometry.",
       "sections": [
         {
-          "title": "The Valthorne Core",
-          "description": "A procedural 3D illustration: Java projects and shades solid geometry, then Valthorne Canvas2D paints it. It demonstrates the website's UI runtime; desktop 3D renderer and physics performance are covered by the downloadable demos.",
+          "title": "Geometry, projection, and shading.",
+          "description": "Java calculates the geometry, perspective, and face shading; Valthorne Canvas2D paints the result. This is a UI rendering example. Download the desktop demos to explore the engine's 3D renderers and physics.",
           "lab": true
         },
         {
-          "title": "How this website works",
+          "title": "Inside the browser application.",
+          "layout": "rows",
           "cards": [
             {
-              "title": "A real Valthorne application",
-              "text": "JGL runs the application lifecycle. UIRoot manages the drawing context, a NanoContainer paints the site, and Canvas2D draws the layout, typography, and scene.",
+              "title": "Valthorne application lifecycle",
+              "text": "JGL runs the application lifecycle. UIRoot manages the drawing context, a NanoContainer paints the site, and Canvas2D draws the layout, typography, and geometry.",
               "href": "https://github.com/tehnewb/Valthorne/tree/main/website",
               "label": "View the website module"
             },
             {
-              "title": "A browser companion",
-              "text": "Native links, scrolling, keyboard focus, editable search, and copyable code remain available through HTML. Switch to Text version at any time for the full semantic document.",
+              "title": "Native browser interaction",
+              "text": "HTML provides native links, scrolling, keyboard focus, editable search, and copyable code. The complete page is also available in Text version.",
               "href": "?view=text",
               "label": "Read the text version"
             },
             {
-              "title": "Motion with consideration",
-              "text": "Entrance reveals settle in a moment. The crystal rotates only while visible, and pauses in hidden tabs. Pause motion from the header at any time; system reduced-motion settings are respected automatically.",
+              "title": "Motion controls",
+              "text": "Rotation stops when the scene is offscreen or the tab is hidden. Use Pause motion to stop animation across the site. System reduced-motion preferences are respected automatically.",
               "href": "about.html",
               "label": "About the project"
             }
@@ -319,12 +340,13 @@
     },
     {
       "id": "about",
-      "title": "Open source. Yours to build with.",
+      "title": "An open-source Java engine.",
       "eyebrow": "ABOUT VALTHORNE",
-      "description": "Valthorne is a Java game engine library by Albert Beaupre. Explore the implementation, learn from the examples, and help improve the tools.",
+      "description": "Valthorne is a game engine library by Albert Beaupre. The source, documentation, and examples are available for you to inspect, use, and improve.",
       "sections": [
         {
-          "title": "Be part of the project",
+          "title": "Follow development. Get involved.",
+          "layout": "rows",
           "cards": [
             {
               "title": "Explore the source",

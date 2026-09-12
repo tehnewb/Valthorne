@@ -37,6 +37,7 @@ try {
     console.log('Verifying ' + name);
     await open(name + '.html');
     await settle();
+    if (name === 'about') assert.equal(await page.locator('.brand-banner').getAttribute('src'), 'assets/banner.png');
     const ink = await page.evaluate(() => {
       const canvas = valthorneHost.nano.get(1).canvas;
       // Inspect the engine's vector surface before WebGL composition; WebGL's
@@ -55,6 +56,10 @@ try {
     await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await settle();
     await page.setViewportSize({ width: 390, height: 844 }); await settle();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Mobile overflow on ' + name);
+    await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await settle();
+    const footerLink = await page.locator('#access-bar a[href^="https://github.com"]').boundingBox();
+    const backTop = await page.locator('#back-top').boundingBox();
+    assert.ok(!backTop || footerLink.x + footerLink.width <= backTop.x || footerLink.y + footerLink.height <= backTop.y || footerLink.y >= backTop.y + backTop.height, 'Back-to-top obscures a footer link on ' + name);
     await page.evaluate(() => scrollTo(0, 0)); await settle();
     await page.screenshot({ path: path.join(root,`build/${name}-mobile.png`) });
     await page.setViewportSize({ width: 1440, height: 980 });
@@ -63,28 +68,31 @@ try {
 
   await open('index.html'); await page.waitForTimeout(800);
   const identity = await page.evaluate(() => ({
-    banner: document.querySelector('.brand-banner').getAttribute('src'),
+    hero: document.querySelector('.hero-media img').getAttribute('src'),
     logo: document.querySelector('.brand img').getAttribute('src'),
-    unwantedScreenshot: [...document.images].some(image => image.src.endsWith('/fps.png'))
+    unwantedScreenshot: [...document.images].some(image => image.src.endsWith('/fps.png')),
+    fontLoaded: document.fonts.check('400 20px UrbanistWebsite') && document.fonts.check('700 20px UrbanistWebsite')
   }));
-  assert.equal(identity.banner, 'assets/banner.png');
+  assert.equal(identity.hero, 'assets/lighting-studio.png');
   assert.equal(identity.logo, 'assets/valthorne.png');
   assert.equal(identity.unwantedScreenshot, false);
+  assert.equal(identity.fontLoaded, true, 'Urbanist did not load');
   // Check the shipped CSS palette and actual engine pixels, not just design documentation.
   const theme = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
-    const palette = Object.fromEntries(['ink','muted','teal','blue','panel','border'].map(key => [key, style.getPropertyValue('--' + key).trim()]));
+    const palette = Object.fromEntries(['ink','muted','primary','link','panel','border'].map(key => [key, style.getPropertyValue('--' + key).trim()]));
     palette.background = style.backgroundColor;
     const surface = valthorneHost.nano.get(1), data = surface.ctx.getImageData(0, 0, surface.canvas.width, surface.canvas.height).data;
-    let cyan = 0, white = 0;
+    let purple = 0, white = 0;
     for (let i = 0; i < data.length; i += 4) {
-      if (data[i] === 88 && data[i + 1] === 238 && data[i + 2] === 224) cyan++;
-      if (data[i] === 247 && data[i + 1] === 252 && data[i + 2] === 255) white++;
+      if (data[i] === 112 && data[i + 1] === 59 && data[i + 2] === 247) purple++;
+      if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255) white++;
     }
-    return { palette, cyan, white };
+    return { palette, purple, white };
   });
   function luminance(color) {
-    const rgb = color.startsWith('#') ? color.slice(1).match(/../g).map(value => parseInt(value,16)) : color.match(/[\d.]+/g).slice(0,3).map(Number);
+    const hex = color.slice(1);
+    const rgb = color.startsWith('#') ? (hex.length === 3 ? [...hex].map(value => value + value) : hex.match(/../g)).map(value => parseInt(value,16)) : color.match(/[\d.]+/g).slice(0,3).map(Number);
     const linear = rgb.map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
     return linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
   }
@@ -92,16 +100,16 @@ try {
   const colors = theme.palette;
   report.contrast = {
     primaryText: contrast(colors.ink, colors.panel), secondaryText: contrast(colors.muted, colors.panel),
-    links: contrast(colors.blue, colors.panel), primaryButton: contrast(colors.background, colors.teal),
+    links: contrast(colors.link, colors.panel), primaryButton: contrast(colors.ink, colors.primary),
     controlBorder: contrast(colors.border, colors.panel)
   };
   for (const [name, ratio] of Object.entries(report.contrast)) assert.ok(ratio >= (name === 'controlBorder' ? 3 : 4.5), 'Insufficient contrast: ' + name);
-  assert.ok(theme.cyan > 500 && theme.white > 50, 'The engine did not paint the new cyan/white theme');
+  assert.ok(theme.purple > 500 && theme.white > 50, 'The engine did not paint the purple/white theme');
   report.checks.push('High-contrast text, links, primary buttons and control borders; matching engine theme pixels');
   const primary = await page.locator('#engine-links a[aria-label="Start building"]:visible').first().boundingBox();
   const secondary = await page.locator('#engine-links a[aria-label="Explore demos"]:visible').boundingBox();
-  assert.ok(Math.abs((primary.x + secondary.x + secondary.width) / 2 - 720) < 2, 'Hero actions are not centered');
-  report.checks.push('Original logo and banner, centered hero actions, and removal of the incorrect FPS screenshot');
+  assert.ok(Math.abs(primary.x - 100) < 2 && secondary.x > primary.x + primary.width && Math.abs(primary.y - secondary.y) < 2, 'Hero actions are not aligned with the editorial column');
+  report.checks.push('Original logo, real engine hero image, locally loaded Urbanist, and aligned hero actions');
   const idle = await page.evaluate(() => websiteMetrics.frames);
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => websiteMetrics.frames), idle, 'Site keeps rendering while idle');
