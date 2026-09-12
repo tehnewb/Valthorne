@@ -62,6 +62,13 @@ try {
   const idle = await page.evaluate(() => websiteMetrics.frames);
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => websiteMetrics.frames), idle, 'Site keeps rendering while idle');
+  await page.keyboard.press('Tab');
+  assert.match(await page.evaluate(() => document.activeElement.textContent), /Skip to text/);
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Valthorne home');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Engine');
+  report.checks.push('Keyboard navigation skips the decorative drawing surface');
   await page.locator('#engine-links').getByRole('link',{name:'Docs',exact:true}).click();
   await page.waitForURL('**/docs.html'); await page.waitForFunction(() => globalThis.valthorneReady);
   await page.evaluate(() => scrollTo(0, 520)); await settle();
@@ -109,6 +116,17 @@ try {
   assert.equal(await textPage.locator('#content a[href*="Valthorne-demo-"]').count(), 10);
   await noJS.close();
   report.checks.push('Text mode avoids engine startup; no-JavaScript view retains all ten downloads');
+  const fallbackPage = await context.newPage();
+  await fallbackPage.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) { return type === 'webgl2' ? null : original.call(this,type,...args); };
+  });
+  await fallbackPage.goto(base + 'index.html');
+  await fallbackPage.waitForFunction(() => globalThis.valthorneError);
+  assert.equal(await fallbackPage.locator('#content h1').isVisible(), true);
+  assert.equal(await fallbackPage.evaluate(() => document.documentElement.classList.contains('engine-ready')), false);
+  await fallbackPage.close();
+  report.checks.push('Graphics-unavailable browsers retain the readable semantic site');
   assert.deepEqual(errors, [], 'Browser errors or missing resources');
   await fs.writeFile(path.join(root,'build/verification.json'), JSON.stringify(report,null,2) + '\n');
   console.log(JSON.stringify(report,null,2));

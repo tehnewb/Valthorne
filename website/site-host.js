@@ -164,6 +164,8 @@ try {
     unlockAudio() { }
   }
   const platform = new WebsitePlatform(document.querySelector('#scene'));
+  // The visual surface is aria-hidden; native links and search own keyboard focus.
+  document.querySelector('#scene').tabIndex = -1;
   Object.defineProperty(platform, 'legacyKeyEvent', { get: () => null, set: () => {} });
   const host = globalThis.valthorneHost = {
     platform,
