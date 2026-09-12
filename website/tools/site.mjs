@@ -68,7 +68,7 @@ async function content() {
   const data = JSON.parse(await read('content.json'));
   data.pages.find(p => p.id === 'examples').sections[0].cards = demoCards();
   const guides = JSON.parse(await read('guides.json'));
-  data.pages.find(p => p.id === 'docs').sections[1].cards = guides;
+  data.pages.find(p => p.id === 'docs').sections.find(section => section.catalog === 'guides').cards = guides;
   return data;
 }
 
@@ -88,8 +88,8 @@ async function updateGuides() {
 function html(page, revision) {
   const nav = [['index','Home'],['engine','Engine'],['examples','Demos'],['docs','Docs'],['start','Start'],['lab','Lab'],['about','About']];
   const body = page.sections.map((section,index) => `<section><h2>${escape(section.title)}</h2>${section.description ? `<p>${escape(section.description)}</p>` : ''}
-    ${section.code ? `<pre id="code-${index}" tabindex="0"><code>${escape(section.code)}</code></pre>` : ''}
-    ${section.lab ? '<p>The interactive canvas is available in the engine view. It starts paused.</p>' : ''}
+    ${section.code ? `<p class="code-filename">${escape(section.filename || '')}</p><pre id="code-${index}" tabindex="0"><code>${escape(section.code)}</code></pre>` : ''}
+    ${section.lab ? '<p>The Valthorne Core is a faceted blue crystal with gold rings, projected from 3D geometry by Java and painted through Canvas2D. Open the engine view to drag or use arrow keys to rotate it. Playback can be paused; system reduced-motion settings are respected.</p>' : ''}
     <div class="cards">${(section.cards || []).map(card => `<article>${card.image ? `<img src="assets/${escape(card.image)}" alt="${escape(card.title)} running in Valthorne" loading="lazy" width="800" height="460">` : ''}<h3>${escape(card.title)}</h3><p>${escape(card.text)}</p><a href="${escape(card.href)}">${escape(card.label)}</a>${card.guide ? `<a href="${escape(card.guide)}">Controls and source</a>` : ''}</article>`).join('')}</div></section>`).join('');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -101,9 +101,12 @@ function html(page, revision) {
 <body><a class="skip-link" href="?view=text#content">Skip to text content</a>
 <canvas id="scene" aria-hidden="true"></canvas><div id="scroll-space" aria-hidden="true"></div>
 <nav id="engine-links" aria-label="Engine view navigation and actions"></nav>
+<div id="scene-interaction" role="group" tabindex="0" aria-label="Interactive Valthorne Core. Drag to orbit. Use arrow keys to rotate, or Home to reset the view." hidden></div>
 <input id="engine-search" type="search" aria-label="Search this collection" placeholder="Search titles and systems…" hidden>
-<div id="access-bar"><span id="status" role="status">Loading Valthorne…</span><a id="view-toggle" href="?view=text">Text version</a><a href="https://github.com/tehnewb/Valthorne">GitHub ↗</a></div>
+<button id="motion-toggle" type="button" aria-label="Pause motion" title="Pause motion"><span aria-hidden="true" class="pause-icon">Ⅱ</span><span aria-hidden="true" class="play-icon">▷</span></button>
+<button id="back-top" type="button" aria-label="Back to top" title="Back to top" hidden>↑</button>
 <main id="content"><a class="brand" href="index.html"><img src="assets/valthorne.png" alt="Valthorne logo" width="38" height="57">VALTHORNE</a><nav aria-label="Main navigation">${nav.map(([id,label]) => `<a href="${id}.html"${id === page.id ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav><div class="eyebrow">${escape(page.eyebrow)}</div>${page.id === 'index' ? '<img class="brand-banner" src="assets/banner.png" alt="Valthorne — gold lettering and blue flame" width="1511" height="623">' : ''}<h1>${escape(page.title)}</h1><p class="intro">${escape(page.description)}</p>${body}<section><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href="about.html">About the project</a></section></main>
+<footer id="access-bar"><span id="status" role="status">Loading Valthorne…</span><a id="view-toggle" href="?view=text">Text version</a><a href="https://github.com/tehnewb/Valthorne">GitHub ↗</a></footer>
 <script id="page-content" type="application/json">${json(page)}</script><script src="boot.js?v=${revision}"></script>
 </body></html>\n`;
 }

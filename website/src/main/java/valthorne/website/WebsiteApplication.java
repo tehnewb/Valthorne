@@ -13,8 +13,9 @@ import valthorne.ui.nodes.nano.NanoContainer;
  * document beneath a fixed engine viewport; only visible cards are painted.
  * Content and its semantic HTML companion share one source (content.json).
  *
- * <p>The host invokes the normal JGL frame callback on demand. The optional lab
- * animation is the only continuous workload. UIRoot owns its rendering context
+ * <p>The host invokes the normal JGL frame callback on demand. Finite entrance
+ * reveals settle; the interactive scene animates only while visible and enabled.
+ * UIRoot owns its rendering context
  * and is disposed with the application.</p>
  */
 public final class WebsiteApplication implements Application {
@@ -41,7 +42,7 @@ public final class WebsiteApplication implements Application {
         root.add(surface);
     }
 
-    /** Updates responsive geometry; animation time advances only on opt-in frames. */
+    /** Updates responsive geometry; scene time advances only on visible, enabled frames. */
     @Override public void update(float delta) {
         width = Window.getWidth(); height = Window.getHeight();
         margin = width < 700 ? 22 : Math.max(42, (width - 1160) / 2);
@@ -64,18 +65,22 @@ public final class WebsiteApplication implements Application {
         Canvas2D.textAlign(vg, Canvas2D.ALIGN_LEFT | Canvas2D.ALIGN_TOP);
         rect(0, 0, width, height, BACKGROUND);
         float y = (width < 900 ? 162 : 144) - scroll;
+        BrowserBridge.reveal("intro", y);
         boolean home = BrowserBridge.page("id").equals("index");
         if (home) y = hero(y); else {
             centeredText(BrowserBridge.page("eyebrow"), width / 2, y, 11, BLUE); y += 36;
             y = heading(BrowserBridge.page("title"), y, Math.min(contentWidth, 920), width < 700 ? 39 : 62) + 24;
             y = centeredParagraph(BrowserBridge.page("description"), width / 2, y, Math.min(contentWidth, 740), 18, MUTED, 1.6f) + 55;
         }
+        BrowserBridge.clearEffect();
         for (int section = 0; section < BrowserBridge.sections(); section++) y = section(section, y);
+        BrowserBridge.reveal("footer", y);
         ornament(y); y += 45;
         y = heading("Your next world starts here.", y, contentWidth, width < 700 ? 32 : 46) + 30;
         button("Start building", "start.html", (width - 180) / 2, y, 180, true); y += 82;
         centeredText("VALTHORNE  /  JAVA  /  APACHE-2.0", width / 2, y, 11, ACCENT); y += 26;
-        y = centeredParagraph("Created by Albert Beaupre. Built with Valthorne.", width / 2, y, contentWidth, 13, MUTED, 1.5f) + 60;
+        y = centeredParagraph("Created by Albert Beaupre. Built with Valthorne.", width / 2, y, contentWidth, 13, MUTED, 1.5f) + 105;
+        BrowserBridge.clearEffect();
         header();
         BrowserBridge.end(y + scroll);
     }
@@ -83,7 +88,7 @@ public final class WebsiteApplication implements Application {
     /** Centered brand presentation. Original artwork is displayed without cropping or recoloring. */
     private float hero(float y) {
         centeredText("OPEN SOURCE JAVA GAME ENGINE", width / 2, y, 11, BLUE); y += 28;
-        float bannerWidth = Math.min(contentWidth, 860), bannerHeight = bannerWidth * 623 / 1511;
+        float bannerWidth = Math.min(contentWidth, width < 700 ? 860 : 720), bannerHeight = bannerWidth * 623 / 1511;
         BrowserBridge.image(vg, "banner.png", (width - bannerWidth) / 2, y, bannerWidth, bannerHeight);
         y += bannerHeight + (width < 700 ? 28 : 18);
         y = heading("Build your next world.", y, contentWidth, width < 700 ? 39 : 57) + 20;
@@ -104,11 +109,24 @@ public final class WebsiteApplication implements Application {
     }
 
     private float section(int index, float y) {
-        ornament(y); y += 44;
-        y = heading(BrowserBridge.section(index, "title"), y, Math.min(contentWidth, 900), width < 700 ? 30 : 42) + 22;
+        boolean scene = BrowserBridge.section(index, "lab").equals("true");
+        boolean catalog = !BrowserBridge.section(index, "catalog").isEmpty();
+        if (BrowserBridge.page("id").equals("docs") && index == 0) {
+            String[] labels = {"Installation", "Migration", "Platforms"};
+            float w = Math.min(160, (contentWidth - 16) / 3);
+            for (int i = 0; i < 3; i++) button(labels[i], BrowserBridge.card(index, i, "href"), width / 2 - (w * 3 + 16) / 2 + i * (w + 8), y - 20, w, false);
+            return y + 46;
+        }
+        // The lab's page introduction already names the scene; keep the controls above the fold.
+        if (scene && BrowserBridge.page("id").equals("lab")) return lab(y - 22) + 28;
+        BrowserBridge.reveal("section-" + index, y);
+        if (!catalog) {
+            ornament(y); y += 44;
+            y = heading(BrowserBridge.section(index, "title"), y, Math.min(contentWidth, 900), width < 700 ? 30 : 42) + 22;
+        }
         String description = BrowserBridge.section(index, "description");
         if (!description.isEmpty()) y = centeredParagraph(description, width / 2, y, Math.min(contentWidth, 760), 17, MUTED, 1.6f) + 30;
-        boolean catalog = !BrowserBridge.section(index, "catalog").isEmpty();
+        BrowserBridge.clearEffect();
         if (catalog) {
             float searchWidth = Math.min(contentWidth, 560);
             BrowserBridge.search((width - searchWidth) / 2, y, searchWidth); y += 62;
@@ -118,7 +136,7 @@ public final class WebsiteApplication implements Application {
         }
         String code = BrowserBridge.section(index, "code");
         if (!code.isEmpty()) y = code(index, code, y);
-        if (BrowserBridge.page("id").equals("lab") && index == 0) y = lab(y);
+        if (scene) y = lab(y);
         int count = BrowserBridge.cards(index), visible = 0;
         boolean images = false;
         for (int card = 0; card < count; card++) images |= !BrowserBridge.card(index, card, "image").isEmpty();
@@ -132,8 +150,9 @@ public final class WebsiteApplication implements Application {
         }
         if (used > 0) y = cardRow(index, row, used, y, cardWidth, gap);
         if (catalog) {
-            String message = visible == 0 ? "No matches. Try another search or choose ALL." : visible + " of " + count + " " + BrowserBridge.section(index, "catalog");
+            String message = visible == 0 ? "No matches. Try a different term or reset the collection." : visible + " of " + count + " " + BrowserBridge.section(index, "catalog");
             y = centeredParagraph(message, width / 2, y + 8, contentWidth, 14, MUTED, 1.5f) + 24;
+            if (visible == 0) { button("Clear search & filters", "#clear", (width - 210) / 2, y, 210, false); y += 65; }
         }
         return y + 50;
     }
@@ -149,7 +168,7 @@ public final class WebsiteApplication implements Application {
         float rowHeight = 0;
         for (int i = 0; i < count; i++) {
             int card = cards[i];
-            float h = BrowserBridge.card(section, card, "image").isEmpty() ? 0 : w * .57f;
+            float h = cardHasVisual(section, card) ? w * .57f : 0;
             h += lineCount(BrowserBridge.card(section, card, "title"), w - 40, 23) * 27;
             h += lineCount(BrowserBridge.card(section, card, "text"), w - 40, 15) * 23;
             h += BrowserBridge.card(section, card, "guide").isEmpty() ? 108 : 141;
@@ -159,59 +178,67 @@ public final class WebsiteApplication implements Application {
             // A partially populated row remains balanced around the same page center.
             int card = cards[i]; float x = (width - (count * w + (count - 1) * gap)) / 2 + i * (w + gap);
             if (y + rowHeight < 88 || y > height) continue;
+            BrowserBridge.reveal("card-" + section + "-" + card, y);
             panel(x, y, w, rowHeight); float yy = y;
             String image = BrowserBridge.card(section, card, "image");
             if (!image.isEmpty()) { BrowserBridge.image(vg, image, x, yy, w, w * .57f); yy += w * .57f; }
+            else if (cardHasVisual(section, card)) { demoArtwork(x, yy, w, w * .57f, BrowserBridge.card(section, card, "category")); yy += w * .57f; }
+            else { rect(x + w / 2 - 24, yy + 1, 48, 2, ACCENT); }
             yy = centeredParagraph(BrowserBridge.card(section, card, "title"), x + w / 2, yy + 23, w - 40, 23, INK, 1.17f) + 15;
             centeredParagraph(BrowserBridge.card(section, card, "text"), x + w / 2, yy, w - 40, 15, MUTED, 1.53f);
             String guide = BrowserBridge.card(section, card, "guide");
             float linkY = y + rowHeight - (guide.isEmpty() ? 49 : 81);
             link(BrowserBridge.card(section, card, "label") + "  →", BrowserBridge.card(section, card, "href"), x + 20, linkY, w - 40);
             if (!guide.isEmpty()) link("Controls & source  ↗", guide, x + 20, linkY + 32, w - 40);
+            BrowserBridge.clearEffect();
         }
         return y + rowHeight + gap;
     }
 
     private float code(int index, String source, float y) {
-        String[] lines = source.split("\n"); float fontSize = width < 700 ? 11 : 14;
+        BrowserBridge.reveal("code-" + index, y);
+        Canvas2D.fontFace(vg, "monospace");
+        String[] lines = source.split("\n"); float fontSize = width < 700 ? 13 : 14;
         float h = 68;
         for (String line : lines) h += lineCount(line.isEmpty() ? " " : line, contentWidth - 38, fontSize) * (fontSize * 1.6f);
         panel(margin, y, contentWidth, h);
-        link("Copy code  ↗", "#copy=" + index, margin + 18, y + 12, 160);
+        text(BrowserBridge.section(index, "filename"), margin + 18, y + 21, 12, MUTED);
+        link(BrowserBridge.copied(index) ? "Copied!" : "Copy code", "#copy=" + index, margin + contentWidth - 142, y + 12, 124);
         float yy = y + 50;
         for (String line : lines) yy = paragraph(line.isEmpty() ? " " : line, margin + 18, yy, contentWidth - 38, fontSize, ACCENT, 1.6f);
+        Canvas2D.fontFace(vg, "default"); BrowserBridge.clearEffect();
         return y + h + 24;
     }
 
-    /** A small Java-projected wireframe drawing, deliberately opt-in and inexpensive. */
+    /** The scene is Java 3D geometry projected into Canvas2D, with accessible native orbit controls. */
     private float lab(float y) {
-        float h = width < 700 ? 330 : 440;
+        float h = width < 700 ? 365 : 450;
+        if (y + h < 120 || y > height) return y + h + 30;
         panel(margin, y, contentWidth, h);
-        float cx = width / 2, cy = y + h / 2, scale = Math.min(contentWidth * .3f, 150);
-        for (int ring = 0; ring < 3; ring++) {
-            int ink = ring == 0 ? ACCENT : ring == 1 ? BLUE : 0x35618b;
-            float rotation = time * (.25f + ring * .08f) + ring * .55f;
-            for (int edge = 0; edge < 12; edge++) {
-                int a = edge < 4 ? edge : edge < 8 ? edge : edge - 8;
-                int b = edge < 4 ? (edge + 1) % 4 : edge < 8 ? 4 + (edge - 3) % 4 : edge - 4;
-                float[] p = project(a, rotation, scale * (1 - ring * .2f));
-                float[] q = project(b, rotation, scale * (1 - ring * .2f));
-                Canvas2D.color(vg, ink, 1); Canvas2D.strokeWidth(vg, 1.5f); Canvas2D.beginPath(vg);
-                Canvas2D.moveTo(vg, cx + p[0], cy + p[1]); Canvas2D.lineTo(vg, cx + q[0], cy + q[1]); Canvas2D.stroke(vg);
-            }
-        }
-        centeredText("JAVA / CANVAS2D / LIVE", width / 2, y + 18, 11, BLUE);
-        button(BrowserBridge.animating() ? "Pause animation" : "Start animation", "#animate", (width - 190) / 2, y + h - 66, 190, true);
+        centeredText("THE VALTHORNE CORE", width / 2, y + 20, 11, BLUE);
+        CrystalScene.draw(vg, margin + 6, y + 30, contentWidth - 12, h - 120, time, BrowserBridge.orbit(), BrowserBridge.tilt());
+        BrowserBridge.scene(margin + 6, y + 40, contentWidth - 12, h - 142);
+        centeredText(width < 700 ? "SWIPE TO ORBIT · ARROW KEYS TO ROTATE" : "DRAG TO ORBIT · ARROW KEYS TO ROTATE · HOME TO RESET", width / 2, y + h - 86, width < 400 ? 9 : 10, MUTED);
+        float buttonWidth = Math.min(170, (contentWidth - 42) / 2);
+        button(!BrowserBridge.motionEnabled() ? "Motion paused" : BrowserBridge.animating() ? "Pause rotation" : "Play rotation", "#animate", width / 2 - buttonWidth - 7, y + h - 57, buttonWidth, true);
+        button("Reset view", "#reset", width / 2 + 7, y + h - 57, buttonWidth, false);
         return y + h + 30;
     }
 
-    private float[] project(int vertex, float rotation, float scale) {
-        float x = (vertex % 4 == 0 || vertex % 4 == 3) ? -1 : 1;
-        float z = vertex % 4 < 2 ? -1 : 1, y = vertex < 4 ? -1 : 1;
-        float xx = (float)(x * Math.cos(rotation) - z * Math.sin(rotation));
-        float zz = (float)(x * Math.sin(rotation) + z * Math.cos(rotation));
-        float yy = y * .8f - zz * .45f, depth = 4 + y * .45f + zz * .8f;
-        return new float[]{xx * scale * 3 / depth, yy * scale * 3 / depth};
+    private boolean cardHasVisual(int section, int card) {
+        return !BrowserBridge.card(section, card, "image").isEmpty() || BrowserBridge.section(section, "catalog").equals("examples");
+    }
+
+    /** A clearly labeled graphic for source/demo packages without a representative screenshot. */
+    private void demoArtwork(float x, float y, float w, float h, String category) {
+        rect(x + 1, y + 1, w - 2, h - 1, 0x0a1523);
+        float cx = x + w / 2, cy = y + h / 2 - 12;
+        Canvas2D.color(vg, LINE, 1); Canvas2D.strokeWidth(vg, 1);
+        for (int i = -2; i <= 2; i++) {
+            Canvas2D.beginPath(vg); Canvas2D.moveTo(vg, cx - 65, cy + i * 18); Canvas2D.lineTo(vg, cx + 65, cy + i * 18); Canvas2D.stroke(vg);
+        }
+        centeredText(category.equals("3d") ? "+" : "{ }", cx, cy - 33, 62, ACCENT);
+        centeredText(category.equals("3d") ? "FIRST-PERSON DEMO" : "APPLICATION STARTER", cx, y + h - 34, 11, BLUE);
     }
 
     private void header() {

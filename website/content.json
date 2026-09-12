@@ -53,13 +53,14 @@
         },
         {
           "title": "This website is the demo.",
-          "description": "The visible interface is drawn by a Java Valthorne application compiled for the browser with TeaVM. A small HTML companion keeps the content accessible and the links usable.",
+          "description": "Meet the Valthorne Core. Drag the crystal to explore its facets, or let it rotate. The geometry, perspective, and shading are calculated in Java and painted by the engine's UI renderer.",
+          "lab": true,
           "cards": [
             {
               "title": "Java, all the way to the browser",
               "text": "Valthorne owns the application lifecycle and UI drawing. Browser integration supplies scrolling, URLs, accessible links, and native text entry.",
               "href": "lab.html",
-              "label": "Try the live canvas"
+              "label": "Explore the 3D lab"
             },
             {
               "title": "Start with one dependency",
@@ -163,7 +164,7 @@
       "sections": [
         {
           "title": "Find your starting point",
-          "description": "These are desktop downloads, not embedded browser games. No Gradle or separate Java installation is needed for the Windows packages. Each guide includes controls and source context.",
+          "description": "No Gradle required. Each desktop demo includes a guide with controls and source. Choose a category or search below.",
           "catalog": "examples",
           "cards": []
         },
@@ -237,6 +238,7 @@
       "sections": [
         {
           "title": "01 / Add Valthorne",
+          "filename": "build.gradle",
           "description": "Native dependencies are included automatically. Use the complete integration guide for equivalent Kotlin and Maven configuration.",
           "code": "plugins { id 'application' }\nrepositories { mavenCentral() }\ndependencies {\n    implementation 'io.github.tehnewb:Valthorne:2.0.0'\n}\njava { toolchain { languageVersion = JavaLanguageVersion.of(25) } }\napplication {\n    mainClass = 'game.Main'\n    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']\n    if (System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('mac')) {\n        applicationDefaultJvmArgs += '-XstartOnFirstThread'\n    }\n}",
           "cards": [
@@ -250,6 +252,7 @@
         },
         {
           "title": "02 / Create an application",
+          "filename": "game/Main.java",
           "description": "Save this as src/main/java/game/Main.java. Allocate resources in init, advance the game in update, draw in render, and release owned resources in dispose.",
           "code": "package game;\n\nimport valthorne.Application;\nimport valthorne.JGL;\nimport valthorne.Window;\nimport valthorne.graphics.Color;\n\npublic final class Main implements Application {\n    private final Color background = new Color(0xFF101211);\n\n    public static void main(String[] args) {\n        JGL.init(new Main(), \"My Game\", 960, 540);\n    }\n\n    public void init() { }\n    public void update(float delta) { }\n    public void render() { Window.clear(background); }\n    public void dispose() { }\n}"
         },
@@ -280,13 +283,13 @@
     },
     {
       "id": "lab",
-      "title": "Built with the engine. Including this.",
-      "eyebrow": "LIVE CANVAS LAB",
-      "description": "This page is drawn by Valthorne's UI renderer. Start the animation to explore a Java-driven wireframe scene, then pause it to return to rendering only when something changes.",
+      "title": "A little world. Written in Java.",
+      "eyebrow": "THE INTERACTIVE LAB",
+      "description": "A blue crystal, gold orbits, and a world you can turn in your hands. Drag to explore, use the arrow keys, or pause and take a closer look.",
       "sections": [
         {
-          "title": "A little world in Java",
-          "description": "A procedural UI drawing experiment: projected geometry and motion calculated in Java, painted through Valthorne Canvas2D. This is not a physics or 3D-renderer benchmark.",
+          "title": "The Valthorne Core",
+          "description": "A procedural 3D illustration: Java projects and shades solid geometry, then Valthorne Canvas2D paints it. It demonstrates the website's UI runtime; desktop 3D renderer and physics performance are covered by the downloadable demos.",
           "lab": true
         },
         {
@@ -305,8 +308,8 @@
               "label": "Read the text version"
             },
             {
-              "title": "Idle means idle",
-              "text": "The host schedules a frame when content, input, images, or the viewport change. Only the opt-in animation requests continuous frames, and it pauses in hidden tabs.",
+              "title": "Motion with consideration",
+              "text": "Entrance reveals settle in a moment. The crystal rotates only while visible, and pauses in hidden tabs. Pause motion from the header at any time; system reduced-motion settings are respected automatically.",
               "href": "about.html",
               "label": "About the project"
             }

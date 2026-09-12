@@ -13,7 +13,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 a { color: var(--blue); }
-a:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+a:focus-visible, input:focus-visible, button:focus-visible, #scene-interaction:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 [hidden] { display: none !important; }
 
 /* Canvas content is decorative to accessibility APIs; real links are positioned by the Java layout. */
@@ -23,10 +23,12 @@ a:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid 
 .engine-ready #valthorne-window { visibility: visible; }
 #engine-links { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 3; }
 .engine-ready #engine-links { display: block; }
-.engine-link { position: absolute; pointer-events: auto; color: transparent; text-decoration: none; overflow: hidden; white-space: nowrap; }
-.engine-link:hover { box-shadow: inset 0 0 0 1px #65beff80; background: #65beff0c; }
+.engine-link { position: absolute; pointer-events: auto; color: transparent; text-decoration: none; overflow: hidden; white-space: nowrap; transition: background .2s ease, box-shadow .2s ease; }
+.engine-link:hover { box-shadow: inset 0 -2px 0 #65beffc0, 0 6px 24px #65beff12; background: #65beff12; }
+.engine-link.primary-action:hover { box-shadow: 0 0 28px #e2ba7940, inset 0 0 0 1px #f8deb4; background: #ffffff18; }
 .engine-link:focus-visible { background: #65beff18; outline-offset: -2px; }
 .engine-link[role=button] { cursor: pointer; }
+.engine-link[aria-disabled=true] { cursor: default; }
 #engine-search {
   position: fixed; z-index: 4; height: 44px; padding: 0 16px;
   border: 1px solid #446889; background: var(--panel); color: #f5eee2;
@@ -36,12 +38,28 @@ a:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid 
 #scroll-space { display: none; }
 .engine-ready #scroll-space { display: block; }
 #access-bar {
-  position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 6;
-  display: flex; gap: 16px; align-items: center; width: max-content; max-width: calc(100% - 24px);
-  background: #070e19f2; border: 1px solid var(--border); padding: 8px 14px; font-size: 11px;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; align-items: center;
+  padding: 10px 18px 25px; font-size: 12px; border-top: 1px solid var(--border);
 }
+.engine-ready #access-bar { position: absolute; left: 22px; right: 22px; z-index: 4; }
 #status { color: var(--muted); }
 #access-bar a { white-space: nowrap; }
+#motion-toggle, #back-top {
+  display: none; position: fixed; z-index: 5; right: 18px; width: 36px; height: 36px;
+  border: 1px solid var(--border); border-radius: 50%; background: #101d2ce8; color: var(--gold);
+  font: 18px/1 system-ui, sans-serif; cursor: pointer; transition: border-color .2s, box-shadow .2s;
+}
+.engine-ready #motion-toggle, .engine-ready #back-top { display: block; }
+#motion-toggle { top: 25px; }
+#back-top { bottom: 20px; }
+#motion-toggle:hover, #back-top:hover { border-color: var(--gold); box-shadow: 0 0 20px #e2ba7925; }
+#motion-toggle:disabled { cursor: default; opacity: .5; }
+#motion-toggle .play-icon, .motion-paused #motion-toggle .pause-icon { display: none; }
+.motion-paused #motion-toggle .play-icon { display: inline; }
+#scene-interaction { display: none; position: fixed; z-index: 2; cursor: grab; touch-action: pan-y; border-radius: 4px; }
+.engine-ready #scene-interaction { display: block; }
+#scene-interaction.dragging { cursor: grabbing; }
+#scene-interaction:focus-visible { outline-offset: -6px; }
 .skip-link { position: fixed; top: -100px; left: 16px; z-index: 10; padding: 12px; background: var(--gold); color: #070e19; }
 .skip-link:focus { top: 12px; }
 
@@ -62,12 +80,14 @@ a:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid 
 #content section::before { content: ''; display: block; width: 220px; height: 1px; margin: 0 auto 36px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
 #content section > p { max-width: 760px; margin: 0 auto 30px; }
 #content .cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
-#content article { flex: 0 1 calc((100% - 40px) / 3); min-width: min(100%, 290px); padding: 24px; background: var(--panel); border: 1px solid var(--border); }
+#content article { flex: 0 1 calc((100% - 40px) / 3); min-width: min(100%, 290px); padding: 24px; background: var(--panel); border: 1px solid var(--border); transition: border-color .2s, box-shadow .2s; }
+#content article:hover { border-color: #446889; box-shadow: 0 8px 30px #00000020; }
 #content article:has(img) { flex-basis: calc((100% - 20px) / 2); }
 #content article img { width: 100%; aspect-ratio: 1.75; object-fit: cover; margin-bottom: 22px; }
 #content article a { display: inline-block; margin: 8px 9px 0; }
 #content p { color: var(--muted); }
 #content pre { overflow: auto; text-align: left; background: var(--panel); border: 1px solid var(--border); padding: 25px; font: 14px/1.7 monospace; color: var(--gold); }
+#content .code-filename { text-align: left; margin-bottom: -15px; padding-left: 25px; font: 13px monospace; }
 .engine-ready #content { position: absolute; left: 0; top: 0; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 700px) {
   #content { padding: 25px 22px 90px; }
@@ -75,5 +95,6 @@ a:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid 
   #content article, #content article:has(img) { flex-basis: 100%; }
   #content h2 { font-size: 30px; }
 }
-@media (max-width: 500px) { #status { display: none; } #access-bar { font-size: 10px; } }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+@media (max-width: 500px) { #access-bar { font-size: 11px; gap: 14px; } #motion-toggle, #back-top { right: 12px; width: 32px; height: 32px; } }
+.motion-paused *, .motion-paused *::before, .motion-paused *::after { transition-duration: 0s !important; animation: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation: none !important; scroll-behavior: auto !important; } }

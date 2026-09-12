@@ -3,7 +3,8 @@
 The public website is a **Java Valthorne application**, compiled to JavaScript
 with TeaVM and hosted at **https://tehnewb.github.io/Valthorne/**.
 It contains the engine overview, platform requirements, ten demo downloads,
-47 system guides, integration instructions, a live canvas lab, and project links.
+47 system guides, integration instructions, an interactive 3D illustration, and
+project links.
 
 ## Visual identity
 
@@ -17,17 +18,29 @@ body text uses the engine's bundled Atkinson Hyperlegible font.
 Headings, introductory copy, actions, filters, and cards are centered. Incomplete
 card rows also center within the content column. Code retains left alignment and
 its original indentation for readability and copying. The HTML companion follows
-the same visual identity. The old FPS screenshot with the incorrect hand pose is
-not distributed by the website; the FPS demo remains available in the catalog.
+the same visual identity. Demo cards without a representative capture use a
+labeled category illustration. These graphics are not presented as screenshots;
+the FPS demo remains available without the old incorrect-hand screenshot.
+
+The documentation page puts installation, migration, and platform quick links
+before the searchable guide catalog. Empty searches offer a single action to
+clear the query and filters. Code panels show filenames, use 13-pixel monospace
+text on phones, and confirm copying beside the action. The text-version and
+GitHub links sit in the footer, with a separate return-to-top button on long
+pages.
+
+[DESIGN_NOTES.md](DESIGN_NOTES.md) records the review of seven official engine
+websites and the rationale for Valthorne's layout, motion, and scene controls.
 
 ## Architecture
 
 | Part | Responsibility |
 | --- | --- |
-| `src/main/java/valthorne/website/WebsiteApplication.java` | Valthorne application lifecycle, responsive layout, text wrapping, cards, navigation painting, and the procedural canvas lab |
-| `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, and semantic link placement |
+| `src/main/java/valthorne/website/WebsiteApplication.java` | Valthorne application lifecycle, responsive layout, text wrapping, cards, navigation painting, and placement of the interactive scene |
+| `src/main/java/valthorne/website/CrystalScene.java` | Procedural meshes, perspective projection, face lighting, and depth-sorted Canvas2D painting for the crystal illustration |
+| `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, motion state, scene input, and semantic link placement |
 | `content.json`, `guides.json` | Shared content for the engine view and complete semantic HTML companion |
-| `site-host.js` | On-demand frame scheduling, native links, search input, clipboard, browser history, and rendering failure recovery |
+| `site-host.js` | Frame scheduling, finite reveals, motion preferences, scene interaction, native links, search input, clipboard, browser history, and rendering failure recovery |
 | `boot.js`, `shell.css` | Engine startup and accessible HTML presentation |
 | `runtime/` | Verified, compiled website UI runtime and bundled dependency notices |
 | `assets/` | Branding and real engine screenshots; no runnable examples or game asset trees |
@@ -37,7 +50,7 @@ not distributed by the website; the FPS demo remains available in the catalog.
 `JGL` owns the normal init/update/render/dispose lifecycle. `UIRoot` and
 `NanoContainer` provide the engine UI context, and `Canvas2D` paints the visible
 site. The host uses the portable vector, WebGL, and Yoga backends. It does not
-initialize Filament, Jolt, audio, or a game scene.
+initialize Filament, Jolt, audio, or the engine's full 3D scene renderer.
 
 The browser retains ordinary scrolling, links, focus, and native text input.
 Each page has its own URL; a search query is preserved in `?q=...`. A complete
@@ -46,10 +59,40 @@ HTML document is generated from the same content. **Text version** switches to
 JavaScript or when engine startup fails. Code copying uses the original source,
 not the visually wrapped canvas text.
 
+## Motion and the interactive scene
+
+The entrance and section/card reveals last 600 milliseconds and play once as
+content enters the viewport. The layout stays fixed while the drawing fades and
+moves a short distance; its native links follow the same offset. CSS supplies
+brief hover and focus feedback. Content and navigation remain available during
+the transitions.
+
+The home page and lab contain the **Valthorne Core**: a blue faceted crystal,
+orbital bands, and a layered pedestal generated in Java. `CrystalScene` rotates
+three-dimensional mesh vertices, computes face lighting, applies a perspective
+camera, and sorts faces before `Canvas2D` paints them. Its triangle pool is
+reused across frames. This is a custom UI illustration, not a demonstration or
+benchmark of the engine's full 3D renderer or physics system. It adds no model,
+texture, physics, or third-party rendering downloads.
+
+Drag or swipe horizontally to orbit the scene. Focus its interaction region and
+use the arrow keys to rotate; **Home** or **Reset view** restores the initial
+camera. Vertical touch scrolling remains available. **Pause rotation** stops the
+scene's automatic movement, and **Play rotation** resumes it.
+
+The header's motion button pauses decorative motion throughout the site. This
+choice persists across pages in the current tab through optional
+`sessionStorage`; storage access is not required. An operating-system
+reduced-motion preference disables automatic rotation, reveals, and CSS
+transitions. Manual orbit and reset controls remain usable in that mode.
+
 Frames are requested for viewport changes, scrolling, image loads, and actions.
-The canvas lab starts paused and animates only after explicit activation.
-Hidden tabs stop scheduling frames. Device pixel ratio is capped at two to keep
-high-density text sharp without unbounded surface allocation.
+Automatic scene animation runs only while the scene is visible and motion is
+enabled. Hidden tabs stop scheduling frames. The scheduler caps continuous scene
+redraws at 30 frames per second and finite reveals at 60; direct interaction
+requests an immediate redraw. Once reveals settle and no animated scene is in
+view, the canvas retains its last frame. Device pixel ratio is capped at two to
+keep high-density text sharp without unbounded surface allocation.
 
 ## Build and preview
 
@@ -65,6 +108,10 @@ Open **http://127.0.0.1:8097/Valthorne/**. The preview deliberately includes the
 repository prefix used by Pages. Set `PORT` to use a different local port.
 Opening an HTML file directly is unsupported because JavaScript modules and
 font loading require HTTP. Publish only `website/dist/`.
+
+The package contains the original branding, selected engine captures, and the
+bundled UI runtime. Procedural scene geometry and motion use that same runtime;
+the published website does not load external fonts or a separate 3D framework.
 
 The checker validates content references, script syntax, runtime checksums, and
 the Java source fingerprints. `dist/`, `build/`, and `node_modules/` are ignored.

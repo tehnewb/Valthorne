@@ -27,7 +27,10 @@ async function open(name = '') {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Horizontal overflow');
   assert.equal(await page.evaluate(() => globalThis.valthorneError), undefined, 'Engine failure');
 }
-async function settle() { await page.waitForTimeout(200); }
+async function settle() {
+  await page.waitForTimeout(120);
+  await page.waitForFunction(() => !globalThis.websiteMetrics?.revealing);
+}
 const report = { browser: selected, pages: [], checks: [] };
 try {
   for (const name of ['index','engine','examples','docs','start','lab','about']) {
@@ -83,7 +86,7 @@ try {
   report.checks.push('Keyboard navigation skips the decorative drawing surface');
   await page.locator('#engine-links').getByRole('link',{name:'Docs',exact:true}).click();
   await page.waitForURL('**/docs.html'); await page.waitForFunction(() => globalThis.valthorneReady);
-  await page.evaluate(() => scrollTo(0, 520)); await settle();
+  await settle();
   const search = page.locator('#engine-search');
   // Scroll until the collection search enters the viewport without relying on a particular text height.
   for (let i=0; i<10 && !(await search.isVisible()); i++) { await page.mouse.wheel(0,250); await settle(); }
@@ -92,6 +95,9 @@ try {
   assert.ok(page.url().includes('q=physics'));
   await search.fill('no-such-system-xyz'); await settle();
   assert.equal(await page.locator('#engine-links a[href*="/docs/systems/"]:visible').count(), 0);
+  await page.locator('#engine-links a[href="#clear"]').click(); await settle();
+  assert.equal(await search.inputValue(), '');
+  assert.equal(await page.evaluate(() => site.category), 'all');
   await search.fill(''); await settle();
   await page.locator('#engine-links a[href="#filter=ui"]').click(); await settle();
   assert.equal(await page.evaluate(() => site.category), 'ui');
@@ -107,17 +113,59 @@ try {
 
   await open('lab.html'); await page.evaluate(() => scrollTo(0, 300)); await settle();
   const animate = page.locator('#engine-links a[href="#animate"]');
-  await animate.click(); await settle(); const moving = await page.evaluate(() => websiteMetrics.frames);
+  assert.equal(await page.evaluate(() => websiteMetrics.animations), true);
+  const moving = await page.evaluate(() => websiteMetrics.frames);
   await page.waitForTimeout(300); assert.ok(await page.evaluate(() => websiteMetrics.frames) > moving + 2);
   await animate.click(); await settle(); const paused = await page.evaluate(() => websiteMetrics.frames);
   await page.waitForTimeout(300); assert.equal(await page.evaluate(() => websiteMetrics.frames), paused);
-  report.checks.push('Lab animation starts and pauses; ordinary pages render on demand');
+  const scene = page.locator('#scene-interaction');
+  const sceneBox = await scene.boundingBox();
+  await page.mouse.move(sceneBox.x + sceneBox.width / 2, sceneBox.y + sceneBox.height / 2);
+  await page.mouse.down(); await page.mouse.move(sceneBox.x + sceneBox.width / 2 + 90, sceneBox.y + sceneBox.height / 2 + 20, { steps: 5 }); await page.mouse.up();
+  assert.ok(await page.evaluate(() => site.orbit) > .5, 'Drag did not rotate the scene');
+  await scene.focus(); await page.keyboard.press('ArrowRight');
+  assert.ok(await page.evaluate(() => site.orbit) > .9, 'Keyboard did not rotate the scene');
+  await page.keyboard.press('Home');
+  assert.deepEqual(await page.evaluate(() => [site.orbit, site.tilt]), [0, 0]);
+  await animate.click(); await settle();
+  await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await settle();
+  assert.equal(await page.evaluate(() => websiteMetrics.sceneVisible), false);
+  const offscreen = await page.evaluate(() => websiteMetrics.frames);
+  await page.waitForTimeout(400); assert.equal(await page.evaluate(() => websiteMetrics.frames), offscreen, 'Offscreen scene keeps rendering');
+  await page.locator('#back-top').click(); await page.waitForFunction(() => scrollY === 0); await settle();
+  assert.equal(await page.evaluate(() => websiteMetrics.animations), true);
+  await page.locator('#motion-toggle').click(); await settle();
+  assert.equal(await page.evaluate(() => websiteMetrics.motionEnabled), false);
+  const motionPaused = await page.evaluate(() => websiteMetrics.frames);
+  await page.waitForTimeout(350); assert.equal(await page.evaluate(() => websiteMetrics.frames), motionPaused);
+  await open('engine.html'); await settle();
+  assert.equal(await page.evaluate(() => websiteMetrics.motionEnabled), false, 'Motion choice did not persist across navigation');
+  await page.locator('#motion-toggle').click(); await settle();
+  report.checks.push('3D pointer and keyboard orbit, reset, playback controls, offscreen suspension, back to top, and persistent motion preference');
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await open('lab.html'); await settle();
+  assert.equal(await page.evaluate(() => websiteMetrics.animations), false);
+  assert.equal(await page.locator('#motion-toggle').isDisabled(), true);
+  const reduced = await page.evaluate(() => websiteMetrics.frames);
+  await page.waitForTimeout(400); assert.equal(await page.evaluate(() => websiteMetrics.frames), reduced);
+  await page.locator('#scene-interaction').focus(); await page.keyboard.press('ArrowLeft'); await settle();
+  assert.ok(await page.evaluate(() => site.orbit) < 0, 'Reduced motion should retain manual exploration');
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); await settle();
+  report.checks.push('System reduced motion disables decorative movement while retaining manual scene controls');
 
   await open('start.html'); await page.evaluate(() => scrollTo(0, 250)); await settle();
   await context.grantPermissions(['clipboard-read','clipboard-write']);
   await page.locator('#engine-links a[href="#copy=0"]').click();
   assert.match(await page.evaluate(() => navigator.clipboard.readText()), /io.github.tehnewb:Valthorne:2.0.0/);
-  report.checks.push('Copy code copies the original, unwrapped source');
+  await page.waitForFunction(() => site.copied === 0); await settle();
+  assert.equal(await page.locator('#engine-links a[href="#copy=0"]').getAttribute('aria-label'), 'Copied!');
+  const widths = await page.evaluate(() => {
+    const c = valthorneHost.nano.get(1), face = c.state.face; c.state.face = 'monospace';
+    const result = [site.measure(1, 'iiiiiiii', 13), site.measure(1, 'mmmmmmmm', 13)]; c.state.face = face; return result;
+  });
+  assert.equal(widths[0], widths[1], 'Code font is not actually monospace');
+  report.checks.push('Readable monospace code, original source copying, and visible copy confirmation');
 
   await page.goto(base + 'docs.html?view=text');
   assert.equal(await page.locator('#content article').count(), 50);

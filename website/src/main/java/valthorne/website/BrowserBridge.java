@@ -15,7 +15,7 @@ final class BrowserBridge {
     static native String page(String key);
     @JSBody(script="return site.page.sections.length;")
     static native int sections();
-    @JSBody(params={"section","key"}, script="return site.page.sections[section][key] || '';")
+    @JSBody(params={"section","key"}, script="return String(site.page.sections[section][key] || '');")
     static native String section(int section, String key);
     @JSBody(params="section", script="return (site.page.sections[section].cards || []).length;")
     static native int cards(int section);
@@ -27,8 +27,22 @@ final class BrowserBridge {
     static native String query();
     @JSBody(script="return site.category;")
     static native String category();
-    @JSBody(script="return site.animating;")
+    @JSBody(script="return site.running();")
     static native boolean animating();
+    @JSBody(script="return site.motionEnabled();")
+    static native boolean motionEnabled();
+    @JSBody(script="return site.orbit;")
+    static native float orbit();
+    @JSBody(script="return site.tilt;")
+    static native float tilt();
+    @JSBody(params="index", script="return site.copied === index;")
+    static native boolean copied(int index);
+    @JSBody(params={"key","y"}, script="site.reveal(key,y);")
+    static native void reveal(String key, float y);
+    @JSBody(script="site.clearEffect();")
+    static native void clearEffect();
+    @JSBody(params={"x","y","w","h"}, script="site.scene(x,y,w,h);")
+    static native void scene(float x, float y, float w, float h);
     @JSBody(script="site.begin();")
     static native void begin();
     @JSBody(params="height", script="site.end(height);")
