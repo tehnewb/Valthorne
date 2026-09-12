@@ -57,7 +57,7 @@ function demoCards() {
     ['lighting-studio','Lighting studio','3d','lighting-studio.png','Inspect a lit 3D environment and adjust the scene.'],
     ['path-tracing','Path tracing','3d','path-tracing.png','Explore the optional path-tracing renderer and its settings.'],
     ['physics-studio','Physics studio','3d','physics-studio.png','Manipulate objects and examine an interactive physics scene.'],
-    ['fps','FPS arena','3d','fps.png','Explore a playable first-person scene with physics, shooting, and effects.']
+    ['fps','FPS arena','3d','','Explore a playable first-person scene with physics, shooting, and effects.']
   ];
   return demos.map(([id,title,category,image,text]) => ({title,category,image,text: text + ' Windows x64; Java included.',label:'Download ZIP',
     href:`https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-${id}-windows-x64-2.0.1.zip`,
@@ -85,7 +85,7 @@ async function updateGuides() {
   console.log(`Imported ${guides.length} published system guides.`);
 }
 
-function html(page) {
+function html(page, revision) {
   const nav = [['index','Home'],['engine','Engine'],['examples','Demos'],['docs','Docs'],['start','Start'],['lab','Lab'],['about','About']];
   const body = page.sections.map((section,index) => `<section><h2>${escape(section.title)}</h2>${section.description ? `<p>${escape(section.description)}</p>` : ''}
     ${section.code ? `<pre id="code-${index}" tabindex="0"><code>${escape(section.code)}</code></pre>` : ''}
@@ -94,26 +94,31 @@ function html(page) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(page.id === 'index' ? 'Valthorne — Java game engine' : page.title + ' — Valthorne')}</title>
-<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#101211">
+<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#070e19"><meta name="valthorne-build" content="${revision}">
 <link rel="canonical" href="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}">
-<meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:type" content="website"><meta property="og:url" content="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}"><meta property="og:image" content="${publicURL}assets/physics-studio.png">
-<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="shell.css"></head>
+<meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:type" content="website"><meta property="og:url" content="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}"><meta property="og:image" content="${publicURL}assets/banner.png">
+<link rel="icon" href="assets/valthorne.png" type="image/png"><link rel="stylesheet" href="shell.css?v=${revision}"></head>
 <body><a class="skip-link" href="?view=text#content">Skip to text content</a>
 <canvas id="scene" aria-hidden="true"></canvas><div id="scroll-space" aria-hidden="true"></div>
 <nav id="engine-links" aria-label="Engine view navigation and actions"></nav>
 <input id="engine-search" type="search" aria-label="Search this collection" placeholder="Search titles and systems…" hidden>
 <div id="access-bar"><span id="status" role="status">Loading Valthorne…</span><a id="view-toggle" href="?view=text">Text version</a><a href="https://github.com/tehnewb/Valthorne">GitHub ↗</a></div>
-<main id="content"><nav aria-label="Main navigation">${nav.map(([id,label]) => `<a href="${id}.html"${id === page.id ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav><div class="eyebrow">${escape(page.eyebrow)}</div><h1>${escape(page.title)}</h1><p class="intro">${escape(page.description)}</p>${body}<section><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href="about.html">About the project</a></section></main>
-<script id="page-content" type="application/json">${json(page)}</script><script src="boot.js"></script>
+<main id="content"><a class="brand" href="index.html"><img src="assets/valthorne.png" alt="Valthorne logo" width="38" height="57">VALTHORNE</a><nav aria-label="Main navigation">${nav.map(([id,label]) => `<a href="${id}.html"${id === page.id ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav><div class="eyebrow">${escape(page.eyebrow)}</div>${page.id === 'index' ? '<img class="brand-banner" src="assets/banner.png" alt="Valthorne — gold lettering and blue flame" width="1511" height="623">' : ''}<h1>${escape(page.title)}</h1><p class="intro">${escape(page.description)}</p>${body}<section><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href="about.html">About the project</a></section></main>
+<script id="page-content" type="application/json">${json(page)}</script><script src="boot.js?v=${revision}"></script>
 </body></html>\n`;
 }
 
 async function build() {
   const data = await content();
+  // A revision ties the compiled Java, host, and stylesheet together across browser caches.
+  const revision = hash((await Promise.all(['runtime/manifest.json','site-host.js','boot.js','shell.css'].map(read))).join('\n')).slice(0, 16);
+  // Clear only the verified output directory so deleted assets cannot leak into a later deployment.
+  if (path.dirname(output) !== root || path.basename(output) !== 'dist') throw new Error('Unsafe output directory');
+  await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(output, { recursive: true });
   // Output is a fixed child of this module; no computed recursive deletion is used.
-  for (const page of data.pages) await fs.writeFile(path.join(output, page.id + '.html'), html(page));
-  for (const name of ['shell.css', 'site-host.js', 'boot.js', 'favicon.svg']) await fs.copyFile(path.join(root, name), path.join(output, name));
+  for (const page of data.pages) await fs.writeFile(path.join(output, page.id + '.html'), html(page, revision));
+  for (const name of ['shell.css', 'site-host.js', 'boot.js']) await fs.copyFile(path.join(root, name), path.join(output, name));
   await fs.cp(path.join(root, 'assets'), path.join(output, 'assets'), { recursive: true });
   await fs.cp(path.join(root, 'runtime'), path.join(output, 'runtime'), { recursive: true });
   await fs.cp(path.join(root, 'licenses'), path.join(output, 'licenses'), { recursive: true });
@@ -123,7 +128,7 @@ async function build() {
   await fs.writeFile(path.join(output, '.nojekyll'), '');
   await fs.writeFile(path.join(output, 'robots.txt'), `User-agent: *\nAllow: /\nSitemap: ${publicURL}sitemap.xml\n`);
   await fs.writeFile(path.join(output, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${data.pages.map(page => `<url><loc>${publicURL}${page.id === 'index' ? '' : page.id + '.html'}</loc></url>`).join('')}</urlset>`);
-  await fs.writeFile(path.join(output, '404.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found — Valthorne</title><body style="background:#101211;color:#f1f0e6;font:20px system-ui;padding:10vw"><h1>This world is still undiscovered.</h1><p>The page could not be found.</p><a style="color:#d5ec84" href="/Valthorne/">Return to Valthorne</a></body></html>`);
+  await fs.writeFile(path.join(output, '404.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found — Valthorne</title><link rel="stylesheet" href="/Valthorne/shell.css"><link rel="icon" href="/Valthorne/assets/valthorne.png"></head><body><main id="content"><img class="brand-banner" src="/Valthorne/assets/banner.png" alt="Valthorne" width="1511" height="623"><div class="eyebrow">404 / PAGE NOT FOUND</div><h1>The page could not be found.</h1><p>Check the address, or continue exploring the engine.</p><a href="/Valthorne/">Return to Valthorne</a></main></body></html>`);
   console.log(`Built ${data.pages.length} Valthorne pages in website/dist.`);
 }
 

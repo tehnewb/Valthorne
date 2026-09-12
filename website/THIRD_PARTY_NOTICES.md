@@ -17,7 +17,8 @@ Screenshots are captures of Valthorne examples. The original game asset sources,
 authors, conversions, and licenses are recorded in the separate
 [examples repository](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
 This website distributes screenshots rather than the example model/resource trees.
-The brand image is copied from this repository's `images/logo-transparent.png`.
+The original logo and banner are copied from this repository's
+`images/logo-transparent.png` and `images/banner.png`, without alterations.
 
 Playwright is an Apache-2.0 development dependency used for verification. It is
 not included in the deployed site. The website does not ship the full Filament,

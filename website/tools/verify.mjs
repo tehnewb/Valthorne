@@ -59,6 +59,18 @@ try {
   report.checks.push('Seven pages render visible engine pixels at desktop and mobile sizes');
 
   await open('index.html'); await page.waitForTimeout(800);
+  const identity = await page.evaluate(() => ({
+    banner: document.querySelector('.brand-banner').getAttribute('src'),
+    logo: document.querySelector('.brand img').getAttribute('src'),
+    unwantedScreenshot: [...document.images].some(image => image.src.endsWith('/fps.png'))
+  }));
+  assert.equal(identity.banner, 'assets/banner.png');
+  assert.equal(identity.logo, 'assets/valthorne.png');
+  assert.equal(identity.unwantedScreenshot, false);
+  const primary = await page.locator('#engine-links a[aria-label="Start building"]:visible').first().boundingBox();
+  const secondary = await page.locator('#engine-links a[aria-label="Explore demos"]:visible').boundingBox();
+  assert.ok(Math.abs((primary.x + secondary.x + secondary.width) / 2 - 720) < 2, 'Hero actions are not centered');
+  report.checks.push('Original logo and banner, centered hero actions, and removal of the incorrect FPS screenshot');
   const idle = await page.evaluate(() => websiteMetrics.frames);
   await page.waitForTimeout(600);
   assert.equal(await page.evaluate(() => websiteMetrics.frames), idle, 'Site keeps rendering while idle');

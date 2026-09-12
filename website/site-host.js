@@ -72,10 +72,11 @@ globalThis.site = {
     globalThis.websiteMetrics = { get frames() { return frames; }, get animations() { return site.animating; } };
   },
   measure(vg, text, size) {
-    const key = `${size}:${text}`;
-    if (measurements.has(key)) return measurements.get(key);
     const context = valthorneHost.nano.get(vg);
-    context.ctx.font = `${size}px "${context.fonts.get('default')?.family || 'sans-serif'}"`;
+    const family = context.fonts.get(context.state.face)?.family || context.state.face || 'sans-serif';
+    const key = `${family}:${size}:${text}`;
+    if (measurements.has(key)) return measurements.get(key);
+    context.ctx.font = `${size}px "${family}"`;
     const width = context.ctx.measureText(text).width;
     if (measurements.size > 15000) measurements.clear();
     measurements.set(key, width); return width;
@@ -127,7 +128,8 @@ globalThis.site = {
     }
     if (!image.complete || !image.naturalWidth) return;
     const context = valthorneHost.nano.get(vg), ctx = valthorneHost.nano.prepare(context);
-    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+    const branding = file === 'banner.png' || file === 'valthorne.png';
+    const scale = (branding ? Math.min : Math.max)(width / image.naturalWidth, height / image.naturalHeight);
     ctx.beginPath(); ctx.rect(x, y, width, height); ctx.clip();
     ctx.drawImage(image, x + (width - image.naturalWidth * scale) / 2, y + (height - image.naturalHeight * scale) / 2,
       image.naturalWidth * scale, image.naturalHeight * scale);

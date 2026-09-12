@@ -18,8 +18,10 @@ import valthorne.ui.nodes.nano.NanoContainer;
  * and is disposed with the application.</p>
  */
 public final class WebsiteApplication implements Application {
-    private static final int BACKGROUND = 0x101211, PANEL = 0x191c19;
-    private static final int INK = 0xf1f0e6, MUTED = 0xaeb6a8, ACCENT = 0xd5ec84, LINE = 0x343b32;
+    // Gold metal, blue flame, and dark steel sampled visually from the original branding.
+    private static final int BACKGROUND = 0x070e19, PANEL = 0x101d2c;
+    private static final int INK = 0xf5eee2, MUTED = 0xb1c0d2, ACCENT = 0xe2ba79;
+    private static final int BLUE = 0x65beff, LINE = 0x293e57;
     private UIRoot root;
     private NanoContainer surface;
     private float width, height, margin, contentWidth, scroll, time;
@@ -42,7 +44,7 @@ public final class WebsiteApplication implements Application {
     /** Updates responsive geometry; animation time advances only on opt-in frames. */
     @Override public void update(float delta) {
         width = Window.getWidth(); height = Window.getHeight();
-        margin = width < 700 ? 22 : Math.max(42, (width - 1280) / 2);
+        margin = width < 700 ? 22 : Math.max(42, (width - 1160) / 2);
         contentWidth = width - margin * 2; scroll = BrowserBridge.scroll();
         if (BrowserBridge.animating()) time += Math.min(delta, .05f);
         root.setSize(width, height);
@@ -61,79 +63,65 @@ public final class WebsiteApplication implements Application {
         Canvas2D.fontFace(vg, "default");
         Canvas2D.textAlign(vg, Canvas2D.ALIGN_LEFT | Canvas2D.ALIGN_TOP);
         rect(0, 0, width, height, BACKGROUND);
-        float y = 142 - scroll;
+        float y = (width < 900 ? 162 : 144) - scroll;
         boolean home = BrowserBridge.page("id").equals("index");
         if (home) y = hero(y); else {
-            text(BrowserBridge.page("eyebrow"), margin, y, 12, ACCENT); y += 38;
-            y = paragraph(BrowserBridge.page("title"), margin, y, Math.min(contentWidth, 1050), width < 700 ? 43 : 72, INK, 1.04f) + 24;
-            y = paragraph(BrowserBridge.page("description"), margin, y, Math.min(contentWidth, 820), 19, MUTED, 1.55f) + 48;
+            centeredText(BrowserBridge.page("eyebrow"), width / 2, y, 11, BLUE); y += 36;
+            y = heading(BrowserBridge.page("title"), y, Math.min(contentWidth, 920), width < 700 ? 39 : 62) + 24;
+            y = centeredParagraph(BrowserBridge.page("description"), width / 2, y, Math.min(contentWidth, 740), 18, MUTED, 1.6f) + 55;
         }
         for (int section = 0; section < BrowserBridge.sections(); section++) y = section(section, y);
-        rule(margin, y, contentWidth); y += 35;
-        y = paragraph("Build something only you could make.", margin, y, contentWidth, width < 700 ? 30 : 48, INK, 1.1f) + 30;
-        button("Start building", "start.html", margin, y, 175, true); y += 85;
-        text("VALTHORNE / APACHE-2.0 / JAVA", margin, y, 11, MUTED); y += 28;
-        y = paragraph("Created by Albert Beaupre. Drawn with Valthorne.", margin, y, contentWidth, 13, MUTED, 1.5f) + 50;
+        ornament(y); y += 45;
+        y = heading("Your next world starts here.", y, contentWidth, width < 700 ? 32 : 46) + 30;
+        button("Start building", "start.html", (width - 180) / 2, y, 180, true); y += 82;
+        centeredText("VALTHORNE  /  JAVA  /  APACHE-2.0", width / 2, y, 11, ACCENT); y += 26;
+        y = centeredParagraph("Created by Albert Beaupre. Built with Valthorne.", width / 2, y, contentWidth, 13, MUTED, 1.5f) + 60;
         header();
         BrowserBridge.end(y + scroll);
     }
 
-    /** Editorial landing layout with an authentic engine capture and clear entry points. */
+    /** Centered brand presentation. Original artwork is displayed without cropping or recoloring. */
     private float hero(float y) {
-        float top = y;
-        text("OPEN SOURCE JAVA GAME ENGINE", margin, y, 11, ACCENT); y += 40;
-        float titleSize = width < 700 ? 61 : width < 1100 ? 68 : 92;
-        text("Your world.", margin, y, titleSize, INK); y += titleSize * 1.04f;
-        text("Your rules.", margin, y, titleSize, ACCENT); y += titleSize * 1.22f;
-        float column = width < 900 ? contentWidth : contentWidth * .45f;
-        y = paragraph(BrowserBridge.page("description"), margin, y, column, 19, MUTED, 1.55f) + 28;
-        button("Start building", "start.html", margin, y, 164, true);
-        button("Explore demos", "examples.html", margin + 176, y, Math.min(164, contentWidth - 176), false); y += 78;
-        text("Java 25   /   Desktop 2D + 3D   /   v2.0.0", margin, y, 11, MUTED); y += 42;
-        float pictureX = width < 900 ? margin : margin + contentWidth * .52f;
-        float pictureY = width < 900 ? y : top + 12;
-        float pictureWidth = width < 900 ? contentWidth : contentWidth * .48f;
-        float pictureHeight = pictureWidth * .77f;
-        rect(pictureX, pictureY, pictureWidth, pictureHeight + 70, PANEL);
-        text("VALTHORNE / IN THE FIELD", pictureX + 18, pictureY + 14, 10, MUTED);
-        BrowserBridge.image(vg, "fps.png", pictureX, pictureY + 38, pictureWidth, pictureHeight);
-        text("FPS ARENA", pictureX + 16, pictureY + pictureHeight + 48, 10, ACCENT);
-        BrowserBridge.link("Explore the FPS arena demo", "examples.html?q=fps", pictureX, pictureY, pictureWidth, pictureHeight + 70);
-        y = Math.max(y, pictureY + pictureHeight + 116);
-        rule(margin, y, contentWidth); y += 30;
+        centeredText("OPEN SOURCE JAVA GAME ENGINE", width / 2, y, 11, BLUE); y += 28;
+        float bannerWidth = Math.min(contentWidth, 860), bannerHeight = bannerWidth * 623 / 1511;
+        BrowserBridge.image(vg, "banner.png", (width - bannerWidth) / 2, y, bannerWidth, bannerHeight);
+        y += bannerHeight + (width < 700 ? 28 : 18);
+        y = heading("Build your next world.", y, contentWidth, width < 700 ? 39 : 57) + 20;
+        y = centeredParagraph(BrowserBridge.page("description"), width / 2, y, Math.min(contentWidth, 700), 18, MUTED, 1.6f) + 28;
+        float buttonWidth = Math.min(180, (contentWidth - 14) / 2);
+        button("Start building", "start.html", width / 2 - buttonWidth - 7, y, buttonWidth, true);
+        button("Explore demos", "examples.html", width / 2 + 7, y, buttonWidth, false); y += 76;
+        centeredText("DESKTOP 2D + 3D   ·   VERSION 2.0.0", width / 2, y, 11, MUTED); y += 52;
+        ornament(y); y += 35;
         String[] values = {"2D + 3D", "JAVA 25", "OPEN SOURCE", "10 DEMOS"};
         String[] notes = {"One engine library", "Your application", "Apache License 2.0", "Download and explore"};
         int columns = width < 700 ? 2 : 4;
         for (int i = 0; i < 4; i++) {
-            float x = margin + (i % columns) * contentWidth / columns, yy = y + (i / columns) * 72;
-            text(values[i], x, yy, 15, INK); text(notes[i], x, yy + 26, 12, MUTED);
+            float x = margin + (i % columns + .5f) * contentWidth / columns, yy = y + (i / columns) * 72;
+            centeredText(values[i], x, yy, 14, ACCENT); centeredText(notes[i], x, yy + 26, 12, MUTED);
         }
         return y + (columns == 2 ? 170 : 100);
     }
 
     private float section(int index, float y) {
-        rule(margin, y, contentWidth); y += 38;
-        y = paragraph(BrowserBridge.section(index, "title"), margin, y, contentWidth, width < 700 ? 31 : 43, INK, 1.15f) + 22;
+        ornament(y); y += 44;
+        y = heading(BrowserBridge.section(index, "title"), y, Math.min(contentWidth, 900), width < 700 ? 30 : 42) + 22;
         String description = BrowserBridge.section(index, "description");
-        if (!description.isEmpty()) y = paragraph(description, margin, y, Math.min(contentWidth, 850), 17, MUTED, 1.55f) + 28;
+        if (!description.isEmpty()) y = centeredParagraph(description, width / 2, y, Math.min(contentWidth, 760), 17, MUTED, 1.6f) + 30;
         boolean catalog = !BrowserBridge.section(index, "catalog").isEmpty();
         if (catalog) {
-            BrowserBridge.search(margin, y, Math.min(contentWidth, 560)); y += 62;
+            float searchWidth = Math.min(contentWidth, 560);
+            BrowserBridge.search((width - searchWidth) / 2, y, searchWidth); y += 62;
             String[] filters = BrowserBridge.section(index, "catalog").equals("examples")
                 ? new String[]{"all", "3d", "2d", "systems"} : new String[]{"all", "graphics", "runtime", "ui", "utilities"};
-            float x = margin;
-            for (String filter : filters) {
-                float w = filter.length() * 8 + 25;
-                button(filter.toUpperCase(), "#filter=" + filter, x, y, w, BrowserBridge.category().equals(filter)); x += w + 7;
-                if (x + 95 > width - margin && !filter.equals(filters[filters.length - 1])) { x = margin; y += 50; }
-            }
-            y += 68;
+            y = filters(filters, y) + 24;
         }
         String code = BrowserBridge.section(index, "code");
         if (!code.isEmpty()) y = code(index, code, y);
         if (BrowserBridge.page("id").equals("lab") && index == 0) y = lab(y);
         int count = BrowserBridge.cards(index), visible = 0;
-        boolean images = count > 0 && !BrowserBridge.card(index, 0, "image").isEmpty();
+        boolean images = false;
+        for (int card = 0; card < count; card++) images |= !BrowserBridge.card(index, card, "image").isEmpty();
         int columns = width < 760 ? 1 : images || width < 1100 ? 2 : 3;
         float gap = 20, cardWidth = (contentWidth - gap * (columns - 1)) / columns;
         int[] row = new int[columns]; int used = 0;
@@ -145,7 +133,7 @@ public final class WebsiteApplication implements Application {
         if (used > 0) y = cardRow(index, row, used, y, cardWidth, gap);
         if (catalog) {
             String message = visible == 0 ? "No matches. Try another search or choose ALL." : visible + " of " + count + " " + BrowserBridge.section(index, "catalog");
-            y = paragraph(message, margin, y + 8, contentWidth, 14, MUTED, 1.5f) + 24;
+            y = centeredParagraph(message, width / 2, y + 8, contentWidth, 14, MUTED, 1.5f) + 24;
         }
         return y + 50;
     }
@@ -168,13 +156,14 @@ public final class WebsiteApplication implements Application {
             rowHeight = Math.max(rowHeight, h);
         }
         for (int i = 0; i < count; i++) {
-            int card = cards[i]; float x = margin + i * (w + gap);
+            // A partially populated row remains balanced around the same page center.
+            int card = cards[i]; float x = (width - (count * w + (count - 1) * gap)) / 2 + i * (w + gap);
             if (y + rowHeight < 88 || y > height) continue;
-            rect(x, y, w, rowHeight, PANEL); float yy = y;
+            panel(x, y, w, rowHeight); float yy = y;
             String image = BrowserBridge.card(section, card, "image");
             if (!image.isEmpty()) { BrowserBridge.image(vg, image, x, yy, w, w * .57f); yy += w * .57f; }
-            yy = paragraph(BrowserBridge.card(section, card, "title"), x + 20, yy + 23, w - 40, 23, INK, 1.17f) + 15;
-            paragraph(BrowserBridge.card(section, card, "text"), x + 20, yy, w - 40, 15, MUTED, 1.53f);
+            yy = centeredParagraph(BrowserBridge.card(section, card, "title"), x + w / 2, yy + 23, w - 40, 23, INK, 1.17f) + 15;
+            centeredParagraph(BrowserBridge.card(section, card, "text"), x + w / 2, yy, w - 40, 15, MUTED, 1.53f);
             String guide = BrowserBridge.card(section, card, "guide");
             float linkY = y + rowHeight - (guide.isEmpty() ? 49 : 81);
             link(BrowserBridge.card(section, card, "label") + "  →", BrowserBridge.card(section, card, "href"), x + 20, linkY, w - 40);
@@ -187,7 +176,7 @@ public final class WebsiteApplication implements Application {
         String[] lines = source.split("\n"); float fontSize = width < 700 ? 11 : 14;
         float h = 68;
         for (String line : lines) h += lineCount(line.isEmpty() ? " " : line, contentWidth - 38, fontSize) * (fontSize * 1.6f);
-        rect(margin, y, contentWidth, h, PANEL);
+        panel(margin, y, contentWidth, h);
         link("Copy code  ↗", "#copy=" + index, margin + 18, y + 12, 160);
         float yy = y + 50;
         for (String line : lines) yy = paragraph(line.isEmpty() ? " " : line, margin + 18, yy, contentWidth - 38, fontSize, ACCENT, 1.6f);
@@ -197,10 +186,10 @@ public final class WebsiteApplication implements Application {
     /** A small Java-projected wireframe drawing, deliberately opt-in and inexpensive. */
     private float lab(float y) {
         float h = width < 700 ? 330 : 440;
-        rect(margin, y, contentWidth, h, PANEL);
+        panel(margin, y, contentWidth, h);
         float cx = width / 2, cy = y + h / 2, scale = Math.min(contentWidth * .3f, 150);
         for (int ring = 0; ring < 3; ring++) {
-            int ink = ring == 0 ? ACCENT : ring == 1 ? 0x68bca3 : 0x4a7365;
+            int ink = ring == 0 ? ACCENT : ring == 1 ? BLUE : 0x35618b;
             float rotation = time * (.25f + ring * .08f) + ring * .55f;
             for (int edge = 0; edge < 12; edge++) {
                 int a = edge < 4 ? edge : edge < 8 ? edge : edge - 8;
@@ -211,8 +200,8 @@ public final class WebsiteApplication implements Application {
                 Canvas2D.moveTo(vg, cx + p[0], cy + p[1]); Canvas2D.lineTo(vg, cx + q[0], cy + q[1]); Canvas2D.stroke(vg);
             }
         }
-        text("JAVA / CANVAS2D / LIVE", margin + 20, y + 18, 11, MUTED);
-        button(BrowserBridge.animating() ? "Pause animation" : "Start animation", "#animate", margin + 18, y + h - 66, 190, true);
+        centeredText("JAVA / CANVAS2D / LIVE", width / 2, y + 18, 11, BLUE);
+        button(BrowserBridge.animating() ? "Pause animation" : "Start animation", "#animate", (width - 190) / 2, y + h - 66, 190, true);
         return y + h + 30;
     }
 
@@ -226,27 +215,67 @@ public final class WebsiteApplication implements Application {
     }
 
     private void header() {
-        float barHeight = width < 760 ? 102 : 80;
+        boolean compact = width < 900;
+        float barHeight = compact ? 120 : 88;
         rect(0, 0, width, barHeight, BACKGROUND); rule(0, barHeight, width);
-        text("V / VALTHORNE", margin, 25, 17, INK);
-        BrowserBridge.link("Valthorne home", "index.html", margin, 12, 185, 44);
+        float brandX = compact ? (width - 208) / 2 : (width - 772) / 2;
+        BrowserBridge.image(vg, "valthorne.png", brandX, compact ? 8 : 14, 38, 57);
+        Canvas2D.fontFace(vg, "Georgia");
+        text("VALTHORNE", brandX + 49, compact ? 25 : 31, 22, ACCENT);
+        Canvas2D.fontFace(vg, "default");
+        BrowserBridge.link("Valthorne home", "index.html", brandX, compact ? 8 : 14, 216, 57);
         String[] labels = {"Engine", "Demos", "Docs", "Start", "Lab", "About"};
         String[] pages = {"engine", "examples", "docs", "start", "lab", "about"};
-        float x = width < 760 ? margin : Math.max(margin + 225, width - margin - 462);
+        float x = compact ? margin : brandX + 280;
         for (int i = 0; i < labels.length; i++) {
-            float w = width < 760 ? contentWidth / 6 : 77, yy = width < 760 ? 66 : 29;
-            text(labels[i], x, yy, width < 400 ? 11 : 13, BrowserBridge.page("id").equals(pages[i]) ? ACCENT : MUTED);
-            BrowserBridge.link(labels[i], pages[i] + ".html", x - 4, yy - 12, w, 42); x += w;
+            float w = compact ? contentWidth / 6 : 82, yy = compact ? 86 : 37;
+            boolean active = BrowserBridge.page("id").equals(pages[i]);
+            centeredText(labels[i], x + w / 2, yy, width < 400 ? 11 : 13, active ? ACCENT : MUTED);
+            if (active) rect(x + w / 2 - 12, yy + 25, 24, 2, ACCENT);
+            BrowserBridge.link(labels[i], pages[i] + ".html", x, yy - 10, w, 42); x += w;
         }
     }
 
     private void button(String label, String href, float x, float y, float w, boolean primary) {
-        rect(x, y, w, 44, primary ? ACCENT : LINE);
-        text(label, x + 13, y + 14, 13, primary ? BACKGROUND : INK);
+        rect(x, y, w, 44, primary ? ACCENT : PANEL);
+        if (!primary) { Canvas2D.color(vg, BLUE, .65f); Canvas2D.strokeWidth(vg, 1); Canvas2D.beginPath(vg); Canvas2D.rect(vg, x, y, w, 44); Canvas2D.stroke(vg); }
+        centeredText(label, x + w / 2, y + 14, 13, primary ? BACKGROUND : INK);
         BrowserBridge.link(label, href, x, y, w, 44);
     }
     private void link(String label, String href, float x, float y, float w) {
-        text(label, x, y + 7, 14, ACCENT); BrowserBridge.link(label, href, x, y, w, 32);
+        centeredText(label, x + w / 2, y + 7, 14, BLUE); BrowserBridge.link(label, href, x, y, w, 32);
+    }
+    /** Wraps filter controls as centered rows, including narrow phone layouts. */
+    private float filters(String[] values, float y) {
+        int first = 0;
+        while (first < values.length) {
+            int end = first; float rowWidth = 0;
+            while (end < values.length) {
+                float next = values[end].length() * 8 + 25;
+                if (end > first && rowWidth + 7 + next > contentWidth) break;
+                rowWidth += (end == first ? 0 : 7) + next; end++;
+            }
+            float x = (width - rowWidth) / 2;
+            for (int i = first; i < end; i++) {
+                float w = values[i].length() * 8 + 25;
+                button(values[i].toUpperCase(), "#filter=" + values[i], x, y, w, BrowserBridge.category().equals(values[i])); x += w + 7;
+            }
+            first = end; y += 53;
+        }
+        return y;
+    }
+    private void panel(float x, float y, float w, float h) {
+        rect(x, y, w, h, PANEL);
+        Canvas2D.color(vg, LINE, 1); Canvas2D.strokeWidth(vg, 1); Canvas2D.beginPath(vg);
+        Canvas2D.rect(vg, x + .5f, y + .5f, w - 1, h - 1); Canvas2D.stroke(vg);
+    }
+    /** A restrained gold diamond and blue rules echo the metalwork around the banner. */
+    private void ornament(float y) {
+        float half = Math.min(contentWidth / 2 - 24, 150);
+        rect(width / 2 - half - 18, y, half, 1, LINE); rect(width / 2 + 18, y, half, 1, LINE);
+        Canvas2D.color(vg, ACCENT, 1); Canvas2D.beginPath(vg);
+        Canvas2D.moveTo(vg, width / 2, y - 4); Canvas2D.lineTo(vg, width / 2 + 4, y);
+        Canvas2D.lineTo(vg, width / 2, y + 4); Canvas2D.lineTo(vg, width / 2 - 4, y); Canvas2D.fill(vg);
     }
     private void rect(float x, float y, float w, float h, int color) {
         Canvas2D.color(vg, color, 1); Canvas2D.beginPath(vg); Canvas2D.rect(vg, x, y, w, h); Canvas2D.fill(vg);
@@ -257,6 +286,19 @@ public final class WebsiteApplication implements Application {
         Canvas2D.color(vg, color, 1); Canvas2D.fontSize(vg, size); Canvas2D.text(vg, x, y, value);
     }
     private int lineCount(String value, float w, float size) { return wrap(value, w, size).size(); }
+    private void centeredText(String value, float center, float y, float size, int color) {
+        text(value, center - BrowserBridge.measure(vg, value, size) / 2, y, size, color);
+    }
+    private float centeredParagraph(String value, float center, float y, float w, float size, int color, float leading) {
+        for (String line : wrap(value, w, size)) { centeredText(line, center, y, size, color); y += size * leading; }
+        return y;
+    }
+    private float heading(String value, float y, float w, float size) {
+        Canvas2D.fontFace(vg, "Georgia");
+        float bottom = centeredParagraph(value, width / 2, y, w, size, INK, 1.15f);
+        Canvas2D.fontFace(vg, "default");
+        return bottom;
+    }
     private float paragraph(String value, float x, float y, float w, float size, int color, float leading) {
         for (String line : wrap(value, w, size)) { text(line, x, y, size, color); y += size * leading; }
         return y;

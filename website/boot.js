@@ -1,5 +1,6 @@
 /* Load the compiled engine only for the visual view. The semantic document needs no JavaScript. */
 'use strict';
+const revision = encodeURIComponent(document.querySelector('meta[name="valthorne-build"]').content);
 if (new URLSearchParams(location.search).get('view') === 'text') {
   document.querySelector('#status').textContent = 'Text version';
   const toggle = document.querySelector('#view-toggle');
@@ -9,8 +10,8 @@ if (new URLSearchParams(location.search).get('view') === 'text') {
   const timeout = setTimeout(() => {
     if (!globalThis.valthorneReady) document.querySelector('#status').textContent = 'Text version is available while the engine loads.';
   }, 8000);
-  const runtime = document.createElement('script'); runtime.src = 'runtime/valthorne.js';
-  runtime.onload = () => { clearTimeout(timeout); import('./site-host.js').catch(error => {
+  const runtime = document.createElement('script'); runtime.src = 'runtime/valthorne.js?v=' + revision;
+  runtime.onload = () => { clearTimeout(timeout); import('./site-host.js?v=' + revision).catch(error => {
     document.querySelector('#status').textContent = 'Engine unavailable. Text version is ready.';
     console.error(error);
   }); };

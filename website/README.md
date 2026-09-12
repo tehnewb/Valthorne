@@ -5,6 +5,21 @@ with TeaVM and hosted at **https://tehnewb.github.io/Valthorne/**.
 It contains the engine overview, platform requirements, ten demo downloads,
 47 system guides, integration instructions, a live canvas lab, and project links.
 
+## Visual identity
+
+The original `images/banner.png` is the centered homepage centerpiece.
+`images/logo-transparent.png` is used in the navigation and browser icon.
+Both images retain their original transparency, proportions, and colors.
+The site uses dark steel blue surfaces, warm gold accents, electric blue links,
+and ivory text to match that artwork. Serif display headings echo its lettering;
+body text uses the engine's bundled Atkinson Hyperlegible font.
+
+Headings, introductory copy, actions, filters, and cards are centered. Incomplete
+card rows also center within the content column. Code retains left alignment and
+its original indentation for readability and copying. The HTML companion follows
+the same visual identity. The old FPS screenshot with the incorrect hand pose is
+not distributed by the website; the FPS demo remains available in the catalog.
+
 ## Architecture
 
 | Part | Responsibility |
@@ -139,8 +154,8 @@ or cross-origin isolation headers are required.
 ## Assets and licenses
 
 Valthorne code and website source use the repository's Apache-2.0 license.
-Branding comes from `images/logo-transparent.png`. The FPS, physics studio, and
-UI captures come from `Valthorne-examples/docs/images/`; the other screenshots
+Branding comes from `images/logo-transparent.png` and `images/banner.png`.
+The physics studio and UI captures come from `Valthorne-examples/docs/images/`; the other screenshots
 come from that project's local capture outputs. They show the actual examples,
 not invented game scenes. Example model and environment provenance remains in
 the [examples notices](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
