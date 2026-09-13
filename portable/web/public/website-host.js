@@ -193,7 +193,7 @@ const revision = document.querySelector('meta[name="valthorne-build"]').content;
 runtime.src = 'runtime/valthorne.js?v=' + encodeURIComponent(revision);
 runtime.onerror = () => bootstrapFailure(new Error('Compiled runtime could not load'));
 runtime.onload = () => {
-  try { main(); }
+  try { main(); globalThis.valthorneReady = true; }
   catch (error) { bootstrapFailure(error); }
 };
 document.head.append(runtime);
