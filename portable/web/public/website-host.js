@@ -1,3 +1,12 @@
+// The Builder is a semantic browser workflow. Open its hash in text mode so
+// keyboard access and generated download controls are always available even
+// when the optional canvas renderer is enabled on the landing page.
+if (location.hash === '#builder' && new URLSearchParams(location.search).get('view') !== 'text') {
+  const query = new URLSearchParams(location.search);
+  query.set('view', 'text');
+  location.replace('?' + query.toString() + '#builder');
+}
+
 /**
  * Web-port entry point and browser drawing primitives.
  *
