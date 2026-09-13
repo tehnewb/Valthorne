@@ -26,6 +26,10 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: website/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Build the Valthorne website
         run: node website/tools/site.mjs build
       - name: Install browser verification tools

@@ -1,5 +1,5 @@
 {
-  "description": "Compiled Valthorne website UI runtime; rebuild with the development portable target.",
+  "description": "Compiled Java-authored Valthorne website runtime; rebuild with the development portable target.",
   "mainClass": "valthorne.website.WebsiteApplication",
   "files": {
     "LICENSE-Valthorne.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
@@ -11,7 +11,7 @@
     "platform.js": "42f5cf3abac26064dfffcd29f54cae7be14ae1669830c8ac2aafecf8912eeb29",
     "ui/AtkinsonHyperlegible-Regular.ttf": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
     "ui/OFL-AtkinsonHyperlegible.txt": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
-    "valthorne.js": "fd89a144ea0cacdf78afc8b13ddec0b2d470d8ee42190737f954bf86fec75986",
+    "valthorne.js": "e80e78148dc5743ddf5a390121800f2ab424695b399abf176f4ddce6d16471a1",
     "vendor/opentype/LICENSE": "a5b87c9bc191e7f9c06b07bd7cbbed3ed846dfdb50e859484b2c245aa1ab2e61",
     "vendor/opentype/opentype.module.js": "8d79d17388114a29d74681dfaed84068b1d7d9b4e39a9544fb6406d25579ad8f",
     "vendor/yoga/dist/binaries/yoga-wasm-base64-esm.js": "2cfeda49ae87f57bcd4a5fe433940edefc531a69bd0f83e32759fb5837df205c",
@@ -31,8 +31,21 @@
     "yoga-backend.js": "fbec4093bfb77f276c0a73c82d513b1dd2c9b7454b324d916ccb78f6f401fa25"
   },
   "sources": {
-    "src/main/java/valthorne/website/BrowserBridge.java": "3edb5b51534fd55ef0d651f585295ac6ea4bcd972cfbcd6d0bdc32de3af2b721",
+    "src/main/java/valthorne/website/BrowserBridge.java": "7f2fda4fc5d8e7e11170831a8827b6a46cc109b49179d1805b02be78db706eb5",
     "src/main/java/valthorne/website/CrystalScene.java": "94e756a274e91b8e6dd0cb3f375de005cbcbfa647c4dcd8e4f81c3736bd09094",
-    "src/main/java/valthorne/website/WebsiteApplication.java": "8d7cd9072503fbd7001a9428a4c95fc4e2ce3698ee5106f60272376960720288"
+    "src/main/java/valthorne/website/WebsiteApplication.java": "9bb48752eef2e107fb2e25ae4b7cc34a5e8d7c34b21553f643ad905abebc4291",
+    "src/main/java/valthorne/website/WebsiteController.java": "9769f90991dfe49cade071c325b9436c03fa7cdb352244283d4922539ac8e566",
+    "src/main/java/valthorne/website/browser/BrowserDom.java": "3cc1141fe9577c3251acfed11f3829872e92d10c09e388d24d6e51e1373992c6",
+    "src/main/java/valthorne/website/browser/BrowserPort.java": "15054c6039114b55ee660ce85f3ca3f8fd384fcc214de3272a93ab7874036cc3",
+    "src/main/java/valthorne/website/browser/WebsiteNavigation.java": "eb5980065cb39bd5c3bc3d9f630724dd56abf4177ba80d39fbd4cc98c7c12b43",
+    "src/main/java/valthorne/website/content/Card.java": "9caf74f225eb35de82ba3aa76929dab70f4ccdc54aa7ff390d8252daff7558b6",
+    "src/main/java/valthorne/website/content/DemoCatalog.java": "cab71053ade32d69c7ceedcd3268337e57d761afc31afe041502ca55e4dcb19e",
+    "src/main/java/valthorne/website/content/GuideCatalog.java": "fc6603d6f393cd478a64a06c8d3b0836a4b41d4093375dbc78bc7a275d88f8f2",
+    "src/main/java/valthorne/website/content/Page.java": "8043a913c899181b771df5bb5be895b2a46a9f92cb8790f3907c38fe94235959",
+    "src/main/java/valthorne/website/content/Section.java": "e6f19ec37ff2f5fe9b34d6ba33fbd26a6ba22f6d465af845b267ff3ab9233747",
+    "src/main/java/valthorne/website/content/WebsiteContent.java": "7d23e092f5618206e21e480193ba6ed08c9b2ec2f0af1b5221639aab891ba3c9",
+    "src/main/java/valthorne/website/export/BrowserStyles.java": "333e81fe3435c151ea00d142cca84791e4e95caa7ad05c170fee303bb1f16379",
+    "src/main/java/valthorne/website/export/ContentValidator.java": "f64d07c8fd693d986f39f6df2b8aa38e58528104e963e31b537470c6c51dd7eb",
+    "src/main/java/valthorne/website/export/HtmlExporter.java": "f19ae84d0eafd8ec61c42662425adc6a3dff484d696aa8d65c4d7345fd1057b6"
   }
 }

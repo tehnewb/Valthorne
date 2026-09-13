@@ -1,4 +1,4 @@
-/** Dependency-free website packaging, validation, and local preview. Run from any directory. */
+/** Packages the Java-authored website, verifies its compiled snapshot, and serves local previews. */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,14 +8,16 @@ import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.dirname(root), output = path.join(root, 'dist');
-const publicURL = 'https://tehnewb.github.io/Valthorne/';
+const sourceRoot = path.join(root, 'src/main/java/valthorne/website');
+const exportClasses = path.join(root, 'build/export-classes');
 const command = process.argv[2] || 'build';
 const read = file => fs.readFile(path.join(root, file), 'utf8');
-const escape = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-const json = value => JSON.stringify(value).replaceAll('<', '\\u003c');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const normalize = text => text.replaceAll('\r\n', '\n');
 // Match Git's LF text normalization on every OS; binary fonts keep exact byte hashes.
-const fingerprint = (file, bytes) => hash(file.endsWith('.ttf') ? bytes : bytes.toString('utf8').replaceAll('\r\n', '\n'));
+const fingerprint = (file, bytes) => hash(file.endsWith('.ttf') ? bytes : normalize(bytes.toString('utf8')));
+const processOptions = { cwd: repo, encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true };
+let compiledExporter;
 
 async function files(dir) {
   const result = [];
@@ -24,6 +26,35 @@ async function files(dir) {
     if (entry.isDirectory()) result.push(...await files(file)); else result.push(file);
   }
   return result.sort();
+}
+
+/** Uses JAVA_HOME when configured, otherwise the JDK available on PATH. */
+function javaTool(name) {
+  return process.env.JAVA_HOME
+    ? path.join(process.env.JAVA_HOME, 'bin', name + (process.platform === 'win32' ? '.exe' : ''))
+    : name;
+}
+
+/** Builds the dependency-free Java exporter once per packaging/check invocation. */
+function compileExporter() {
+  return compiledExporter ??= (async () => {
+    const groups = await Promise.all(['content', 'export'].map(name => files(path.join(sourceRoot, name))));
+    const sources = groups.flat().filter(file => file.endsWith('.java')).sort();
+    if (!sources.length) throw new Error('The Java website content/export sources are missing.');
+    await fs.mkdir(exportClasses, { recursive: true });
+    try {
+      execFileSync(javaTool('javac'), ['--release', '17', '-encoding', 'UTF-8', '-d', exportClasses, ...sources], processOptions);
+    } catch (error) {
+      throw new Error('Unable to compile the website exporter. Install JDK 17 or later and configure JAVA_HOME or PATH. ' + (error.stderr || error.message), { cause: error });
+    }
+  })();
+}
+
+/** Java owns page validation, content, HTML, stylesheet generation, and search-engine files. */
+async function runExporterClass(name, args) {
+  await compileExporter();
+  const result = execFileSync(javaTool('java'), ['-cp', exportClasses, 'valthorne.website.export.' + name, ...args], processOptions);
+  if (result.trim()) console.log(result.trim());
 }
 
 /** Captures only the browser UI runtime used by the site, never game models or demo resources. */
@@ -37,137 +68,44 @@ async function captureRuntime() {
   await fs.cp(path.join(dist, 'vendor/opentype'), path.join(runtime, 'vendor/opentype'), { recursive: true });
   await fs.cp(path.join(repo, 'src/main/resources/ui'), path.join(runtime, 'ui'), { recursive: true });
   await fs.copyFile(path.join(repo, 'LICENSE'), path.join(runtime, 'LICENSE-Valthorne.txt'));
-  const manifest = { description: 'Compiled Valthorne website UI runtime; rebuild with the development portable target.', mainClass: 'valthorne.website.WebsiteApplication', files: {} };
+  const manifest = { description: 'Compiled Java-authored Valthorne website runtime; rebuild with the development portable target.', mainClass: 'valthorne.website.WebsiteApplication', files: {} };
   for (const file of await files(runtime)) if (!file.endsWith('manifest.json')) manifest.files[path.relative(runtime, file).replaceAll('\\', '/')] = fingerprint(file, await fs.readFile(file));
-  // Record website Java sources too, so CI rejects stale compiled website code.
+  // Capture every website Java source, including content, browser behavior, and the semantic exporter.
   manifest.sources = {};
   for (const file of await files(path.join(root, 'src'))) manifest.sources[path.relative(root, file).replaceAll('\\', '/')] = fingerprint(file, await fs.readFile(file));
   await fs.writeFile(path.join(runtime, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  console.log('Captured the website UI runtime and source fingerprints.');
-}
-
-function demoCards() {
-  const demos = [
-    ['starter','Application starter','systems','','A minimal application with lifecycle callbacks and a clean starting point.'],
-    ['scene','3D scene','3d','scene.png','Explore models, materials, cameras, and scene composition.'],
-    ['physics','Physics playground','3d','physics.png','Drop and interact with rigid bodies powered by Jolt.'],
-    ['lighting2d','2D lighting','2d','lighting2d.png','Explore colored lights, occlusion, and real-time 2D shadows.'],
-    ['ui','UI gallery','systems','ui.png','Explore layouts, controls, themes, and text editing.'],
-    ['audio','Audio studio','systems','audio.png','Experiment with sound playback, controls, and queues.'],
-    ['lighting-studio','Lighting studio','3d','lighting-studio.png','Inspect a lit 3D environment and adjust the scene.'],
-    ['path-tracing','Path tracing','3d','path-tracing.png','Explore the optional path-tracing renderer and its settings.'],
-    ['physics-studio','Physics studio','3d','physics-studio.png','Manipulate objects and examine an interactive physics scene.'],
-    ['fps','FPS arena','3d','','Explore a playable first-person scene with physics, shooting, and effects.']
-  ];
-  return demos.map(([id,title,category,image,text]) => ({title,category,image,text: text + ' Windows x64; Java included.',label:'Download ZIP',
-    href:`https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-${id}-windows-x64-2.0.1.zip`,
-    guide:`https://github.com/tehnewb/Valthorne-examples/blob/main/docs/${id}.md`}));
-}
-
-async function content() {
-  const data = JSON.parse(await read('content.json'));
-  data.pages.find(p => p.id === 'examples').sections[0].cards = demoCards();
-  const guides = JSON.parse(await read('guides.json'));
-  data.pages.find(p => p.id === 'docs').sections.find(section => section.catalog === 'guides').cards = guides;
-  return data;
-}
-
-/** Import the published manual index explicitly; ordinary builds never read unrelated checkout changes. */
-async function updateGuides() {
-  const manual = execFileSync('git', ['show', 'HEAD:docs/systems/README.md'], { cwd: repo, encoding: 'utf8' });
-  const guides = [...manual.matchAll(/^\| \[([^\]]+)\]\(([^)]+)\) \|[^|]+\| ([^|]+)\|/gm)].map(([,title,file,components]) => {
-    const category = file.startsWith('ui-') ? 'ui' : /array|stack|bits|data-structures|cache|compression|encryption|buffers|files|pooling|math|utilities/.test(file) ? 'utilities'
-      : /runtime|events|timing|state|scenes|assets|audio|plugins|diagnostics|physics/.test(file) ? 'runtime' : 'graphics';
-    return {title,category,text:components.replaceAll('`','').replaceAll('…','and related components').trim(),href:`https://github.com/tehnewb/Valthorne/blob/main/docs/systems/${file}`,label:'Read the guide'};
-  });
-  if (guides.length < 40) throw new Error('The system manual could not be parsed; review its format.');
-  await fs.writeFile(path.join(root, 'guides.json'), JSON.stringify(guides, null, 2) + '\n');
-  console.log(`Imported ${guides.length} published system guides.`);
-}
-
-function html(page, revision) {
-  const nav = [['engine','Engine'],['examples','Demos'],['docs','Docs'],['start','Get started'],['lab','Lab'],['about','About']];
-  // The semantic view uses the same page data as Java, including editorial media and resource lists.
-  const media = (file, caption, className) => `<figure class="${className}"><img src="assets/${escape(file)}" alt="${escape(caption || 'A scene rendered with Valthorne')}" width="800" height="460"${className === 'hero-media' ? ' fetchpriority="high"' : ' loading="lazy"'}>${caption ? `<figcaption>${escape(caption)}</figcaption>` : ''}</figure>`;
-  const body = page.sections.map((section,index) => {
-    const layout = section.layout || (section.catalog === 'guides' ? 'rows' : section.catalog === 'examples' ? 'examples' : 'cards');
-    const cards = (section.cards || []).map(card => `<article>${card.image ? `<img src="assets/${escape(card.image)}" alt="${escape(card.title)} running in Valthorne" loading="lazy" width="800" height="460">` : ''}<div class="card-copy">${card.category ? `<p class="card-category">${escape(card.category)}</p>` : ''}<h3>${escape(card.title)}</h3><p>${escape(card.text)}</p></div><div class="card-links"><a href="${escape(card.href)}">${escape(card.label)} <span aria-hidden="true">&nbsp;→</span></a>${card.guide ? `<a href="${escape(card.guide)}">Controls and source <span aria-hidden="true">&nbsp;↗</span></a>` : ''}</div></article>`).join('');
-    return `<section class="section-${escape(layout)}"><div class="section-copy"><header class="section-heading"><h2>${escape(section.title)}</h2>${section.description ? `<p>${escape(section.description)}</p>` : ''}</header>
-    ${section.code ? `<p class="code-filename">${escape(section.filename || '')}</p><pre id="code-${index}" tabindex="0"><code>${escape(section.code)}</code></pre>` : ''}
-    ${section.lab ? `<p class="lab-note">The interactive scene is available in the <a href="${page.id}.html">engine view</a>. Drag to orbit, use the arrow keys to rotate, or pause playback. System reduced-motion settings are respected.</p>` : ''}
-    ${cards ? `<div class="cards">${cards}</div>` : ''}</div>${section.image ? media(section.image, section.imageCaption || '', 'section-media') : ''}</section>`;
-  }).join('');
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(page.id === 'index' ? 'Valthorne — Java game engine' : page.title + ' — Valthorne')}</title>
-<meta name="description" content="${escape(page.description)}"><meta name="theme-color" content="#141414"><meta name="valthorne-build" content="${revision}">
-<link rel="canonical" href="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}">
-<meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:type" content="website"><meta property="og:url" content="${publicURL}${page.id === 'index' ? '' : page.id + '.html'}"><meta property="og:image" content="${publicURL}assets/banner.png">
-<link rel="icon" href="assets/valthorne.png" type="image/png"><link rel="stylesheet" href="shell.css?v=${revision}"></head>
-<body><a class="skip-link" href="?view=text#content">Skip to text content</a>
-<canvas id="scene" aria-hidden="true"></canvas><div id="scroll-space" aria-hidden="true"></div>
-<nav id="engine-links" aria-label="Engine view navigation and actions"></nav>
-<div id="scene-interaction" role="group" tabindex="0" aria-label="Interactive geometry lab. Drag to orbit. Use arrow keys to rotate, or Home to reset the view." hidden></div>
-<input id="engine-search" type="search" aria-label="Search this collection" placeholder="Search titles and systems…" hidden>
-<button id="motion-toggle" type="button" aria-label="Pause motion" title="Pause motion"><span aria-hidden="true" class="pause-icon">Ⅱ</span><span aria-hidden="true" class="play-icon">▷</span></button>
-<button id="back-top" type="button" aria-label="Back to top" title="Back to top" hidden>↑</button>
-<main id="content"><header class="masthead"><a class="brand" href="index.html"${page.id === 'index' ? ' aria-current="page"' : ''}><img src="assets/valthorne.png" alt="Valthorne logo" width="31" height="48">Valthorne</a><nav aria-label="Main navigation">${nav.map(([id,label]) => `<a href="${id}.html"${id === page.id ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav></header>
-<header class="page-hero${page.heroImage ? ' has-media' : ''}"><div class="hero-copy"><p class="eyebrow">${escape(page.eyebrow)}</p><h1>${escape(page.title)}</h1><p class="intro">${escape(page.description)}</p>${page.id === 'index' ? '<div class="hero-actions"><a class="action primary" href="start.html">Start building</a><a class="action" href="examples.html">Explore demos</a></div>' : ''}</div>${page.heroImage ? media(page.heroImage, page.heroCaption || '', 'hero-media') : ''}</header>
-${page.id === 'about' ? '<div class="project-identity"><img class="brand-banner" src="assets/banner.png" alt="Valthorne — original gold lettering and blue flame" width="1511" height="623"></div>' : ''}${body}<div class="project-footer"><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href="about.html">About the project →</a></div></main>
-<footer id="access-bar"><span id="status" role="status">Loading Valthorne…</span><a id="view-toggle" href="?view=text">Text version</a><a href="https://github.com/tehnewb/Valthorne">GitHub ↗</a></footer>
-<script id="page-content" type="application/json">${json(page)}</script><script src="boot.js?v=${revision}"></script>
-</body></html>\n`;
+  console.log('Captured the website UI runtime and Java source fingerprints.');
 }
 
 async function build() {
-  const data = await content();
-  // A revision ties the compiled Java, host, and stylesheet together across browser caches.
-  const revision = hash((await Promise.all(['runtime/manifest.json','site-host.js','navigation.js','boot.js','shell.css','content.json','guides.json','tools/site.mjs'].map(read))).join('\n')).slice(0, 16);
+  // Normalize source line endings so the same checkout receives the same build ID on every OS.
+  const sources = (await files(path.join(root, 'src'))).filter(file => file.endsWith('.java'));
+  const revisionFiles = [...sources, ...['runtime/manifest.json', 'browser-host.js', 'tools/site.mjs'].map(file => path.join(root, file))];
+  const revision = hash((await Promise.all(revisionFiles.map(async file => path.relative(root, file).replaceAll('\\', '/') + '\n' + normalize(await fs.readFile(file, 'utf8'))))).join('\n')).slice(0, 16);
   // Clear only the verified output directory so deleted assets cannot leak into a later deployment.
   if (path.dirname(output) !== root || path.basename(output) !== 'dist') throw new Error('Unsafe output directory');
   await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(output, { recursive: true });
-  // Output is a fixed child of this module; no computed recursive deletion is used.
-  for (const page of data.pages) await fs.writeFile(path.join(output, page.id + '.html'), html(page, revision));
-  for (const name of ['shell.css', 'site-host.js', 'navigation.js', 'boot.js']) await fs.copyFile(path.join(root, name), path.join(output, name));
+  await runExporterClass('HtmlExporter', [output, revision]);
+  await fs.copyFile(path.join(root, 'browser-host.js'), path.join(output, 'browser-host.js'));
   await fs.cp(path.join(root, 'assets'), path.join(output, 'assets'), { recursive: true });
   await fs.cp(path.join(root, 'runtime'), path.join(output, 'runtime'), { recursive: true });
   await fs.cp(path.join(root, 'licenses'), path.join(output, 'licenses'), { recursive: true });
   await fs.copyFile(path.join(root, 'THIRD_PARTY_NOTICES.md'), path.join(output, 'THIRD_PARTY_NOTICES.md'));
   // UIRoot resolves its bundled font relative to the document, not to its JS module.
   await fs.cp(path.join(root, 'runtime/ui'), path.join(output, 'ui'), { recursive: true });
-  await fs.writeFile(path.join(output, '.nojekyll'), '');
-  await fs.writeFile(path.join(output, 'robots.txt'), `User-agent: *\nAllow: /\nSitemap: ${publicURL}sitemap.xml\n`);
-  await fs.writeFile(path.join(output, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${data.pages.map(page => `<url><loc>${publicURL}${page.id === 'index' ? '' : page.id + '.html'}</loc></url>`).join('')}</urlset>`);
-  await fs.writeFile(path.join(output, '404.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found — Valthorne</title><link rel="stylesheet" href="/Valthorne/shell.css"><link rel="icon" href="/Valthorne/assets/valthorne.png"></head><body><main id="content"><img class="brand-banner" src="/Valthorne/assets/banner.png" alt="Valthorne" width="1511" height="623"><div class="eyebrow">404 / PAGE NOT FOUND</div><h1>The page could not be found.</h1><p>Check the address, or continue exploring the engine.</p><a href="/Valthorne/">Return to Valthorne</a></main></body></html>`);
-  console.log(`Built ${data.pages.length} Valthorne pages in website/dist.`);
+  console.log('Packaged the Java-authored website in website/dist.');
 }
 
 async function check() {
-  const data = await content();
   const manifest = JSON.parse(await read('runtime/manifest.json'));
   for (const [file, digest] of Object.entries(manifest.files)) if (fingerprint(file, await fs.readFile(path.join(root, 'runtime', file))) !== digest) throw new Error('Runtime fingerprint mismatch: ' + file);
   for (const [file, digest] of Object.entries(manifest.sources)) if (fingerprint(file, await fs.readFile(path.join(root, file))) !== digest) throw new Error('Java changed; compile and capture the runtime again: ' + file);
   const javaFiles = (await files(path.join(root, 'src'))).map(file => path.relative(root, file).replaceAll('\\', '/'));
   if (JSON.stringify(javaFiles.sort()) !== JSON.stringify(Object.keys(manifest.sources).sort())) throw new Error('Java sources added or removed; compile and recapture the runtime.');
-  for (const file of ['boot.js','site-host.js','navigation.js','runtime/valthorne.js']) execFileSync(process.execPath, ['--check', path.join(root, file)]);
-  const pages = new Set(data.pages.map(page => page.id + '.html'));
-  let count = 0;
-  for (const page of data.pages) {
-    if (!page.title || !page.description || !page.sections.length) throw new Error('Incomplete page: ' + page.id);
-    for (const image of [page.heroImage, ...page.sections.map(section => section.image)].filter(Boolean)) {
-      await fs.access(path.join(root, 'assets', image));
-    }
-    for (const section of page.sections) for (const card of section.cards || []) {
-      for (const href of [card.href,card.guide].filter(Boolean)) {
-        if (/^https:\/\//.test(href)) { new URL(href); }
-        else if (!href.startsWith('?') && !pages.has(href.split('?')[0])) throw new Error('Unknown local link: ' + href);
-        count++;
-      }
-      if (card.image) await fs.access(path.join(root, 'assets', card.image));
-    }
-  }
-  console.log(`Validated ${data.pages.length} pages, ${count} content links, Java/runtime fingerprints, and script syntax.`);
+  for (const file of ['browser-host.js', 'runtime/valthorne.js']) execFileSync(process.execPath, ['--check', path.join(root, file)], processOptions);
+  await runExporterClass('ContentValidator', [path.join(root, 'assets')]);
+  console.log('Verified Java/runtime fingerprints and browser bootstrap syntax.');
 }
 
 function serve() {
@@ -189,8 +127,7 @@ function serve() {
 }
 
 if (command === 'capture-runtime') await captureRuntime();
-else if (command === 'update-guides') await updateGuides();
 else if (command === 'build') { await check(); await build(); }
 else if (command === 'check') await check();
 else if (command === 'serve') serve();
-else throw new Error('Use build, check, serve, capture-runtime, or update-guides.');
+else throw new Error('Use build, check, serve, or capture-runtime.');

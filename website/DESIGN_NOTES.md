@@ -57,7 +57,7 @@ There is no atmospheric background painter or decorative grid, star field,
 ribbon, or glow. Product media provides the visual depth.
 
 Urbanist is self-hosted as an unmodified normal variable font, supporting weights
-100–900. The Java host loads it before layout and uses matching font definitions
+100–900. The Java controller loads it before layout and uses matching font definitions
 for measurement and drawing: 400 for body text, 600 for card titles and controls,
 and 700 for display headings. The HTML companion uses the same family. Code uses
 the system monospace family. [Font provenance and license](assets/fonts/README.md)
@@ -69,6 +69,34 @@ border. White primary-button text against purple measures 5.74:1. Keyboard focus
 uses a separate pale-purple outline and input placeholders use the full
 secondary-text color. These are checks of specific color pairs, not a claim of
 complete WCAG conformance.
+
+## Java authoring and browser output
+
+The website's application code is maintained in Java. `WebsiteApplication`
+paints the responsive Valthorne UI, `WebsiteController` owns input and display
+state, and `WebsiteNavigation` owns route loading, history, and transition
+timing. `BrowserBridge` is a Java facade for the painter. Search, filters, code
+copying, scene controls, motion preferences, and frame scheduling are Java
+behavior, including the handling of browser events.
+
+`WebsiteContent`, `GuideCatalog`, and `DemoCatalog` hold the shared copy and
+links. At build time, the standalone Java `HtmlExporter` writes the semantic
+documents, metadata, sitemap, and error page. `BrowserStyles` emits the native
+control and text-view stylesheet. HTML and CSS remain necessary browser output,
+but are generated from the Java source instead of maintained as a second
+website. Keep the canvas theme and the emitted browser style tokens aligned.
+
+TeaVM compiles the browser application. `BrowserDom` and `BrowserPort` expose
+small native browser operations, while `browser-host.js` initializes the web
+port and connects its graphics resources and callbacks. The adapter does not
+decide routes, filters, animation timing, or other website behavior. Node.js
+packaging and Playwright verification remain development tools.
+
+Packaging uses JDK 17 or later to compile the dependency-free exporter and
+verifies the checked-in browser runtime against every Java source fingerprint.
+Rebuilding that browser runtime still requires the development `portable/`
+checkout and Java 25; the published desktop library alone cannot compile the
+website for the web. Keep this distinction explicit in setup instructions.
 
 ## Motion and 3D direction
 

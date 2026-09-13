@@ -19,7 +19,7 @@ import valthorne.ui.nodes.nano.NanoContainer;
  * scrolling moves the document behind a fixed engine drawing surface.</p>
  *
  * <p>BrowserBridge supplies shared content and positions real HTML controls.
- * Urbanist is loaded by the host before layout begins. Finite entrance movement
+ * The Java controller loads Urbanist before layout begins. Finite entrance movement
  * preserves text opacity; only the visible, enabled lab requests ongoing frames.</p>
  */
 public final class WebsiteApplication implements Application {
@@ -32,7 +32,9 @@ public final class WebsiteApplication implements Application {
     private long vg;
 
     /** Entry point used by the portable TeaVM target. */
-    public static void main(String[] args) { JGL.init(new WebsiteApplication(), "Valthorne", 1280, 800); }
+    public static void main(String[] args) {
+        WebsiteController.launch(() -> JGL.init(new WebsiteApplication(), "Valthorne", 1280, 800));
+    }
 
     /** One root owns the vector context, layout, and drawing resources. */
     @Override public void init() {
@@ -65,7 +67,7 @@ public final class WebsiteApplication implements Application {
         y = page.equals("index") ? hero(y) : introduction(y);
         for (int index = 0; index < BrowserBridge.sections(); index++) y = section(index, y);
         y = footer(y);
-        header(); // Always last: the host moves these seven links to the front of tab order.
+        header(); // Always last: the controller moves these seven links to the front of tab order.
         BrowserBridge.end(y + scroll);
     }
 

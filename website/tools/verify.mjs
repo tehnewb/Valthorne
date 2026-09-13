@@ -204,14 +204,16 @@ try {
   report.checks.push('Readable monospace code, original source copying, and visible copy confirmation');
 
   await page.goto(base + 'docs.html?view=text');
+  await page.waitForFunction(() => document.querySelector('#view-toggle').textContent === 'Engine version');
   assert.equal(await page.locator('#content article').count(), 50);
   assert.equal(await page.evaluate(() => globalThis.valthorneReady), undefined);
+  assert.equal(await page.evaluate(() => globalThis.valthorneHost), undefined, 'Text mode initialized the graphics runtime');
   assert.equal(await page.locator('#view-toggle').textContent(), 'Engine version');
   const noJS = await browser.newContext({ javaScriptEnabled: false });
   const textPage = await noJS.newPage(); await textPage.goto(base + 'examples.html');
   assert.equal(await textPage.locator('#content a[href*="Valthorne-demo-"]').count(), 10);
   await noJS.close();
-  report.checks.push('Text mode avoids engine startup; no-JavaScript view retains all ten downloads');
+  report.checks.push('Java selects text mode without graphics startup; no-JavaScript view retains all ten downloads');
   const fallbackPage = await context.newPage();
   await fallbackPage.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;

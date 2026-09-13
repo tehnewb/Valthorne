@@ -61,7 +61,7 @@ async function settled(page, id) {
   await page.waitForFunction(id => globalThis.site?.page.id === id && globalThis.websiteMetrics?.navigating === false, id);
   await page.waitForFunction(() => !websiteMetrics.revealing && !document.querySelector('.page-transition'));
   const state = await page.evaluate(() => ({
-    id: site.page.id, payload: JSON.parse(document.querySelector('#page-content').textContent).id,
+    id: site.page.id, payload: document.documentElement.dataset.pageId,
     title: document.title,
     expectedTitle: site.page.id === 'index' ? 'Valthorne — Java game engine' : `${site.page.title} — Valthorne`,
     liveHost: navigationAudit.host === valthorneHost, liveCanvas: navigationAudit.canvas === valthorneHost.graphics.canvas,

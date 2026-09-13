@@ -1,7 +1,11 @@
 # Valthorne website
 
-The public website is a **Java Valthorne application**, compiled to JavaScript
-with TeaVM and hosted at **https://tehnewb.github.io/Valthorne/**.
+The public website is **authored in Java using Valthorne**, compiled to JavaScript
+with TeaVM and hosted at **https://tehnewb.github.io/Valthorne/**. Java owns the
+content, layouts, interaction state, navigation, transitions, and generation of
+the accessible HTML and browser stylesheet. The remaining handwritten browser
+JavaScript supplies the web port's startup and drawing primitives; Node.js tools
+package and verify the result.
 It contains the engine overview, platform requirements, ten demo downloads,
 47 system guides, integration instructions, an interactive 3D illustration, and
 project links.
@@ -24,8 +28,8 @@ background is plain; no atmospheric painter, stars, grid, or glow is used.
 
 Urbanist is served locally from `assets/fonts/Urbanist-Variable.ttf`, with its
 SIL OFL license and pinned source documented in [assets/fonts/README.md](assets/fonts/README.md).
-The host loads it before Java measures or draws text. The Java aliases use
-weight 400 for body copy (`default`), 600 for titles and controls (`ui-medium`),
+`WebsiteController` loads it before Java measures or draws text. The Java aliases
+use weight 400 for body copy (`default`), 600 for titles and controls (`ui-medium`),
 and 700 for display headings (`display`). The HTML companion uses the same
 variable family, `UrbanistWebsite`. Code uses the system monospace family.
 
@@ -66,26 +70,35 @@ websites and the rationale for Valthorne's layout, motion, and scene controls.
 | --- | --- |
 | `src/main/java/valthorne/website/WebsiteApplication.java` | Valthorne application lifecycle, responsive layout, text wrapping, cards, navigation painting, and placement of the interactive scene |
 | `src/main/java/valthorne/website/CrystalScene.java` | Procedural meshes, perspective projection, face lighting, and depth-sorted Canvas2D painting for the crystal illustration |
-| `src/main/java/valthorne/website/BrowserBridge.java` | Small TeaVM bridge for content, scrolling, image painting, measurements, motion state, scene input, and semantic link placement |
-| `content.json`, `guides.json` | Shared content for the engine view and complete semantic HTML companion |
-| `site-host.js` | Frame scheduling, finite reveals, motion preferences, scene interaction, native links, search input, clipboard, browser history, and rendering failure recovery |
-| `navigation.js` | Internal page loading, prepared media, persistent engine navigation, browser history restoration, and brief page transitions |
-| `boot.js`, `shell.css` | Engine startup and accessible HTML presentation |
+| `src/main/java/valthorne/website/WebsiteController.java` | Page and interaction state, frame scheduling, reveals, motion preferences, scene input, native controls, search, clipboard, font selection, image preparation, and rendering failure recovery |
+| `src/main/java/valthorne/website/BrowserBridge.java` | Ordinary Java facade connecting the painter to the controller and immutable page content |
+| `src/main/java/valthorne/website/browser/WebsiteNavigation.java` | Route selection, prepared page loading, persistent engine navigation, browser history restoration, and transition timing |
+| `src/main/java/valthorne/website/browser/BrowserDom.java`, `BrowserPort.java` | Thin TeaVM bindings to browser DOM, storage, font, clipboard, canvas, and portable graphics operations |
+| `src/main/java/valthorne/website/content/` | Immutable page, section, and card models; canonical copy in `WebsiteContent`, guide links in `GuideCatalog`, and release downloads in `DemoCatalog` |
+| `src/main/java/valthorne/website/export/` | `HtmlExporter` generates complete semantic documents and search-engine files; `BrowserStyles` emits browser CSS; `ContentValidator` checks the shared Java content |
+| `browser-host.js` | Web-port bootstrap, graphics-backend setup, callback connection, and generic drawing primitives; Java owns the application behavior |
 | `runtime/` | Verified, compiled website UI runtime and bundled dependency notices |
 | `assets/` | Original branding, real engine screenshots, and the self-hosted Urbanist font; no runnable examples or game asset trees |
-| `tools/site.mjs` | Validation, static packaging, preview, guide import, and runtime capture |
+| `tools/site.mjs` | Compiles and runs the Java exporter, validates source/runtime fingerprints, packages static files, serves previews, and captures the compiled runtime |
 | `tools/verify.mjs` | Browser acceptance checks; output is written to ignored `build/` |
 | `tools/verify-navigation.mjs` | Actual link navigation, engine continuity, keyboard focus, scroll restoration, and overlapping navigation checks |
 
 `JGL` owns the normal init/update/render/dispose lifecycle. `UIRoot` and
 `NanoContainer` provide the engine UI context, and `Canvas2D` paints the visible
-site. The host uses the portable vector, WebGL, and Yoga backends. It does not
+site. The browser port uses the portable vector, WebGL, and Yoga backends. It does not
 initialize Filament, Jolt, audio, or the engine's full 3D scene renderer.
+
+The application is maintained in `.java` files. `HtmlExporter` runs on the JVM
+at build time; `WebsiteApplication` and its controller run through TeaVM in the
+browser. They share `WebsiteContent` and the same catalog models. The exported
+HTML and CSS are deployment artifacts, not separately maintained application
+sources. The TeaVM binding methods expose small browser operations; routing,
+timing, filtering, and interaction decisions are implemented as Java methods.
 
 The browser retains ordinary scrolling, links, focus, and native text input.
 Each page has its own URL; a search query is preserved in `?q=...`. A complete
 HTML document is generated from the same content. **Text version** switches to
-`?view=text`, which does not load the engine. The HTML is also readable without
+`?view=text`, which Java selects without initializing the graphics runtime. The HTML is also readable without
 JavaScript or when engine startup fails. Code copying uses the original source,
 not the visually wrapped canvas text.
 
@@ -138,8 +151,10 @@ keep high-density text sharp without unbounded surface allocation.
 
 ## Build and preview
 
-Node.js 24 is sufficient to package the checked-in runtime. No npm installation,
-Java installation, Gradle run, credentials, or network access is needed for this:
+Install **Node.js 24 and JDK 17 or later**. Set `JAVA_HOME` to the JDK directory,
+or make `java` and `javac` available on `PATH`. Packaging compiles and runs the
+dependency-free Java exporter and uses the checked-in browser runtime. It needs
+no npm installation, Gradle run, credentials, or network access:
 
 ```sh
 node website/tools/site.mjs build
@@ -155,36 +170,46 @@ The package contains the original branding, selected engine captures, and the
 bundled UI runtime. Procedural scene geometry and motion use that same runtime;
 the published website does not load external fonts or a separate 3D framework.
 
-The checker validates content references, script syntax, runtime checksums, and
-the Java source fingerprints. `dist/`, `build/`, and `node_modules/` are ignored.
+The Java validator checks content and asset references. The packaging tool also
+checks browser bootstrap syntax, runtime checksums, and Java source fingerprints.
+Exporter classes are written to `build/export-classes/`; `dist/`, `build/`, and
+`node_modules/` are ignored.
 
 ## Editing content
 
-Edit `content.json` for page copy, code snippets, and feature cards. Edit
-`guides.json` for the manual directory. The explicit import command below reads
-the **committed** manual index so local engine work cannot silently alter the
-published website:
+Edit the classes under `src/main/java/valthorne/website/content/`:
 
-```sh
-node website/tools/site.mjs update-guides
-node website/tools/site.mjs build
-```
+- `WebsiteContent.java`: page copy, integration code, feature sections, and media.
+- `GuideCatalog.java`: the curated manual directory and its categories.
+- `DemoCatalog.java`: demo descriptions, guide links, release version, and ZIP filenames.
 
-The demo catalog and release filenames are maintained in `demoCards()` in
-`tools/site.mjs`. Update the release tag and filenames together after verifying
-the release assets. Screenshots are actual engine captures; captions should not
-imply that desktop screenshots are playable browser demos.
+Use the `Page`, `Section`, and `Card` models to keep the engine view and exported
+HTML in agreement. The manual directory is explicit Java content; packaging does
+not import uncommitted engine documentation. Update release versions and filenames
+together after verifying the release assets. Screenshots are actual engine
+captures; captions should not imply that desktop screenshots are playable browser
+demos.
+
+Edit `export/BrowserStyles.java` for the native controls and text-view styles,
+and `export/HtmlExporter.java` for semantic markup or metadata. Update the Java
+painter's palette and the emitted stylesheet together when changing the theme.
+Do not edit generated files in `dist/`. After changing Java content, behavior,
+layout, or export sources, rebuild and capture the browser runtime as described
+below so the source fingerprints remain consistent.
 
 ## Editing Java and rebuilding the runtime
 
 The browser target is currently development code in `portable/`, separate from
 the stable Maven library. This module intentionally checks in its small compiled
 UI runtime so a fresh website checkout can be packaged and deployed independently
-of that ongoing port. **Recompiling Java currently requires the development
-checkout containing `portable/`; the 2.0.0 Maven artifact alone is insufficient.**
-The deployment workflow verifies and packages the snapshot; it does not compile
-Java. Replace this bootstrap arrangement with source compilation once the web
-target is versioned and available to consumers.
+of that ongoing port. **Recompiling the browser application currently requires
+the development checkout containing `portable/`; the 2.0.0 Maven artifact alone
+is insufficient.**
+The deployment workflow compiles the standalone Java HTML exporter and verifies
+and packages the browser snapshot; it does not run TeaVM to rebuild the browser
+application. The exporter needs only JDK 17 or later. Replace the browser snapshot
+arrangement with source compilation once the web target is versioned and
+available to consumers.
 
 With that checkout, Java 25, and the portable web npm dependencies installed:
 
@@ -225,8 +250,8 @@ mobile overflow, visible engine pixels, navigation, search and filters, idle
 rendering, animation, clipboard, and text/no-JavaScript fallback. Navigation checks
 click the actual links at desktop and phone sizes, verify the same engine remains
 alive, and cover keyboard focus, Back/Forward restoration, rapid clicks, and
-reduced motion. Reports and
-screenshots are written to `website/build/`, not a test directory. The Chromium
+reduced motion. Reports and screenshots are written to `website/build/`, not a
+test directory. The Chromium
 checks are also required before Pages deployment. Other browsers are not claimed
 as verified by that check.
 
@@ -240,9 +265,9 @@ no deployment branch or custom domain requirement.
 
 All assets are relative to the document, so the site works under `/Valthorne/`.
 Canonical metadata and the sitemap use the public URL. If the repository is
-renamed, update `publicURL`, the preview prefix, the 404 home link, and the
-workflow preview URL together. No application server, CDN, analytics, cookies,
-or cross-origin isolation headers are required.
+renamed, update `HtmlExporter.PUBLIC_URL`, the preview prefix, the exported 404
+home link, and the workflow preview URL together. No application server, CDN,
+analytics, cookies, or cross-origin isolation headers are required.
 
 ## Assets and licenses
 
