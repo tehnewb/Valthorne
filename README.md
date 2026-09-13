@@ -6,8 +6,8 @@ physics, particles, lighting, and a shared texture/NanoVG UI system.
 
 **Version 2.0.0 · Java 25 · Apache-2.0**
 
-Explore the [Valthorne website](https://tehnewb.github.io/Valthorne/) for engine
-features, demo downloads, and documentation. The [website module](website/README.md)
+Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) for engine
+features, demo downloads, and documentation. The [website repository](https://github.com/tehnewb/Valthorne-website)
 is itself a Java Valthorne application compiled for the browser.
 
 Version 2.0.0 contains breaking API changes from 1.4.6, including public JOML math
