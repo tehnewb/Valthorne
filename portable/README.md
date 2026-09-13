@@ -368,7 +368,10 @@ Profiling getters currently retain their default zero values in the browser.
 The browser `engine-*.filamat` packages compile the existing shared shader sources
 using `matc` 1.75.0 with `-p mobile -a opengl`. `webDist` verifies their source and
 binary hashes against `web/engine-materials.json`; shader edits require recompiling
-the matching package and updating that manifest. Builds do not require a locally
+the matching package and updating that manifest. Source SHA-256 hashes use UTF-8
+with LF line endings; binary hashes cover the exact package bytes. This keeps
+validation consistent across Windows, Linux and macOS checkouts without ignoring
+shader edits. Builds do not require a locally
 installed shader compiler while the checked-in packages match their sources.
 
 JOML remains version 1.10.8. The build compiles narrowly patched upstream sources

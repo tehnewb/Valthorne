@@ -1,6 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 *.java text eol=lf
+*.mat text eol=lf
 *.gradle text eol=lf
 *.properties text eol=lf
 *.md text eol=lf
