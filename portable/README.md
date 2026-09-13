@@ -75,6 +75,10 @@ Use `build web` to produce a static deployment in `portable/web/build/dist`.
 Clone `Valthorne-examples` alongside this repository first. Set
 `VALTHORNE_EXAMPLES_DIR` to use another location. The FPS launcher reads example
 sources and assets there; maintain runnable examples in that repository.
+CI pins [example revision d9c8ba4](https://github.com/tehnewb/Valthorne-examples/commit/d9c8ba498674686efc41f8e7ce0a343d95159e5e),
+whose own checks use [engine revision 256cde5](https://github.com/tehnewb/Valthorne/commit/256cde556a407f347e27644e9d0de9e744f8103e).
+Use these revisions to reproduce the shared FPS build; the portable APIs are
+development sources and are not included in the older published engine dependency.
 Set `PORT` to change the preview server's default port of 8095.
 The application uses `Canvas2D` for its custom HUD and `PlatformTools` for
 graphics diagnostics and test input; native bindings stay inside the engine.
