@@ -1,7 +1,7 @@
 # Runnable examples
 
 The public [Valthorne examples repository](https://github.com/tehnewb/Valthorne-examples) contains the complete examples
-and redistributable resources for Valthorne 2.0.0. Each demo includes a walkthrough,
+and redistributable resources for Valthorne 2.1.0. Each demo includes a walkthrough,
 documented source, controls, platform requirements, and a bounded smoke mode.
 It builds against the released Maven Central dependency.
 

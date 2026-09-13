@@ -1,7 +1,8 @@
 # Add Valthorne to a Java project
 
-This guide targets **2.0.0**. Use documentation matching your dependency version;
-2.0.0 changes public math types from 1.4.6. See [migration notes](joml-migration.md).
+This guide targets **2.1.0**. Use documentation matching your dependency version;
+2.1.0 includes the public JOML math API introduced after 1.4.6. See [migration
+notes](joml-migration.md).
 
 ## Requirements
 
@@ -36,7 +37,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:2.0.0'
+    implementation 'io.github.tehnewb:Valthorne:2.1.0'
 }
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 application {
@@ -65,7 +66,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation("io.github.tehnewb:Valthorne:2.0.0")
+    implementation("io.github.tehnewb:Valthorne:2.1.0")
 }
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }
 application {
@@ -102,7 +103,7 @@ when using the optional local installation, and Maven Central for published rele
         <dependency>
             <groupId>io.github.tehnewb</groupId>
             <artifactId>Valthorne</artifactId>
-            <version>2.0.0</version>
+            <version>2.1.0</version>
         </dependency>
     </dependencies>
     <build>
