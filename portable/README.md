@@ -415,9 +415,12 @@ timeout. The model check still requires all 180 frames and its resource cleanup.
 Arena and FPS input checks wait for rendered frames or simulated physics time;
 slow rendering must not shorten a movement, reload or grenade-fuse check. Software
 FPS checks select the engine's Performance preset at 1200×800, keep all menu
-controls visible, and allow up to three minutes for each simulation-time condition.
+controls visible, and allow up to five minutes for each simulation-time condition.
 Normal FPS checks retain the game's High preset at 1600×960. Both exercise the
-same gameplay, lights, shadows and resource ownership assertions.
+same gameplay, lights, shadows and resource ownership assertions. The software
+verifier allows five minutes for a simulation condition because a SwiftShader
+grenade burst can block one Filament frame for several minutes; hardware retains
+the shorter deadline.
 Each entry, restart and resume must acquire mouse capture. Repeated capture
 requests are spaced to respect browser rate limits; failure reports include
 activation, focus and capture events alongside the current gameplay phase.
