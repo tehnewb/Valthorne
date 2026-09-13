@@ -1,0 +1,35 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+try{
+ const page=await browser.newPage({viewport:{width:640,height:480}}),messages=[],errors=[];
+ page.on('console',m=>messages.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
+ await page.goto(process.env.TEST_URL||'http://127.0.0.1:8095');
+ await page.waitForFunction(()=>globalThis.valthorneHost?.nano?.contexts.size&&[...valthorneHost.nano.contexts.values()][0].dirty!==undefined);
+ await page.waitForFunction(()=>document.querySelector('aside').hidden);
+ await page.evaluate(()=>{const host=valthorneHost,close=host.close;host.close=function(){globalThis.uiLeaks={yoga:this.yoga.objects.size,nano:this.nano.contexts.size,fonts:this.fonts.fonts.size,graphics:this.graphics.objects.size};return close.call(this);};});
+ await page.mouse.click(120,104);await page.mouse.click(420,104);await page.mouse.click(120,180);
+ await page.keyboard.type('Valthorne');await page.keyboard.press('Backspace');await page.keyboard.type('e');
+ await page.keyboard.press('ControlOrMeta+a');await page.keyboard.type('Web UI');
+ await page.mouse.move(160,260);await page.mouse.down();await page.mouse.move(420,260,{steps:8});await page.mouse.up();
+ await page.mouse.click(40,330);
+ await page.waitForTimeout(150);
+ const state=await page.evaluate(()=>({yoga:valthorneHost.yoga.objects.size,fonts:valthorneHost.fonts.fonts.size,nano:valthorneHost.nano.contexts.size,error:valthorneHost.graphics.gl.getError()}));
+ assert(state.yoga>5);assert.equal(state.nano,1);assert.equal(state.error,0);
+ const output=new URL('./build/verification/',import.meta.url);await mkdir(output,{recursive:true});await page.screenshot({path:fileURLToPath(new URL('common-ui.png',output))});
+ await page.setViewportSize({width:800,height:600});
+ await page.waitForTimeout(100);
+ assert.deepEqual(await page.evaluate(()=>[valthorneHost.graphics.canvas.width,valthorneHost.graphics.canvas.height]),[800,600]);
+ await page.waitForFunction(()=>valthorneHost.closed,null,{timeout:20000});
+ assert.deepEqual(errors,[],messages.join('\n'));
+ assert(messages.includes('UI_VECTOR_CLICK'),messages.join('\n'));assert(messages.includes('UI_TEXTURE_CLICK'),messages.join('\n'));
+ const validation=messages.find(m=>m.startsWith('COMMON_UI_VALIDATED'));
+ assert(validation?.includes('clicks=2 text=Web UI'),messages.join('\n'));
+ assert(Number(validation.match(/slider=([\d.]+)/)?.[1])>.65,validation);
+ assert(messages.includes('COMMON_UI_RETURNED'),messages.join('\n'));
+ assert.deepEqual(await page.evaluate(()=>globalThis.uiLeaks),{yoga:0,nano:0,fonts:0,graphics:0});
+ for(const message of messages)if(message.startsWith('UI_BENCHMARK'))console.log(message);
+ console.log('COMMON_UI_BROWSER_VALIDATED '+validation);
+}finally{await browser.close();}

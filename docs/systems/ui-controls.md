@@ -17,6 +17,7 @@ Standard controls render through the texture-oriented UI path. Choose controls b
 | Containers | Panel, Grid, ScrollPanel, SplitPane, and TabbedPane arrange or reveal content. |
 | Transient UI | Modal and Tooltip provide temporary or contextual information. |
 | Collapsible content | CollapsibleSection hides or reveals a related group without replacing the application screen. |
+| Live curve labels | SlugLabel draws Slug outlines with retained layout and updates measured dimensions when text or em size changes. |
 
 ## Getting started
 
@@ -34,6 +35,7 @@ Controls commonly retain fonts, textures, and colors by reference. Keep those re
 - Programmatic setters do not all fire user-action callbacks; read each setter's contract.
 - A displayed range value and a normalized thumb position are not interchangeable units.
 - Use virtualized controls for large datasets rather than attaching one ordinary widget per row.
+- SlugLabel borrows its SlugFont, SlugBatch, and mutable tint. Keep the shared batch idle on entry to label drawing and dispose shared GPU resources only after all dependent labels are gone.
 
 ## Components and examples
 
@@ -51,6 +53,7 @@ The sections below explain each component and its declared public or protected o
 - [`ProgressBar`](#type-progressbar)
 - [`ScrollPanel`](#type-scrollpanel)
 - [`Slider`](#type-slider)
+- [`SlugLabel`](#type-sluglabel)
 - [`SplitPane`](#type-splitpane)
 - [`TabbedPane`](#type-tabbedpane)
 - [`TextField`](#type-textfield)
@@ -820,7 +823,6 @@ Sets the horizontal gap between columns.
 #### applyLayout
 
 ```java
-@Override
     protected void applyLayout()
 ```
 
@@ -838,7 +840,6 @@ the corresponding size is left automatic.
 #### update
 
 ```java
-@Override
     public void update(float delta)
 ```
 
@@ -851,7 +852,6 @@ This implementation delegates directly to the superclass update method.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch)
 ```
 
@@ -919,7 +919,6 @@ Creates a new image node using the provided texture.
 #### onCreate
 
 ```java
-@Override
     public void onCreate()
 ```
 
@@ -931,7 +930,6 @@ and then configured to fill according to the layout system.
 #### onDestroy
 
 ```java
-@Override
     public void onDestroy()
 ```
 
@@ -943,7 +941,6 @@ the method exists to fulfill the node lifecycle contract.
 #### update
 
 ```java
-@Override
     public void update(float delta)
 ```
 
@@ -956,7 +953,6 @@ This implementation currently performs no per-frame logic.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch)
 ```
 
@@ -3269,6 +3265,147 @@ renders them in order: track first, fill second, and thumb last.
 
 </details>
 
+<a id="type-sluglabel"></a>
+
+### SlugLabel
+
+[Source](../../src/main/java/valthorne/ui/nodes/SlugLabel.java#L29)
+
+Retained curve-rendered text for regular or NanoVG UI containers. Text and size changes
+refresh a reusable glyph layout and the node's measured dimensions; each draw renders
+live curves through a shared Slug batch. The font and renderer are borrowed and must
+outlive all labels using them. GPU operations require their owning GL context thread.
+
+```java
+SlugLabel label = new SlugLabel(font, slugBatch, "Score: 0", 24f);
+container.add(label);
+label.text("Score: 100").color(Color.WHITE);
+```
+
+The shared batch must be idle when this node draws. Container clipping is forwarded
+for glyph rejection and CPU quad cropping in the text's world-coordinate space.
+
+<details>
+<summary>SlugLabel operation reference (10 declarations)</summary>
+
+#### Constructor
+
+```java
+public SlugLabel(SlugFont font, SlugBatch renderer, String text, float size)
+```
+
+Creates retained text and initializes measured node dimensions from its layout.
+
+- **`font`** — borrowed font supplying live curve data and metrics
+- **`renderer`** — borrowed batch, idle whenever this label draws
+- **`text`** — initial text; null is normalized to empty
+- **`size`** — finite nonnegative world units per em
+
+**Throws `NullPointerException`:** if font or renderer is null
+
+**Throws `IllegalArgumentException`:** if size is negative or nonfinite
+
+#### text
+
+```java
+public SlugLabel text(String text)
+```
+
+Changes text and updates layout dimensions; unchanged content reuses glyph arrays.
+
+- **`text`** — replacement text, with null treated as empty
+
+**Returns:** this label for configuration chaining
+
+#### text
+
+```java
+public String text()
+```
+
+Reads the normalized source string retained by the glyph layout.
+
+**Returns:** current text, never null
+
+#### size
+
+```java
+public SlugLabel size(float size)
+```
+
+Changes the em scale, rebuilds glyph positions when necessary, and updates dimensions.
+
+- **`size`** — finite nonnegative world units per em
+
+**Returns:** this label
+
+**Throws `IllegalArgumentException`:** if size is negative or nonfinite
+
+#### size
+
+```java
+public float size()
+```
+
+Reads the retained font scale, which is independent of the node's layout height.
+
+**Returns:** world units per em
+
+#### color
+
+```java
+public SlugLabel color(Color color)
+```
+
+Borrows a tint object without copying it; later mutations affect subsequent draws.
+
+- **`color`** — nonnull text tint
+
+**Returns:** this label
+
+**Throws `NullPointerException`:** if color is null
+
+#### onCreate
+
+```java
+@Override public void onCreate()
+```
+
+Requires no additional resources because construction already created the CPU run.
+
+#### onDestroy
+
+```java
+@Override public void onDestroy()
+```
+
+Leaves the borrowed font and renderer alive for other labels; their owner disposes them.
+
+#### update
+
+```java
+@Override public void update(float delta)
+```
+
+Performs no timed updates; text layout changes only through explicit setters.
+
+- **`delta`** — elapsed update time supplied by the UI lifecycle
+
+#### draw
+
+```java
+@Override public void draw(TextureBatch batch)
+```
+
+Flushes preceding texture geometry, renders retained curves using the window projection
+and current viewport, then restores the Slug pass state. Applies batch translation
+and forwards its clip rectangle. Empty, zero-sized, and fully transparent labels skip
+work. A finally block cancels unfinished submission and clears the shared CPU clip.
+
+- **`batch`** — active UI texture batch whose pending geometry must precede this label
+
+</details>
+
 <a id="type-splitpane"></a>
 
 ### SplitPane
@@ -4433,3 +4570,4 @@ Returns the current tooltip text.
 - [Themes, styles, and design tokens](ui-themes.md)
 - [Virtual lists, tables, and selection](ui-data.md)
 - [Shared UI behavior and editing models](ui-behavior.md)
+- [Slug vector fonts](slug-fonts.md)

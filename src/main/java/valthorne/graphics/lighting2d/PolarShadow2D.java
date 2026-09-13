@@ -108,6 +108,7 @@ public final class PolarShadow2D {
      * @throws NullPointerException if light, the list or a list entry is null
      */
     public boolean update(PointLight2D light, List<Occluder2D> occluders) {
+        for (Occluder2D o : occluders) o.synchronize();
         long hash = light.shadowRevision * 31 + System.identityHashCode(light);
         for (Occluder2D o : occluders)
             if ((o.category & light.mask) != 0 && o.overlaps(light))
@@ -120,8 +121,8 @@ public final class PolarShadow2D {
                 Arrays.fill(distances, 0);
                 break;
             }
-            for (int i = 0; i < o.vertices.length; i += 2) {
-                int j = (i + 2) % o.vertices.length;
+            for (int i = 0; i < o.coordinateCount; i += o.edgeStep()) {
+                int j = o.edgeEnd(i);
                 edge(o.x + o.vertices[i] - light.x, o.y + o.vertices[i + 1] - light.y,
                         o.x + o.vertices[j] - light.x, o.y + o.vertices[j + 1] - light.y, light.radius);
             }

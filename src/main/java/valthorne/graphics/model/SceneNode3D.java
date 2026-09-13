@@ -99,7 +99,9 @@ public final class SceneNode3D {
         return appendLocalTransform(out);
     }
 
-    /** Appends the live local transform to an already captured parent transform. */
+    /**
+     * Appends the live local transform to an already captured parent transform.
+     */
     Matrix4f appendLocalTransform(Matrix4f out) {
         localTransform.identity().translate(position.x(), position.y(), position.z());
         if (quaternion == null) localTransform.rotateZ(yawRadians).rotateY(rotationY).rotateX(rotationX);
@@ -313,7 +315,18 @@ public final class SceneNode3D {
     }
 
     // Allocation-free package traversal without exposing mutable membership.
+    /**
+     * Reads direct child count for package-local traversal without allocating a snapshot.
+     * @return current number of direct children
+     */
     int childCount() {return children.size();}
+    /**
+     * Borrows a direct child in current list order. Hierarchy mutation during indexed
+     * traversal is unsupported because indices may shift.
+     * @param index zero-based child index
+     * @return borrowed child node
+     * @throws IndexOutOfBoundsException if index is outside the current child list
+     */
     SceneNode3D childAt(int index) {return children.get(index);}
 
     /**

@@ -19,11 +19,6 @@ Start here when embedding Valthorne in a desktop application. `Application` supp
 
 ## Getting started
 
-Follow [dependency and launcher setup](../getting-started.md) first. Java 25 native
-launchers need `--enable-native-access=ALL-UNNAMED`, and macOS additionally needs
-`-XstartOnFirstThread`. The [minimal application](../getting-started.md#your-first-application)
-is the asset-free starting point; [platform support](../platforms.md) describes renderer limits.
-
 1. Implement `Application`, keeping resource references in instance fields.
 2. Call `JGL.init(application, title, width, height)` or the configuration overload from your entry point.
 3. Create textures, batches, renderers, and UI inside initialization, then update them once per frame.
@@ -67,6 +62,11 @@ public final class MinimalApplication implements Application {
 ## Ownership and lifecycle
 
 Do not create a second owner for the same OpenGL handle. A CPU asset-loading future is not a graphics context. Schedule uploads onto the engine/context thread. Window logical dimensions and framebuffer pixels can differ on scaled displays.
+
+Follow [dependency and launcher setup](../getting-started.md) first. Java 25 native
+launchers need `--enable-native-access=ALL-UNNAMED`, and macOS additionally needs
+`-XstartOnFirstThread`. The [minimal application](../getting-started.md#your-first-application)
+is the asset-free starting point; [platform support](../platforms.md) describes renderer limits.
 
 ## Important behavior
 

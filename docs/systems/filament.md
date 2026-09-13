@@ -17,6 +17,10 @@ FilamentRenderer3D connects Valthorne scene models and materials to the native F
 | Lighting | Explicit point lights, supported emissive approximations, and environment illumination feed the native scene. |
 | Quality | Presets select multisample behavior while retaining full-resolution ambient occlusion. |
 | Invalidation | Explicit invalidation refreshes supported cached scene/texture state. |
+| Exact vertex indexing | Bit-identical complete vertex records share one uploaded record; seams remain distinct and triangle order is preserved. |
+| Solid material path | Opaque placements whose known alpha cannot trigger discard use the no-discard material package. |
+| Selective synchronization | Per-entry signatures skip redundant transform/material uploads; culled entries refresh before reappearing. |
+| Visibility and counters | Current-frame CPU tests reject eligible geometry while upload and phase counters help explain the remaining work. |
 
 ## Getting started
 
@@ -34,6 +38,10 @@ Filament resources and the confined native arena belong to the creating thread. 
 - Do not use invalidation as a promise that arbitrary geometry edits are reuploaded.
 - Transparent, opaque, and glass-like material paths have different supported behavior.
 - Native platform support is determined by the dependencies shipped in this checkout.
+- Occlusion is enabled by default. Shadow casters and active implicit light contributors remain in the native scene, and transmission above 0.01 anywhere in the collected scene bypasses additional camera rejection. Explicit point lights remain independent.
+- For controlled comparisons, set `-Dvalthorne.filament.disableSolid=true` or `-Dvalthorne.filament.disableIndexing=true` before class initialization. These settings affect material selection or native upload layout.
+- Enable `-Dvalthorne.filament.profile=true` before class initialization to read `getProfileNanos(0..3)`: caller wait, scene synchronization, native rendering/completion, and camera/blit overhead, respectively. Timings are nanoseconds; disabled profiling returns zero.
+- `getUploadedSourceVertices()` and `getUploadedUniqueVertices()` are cumulative upload diagnostics, not per-frame triangle counts. Indexing compares all attributes, including raw floating-point bits.
 
 ## Components and examples
 
@@ -46,7 +54,7 @@ The sections below explain each component and its declared public or protected o
 
 ### FilamentRenderer3D
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L53)
+[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L59)
 
 Adapts Valthorne triangle scenes to Filament 1.75 through Windows x64 OpenGL
 texture sharing. Create, render, configure, and close on the GLFW context's
@@ -68,6 +76,13 @@ filtering. Call invalidate after changing base pixels to regenerate mip levels.
 Custom procedural renderables and in-place animated mesh-buffer updates are
 not represented by this adapter.
 
+Native mesh uploads index bit-identical complete vertices, retaining attribute
+seams and source triangle order. Opaque surfaces proven not to need alpha discard
+use the solid material package. Per-entry signatures avoid redundant synchronization.
+Conservative camera rejection is enabled by default, but retains shadow casters
+and implicit light contributors and is bypassed for refractive scenes. These
+optimizations do not suspend source scene collection or application updates.
+
 ```java
 try (FilamentRenderer3D renderer = new FilamentRenderer3D()) {
     renderer.setQuality(FilamentRenderer3D.Quality.HIGH);
@@ -79,7 +94,81 @@ try (FilamentRenderer3D renderer = new FilamentRenderer3D()) {
 See the repository's docs/filament.md for material packages and integration limits.
 
 <details>
-<summary>FilamentRenderer3D operation reference (10 declarations)</summary>
+<summary>FilamentRenderer3D operation reference (17 declarations)</summary>
+
+#### getUploadedSourceVertices
+
+```java
+public long getUploadedSourceVertices()
+```
+
+Reads the cumulative number of source vertices processed by native mesh uploads. Shared cached meshes do not add counts every time an instance is drawn.
+
+**Returns:** cumulative vertices before exact mesh indexing, for upload diagnostics
+
+#### getUploadedUniqueVertices
+
+```java
+public long getUploadedUniqueVertices()
+```
+
+Reads cumulative vertices actually retained for native uploads after optional exact indexing. Compare with source vertices to measure upload compaction; this is not a per-frame draw count.
+
+**Returns:** cumulative unique vertices actually uploaded, for upload diagnostics
+
+#### getProfileNanos
+
+```java
+public long getProfileNanos(int phase)
+```
+
+Reads optional phase timing, enabled with -Dvalthorne.filament.profile=true.
+
+- **`phase`** — 0 caller wait, 1 scene synchronization, 2 native render/completion, 3 camera/blit overhead
+
+**Returns:** most recent phase duration in nanoseconds, zero when profiling is disabled
+
+#### setOcclusionCullingEnabled
+
+```java
+public void setOcclusionCullingEnabled(boolean enabled)
+```
+
+Enables conservative current-frame occlusion and offscreen submission rejection.
+Shadow casters and implicit light contributors remain active. Scenes containing
+refractive glass bypass rejection to preserve secondary visibility.
+
+- **`enabled`** — whether additional CPU visibility rejection is enabled
+
+#### getOccludedCount
+
+```java
+public int getOccludedCount()
+```
+
+Reads native entry rejections caused by the additional CPU occlusion test during the latest scene synchronization. Retained shadow and lighting contributors are not counted as rejected.
+
+**Returns:** number of native geometry entries rejected by occlusion in the last frame
+
+#### getOffscreenCount
+
+```java
+public int getOffscreenCount()
+```
+
+Reads entry rejections proven offscreen by the additional CPU test during the latest synchronization. This does not include all culling performed internally by Filament.
+
+**Returns:** number of native geometry entries rejected as offscreen in the last frame
+
+#### getUpdatedEntryCount
+
+```java
+public int getUpdatedEntryCount()
+```
+
+Reads how many entry transforms/materials were synchronized during the latest frame. Unchanged visible entries and deferred culled entries can avoid these updates.
+
+**Returns:** number of entries whose native transform/material state was refreshed last frame
 
 #### getCachedMeshCount
 
@@ -172,8 +261,9 @@ Does not alter MSAA, which is controlled by setQuality.
 public void setQuality(Quality quality)
 ```
 
-Applies full-resolution ambient occlusion settings and configures MSAA:
-disabled for INTERACTIVE, four requested samples for HIGH, or eight for ULTRA.
+Applies ambient occlusion and MSAA settings. PERFORMANCE uses half-resolution AO;
+other presets use full-resolution AO. MSAA is disabled for PERFORMANCE and
+INTERACTIVE, four requested samples for HIGH, or eight for ULTRA.
 Does not change temporal antialiasing or output resolution.
 
 - **`quality`** — nonnull preset
@@ -221,6 +311,7 @@ a general try/finally GL-state guard around all native operations.
 #### close
 
 ```java
+@Override
     public void close()
 ```
 
@@ -237,14 +328,22 @@ Repeated calls on the owner thread have no effect.
 
 ### FilamentRenderer3D.Quality
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L62)
+[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L68)
 
-Multisample quality presets at full output resolution. All presets retain
-full-resolution ambient occlusion; INTERACTIVE disables MSAA, HIGH requests
+Quality presets at full output resolution. PERFORMANCE uses half-resolution
+ambient occlusion without MSAA; INTERACTIVE uses full-resolution AO without MSAA, HIGH requests
 four samples, and ULTRA requests eight, subject to backend support.
 
 <details>
-<summary>FilamentRenderer3D.Quality operation reference (3 declarations)</summary>
+<summary>FilamentRenderer3D.Quality operation reference (4 declarations)</summary>
+
+#### PERFORMANCE
+
+```java
+public static final  Quality PERFORMANCE
+```
+
+Temporal smoothing with half-resolution, edge-aware ambient occlusion and no MSAA.
 
 #### INTERACTIVE
 
@@ -272,11 +371,21 @@ Full-resolution ambient occlusion with eight requested MSAA samples, subject to 
 
 </details>
 
+<a id="type-filamentrenderer3d-entrystate"></a>
+
+### FilamentRenderer3D.EntryState — internal support type
+
+[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L150)
+
+Tracks synchronization and visibility for one reusable native renderable slot.
+The signature represents the last submitted instance state; initialization separates
+a valid first signature from a default value, and visibility tracks native scene membership.
+
 <a id="type-filamentrenderer3d-explicitlight"></a>
 
 ### FilamentRenderer3D.ExplicitLight — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L127)
+[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L213)
 
 Owner-thread cache for one reusable explicit native point-light slot. Stores
 the last uploaded source components so moving lights update only changed
@@ -286,7 +395,7 @@ parameters without invalidating mesh/material bindings.
 
 ### FilamentRenderer3D.Mesh — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L160)
+[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L246)
 
 Owned immutable native mesh buffers and local bounds cached by source model
 identity. Bounds use center/half-extent representation for Filament culling.
@@ -308,7 +417,7 @@ supplying independent transforms; constructing this record does not allocate a m
 
 ### FilamentRenderer3D.Entry — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L183)
+[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L269)
 
 Reusable native renderable/material slot associated with a borrowed source
 model. The reserved light entity gains a component only when emission lighting
@@ -321,9 +430,21 @@ is enabled and nonzero.
 - **`light`** — owned entity ID reserved for implicit emission lighting
 - **`material`** — owned native material instance
 
+<a id="type-vertexcompaction3d"></a>
+
+### VertexCompaction3D — internal support type
+
+[Source](../../src/main/java/valthorne/graphics/model/VertexCompaction3D.java#L10)
+
+Indexes immutable interleaved mesh uploads by exact vertex contents. Every attribute
+participates in equality, so position sharing never erases normal, UV, or color seams.
+Compaction changes the caller's staging array and produces indices in original vertex
+order; it neither changes model geometry nor owns native rendering resources.
+
 ## Related guides
 
 - [3D models, materials, scenes, and billboards](models.md)
 - [Raster 3D lighting and shadow maps](lighting-3d.md)
 - [Application lifecycle and window management](runtime.md)
+- [Conservative 3D visibility and occlusion](culling.md)
 - [Existing filament guide](../filament.md)

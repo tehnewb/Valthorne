@@ -192,6 +192,8 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
     }
 
     /**
+     * Tests whether a UTF-16 character falls within the contiguous baked glyph-array range. This checks the index range only and does not establish that a particular glyph has a drawable outline.
+     *
      * @param c character
      * @return true if the character is inside the baked range
      */

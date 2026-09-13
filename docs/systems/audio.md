@@ -557,6 +557,8 @@ Creates a new MP3 stream for the supplied sound data.
     public int channels()
 ```
 
+Reads the decoded PCM channel count without advancing the stream cursor.
+
 **Returns:** the channel count produced by this stream
 
 #### sampleRate
@@ -564,6 +566,8 @@ Creates a new MP3 stream for the supplied sound data.
 ```java
     public int sampleRate()
 ```
+
+Reads the decoded PCM sampling frequency in frames per second (Hz), independent of playback position.
 
 **Returns:** the sample rate produced by this stream
 
@@ -573,6 +577,8 @@ Creates a new MP3 stream for the supplied sound data.
     public int bitsPerSample()
 ```
 
+Reads the decoded PCM bit depth per channel sample, rather than the compressed file bitrate.
+
 **Returns:** the bits per sample produced by this stream
 
 #### duration
@@ -580,6 +586,8 @@ Creates a new MP3 stream for the supplied sound data.
 ```java
     public float duration()
 ```
+
+Reads total decoded-content duration in seconds, not remaining time or the current playback position.
 
 **Returns:** the total stream duration in seconds
 
@@ -721,6 +729,8 @@ Creates a new OGG stream for the supplied sound data.
     public int channels()
 ```
 
+Reads the decoded PCM channel count without advancing the stream cursor.
+
 **Returns:** the channel count produced by this stream
 
 #### sampleRate
@@ -728,6 +738,8 @@ Creates a new OGG stream for the supplied sound data.
 ```java
     public int sampleRate()
 ```
+
+Reads the decoded PCM sampling frequency in frames per second (Hz), independent of playback position.
 
 **Returns:** the sample rate produced by this stream
 
@@ -737,6 +749,8 @@ Creates a new OGG stream for the supplied sound data.
     public int bitsPerSample()
 ```
 
+Reads the decoded PCM bit depth per channel sample, rather than the compressed file bitrate.
+
 **Returns:** the bits per sample produced by this stream
 
 #### duration
@@ -744,6 +758,8 @@ Creates a new OGG stream for the supplied sound data.
 ```java
     public float duration()
 ```
+
+Reads total decoded-content duration in seconds, not remaining time or the current playback position.
 
 **Returns:** the total stream duration in seconds
 

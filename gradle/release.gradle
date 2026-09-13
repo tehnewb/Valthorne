@@ -66,7 +66,9 @@ tasks.register('verifyReleaseArtifacts') {
                 if (zip.size() < 2) throw new GradleException("Empty publication: ${artifact}")
                 def exampleEntry = zip.entries().find { entry ->
                     entry.name.startsWith('valthorne/examples/') || entry.name.startsWith('valthorne/fps-arena/') ||
-                            entry.name.startsWith('valthorne/physics-studio/')
+                            entry.name.startsWith('valthorne/physics-studio/') ||
+                            // Include nested classes and class-use Javadoc pages for the browser fixture.
+                            entry.name ==~ /(?:.*\/)?valthorne\/portable\/(?:class-use\/)?FirstPersonDemo(?:[.$][^\/]*)/
                 }
                 if (exampleEntry != null) throw new GradleException("Example content leaked into ${artifact.name}: ${exampleEntry.name}")
                 if (classifier == '-javadoc' && zip.getEntry('index.html') == null)
@@ -80,10 +82,7 @@ tasks.register('verifyReleaseArtifacts') {
                      'META-INF/licenses/filament.txt'].each { resource ->
                         if (zip.getEntry(resource) == null) throw new GradleException("Missing runtime resource: ${resource}")
                     }
-                    def forbidden = zip.entries().find { entry ->
-                        entry.name.startsWith('valthorne/examples/') || entry.name.startsWith('valthorne/fps-arena/') ||
-                                entry.name.startsWith('valthorne/physics-studio/') || entry.name.endsWith('.java')
-                    }
+                    def forbidden = zip.entries().find { entry -> entry.name.endsWith('.java') }
                     if (forbidden != null) throw new GradleException("Development content leaked into library: ${forbidden.name}")
                 }
             }

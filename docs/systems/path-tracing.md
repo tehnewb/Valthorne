@@ -17,6 +17,7 @@ Path tracing evaluates stochastic light transport across triangle geometry, supp
 | Progressive mode | A stationary view accumulates samples at the selected quality scale. |
 | Quality presets | Sample count and path depth change cost; progressive resolution also changes with quality. |
 | History invalidation | Scene or relevant texture changes require restarting incompatible accumulation. |
+| Reusable collection scratch | Renderer-owned collectors reuse placement, transform, and combined-material storage across captures. |
 
 ## Getting started
 
@@ -34,6 +35,9 @@ The tracer owns its GPU resources but borrows scene resources. Off-camera geomet
 - Progressive noise reduction requires repeated compatible frames.
 - Camera movement and scene edits have different history consequences in realtime mode.
 - Quality is a cost/accuracy setting, not a hardware ray-tracing-extension toggle.
+- Explicitly invisible renderables and hidden node subtrees are excluded; objects merely outside the camera remain available to secondary rays.
+- Internal Collector snapshots are borrowed until the next capture or clear. Consume build output before recapturing; collection clears old build data and overwrites reusable transforms. Build appends, so call it only after collection or explicit release of previous build data.
+- Retired collection references are removed immediately. Backing capacity trims after 32 consecutive captures below one quarter of peak use, or immediately when empty. Source textures and models are never disposed by collection cleanup.
 
 ## Components and examples
 
@@ -553,7 +557,7 @@ Full-resolution progressive rendering with four nominal samples and up to twelve
 
 ### PathTracer3D.State — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracer3D.java#L424)
+[Source](../../src/main/java/valthorne/graphics/model/PathTracer3D.java#L429)
 
 Captures the GL bindings and enable flags modified by path tracing, including
 seven image units, three shader-storage ranges, texture/sampler units zero
@@ -581,29 +585,53 @@ the guarded renderer does not change.
 
 ### PathTracingScene — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L32)
+[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L35)
 
 Collects visible triangle-model instances and builds packed geometry, emitter
 sampling data, and a surface-area-heuristic bounding-volume hierarchy for the GPU
 path tracer. Visibility means the scene's explicit visibility flags; geometry
 outside the camera remains available to shadow and secondary rays.
 
-Construction captures transforms and computes a signature from model identity
+Collection captures transforms and computes a signature from model identity
 and selected material values, but retains model/material references until build.
 In-place model geometry or texture-pixel edits are not hashed. The renderer must
 invalidate those changes explicitly. OBJ parts are expanded with combined tint
 and texture selection, and their pending textures are uploaded during collection,
-so constructing this snapshot can require the OpenGL context.
+so collecting this snapshot can require the OpenGL context.
 
-Call build once on a fresh snapshot, then read its packed arrays. Build appends
-rather than clearing existing lists. Models, materials, and textures remain
-borrowed; this package-private object owns CPU lists and packed arrays only.
+A renderer's Collector reuses the same snapshot and its placement scratch across
+captures. Consume or upload build output before capturing again, because capture
+releases the previous build data and overwrites transforms and combined materials.
+Call build only with empty output lists: once after collection, or after explicitly
+releasing prior build data. Models, materials, and textures remain borrowed;
+this package-private object owns CPU lists, matrices, and packed arrays only.
+
+<a id="type-pathtracingscene-collector"></a>
+
+### PathTracingScene.Collector — internal support type
+
+[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L43)
+
+Retains reusable instance, transform, and combined-material storage for one renderer.
+Each capture refreshes the same snapshot; callers must finish consuming it before
+the next capture or clear. Failed collection abandons the retained snapshot so a
+later attempt starts cleanly. Source scene resources remain borrowed.
+
+<a id="type-pathtracingscene-capacity"></a>
+
+### PathTracingScene.Capacity — internal support type
+
+[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L86)
+
+Tracks peak active list size and consecutive small captures for reusable scene
+scratch. Retired references are removed immediately, while backing arrays shrink
+after 32 captures below one quarter of the peak, or immediately when empty.
 
 <a id="type-pathtracingscene-instance"></a>
 
 ### PathTracingScene.Instance — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L444)
+[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L578)
 
 Collected geometry source and effective material with a captured world matrix.
 The record itself does not defensively copy its mutable components.

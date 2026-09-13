@@ -82,6 +82,8 @@ public enum TextureFilter {
     }
 
     /**
+     * Checks whether the minification filter selects a mipmapped OpenGL mode. It does not inspect a texture or generate missing mip levels.
+     *
      * @return true if this filter requires mipmaps
      */
     public boolean usesMipmaps() {
@@ -92,6 +94,8 @@ public enum TextureFilter {
     }
 
     /**
+     * Checks whether magnification uses nearest-neighbor sampling. This predicate alone does not guarantee pixel alignment, integer scaling, or nearest sampling during minification.
+     *
      * @return true if this filter is pixel-perfect
      */
     public boolean isPixelPerfect() {

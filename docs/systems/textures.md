@@ -1111,6 +1111,8 @@ Sets this color to fully transparent (alpha = 0).
 public Color withAlpha(float alpha)
 ```
 
+Creates an independent color retaining the packed RGB bytes and replacing alpha. Finite alpha is clamped to zero through one and truncated to an eight-bit value; this color is unchanged.
+
 - **`alpha`** — normalized alpha in [0..1]
 
 **Returns:** a new Color with the same RGB but a different alpha.
@@ -1121,6 +1123,8 @@ public Color withAlpha(float alpha)
 public String toHex()
 ```
 
+Formats all four packed bytes as an uppercase, zero-padded eight-digit hexadecimal string prefixed with #. Alpha precedes red, green, and blue.
+
 **Returns:** hex string in `#AARRGGBB` format.
 
 #### isOpaque
@@ -1128,6 +1132,8 @@ public String toHex()
 ```java
 public boolean isOpaque()
 ```
+
+Checks whether the stored eight-bit alpha is exactly 255. This tests color data only; texture alpha and blend state may still affect final coverage.
 
 **Returns:** true if this color is fully opaque (alpha == 255).
 
@@ -1137,6 +1143,8 @@ public boolean isOpaque()
 public boolean isTransparent()
 ```
 
+Checks whether the stored eight-bit alpha is exactly zero. RGB bytes are retained and do not affect this predicate.
+
 **Returns:** true if this color is fully transparent (alpha == 0).
 
 #### copy
@@ -1144,6 +1152,8 @@ public boolean isTransparent()
 ```java
 public Color copy()
 ```
+
+Creates a separate mutable color with identical packed channel bytes. Later channel changes on either instance do not affect the other.
 
 **Returns:** a copy of this color.
 
@@ -2007,7 +2017,6 @@ Returns the sprite's world Y position.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height)
 ```
 
@@ -2024,7 +2033,6 @@ A missing region is skipped.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, Color tint)
 ```
 
@@ -2042,7 +2050,6 @@ stored bounds. A missing region is skipped.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float originX, float originY, float rotation, Color tint)
 ```
 
@@ -2063,7 +2070,6 @@ flips, and tint still apply. Stored sprite geometry is not changed.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight)
 ```
 
@@ -2084,7 +2090,6 @@ coordinates are not clamped to the region.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint)
 ```
 
@@ -2341,7 +2346,6 @@ references and buffers. After this call, the sprite should no longer be used.
 #### reset
 
 ```java
-@Override
     public void reset()
 ```
 
@@ -3278,7 +3282,6 @@ Sets the bottom border size and marks the mesh dirty if the value changes.
 #### reset
 
 ```java
-@Override
     public void reset()
 ```
 
@@ -3683,7 +3686,6 @@ After disposal, the texture data and filter references are set to
 #### reset
 
 ```java
-@Override
     public void reset()
 ```
 
@@ -5551,7 +5553,6 @@ Creates a new TextureDrawable instance using the specified texture data.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint)
 ```
 
@@ -5576,7 +5577,6 @@ lifecycle operations occur in this method.
 #### getWidth
 
 ```java
-@Override
     public float getWidth()
 ```
 
@@ -5589,7 +5589,6 @@ Returns the wrapped texture's current pixel width without applying draw scaling.
 #### getHeight
 
 ```java
-@Override
     public float getHeight()
 ```
 
@@ -5602,7 +5601,6 @@ Returns the wrapped texture's current pixel height without applying draw scaling
 #### texture
 
 ```java
-@Override
     public Texture texture()
 ```
 
@@ -5717,6 +5715,8 @@ OpenGL magnification filter; always nearest or linear.
 public boolean usesMipmaps()
 ```
 
+Checks whether the minification filter selects a mipmapped OpenGL mode. It does not inspect a texture or generate missing mip levels.
+
 **Returns:** true if this filter requires mipmaps
 
 #### isPixelPerfect
@@ -5724,6 +5724,8 @@ public boolean usesMipmaps()
 ```java
 public boolean isPixelPerfect()
 ```
+
+Checks whether magnification uses nearest-neighbor sampling. This predicate alone does not guarantee pixel alignment, integer scaling, or nearest sampling during minification.
 
 **Returns:** true if this filter is pixel-perfect
 
@@ -5750,7 +5752,6 @@ The result is decoded pixel data; GPU texture creation is a separate operation.
 #### load
 
 ```java
-@Override
     public TextureData load(TextureParameters parameters)
 ```
 
@@ -6450,7 +6451,6 @@ and coordinates.
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint)
 ```
 
@@ -6475,7 +6475,6 @@ lifecycle operations occur in this method.
 #### getWidth
 
 ```java
-@Override
     public float getWidth()
 ```
 
@@ -6488,7 +6487,6 @@ Returns the wrapped region's current pixel width without applying draw scaling.
 #### getHeight
 
 ```java
-@Override
     public float getHeight()
 ```
 
@@ -6501,7 +6499,6 @@ Returns the wrapped region's current pixel height without applying draw scaling.
 #### region
 
 ```java
-@Override
     public TextureRegion region()
 ```
 

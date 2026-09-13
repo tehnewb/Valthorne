@@ -466,6 +466,21 @@ public final class Mouse {
     }
 
     /**
+     * Requests unaccelerated relative mouse motion on supported desktop platforms.
+     * GLFW applies this setting while the cursor is {@link #CURSOR_DISABLED}.
+     * Call on the window thread after selecting the desired cursor mode. Missing
+     * windows and unsupported backends ignore the request; browser relative input
+     * remains controlled by the browser's pointer-lock implementation.
+     *
+     * @param enabled whether raw desktop motion should be enabled
+     */
+    public static void setRawMouseMotion(boolean enabled) {
+        long win = Window.getAddress();
+        if (win != 0 && glfwRawMouseMotionSupported())
+            glfwSetInputMode(win, GLFW_RAW_MOUSE_MOTION, enabled ? GLFW_TRUE : GLFW_FALSE);
+    }
+
+    /**
      * <p>
      * Sets the cursor position in GLFW window coordinates.
      * </p>

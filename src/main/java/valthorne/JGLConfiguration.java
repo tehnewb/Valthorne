@@ -116,6 +116,7 @@ public final class JGLConfiguration {
     private int auxBuffers = GLFW_DONT_CARE; // Requested number of auxiliary buffers
     private int contextVersionMajor = 3; // Requested OpenGL context major version
     private int contextVersionMinor = 3; // Requested OpenGL context minor version
+    private boolean automaticContext; // Opt-in desktop negotiation; explicit contextVersion remains strict.
     private int openglProfile = GLFW_OPENGL_CORE_PROFILE; // Requested OpenGL profile hint
     private int openglForwardCompat = isMacOS() ? GLFW_TRUE : GLFW_FALSE; // Whether forward-compatible OpenGL context mode should be requested
     private int openglDebugContext = GLFW_FALSE; // Whether an OpenGL debug context should be requested
@@ -992,8 +993,25 @@ public final class JGLConfiguration {
     public JGLConfiguration contextVersion(int major, int minor) {
         this.contextVersionMajor = major;
         this.contextVersionMinor = minor;
+        this.automaticContext = false;
         return this;
     }
+
+    /**
+     * Tries desktop OpenGL 4.3, 4.1, then 3.3. Selects a core profile; other window
+     * options remain in effect. Explicit contextVersion calls restore strict creation.
+     * This does not select an OpenGL ES backend or guarantee an exact driver version.
+     * @return this configuration
+     */
+    public JGLConfiguration automaticContext() {
+        automaticContext = true;
+        clientApi = GLFW_OPENGL_API;
+        openglProfile = GLFW_OPENGL_CORE_PROFILE;
+        return this;
+    }
+
+    /** @return whether desktop context negotiation is enabled */
+    public boolean isAutomaticContext() {return automaticContext;}
 
     /**
      * <p>

@@ -1,0 +1,18 @@
+[
+  {
+    "file": "tree.glb",
+    "source": "tree_oak.glb",
+    "sourceSha256": "d7fd8773674928c50c11b66d12c636d49bdcc15a8b1c7fbb98e6f63a3439a3f3",
+    "outputSha256": "d363b5e49f1eea3654c25883bf1a4b17eba96551f2e9b25b41734823bf0da183",
+    "license": "CC0",
+    "validatorErrors": 0
+  },
+  {
+    "file": "tent.glb",
+    "source": "tent_detailedClosed.glb",
+    "sourceSha256": "fe8a2f9033cc87f1ec01b6c18bae7c57b84e787b4b210328ed708a4a3f9bb994",
+    "outputSha256": "f14132fdd10b13ce58ab9be6d2ae9939f94a0635e989eccf77b81298f753c679",
+    "license": "CC0",
+    "validatorErrors": 0
+  }
+]

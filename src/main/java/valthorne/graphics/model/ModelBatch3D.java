@@ -9,7 +9,8 @@ import java.util.Comparator;
 import java.util.IdentityHashMap;
 
 /**
- * Frame submission batch with frustum culling, material batching and shared mesh/billboard transparency ordering.
+ * Frame submission batch with frustum/opaque-triangle occlusion culling, material batching
+ * and shared mesh/billboard transparency ordering. Submit opaque walls first to improve occlusion coverage.
  * Built-in instances and materials are snapshotted at submission. Custom renderables must remain stable until end.
  * Owns the supplied mesh and billboard batches, but never owns submitted models or textures.
  * Opaque submissions group by material identity, while other passes sort back to front
@@ -48,6 +49,24 @@ public final class ModelBatch3D implements AutoCloseable {
     private boolean begun, disposed, cullingEnabled = true; // Frame lifecycle, disposal state, and frustum-culling enablement.
     private int submittedCount, visibleCount, culledCount; // Current or most recent frame's submission outcome counters.
     private int culledSubtreeCount; // Number of hierarchy branches rejected before per-item traversal.
+    private final OcclusionCuller3D occlusion = new OcclusionCuller3D(); // Reusable conservative visibility tester for the current camera pass.
+    private final org.joml.Matrix4f occlusionTransform = new org.joml.Matrix4f(); // Scratch model-to-world transform for visibility tests.
+    private boolean occlusionCullingEnabled = true; // Enables optional conservative current-pass occlusion rejection.
+    private int occludedCount; // Number of candidates rejected as occluded during the latest pass.
+
+    /**
+     * Enables rejection behind previously submitted opaque triangles. Submit large
+     * opaque walls first for best coverage. Shadow passes always bypass occlusion.
+     * @param enabled whether camera-pass occlusion is enabled
+     * @return this batch
+     */
+    public ModelBatch3D setOcclusionCullingEnabled(boolean enabled) {occlusionCullingEnabled = enabled; return this;}
+    /**
+     * Reads the current or most recently completed pass's model submissions rejected by opaque-triangle coverage. The counter resets at begin and excludes ordinary frustum rejections.
+     *
+     * @return camera-pass submissions rejected by occlusion in the last frame
+     */
+    public int getOccludedCount() {return occludedCount;}
 
     /**
      * Allocates default owned mesh and billboard backends. Construct on the graphics
@@ -126,6 +145,8 @@ public final class ModelBatch3D implements AutoCloseable {
         materialOrder.clear();
         submittedCount = visibleCount = culledCount = 0;
         culledSubtreeCount = 0;
+        occludedCount = 0;
+        occlusion.begin(activeCamera.getCombined(), Math.max(1, (int) activeCamera.getViewportWidth()), Math.max(1, (int) activeCamera.getViewportHeight()));
         begun = true;
     }
 
@@ -169,13 +190,28 @@ public final class ModelBatch3D implements AutoCloseable {
             culledCount++;
             return false;
         }
+        boolean useOcclusion = cullingEnabled && occlusionCullingEnabled && !activeState.isShadowPass();
+        if (useOcclusion && renderable instanceof ModelInstance3D instance) {
+            Material3D source = instance.getMaterial();
+            Material3D effective = materials.getOrDefault(source, source);
+            if (effective != null && effective.isDepthTest()
+                    && occlusion.test(instance.getWorldBounds()) == OcclusionCuller3D.Visibility.OCCLUDED) {
+                culledCount++;
+                occludedCount++;
+                return false;
+            }
+        }
         if (renderable instanceof ModelInstance3D instance && instance.getModel() instanceof ObjModel3D obj) {
             obj.uploadTextures();
             for (ObjModel3D.Part part : obj.getParts()) {
                 Material3D combined = combine(instance.getMaterial(), part.material());
                 enqueue(new ModelInstance3D().set(instance).setModel(part.model()).setMaterial(combined));
+                if (useOcclusion) occlusion.addOccluder(part.model(), instance.getWorldTransform(occlusionTransform), materials.get(combined));
             }
-        } else if (renderable instanceof ModelInstance3D instance) enqueue(new ModelInstance3D().set(instance));
+        } else if (renderable instanceof ModelInstance3D instance) {
+            enqueue(new ModelInstance3D().set(instance));
+            if (useOcclusion) occlusion.addOccluder(instance.getModel(), instance.getWorldTransform(occlusionTransform), materials.get(instance.getMaterial()));
+        }
         else if (renderable instanceof BillboardSprite3D billboard) enqueue(new BillboardSprite3D().set(billboard));
         else enqueue(renderable);
         visibleCount++;

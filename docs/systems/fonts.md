@@ -518,7 +518,6 @@ Sets the world-space y position of this font.
 #### getWidth
 
 ```java
-@Override
     public float getWidth()
 ```
 
@@ -531,7 +530,6 @@ This value is updated whenever cached layout data is rebuilt.
 #### setWidth
 
 ```java
-@Override
     public void setWidth(float width)
 ```
 
@@ -590,7 +588,6 @@ The range is clamped internally so invalid index combinations do not throw.
 #### getHeight
 
 ```java
-@Override
     public float getHeight()
 ```
 
@@ -601,7 +598,6 @@ Returns the cached height of the currently assigned text.
 #### setHeight
 
 ```java
-@Override
     public void setHeight(float height)
 ```
 
@@ -629,7 +625,6 @@ Multi-line text adds scaled line advance for each additional line.
 #### setSize
 
 ```java
-@Override
     public void setSize(float width, float height)
 ```
 
@@ -676,6 +671,8 @@ Returns the atlas texture used by this font.
 public FontData getData()
 ```
 
+Borrows the FontData associated with this font without copying glyph or atlas data. Resource lifetime remains governed by the font/data ownership contract; this accessor does not transfer disposal responsibility.
+
 **Returns:** The FontData corresponding to this Font.
 
 </details>
@@ -684,7 +681,7 @@ public FontData getData()
 
 ### Font.CachedQuad — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/Font.java#L1483)
+[Source](../../src/main/java/valthorne/graphics/font/Font.java#L1485)
 
 Cached render data for one drawable glyph.
 
@@ -699,7 +696,7 @@ source text without rebuilding layout every frame.
 
 ### Font.OutlineOffset — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/Font.java#L1510)
+[Source](../../src/main/java/valthorne/graphics/font/Font.java#L1512)
 
 Cached offset data used for outline rendering.
 
@@ -812,6 +809,8 @@ Returns 0 if kerning data isn't available.
 public boolean contains(char c)
 ```
 
+Tests whether a UTF-16 character falls within the contiguous baked glyph-array range. This checks the index range only and does not establish that a particular glyph has a drawable outline.
+
 - **`c`** — character
 
 **Returns:** true if the character is inside the baked range
@@ -840,7 +839,6 @@ If an unsupported or unknown FontSource is provided, an IllegalStateException is
 #### load
 
 ```java
-@Override
     public FontData load(FontParameters parameters)
 ```
 

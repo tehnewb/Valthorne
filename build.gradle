@@ -49,9 +49,11 @@ dependencies {
     implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
     implementation "org.apache.commons:commons-compress:1.28.0"
-    // This renderer implements Windows x64 texture sharing only. Keep its
-    // dependency host-independent so publishing on Linux/macOS is identical.
-    implementation "io.github.erkko68.filament-ffm:filament-ffm-runtime-windows-x64:0.4.0"
+    implementation "io.github.erkko68.filament-ffm:filament-ffm:0.4.0"
+    // Publish the same native runtime set regardless of the build host.
+    ['windows-x64', 'linux-x64', 'linux-arm64', 'macos-arm64'].each { platform ->
+        runtimeOnly "io.github.erkko68.filament-ffm:filament-ffm-runtime-${platform}:0.4.0"
+    }
     // Platform-independent Jolt JNI classes; platform suffix is the upstream publication name.
     implementation "com.github.stephengold:jolt-jni-Windows64:$joltVersion"
     ["Windows64", "Windows_ARM64", "Linux64", "Linux_ARM64", "Linux_ARM32hf", "MacOSX64", "MacOSX_ARM64"].each { platform ->
@@ -92,7 +94,7 @@ tasks.register('verifyPhysics3D', Test) {
 
 // Material packages are committed so consumers do not need a native compiler.
 // Binding 0.4.0 uses Filament material ABI 75, not the newer SDK ABI 76.
-def filamentMaterialTasks = ['surface', 'glass', 'alpha'].collect { materialName ->
+def filamentMaterialTasks = ['surface', 'solid', 'glass', 'alpha'].collect { materialName ->
     tasks.register("compileFilament${materialName.capitalize()}Material", Exec) {
         group = 'build'
         def source = file("src/main/resources/valthorne/filament/${materialName}.mat")
@@ -212,3 +214,6 @@ mavenPublishing {
 }
 
 apply from: 'gradle/release.gradle'
+
+// Shared-source desktop/web compatibility entry point.
+apply from: 'portable/desktop.gradle'

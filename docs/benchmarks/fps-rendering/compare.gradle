@@ -1,0 +1,6 @@
+allprojects {
+ tasks.matching { it.name == 'runFpsArena' }.configureEach {
+  jvmArgs '-Dvalthorne.filament.profile=true'
+  if (project.hasProperty('originalMesh')) jvmArgs '-Dvalthorne.filament.disableIndexing=true', '-Dvalthorne.filament.disableSolid=true'
+ }
+}

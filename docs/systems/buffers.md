@@ -784,7 +784,6 @@ Returns the number of bytes remaining for writing from the current write positio
 #### equals
 
 ```java
-@Override
     public boolean equals(Object o)
 ```
 
@@ -800,7 +799,6 @@ and identical buffer contents.
 #### hashCode
 
 ```java
-@Override
     public int hashCode()
 ```
 

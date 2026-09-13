@@ -6,7 +6,12 @@ Runnable demos and assets are maintained in the public
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
-On Windows x64, Lighting Studio defaults to **Filament / real-time PBR**. The integration uses the community `filament-ffm-runtime-windows-x64:0.4.0` binding from Maven Central, which bundles Filament with material ABI 75 (Filament 1.75). Java 25 calls its C API through the Foreign Function & Memory API; no local native compiler is required to run or build Valthorne. Other OpenGL 4.3 hosts use the studio's path tracer. See [platform support](platforms.md) and [consumer setup](getting-started.md).
+The integration uses the community Filament FFM 0.4.0 bindings and material ABI
+75 (Filament 1.75). Windows x64 uses shared OpenGL textures. Linux x64/ARM64 and
+macOS ARM64 now have packaged runtimes and an independent-context pixel-transfer
+implementation, with native validation still pending. Java 25 calls the C API
+through FFM. See [platform progress and limitations](filament-platform-progress.md),
+[platform support](platforms.md), and [consumer setup](getting-started.md).
 
 ## Run
 
@@ -23,7 +28,7 @@ The existing mouse orbit, pan, zoom, light selection/placement, color palette, t
 ## Engine integration
 
 ```java
-// Current GLFW/OpenGL context, Windows x64, Java 25.
+// Current GLFW/OpenGL 4.1 context, packaged desktop runtime, Java 25.
 FilamentRenderer3D renderer = new FilamentRenderer3D();
 renderer.setQuality(FilamentRenderer3D.Quality.HIGH);
 renderer.setExposure(1);

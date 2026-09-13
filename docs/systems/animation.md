@@ -155,7 +155,6 @@ and `draw(TextureBatch, float, float, float, float)` will no-op when the current
 #### draw
 
 ```java
-@Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint)
 ```
 
@@ -178,7 +177,6 @@ Draws the current animation frame using the specified parameters.
 #### getWidth
 
 ```java
-@Override
     public float getWidth()
 ```
 
@@ -193,7 +191,6 @@ If there is no current frame (null/empty frames) or drawable is null, returns 0.
 #### getHeight
 
 ```java
-@Override
     public float getHeight()
 ```
 

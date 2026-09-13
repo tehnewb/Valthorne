@@ -501,7 +501,6 @@ Creates a new in-memory dependency source.
 #### files
 
 ```java
-@Override
         public Map<String, byte[]> files()
 ```
 
@@ -1792,7 +1791,6 @@ Resolves all dependencies recursively and stores them in-memory.
 #### key
 
 ```java
-@Override
     public String key()
 ```
 
@@ -1909,7 +1907,6 @@ Creates a new byte-based map source.
 #### bytes
 
 ```java
-@Override
         public byte[] bytes()
 ```
 
@@ -2138,7 +2135,6 @@ Creates a new in-memory dependency resolver.
 #### resolve
 
 ```java
-@Override
         public byte[] resolve(byte[] parentBytes, String parentPath, String dependencyPath)
 ```
 

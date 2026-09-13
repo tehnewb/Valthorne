@@ -1459,6 +1459,8 @@ public class Font implements Dimensional {
     }
 
     /**
+     * Borrows the FontData associated with this font without copying glyph or atlas data. Resource lifetime remains governed by the font/data ownership contract; this accessor does not transfer disposal responsibility.
+     *
      * @return The FontData corresponding to this Font.
      */
     public FontData getData() {

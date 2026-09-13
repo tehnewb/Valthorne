@@ -15,29 +15,41 @@ import java.util.List;
  * path tracer. Visibility means the scene's explicit visibility flags; geometry
  * outside the camera remains available to shadow and secondary rays.
  * <p>
- * Construction captures transforms and computes a signature from model identity
+ * Collection captures transforms and computes a signature from model identity
  * and selected material values, but retains model/material references until build.
  * In-place model geometry or texture-pixel edits are not hashed. The renderer must
  * invalidate those changes explicitly. OBJ parts are expanded with combined tint
  * and texture selection, and their pending textures are uploaded during collection,
- * so constructing this snapshot can require the OpenGL context.
+ * so collecting this snapshot can require the OpenGL context.
  * </p>
  * <p>
- * Call build once on a fresh snapshot, then read its packed arrays. Build appends
- * rather than clearing existing lists. Models, materials, and textures remain
- * borrowed; this package-private object owns CPU lists and packed arrays only.
+ * A renderer's Collector reuses the same snapshot and its placement scratch across
+ * captures. Consume or upload build output before capturing again, because capture
+ * releases the previous build data and overwrites transforms and combined materials.
+ * Call build only with empty output lists: once after collection, or after explicitly
+ * releasing prior build data. Models, materials, and textures remain borrowed;
+ * this package-private object owns CPU lists, matrices, and packed arrays only.
  * </p>
  * @author Albert Beaupre
  */
 final class PathTracingScene {
     /**
-     * Owns collection scratch storage for one renderer. A returned snapshot is
-     * borrowed until the next capture or clear; callers needing an independent
-     * snapshot can still use the scene constructor directly.
+     * Retains reusable instance, transform, and combined-material storage for one renderer.
+     * Each capture refreshes the same snapshot; callers must finish consuming it before
+     * the next capture or clear. Failed collection abandons the retained snapshot so a
+     * later attempt starts cleanly. Source scene resources remain borrowed.
+     * @author Albert Beaupre
      */
     static final class Collector {
-        private PathTracingScene snapshot;
+        private PathTracingScene snapshot; // Reusable snapshot borrowed by callers until the next capture or clear.
 
+        /**
+         * Collects current visible placements into reusable CPU storage, clearing previous
+         * build data and refreshing the signature. OBJ preparation may require the GL context.
+         * The returned object and its mutable contents are borrowed until the next capture.
+         * @param scene scene whose current visibility and material values are collected
+         * @return reusable snapshot owned by this collector
+         */
         PathTracingScene capture(Scene3D scene) {
             if (snapshot == null) snapshot = new PathTracingScene();
             try {
@@ -49,7 +61,9 @@ final class PathTracingScene {
             }
         }
 
-        /** Drops borrowed references and retained scratch capacity without disposing sources. */
+        /**
+         * Drops borrowed references and retained scratch capacity without disposing sources.
+         */
         void clear() {snapshot = null;}
     }
 
@@ -60,13 +74,24 @@ final class PathTracingScene {
     final ArrayList<Integer> emitters = new ArrayList<>(); // Indices of emissive triangles after BVH ordering.
     private final ArrayList<Matrix4f> transforms = new ArrayList<>(); // One captured matrix per source placement, shared by its OBJ parts.
     private final ArrayList<Material3D> objMaterials = new ArrayList<>(); // Owned combined materials; never aliases a source material.
-    private final Capacity instancesCapacity = new Capacity(), transformsCapacity = new Capacity(), materialsCapacity = new Capacity();
+    private final Capacity instancesCapacity = new Capacity(), transformsCapacity = new Capacity(), materialsCapacity = new Capacity(); // Independent retention policies for instances, transforms, and combined OBJ materials.
     private int instanceCount, transformCount, objMaterialCount; // Active prefixes during recollection.
 
-    /** Releases excess backing storage after 32 consecutive captures below one quarter of its peak. */
+    /**
+     * Tracks peak active list size and consecutive small captures for reusable scene
+     * scratch. Retired references are removed immediately, while backing arrays shrink
+     * after 32 captures below one quarter of the peak, or immediately when empty.
+     * @author Albert Beaupre
+     */
     private static final class Capacity {
-        private int peak, smallCaptures;
+        private int peak, smallCaptures; // Peak active size and consecutive captures below its quarter-size threshold.
 
+        /**
+         * Removes elements outside the active prefix and applies delayed capacity trimming.
+         * Call after a successful collection with a count no greater than the list size.
+         * @param list owned scratch list to prune
+         * @param count number of elements used by the completed capture
+         */
         void finish(ArrayList<?> list, int count) {
             // Remove retired references immediately, without allocating a sub-list view.
             for (int i = list.size() - 1; i >= count; i--) list.remove(i);
@@ -94,9 +119,14 @@ final class PathTracingScene {
         collect(scene);
     }
 
+    /**
+     * Creates empty renderer-owned scratch; collection must populate it before building.
+     */
     private PathTracingScene() {}
 
-    /** Refreshes mutable inputs in the original order without a second signature traversal. */
+    /**
+     * Refreshes mutable inputs in the original order without a second signature traversal.
+     */
     private void collect(Scene3D scene) {
         releaseBuildData();
         signature = 0xcbf29ce484222325L;
@@ -114,12 +144,19 @@ final class PathTracingScene {
         materialsCapacity.finish(objMaterials, objMaterialCount);
     }
 
+    /**
+     * Reserves the next reusable captured transform, growing storage only when needed.
+     * The caller must overwrite the matrix before reading it; later captures may reuse it.
+     * @return owned mutable matrix for the current placement
+     */
     private Matrix4f nextTransform() {
         if (transformCount == transforms.size()) transforms.add(new Matrix4f());
         return transforms.get(transformCount++);
     }
 
-    /** Releases potentially large packed CPU buffers after upload, preserving collected instances. */
+    /**
+     * Releases potentially large packed CPU buffers after upload, preserving collected instances.
+     */
     void releaseBuildData() {
         release(textures);
         release(triangles);
@@ -127,6 +164,11 @@ final class PathTracingScene {
         release(emitters);
     }
 
+    /**
+     * Drops all entries and trims a nonempty build-data list after upload or recollection.
+     * Referenced textures and model resources are borrowed and are never disposed here.
+     * @param data owned list whose temporary build entries can be released
+     */
     private static void release(ArrayList<?> data) {
         if (!data.isEmpty()) {
             data.clear();
@@ -297,7 +339,8 @@ final class PathTracingScene {
      * tinted color, emission, BSDF parameters, UVs, and texture/cutoff/probability/
      * surface metadata. Emission entries are selected from positive packed emission;
      * the material emission-light flag is hashed but is not used as a filter here.
-     * Call once per fresh snapshot because existing output lists are not cleared.
+     * Call once after collection or releaseBuildData, because build appends to its
+     * output lists and does not clear a previous build itself.
      * </p>
      *
      * @throws IllegalStateException if an instance's linear transform is effectively singular

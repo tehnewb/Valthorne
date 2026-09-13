@@ -62,6 +62,14 @@ public class Model3D {
      */
     Triangle[] triangles() {return triangles;}
 
+    // Trusted package access; callers must not modify the stored geometry bound.
+    /**
+     * Borrows the construction-time model-local geometry bound without allocating a copy.
+     * Trusted rendering code must not mutate it; public callers should use the copying accessor.
+     * @return owned mutable bound exposed read-only by convention
+     */
+    AABBf localBounds() {return localBounds;}
+
     /**
      * Returns geometry size without copying or traversing the triangle array.
      *

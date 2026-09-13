@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Valthorne · Web physics lab</title><link rel="icon" href="data:,">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111925;color:#edf3fa;font:15px system-ui,sans-serif}canvas{display:block;width:100vw;height:100vh;touch-action:none}header{position:absolute;top:28px;left:32px;pointer-events:none}h1{font-size:27px;letter-spacing:-1px;margin:6px 0}small{letter-spacing:2px;color:#8edbe9;text-transform:uppercase}aside{position:absolute;right:24px;top:24px;width:265px;background:#16202eea;border:1px solid #344354;padding:22px;border-radius:16px;backdrop-filter:blur(12px)}h2{font-size:16px;margin:0 0 16px}button{font:inherit;background:#2e485e;color:#fff;border:1px solid #4c6375;border-radius:8px;padding:10px;width:100%;margin:5px 0;cursor:pointer}button:hover{background:#406079}button:disabled{opacity:.5;cursor:wait}label{display:flex;justify-content:space-between;align-items:center;margin:20px 0}input[type=color]{width:45px;height:30px;background:none;border:none}p{color:#bac7d7;line-height:1.5}#stats{font-variant-numeric:tabular-nums;color:#98e1ee}footer{position:absolute;bottom:24px;left:32px;font-size:13px;color:#b8c7d6}#error{position:absolute;bottom:64px;left:24px;right:24px;color:#ffc1b5;background:#38242c;padding:18px;border-radius:10px;display:none}@media(max-width:650px){header{left:18px;top:12px}h1{font-size:20px}aside{top:auto;bottom:12px;right:12px;width:225px;padding:14px}footer{left:18px;bottom:20px;width:120px}}
+</style></head><body>
+<style>.playing aside{display:none}.playing footer::after{content:' · Escape opens controls'}</style>
+<canvas id="scene" aria-label="Interactive lit Jolt physics scene"></canvas>
+<div id="crosshair" hidden style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;color:white;font:24px monospace;z-index:1">+</div>
+<header><small>Valthorne / browser edition</small><h1>Physics in the light</h1></header>
+<aside><h2>Scene controls</h2><p><a style="color:#8edbe9" href="?scene=arena">First-person arena</a> · <a style="color:#8edbe9" href="?scene=lab">Physics lab</a></p><button id="enter" hidden disabled>Enter arena</button><button id="drop" disabled>Drop a body</button><button id="reset" disabled>Rebuild stack</button><button id="pause" disabled>Pause simulation</button><label>Moving light <input id="color" type="color" value="#65d9ff" aria-label="Moving light color"></label><p id="stats" aria-live="off">Loading engine…</p><p id="instructions">Drag to orbit. Scroll to zoom.<br>Touch and drag on mobile.</p><small>Filament + Jolt WASM</small></aside>
+<footer>Java application · WebGL 2<br>No browser plugins required</footer><div id="error" role="alert"></div>
+<script src="vendor/filament.js"></script><script src="valthorne.js"></script><script type="module" src="host.js"></script>
+</body></html>

@@ -1,0 +1,13 @@
+material {
+    name : PortableParticle,
+    shadingModel : unlit,
+    blending : transparent,
+    depthWrite : false,
+    parameters : [ { type : float4, name : color } ]
+}
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        material.baseColor = materialParams.color;
+    }
+}

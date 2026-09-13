@@ -1,0 +1,21 @@
+{
+  "compiler": "Filament matc 1.75.0",
+  "arguments": "-p mobile -a opengl",
+  "materials": [
+    {
+      "name": "surface",
+      "sourceSha256": "cf1bcfc3d3402a27b26b0c05dc40771831130dbbfad0fb90f5d55a90419394ba",
+      "binarySha256": "6b2f08993481fac905181b54b2553b9f5678b7445939c3f7a7f3808a3abc293b"
+    },
+    {
+      "name": "alpha",
+      "sourceSha256": "727d8ea4b2a576e733d75596612cb22ddfa8cb4875a21ed22f4fe29b0c3f63f0",
+      "binarySha256": "216876c6e4d29a1205807bfdafb595080f5b93e2e084d025c7b1329e3fd5e3d5"
+    },
+    {
+      "name": "glass",
+      "sourceSha256": "b98978bd9ffc3d6c2409f5c444b6e1db6aa905b0facef94aab9bf69af6a75393",
+      "binarySha256": "7f7fac15791051299b11d39037f0a9f7f2a702b9e9b52bef854624cffc5509de"
+    }
+  ]
+}

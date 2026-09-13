@@ -1,0 +1,25 @@
+{
+  "name": "valthorne-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node serve.mjs",
+    "verify": "node verify.mjs && node verify-arena.mjs",
+    "verify:examples": "node verify-examples.mjs",
+    "verify:compatibility": "node verify-compatibility.mjs",
+    "benchmark:physics": "node benchmark-physics.mjs",
+    "validate:models": "node validate-models.mjs"
+  },
+  "dependencies": {
+    "@wasm-audio-decoders/ogg-vorbis": "0.1.20",
+    "@webgpu/glslang": "0.0.15",
+    "jolt-physics": "1.1.0",
+    "mpg123-decoder": "1.0.3",
+    "opentype.js": "1.3.4",
+    "yoga-layout": "3.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}

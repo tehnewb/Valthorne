@@ -1,0 +1,13 @@
+material {
+    name : PortableLit,
+    shadingModel : lit,
+    parameters : [ { type : float3, name : baseColor } ]
+}
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        material.baseColor = vec4(materialParams.baseColor, 1.0);
+        material.roughness = 0.48;
+        material.metallic = 0.12;
+    }
+}

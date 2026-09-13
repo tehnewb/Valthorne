@@ -8,23 +8,23 @@ layout(rgba32f, binding = 4) uniform readonly image2D sourceSpecular;
 layout(rgba32f, binding = 5) uniform writeonly image2D destinationSpecular;
 uniform int stepWidth, realtime;
 uniform float colorSigma;
-vec3 octDecode(vec2 p){ vec3 n = vec3(p, 1 - abs(p.x) - abs(p.y));n.xy += mix(vec2(1), vec2(-1), greaterThanEqual(n.xy, vec2(0))) * clamp(-n.z, 0, 1);return normalize(n); }
+vec3 octDecode(vec2 p){ vec3 n = vec3(p, 1.0 - abs(p.x) - abs(p.y));n.xy += mix(vec2(1), vec2(-1), greaterThanEqual(n.xy, vec2(0))) * clamp(-n.z, 0.0, 1.0);return normalize(n); }
 void main(){
     ivec2 p = ivec2(gl_GlobalInvocationID.xy), size = imageSize(sourceImage);if (any(greaterThanEqual(p, size)))return;
-    vec4 center = imageLoad(sourceImage, p), guide = imageLoad(guideImage, p);vec3 sum = vec3(0);float weights = 0;
+    vec4 center = imageLoad(sourceImage, p), guide = imageLoad(guideImage, p);vec3 sum = vec3(0);float weights = 0.0;
     float roughness = imageLoad(materialImage, p).a;
-    vec4 centerS = imageLoad(sourceSpecular, p);vec3 sumS = vec3(0);float weightsS = 0;
+    vec4 centerS = imageLoad(sourceSpecular, p);vec3 sumS = vec3(0);float weightsS = 0.0;
     bool filterS = roughness >= .3 || stepWidth == 1;
     vec3 normal = octDecode(guide.xy);
-    float sigma = realtime != 0?max(.25, 3 / sqrt(max(center.a, 1))):colorSigma;
-    const float kernel[5] = float[5](1, 4, 6, 4, 1);
-    float sigmaS = realtime != 0?max(.25, 3 / sqrt(max(centerS.a, 1))):colorSigma;
+    float sigma = realtime != 0?max(.25, 3.0 / sqrt(max(center.a, 1.0))):colorSigma;
+    const float kernel[5] = float[5](1.0, 4.0, 6.0, 4.0, 1.0);
+    float sigmaS = realtime != 0?max(.25, 3.0 / sqrt(max(centerS.a, 1.0))):colorSigma;
     int radius = 2;
     for (int y = -radius;y <= radius;y++)for (int x = -radius;x <= radius;x++){
         ivec2 q = p + ivec2(x, y) * stepWidth;if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, size)))continue;
         vec4 g = imageLoad(guideImage, q), c = imageLoad(sourceImage, q);
         if (guide.w != g.w)continue;
-        float nw = guide.z == 0?1:pow(max(dot(normal, octDecode(g.xy)), 0), 64);
+        float nw = guide.z == 0.0?1.0:pow(max(dot(normal, octDecode(g.xy)), 0.0), 64.0);
         float dw = exp(-abs(guide.z - g.z) / max(.015, guide.z * .007 * float(stepWidth)));
         float cw = exp(-length(c.rgb - center.rgb) / max(.025, sigma * (.2 + length(center.rgb))));
         float w = kernel[x + 2] * kernel[y + 2] * nw * dw * cw;sum += c.rgb * w;weights += w;

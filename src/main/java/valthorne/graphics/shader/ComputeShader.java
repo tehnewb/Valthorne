@@ -63,33 +63,20 @@ public class ComputeShader {
     public ComputeShader(String computeSource) {
         if (!isComputeSupported()) {
             String version = glGetString(GL_VERSION);
-            throw new IllegalStateException("Compute shaders require an OpenGL 4.3+ context or GL_ARB_compute_shader support. Current GL context: " + (version != null ? version : "unknown"));
+            throw new IllegalStateException("Compute shaders require OpenGL 4.3 or compute, shader-storage and image-load/store extensions. Current GL context: " + (version != null ? version : "unknown"));
         }
         if (computeSource == null) throw new NullPointerException("computeSource");
         buildProgram(computeSource);
     }
 
     /**
-     * Inspects the current context's version string, then falls back to checking both
-     * compute-shader and shader-storage extension names. This string-based probe is
-     * not an exhaustive capabilities check and requires an initialized current context.
+     * Uses LWJGL's current-context capabilities, including storage and image operations.
+     * Does not query the legacy extension string, which is invalid in core contexts.
      *
      * @return whether the version or extension probe reports support
      */
     public static boolean isComputeSupported() {
-        // Basic check: GL version >= 4.3 or ARB_compute_shader available
-        String ver = glGetString(GL_VERSION);
-        if (ver != null) {
-            try {
-                String[] parts = ver.split("\\.");
-                int major = Integer.parseInt(parts[0].replaceAll("[^0-9]", ""));
-                int minor = parts.length > 1 ? Integer.parseInt(parts[1].replaceAll("[^0-9]", "")) : 0;
-                if (major > 4 || (major == 4 && minor >= 3)) return true;
-            } catch (Exception ignored) {}
-        }
-        // Fallback extension probe
-        String ext = glGetString(GL_EXTENSIONS);
-        return ext != null && (ext.contains("GL_ARB_compute_shader") && ext.contains("GL_ARB_shader_storage_buffer_object"));
+        return valthorne.graphics.GraphicsCapabilities.supportsCompute(org.lwjgl.opengl.GL.getCapabilities());
     }
 
     /**
@@ -148,6 +135,11 @@ public class ComputeShader {
      */
     public static void bindSSBO(int ssboId, int binding) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssboId);
+    }
+
+    /** Releases caller-owned storage without requiring a platform-specific GL import. */
+    public static void deleteSSBO(int ssboId) {
+        glDeleteBuffers(ssboId);
     }
 
     /**

@@ -1,0 +1,204 @@
+plugins {
+    id 'java'
+    id 'org.teavm' version '0.15.0'
+}
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+tasks.withType(JavaCompile).configureEach { options.release = 17 }
+sourceSets.main.java.srcDir '../compatibility'
+// Browser integration applications are fixtures, never desktop/core library sources.
+sourceSets.main.java.srcDir '../fixtures/java'
+if (providers.gradleProperty('applicationSources').isPresent()) {
+    def applicationSourceRoot = rootProject.projectDir.parentFile.toPath().resolve(providers.gradleProperty('applicationSources').get()).normalize().toFile()
+    def applicationIncludes = providers.gradleProperty('applicationIncludes').orElse('**/*.java').get().split(',')
+    def applicationFiles = fileTree(applicationSourceRoot) { include applicationIncludes }.files
+    sourceSets.main.java.srcDir applicationSourceRoot
+    sourceSets.main.java.exclude { entry -> !entry.directory && entry.file.toPath().startsWith(applicationSourceRoot.toPath()) && !applicationFiles.contains(entry.file) }
+}
+configurations { desktopApi; jomlBinary; jomlSources }
+configurations.configureEach {
+    if (canBeResolved) attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+}
+def backendClasses = ['viewport/Viewport','viewport/PerspectiveViewport','graphics/font/FontData','Audio','audio/sound/SoundData','audio/sound/SoundPlayer','audio/sound/WaveSoundDecoder','audio/sound/OggSoundDecoder','audio/sound/Mp3SoundDecoder','audio/sound/WaveSoundStream','audio/sound/OggSoundStream','audio/sound/Mp3SoundStream','JGL', 'Window', 'Keyboard', 'Mouse',
+    'math/physics/PhysicsWorld3D', 'math/physics/RigidBody3D', 'math/physics/CollisionShape3D',
+    'math/physics/DistanceJoint3D', 'math/physics/PhysicsMath3D', 'graphics/model/FilamentRenderer3D', 'graphics/model/SceneRenderer3D',
+    'graphics/texture/Texture', 'graphics/texture/TextureData', 'graphics/texture/TextureBatch', 'graphics/texture/FrameBuffer',
+    'graphics/texture/NinePatchTexture', 'graphics/Sprite', 'graphics/ImmediateTextureRenderer', 'graphics/shader/Shader', 'graphics/shader/ShaderSources']
+fileTree('../../src/main/java/valthorne/ui').matching { include '**/*.java'; exclude '**/SlugLabel.java' }.each { source ->
+    if (source.getText('UTF-8').contains('org.lwjgl')) backendClasses.add(file('../../src/main/java/valthorne').toPath().relativize(source.toPath()).toString().replace('\\','/').replace('.java',''))
+}
+backendClasses.add('ui/behavior/TextEditing')
+backendClasses.add('ui/behavior/TextEditModel')
+backendClasses.addAll(['graphics/model/ObjModel3D','graphics/model/ModelParameters','graphics/model/RenderStateSnapshot3D'])
+backendClasses.addAll(['graphics/lighting2d/Lighting2D','graphics/lighting2d/GroundShadowRenderer2D'])
+backendClasses.add('io/file/ValthorneFiles')
+backendClasses.addAll(['graphics/map/tiled/TiledXML','graphics/map/tiled/TiledMapParameters','graphics/map/tiled/TiledMapData','graphics/map/tiled/TiledMapLoader','graphics/map/tiled/FileSystemResolver','graphics/map/tiled/TiledResolvers'])
+backendClasses.add('graphics/map/tiled/TiledDecoding')
+backendClasses.add('asset/Assets')
+backendClasses.add('graphics/shader/ComputeShader')
+backendClasses.add('PlatformTools')
+backendClasses.add('graphics/model/PathTracer3D')
+backendClasses.addAll(['graphics/debug/PerformanceOverlay','graphics/radiance/RadianceCascades','graphics/radiance/RadianceRenderTarget','graphics/radiance/RadianceTexture'])
+backendClasses.addAll(['graphics/font/slug/SlugFont','graphics/font/slug/SlugBatch','graphics/font/slug/SlugShader','ui/nodes/SlugLabel'])
+backendClasses.addAll(['graphics/model/MeshBatch3D','graphics/model/BillboardBatch3D','graphics/model/ShadowMap3D','graphics/lighting3d/Lighting3D','graphics/GraphicsCapabilities'])
+backendClasses.addAll(['graphics/texture/TexturePacker','graphics/particle/ParticleSystem','graphics/shader/ShapeShader','graphics/lighting/DynamicMesh2D','graphics/lighting/LightMapRenderer','graphics/lighting/LightMesh','graphics/lighting/LightTexture','graphics/lighting/RayHandler','graphics/lighting/SoftShadowMesh','graphics/lighting2d/SpriteVolumeRenderer2D'])
+
+def prepareGraphics = tasks.register('prepareGraphics', Exec) {
+    inputs.file('prepare-graphics.mjs')
+    inputs.dir('../../src/main/java/valthorne/graphics')
+    inputs.dir('../../src/main/java/valthorne/audio')
+    inputs.dir('../../src/main/java/valthorne/ui')
+    inputs.dir('../../src/main/java/valthorne/viewport')
+    inputs.dir('../../src/main/java/valthorne/io/file')
+    inputs.dir('../../src/main/java/valthorne/asset')
+    inputs.dir('../../src/main/resources/valthorne/shaders')
+    outputs.dir(layout.buildDirectory.dir('generated/graphics'))
+    commandLine 'node', 'prepare-graphics.mjs'
+}
+sourceSets.main.java.srcDir(layout.buildDirectory.dir('generated/graphics'))
+tasks.named('compileJava') { dependsOn prepareGraphics }
+
+def applicationResources = providers.gradleProperty('applicationResources')
+def prepareResourceManifest = tasks.register('prepareResourceManifest') {
+    inputs.dir('../../src/main/resources')
+    inputs.property('applicationResources', applicationResources.orElse(''))
+    if (applicationResources.isPresent()) inputs.dir(rootProject.projectDir.parentFile.toPath().resolve(applicationResources.get()).toFile())
+    outputs.dir(layout.buildDirectory.dir('generated/resource-manifest'))
+    doLast {
+        def names = new TreeSet<String>()
+        def roots = [file('../../src/main/resources')]
+        if (applicationResources.isPresent()) roots.add(rootProject.projectDir.parentFile.toPath().resolve(applicationResources.get()).toFile())
+        roots.each { root -> fileTree(root).files.each { entry -> names.add(root.toPath().relativize(entry.toPath()).toString().replace('\\','/')) } }
+        def manifest = layout.buildDirectory.file('generated/resource-manifest/META-INF/valthorne-resources.list').get().asFile
+        manifest.parentFile.mkdirs(); manifest.setText(names.join('\n'), 'UTF-8')
+    }
+}
+sourceSets.main.resources.srcDir(layout.buildDirectory.dir('generated/resource-manifest'))
+if (applicationResources.isPresent()) sourceSets.main.resources.srcDir(rootProject.projectDir.parentFile.toPath().resolve(applicationResources.get()).toFile())
+tasks.named('processResources') { dependsOn prepareResourceManifest }
+def browserApi = tasks.register('browserApi', Jar) {
+    inputs.property('backendClasses', backendClasses)
+    inputs.property('sharedCorePackages', ['Application', 'portable', 'collections', 'state', 'tick', 'MathUtils'])
+    archiveFileName = 'valthorne-browser-api.jar'
+    dependsOn configurations.desktopApi
+    from { configurations.desktopApi.collect { zipTree(it) } }
+    // Never leave two implementations of a public backend class on TeaVM's classpath.
+    backendClasses.each { name -> exclude "valthorne/${name}.class", "valthorne/${name}\$*.class" }
+    exclude 'valthorne/Application.class', 'valthorne/portable/**', 'valthorne/collections/**', 'valthorne/state/**', 'valthorne/tick/**', 'valthorne/math/MathUtils.class'
+}
+dependencies {
+    implementation project(':core')
+    implementation teavm.libs.jso
+    implementation('com.fasterxml:aalto-xml:1.3.3') { transitive = false }
+    implementation('org.codehaus.woodstox:stax2-api:4.2.2') { transitive = false }
+    implementation('stax:stax-api:1.0.1') { transitive = false }
+    jomlBinary('org.joml:joml:1.10.8') { transitive = false }
+    jomlSources('org.joml:joml:1.10.8:sources') { transitive = false }
+    compileOnly 'org.jspecify:jspecify:1.0.0'
+    compileOnly('org.lwjgl:lwjgl-stb:3.4.1') { transitive = false }
+    compileOnly('org.lwjgl:lwjgl:3.4.1') { transitive = false }
+    compileOnly('org.lwjgl:lwjgl-opengl:3.4.1') { transitive = false }
+    compileOnly('org.teavm:teavm-core:0.15.0') { transitive = false }
+    implementation('org.joml:joml-primitives:1.10.0') { transitive = false }
+    // Engine API bytecode; native dependency jars never enter the browser runtime.
+    desktopApi('io.github.tehnewb:Valthorne:2.0.0') { transitive = false }
+    implementation files(browserApi)
+}
+// TeaVM 0.15 lacks Math.fma. Compile JOML's own default non-FMA path without
+// its optional JVM intrinsic branch. No changes to game source or vector APIs.
+def prepareJoml = tasks.register('prepareJoml') {
+    inputs.files(configurations.jomlSources)
+    outputs.dir(layout.buildDirectory.dir('generated/joml'))
+    doLast {
+        def source = zipTree(configurations.jomlSources.singleFile).matching { include 'org/joml/Math.java' }.singleFile.getText('UTF-8')
+        def branch = /(?m)        if \(Runtime.HAS_Math_fma\)\r?\n            return java.lang.Math.fma\(a, b, c\);\r?\n/
+        if ((source =~ branch).count != 2) throw new GradleException('Review the JOML non-FMA browser patch after upgrading JOML')
+        def output = layout.buildDirectory.file('generated/joml/org/joml/Math.java').get().asFile
+        output.parentFile.mkdirs()
+        output.setText(source.replaceAll(branch, ''), 'UTF-8')
+        // TeaVM requires digits in both DecimalFormat subpatterns; the JVM also
+        // accepts JOML's abbreviated negative pattern. Spell out equivalent digits.
+        def options = zipTree(configurations.jomlSources.singleFile).matching { include 'org/joml/Options.java' }.singleFile.getText('UTF-8')
+        def pattern = '"E0;-"'
+        if (!options.contains(pattern)) throw new GradleException('Review the JOML browser number format patch')
+        layout.buildDirectory.file('generated/joml/org/joml/Options.java').get().asFile.setText(options.replace(pattern, '"E0;-0." + new String(prec) + "E0"'), 'UTF-8')
+        def memory = zipTree(configurations.jomlSources.singleFile).matching { include 'org/joml/MemUtil.java' }.singleFile.getText('UTF-8')
+        def factory = /(?s)private static MemUtil createInstance\(\) \{.*?return accessor;\s*\}/
+        if ((memory =~ factory).count != 1) throw new GradleException('Review JOML browser NIO selection')
+        layout.buildDirectory.file('generated/joml/org/joml/MemUtil.java').get().asFile.setText(memory.replaceAll(factory, 'private static MemUtil createInstance() { return new MemUtilNIO(); }'), 'UTF-8')
+    }
+}
+def browserJoml = tasks.register('browserJoml', Jar) {
+    inputs.property('replacedClasses', ['Math', 'Options', 'MemUtil'])
+    archiveFileName = 'joml-browser.jar'
+    from { configurations.jomlBinary.collect { zipTree(it) } }
+    exclude 'org/joml/Math.class', 'org/joml/Options.class', 'org/joml/MemUtil.class', 'org/joml/MemUtil$*.class'
+}
+sourceSets.main.java.srcDir(layout.buildDirectory.dir('generated/joml'))
+tasks.named('compileJava') { dependsOn prepareJoml }
+dependencies { implementation files(browserJoml) }
+// Standard Java types missing from TeaVM's class library. These are used only
+// by the browser linker; the desktop continues to use the JDK implementations.
+def compileJavaCompatibility = tasks.register('compileJavaCompatibility', JavaCompile) {
+    source = fileTree('src/compat/java') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('classes/java/compat')
+    options.compilerArgs += ['--patch-module', 'java.base=' + file('src/compat/java').absolutePath]
+}
+dependencies { implementation files(compileJavaCompatibility.map { it.destinationDirectory }) }
+teavm.js {
+    mainClass = providers.gradleProperty('applicationMain').orElse(providers.gradleProperty('webMainClass')).orElse('valthorne.web.WebLauncher').get()
+    targetFileName = 'valthorne.js'
+    sourceMap = true
+    obfuscated = true
+}
+tasks.register('prepareRuntime', Exec) {
+    commandLine 'node', 'prepare-runtime.mjs'
+}
+tasks.register('validateModels', Exec) {
+    commandLine 'node', 'validate-models.mjs'
+}
+tasks.register('validateEngineMaterials', Exec) {
+    commandLine 'node', 'validate-engine-materials.mjs'
+}
+tasks.register('validateJavaScript', Exec) {
+    dependsOn 'generateJavaScript'
+    commandLine 'node', '--check', 'build/generated/teavm/js/valthorne.js'
+}
+tasks.register('verifyBackendApi', Exec) {
+    dependsOn 'compileJava'
+    inputs.file('verify-api.mjs')
+    inputs.files(configurations.desktopApi)
+    inputs.dir(layout.buildDirectory.dir('classes/java/main/valthorne'))
+    outputs.file(layout.buildDirectory.file('verification/backend-api.json'))
+    doFirst {
+        def jdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }.get().metadata.installationPath
+        def javap = jdk.file('bin/javap' + (System.getProperty('os.name').toLowerCase().contains('windows') ? '.exe' : '')).asFile
+        commandLine 'node', 'verify-api.mjs', configurations.desktopApi.singleFile.absolutePath, layout.buildDirectory.dir('classes/java/main').get().asFile.absolutePath, javap.absolutePath
+    }
+}
+
+tasks.register('webDist', Sync) {
+    dependsOn 'validateJavaScript', 'prepareRuntime', 'validateModels', 'validateEngineMaterials', 'verifyBackendApi'
+    from(layout.buildDirectory.dir('generated/teavm/js'))
+    from('public')
+    from('../../src/main/resources/ui') { into 'ui' }
+    from('../compatibility/assets') { into 'portable/compatibility/assets' }
+    if (providers.gradleProperty('applicationResources').isPresent()) {
+        from(rootProject.projectDir.parentFile.toPath().resolve(providers.gradleProperty('applicationResources').get()).toFile())
+    }
+    from('build/runtime') { include 'filament.js', 'filament.wasm'; into 'vendor' }
+    from('node_modules/jolt-physics/dist') { include 'jolt-physics.wasm-compat.js'; into 'vendor' }
+    from('node_modules/yoga-layout') { include 'dist/**', 'LICENSE'; into 'vendor/yoga' }
+    from('node_modules/opentype.js/dist') { include 'opentype.module.js'; into 'vendor/opentype' }
+    from('node_modules/opentype.js') { include 'LICENSE'; into 'vendor/opentype' }
+    from('node_modules/mpg123-decoder/dist') { include 'mpg123-decoder.min.js'; into 'vendor/audio' }
+    from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include 'ogg-vorbis-decoder.min.js'; into 'vendor/audio' }
+    from('node_modules/@webgpu/glslang/dist/web-devel') { include 'glslang.js', 'glslang.wasm'; into 'vendor/glslang' }
+    from('build/runtime/twgsl') { include 'twgsl.js', 'twgsl.wasm'; into 'vendor/twgsl' }
+    into(layout.buildDirectory.dir('dist'))
+    doFirst {
+        if (!file('node_modules/jolt-physics/dist/jolt-physics.wasm-compat.js').isFile())
+            throw new GradleException('Run npm ci in portable/web before webDist')
+    }
+}

@@ -18,6 +18,7 @@ The 3D model system separates reusable geometry from instances, materials, scene
 | Procedural geometry | ProceduralRenderable3D emits geometry through a callback without requiring a fixed imported mesh. |
 | Billboards | Billboard sprites orient textured quads toward a camera using a selected facing mode. |
 | Picking and bounds | World bounds and pick results connect camera rays to scene selection. |
+| Conservative camera culling | Frustum and opaque-triangle tests avoid eligible submissions while shadow passes retain their required geometry. |
 
 ## Getting started
 
@@ -35,6 +36,7 @@ Scene membership does not automatically imply resource ownership. Dispose shared
 - Changing mutable pose data can require rebuilding derived transforms/bounds.
 - Use inverse-transpose normal handling for nonuniform scale; singular transforms are invalid for those operations.
 - Keep billboard orientation and geometry axis conventions consistent with the camera.
+- ModelBatch3D uses earlier accepted opaque submissions as occluders for later model candidates. Submit large untextured opaque walls first; disabling general culling also bypasses occlusion. Procedural renderables and billboards do not use this model occlusion test.
 
 ## Components and examples
 
@@ -610,7 +612,7 @@ Set render pass before an explicit depth-write override, because pass assignment
 resets that flag. Instances provide no synchronization or change notifications.
 
 <details>
-<summary>Material3D operation reference (40 declarations)</summary>
+<summary>Material3D operation reference (41 declarations)</summary>
 
 #### getTransmission
 
@@ -1076,6 +1078,21 @@ public Material3D copy()
 Copies every current setting into a new material with independent tint and emissive storage. Texture is shared by reference. Depth-write is copied after render-pass assignment so an explicit override is preserved.
 
 **Returns:** a new independently mutable material sharing only the texture resource
+
+#### set
+
+```java
+public Material3D set(Material3D source)
+```
+
+Copies all settings into this material without replacing its owned colors.
+The texture remains borrowed. Self-assignment is supported.
+
+- **`source`** — material to copy
+
+**Returns:** this material
+
+**Throws `NullPointerException`:** if source is null
 
 </details>
 
@@ -2024,7 +2041,7 @@ model-local coordinates and includes no instance transform.
 
 ### Model3D.Triangle
 
-[Source](../../src/main/java/valthorne/graphics/model/Model3D.java#L92)
+[Source](../../src/main/java/valthorne/graphics/model/Model3D.java#L100)
 
 Stores three copied positions, one copied color, UV coordinates, and vertex normals.
 Missing individual normals use the normalized cross product of the two face edges;
@@ -2187,9 +2204,10 @@ Copies the triangle's color so callers can modify it without altering geometry.
 
 ### ModelBatch3D
 
-[Source](../../src/main/java/valthorne/graphics/model/ModelBatch3D.java#L39)
+[Source](../../src/main/java/valthorne/graphics/model/ModelBatch3D.java#L40)
 
-Frame submission batch with frustum culling, material batching and shared mesh/billboard transparency ordering.
+Frame submission batch with frustum/opaque-triangle occlusion culling, material batching
+and shared mesh/billboard transparency ordering. Submit opaque walls first to improve occlusion coverage.
 Built-in instances and materials are snapshotted at submission. Custom renderables must remain stable until end.
 Owns the supplied mesh and billboard batches, but never owns submitted models or textures.
 Opaque submissions group by material identity, while other passes sort back to front
@@ -2215,7 +2233,30 @@ using a material determines the snapshot reused by later submissions of that sam
 source. Custom renderable geometry remains borrowed until end or cancellation.
 
 <details>
-<summary>ModelBatch3D operation reference (21 declarations)</summary>
+<summary>ModelBatch3D operation reference (23 declarations)</summary>
+
+#### setOcclusionCullingEnabled
+
+```java
+public ModelBatch3D setOcclusionCullingEnabled(boolean enabled)
+```
+
+Enables rejection behind previously submitted opaque triangles. Submit large
+opaque walls first for best coverage. Shadow passes always bypass occlusion.
+
+- **`enabled`** — whether camera-pass occlusion is enabled
+
+**Returns:** this batch
+
+#### getOccludedCount
+
+```java
+public int getOccludedCount()
+```
+
+Reads the current or most recently completed pass's model submissions rejected by opaque-triangle coverage. The counter resets at begin and excludes ordinary frustum rejections.
+
+**Returns:** camera-pass submissions rejected by occlusion in the last frame
 
 #### Constructor
 
@@ -2478,7 +2519,7 @@ Use on the owning graphics thread.
 
 ### ModelBatch3D.Submission — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/ModelBatch3D.java#L412)
+[Source](../../src/main/java/valthorne/graphics/model/ModelBatch3D.java#L448)
 
 Retains one stable renderable reference and captured material/order values for
 deferred frame emission. Texture resources remain shared with their owners.
@@ -4738,4 +4779,5 @@ when drawable content is traversed. Prepared instances are reused internally.
 - [Raster 3D lighting and shadow maps](lighting-3d.md)
 - [Filament rendering](filament.md)
 - [Jolt rigid-body physics](physics.md)
+- [Conservative 3D visibility and occlusion](culling.md)
 - [Existing 3D guide](../3D.md)

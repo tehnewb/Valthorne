@@ -206,9 +206,30 @@ public final class Scene3D {
     }
 
     // Allocation-free package traversal; membership must remain stable during collection.
+    /**
+     * Reads the current direct-renderable count without allocating a list snapshot.
+     * @return number of direct entries, including hidden entries
+     */
     int renderableCount() {return renderables.size();}
+    /**
+     * Borrows a direct renderable in insertion order for package-local collection.
+     * Do not structurally modify the scene while traversing by index.
+     * @param index zero-based entry index
+     * @return borrowed renderable
+     * @throws IndexOutOfBoundsException if index is outside the current list
+     */
     Renderable3D renderableAt(int index) {return renderables.get(index);}
+    /**
+     * Reads the number of registered root nodes without creating a list view.
+     * @return current root-node count
+     */
     int nodeCount() {return nodes.size();}
+    /**
+     * Borrows a registered root node for allocation-free indexed traversal.
+     * @param index zero-based root index
+     * @return borrowed scene root
+     * @throws IndexOutOfBoundsException if index is outside the current list
+     */
     SceneNode3D nodeAt(int index) {return nodes.get(index);}
 
     /**
