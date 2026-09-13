@@ -55,7 +55,7 @@ function createHost(BrowserGraphics, BrowserPlatform, BrowserNano, BrowserYoga, 
     },
 
     /** Draw a decoded image with generic cover/contain fitting and clipping. */
-    drawImage(handle, image, x, y, width, height, contain, radius) {
+    drawImage(handle, image, x, y, width, height, contain, radius, focalX = .5) {
       if (width <= 0 || height <= 0 || !image.naturalWidth || !image.naturalHeight) return;
       const context = this.nano.get(handle), ctx = this.nano.prepare(context);
       try {
@@ -65,7 +65,7 @@ function createHost(BrowserGraphics, BrowserPlatform, BrowserNano, BrowserYoga, 
         else ctx.rect(x, y, width, height);
         ctx.clip();
         ctx.drawImage(image,
-          x + (width - image.naturalWidth * scale) / 2,
+          x + (width - image.naturalWidth * scale) * focalX,
           y + (height - image.naturalHeight * scale) / 2,
           image.naturalWidth * scale, image.naturalHeight * scale);
         context.dirty = true;
@@ -73,6 +73,20 @@ function createHost(BrowserGraphics, BrowserPlatform, BrowserNano, BrowserYoga, 
     },
 
     surface(handle) { return this.nano.get(handle).canvas; },
+
+    /** Native gradient primitive; the Java caller owns its geometry and color. */
+    fillGradient(handle, x, y, width, height, color, from, to) {
+      const context = this.nano.get(handle), ctx = this.nano.prepare(context);
+      try {
+        const rgb = [(color >> 16) & 255, (color >> 8) & 255, color & 255].join(',');
+        const gradient = ctx.createLinearGradient(x, y, x, y + height);
+        gradient.addColorStop(0, 'rgba(' + rgb + ',' + from + ')');
+        gradient.addColorStop(1, 'rgba(' + rgb + ',' + to + ')');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, width, height);
+        context.dirty = true;
+      } finally { ctx.restore(); }
+    },
     resize(ratio) { this.pixelRatio = ratio; this.graphics.resize(); },
 
     close() {

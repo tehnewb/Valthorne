@@ -11,7 +11,7 @@
     "platform.js": "42f5cf3abac26064dfffcd29f54cae7be14ae1669830c8ac2aafecf8912eeb29",
     "ui/AtkinsonHyperlegible-Regular.ttf": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
     "ui/OFL-AtkinsonHyperlegible.txt": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
-    "valthorne.js": "e80e78148dc5743ddf5a390121800f2ab424695b399abf176f4ddce6d16471a1",
+    "valthorne.js": "9ebaf8e64b9b878a412a683a211ca42cee4cfe4b29dc51ce5df22302519f88cf",
     "vendor/opentype/LICENSE": "a5b87c9bc191e7f9c06b07bd7cbbed3ed846dfdb50e859484b2c245aa1ab2e61",
     "vendor/opentype/opentype.module.js": "8d79d17388114a29d74681dfaed84068b1d7d9b4e39a9544fb6406d25579ad8f",
     "vendor/yoga/dist/binaries/yoga-wasm-base64-esm.js": "2cfeda49ae87f57bcd4a5fe433940edefc531a69bd0f83e32759fb5837df205c",
@@ -31,21 +31,15 @@
     "yoga-backend.js": "fbec4093bfb77f276c0a73c82d513b1dd2c9b7454b324d916ccb78f6f401fa25"
   },
   "sources": {
-    "src/main/java/valthorne/website/BrowserBridge.java": "7f2fda4fc5d8e7e11170831a8827b6a46cc109b49179d1805b02be78db706eb5",
-    "src/main/java/valthorne/website/CrystalScene.java": "94e756a274e91b8e6dd0cb3f375de005cbcbfa647c4dcd8e4f81c3736bd09094",
-    "src/main/java/valthorne/website/WebsiteApplication.java": "9bb48752eef2e107fb2e25ae4b7cc34a5e8d7c34b21553f643ad905abebc4291",
-    "src/main/java/valthorne/website/WebsiteController.java": "9769f90991dfe49cade071c325b9436c03fa7cdb352244283d4922539ac8e566",
-    "src/main/java/valthorne/website/browser/BrowserDom.java": "3cc1141fe9577c3251acfed11f3829872e92d10c09e388d24d6e51e1373992c6",
-    "src/main/java/valthorne/website/browser/BrowserPort.java": "15054c6039114b55ee660ce85f3ca3f8fd384fcc214de3272a93ab7874036cc3",
-    "src/main/java/valthorne/website/browser/WebsiteNavigation.java": "eb5980065cb39bd5c3bc3d9f630724dd56abf4177ba80d39fbd4cc98c7c12b43",
-    "src/main/java/valthorne/website/content/Card.java": "9caf74f225eb35de82ba3aa76929dab70f4ccdc54aa7ff390d8252daff7558b6",
-    "src/main/java/valthorne/website/content/DemoCatalog.java": "cab71053ade32d69c7ceedcd3268337e57d761afc31afe041502ca55e4dcb19e",
-    "src/main/java/valthorne/website/content/GuideCatalog.java": "fc6603d6f393cd478a64a06c8d3b0836a4b41d4093375dbc78bc7a275d88f8f2",
-    "src/main/java/valthorne/website/content/Page.java": "8043a913c899181b771df5bb5be895b2a46a9f92cb8790f3907c38fe94235959",
-    "src/main/java/valthorne/website/content/Section.java": "e6f19ec37ff2f5fe9b34d6ba33fbd26a6ba22f6d465af845b267ff3ab9233747",
-    "src/main/java/valthorne/website/content/WebsiteContent.java": "7d23e092f5618206e21e480193ba6ed08c9b2ec2f0af1b5221639aab891ba3c9",
-    "src/main/java/valthorne/website/export/BrowserStyles.java": "333e81fe3435c151ea00d142cca84791e4e95caa7ad05c170fee303bb1f16379",
-    "src/main/java/valthorne/website/export/ContentValidator.java": "f64d07c8fd693d986f39f6df2b8aa38e58528104e963e31b537470c6c51dd7eb",
-    "src/main/java/valthorne/website/export/HtmlExporter.java": "f19ae84d0eafd8ec61c42662425adc6a3dff484d696aa8d65c4d7345fd1057b6"
+    "src/main/java/valthorne/website/BrowserBridge.java": "1e331b3eb7f587e5a5e015f570ea1501bb9673a3c6dc38d0f96172ba64791096",
+    "src/main/java/valthorne/website/WebsiteApplication.java": "04e9ae67b778d44b8c7be54cf3937bec4ad6c99453d75157fad570685780dd7c",
+    "src/main/java/valthorne/website/WebsiteController.java": "123198952a4bdbb9b9645b98a9bdfb3ab6d7f1c74ca2dcbef7d68fc77b9da80d",
+    "src/main/java/valthorne/website/browser/BrowserDom.java": "fb7ee15ec353a96281561d0a7efc9ada3acdcdf826e92ff3d325b7b2a75c515e",
+    "src/main/java/valthorne/website/browser/BrowserPort.java": "5af611b9319710a1b7778be72cece4afbce39c9d6c862e65badbbfe199109e31",
+    "src/main/java/valthorne/website/content/LandingContent.java": "523ecac6dcc0d9f38309412624e5cf0eb5977944579786f24d3dfff6fb521104",
+    "src/main/java/valthorne/website/export/BrowserStyles.java": "fb6bc1689565269c6dc30d745de07c74afefdede7b00f36bfa3966c928b07c5e",
+    "src/main/java/valthorne/website/export/ContentValidator.java": "87ef826c0503bc7133b343ec2c4f2677dc0cf58c3af76dc09baebb2138775986",
+    "src/main/java/valthorne/website/export/HtmlExporter.java": "4ede4243a2ba79571ecaf5699fb6732c4122e5cef0f49f216d3cd88442460610",
+    "src/main/java/valthorne/website/export/WorldArtwork.java": "8b7dcce9c2ab6a99adc6331360507ba41fd7573c766225966cded63cb9904910"
   }
 }

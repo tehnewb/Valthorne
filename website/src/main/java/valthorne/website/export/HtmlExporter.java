@@ -4,179 +4,157 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import valthorne.website.content.Card;
-import valthorne.website.content.Page;
-import valthorne.website.content.Section;
-import valthorne.website.content.WebsiteContent;
+import valthorne.website.content.LandingContent;
+import valthorne.website.content.LandingContent.Feature;
+import valthorne.website.content.LandingContent.Resource;
 
 /**
- * Exports the Java-authored website as complete, accessible static documents.
+ * Exports Valthorne's single landing page entirely from Java-authored content.
  *
- * <p>The generated HTML remains useful without JavaScript and gives search
- * engines, assistive technology, and text-mode visitors the same content as the
- * canvas application. Browser-host JavaScript is limited to starting the Java
- * application; no application logic is embedded in these documents.</p>
+ * <p>The semantic document carries the same product copy and destinations as
+ * the engine renderer. It remains readable without scripting and supplies the
+ * native browser controls used by the compiled Java application. Java also
+ * generates the stylesheet, cinematic artwork, and search-engine files.</p>
  *
- * <p>Run with Java 17 or later: {@code HtmlExporter output-directory revision}.
- * This exporter has no dependency on the engine, TeaVM, or a JSON parser.</p>
+ * <p>Run with Java 17 or later: {@code HtmlExporter output-directory revision}.</p>
  */
 public final class HtmlExporter {
-    /** Canonical public address used by social metadata and search engines. */
     public static final String PUBLIC_URL = "https://tehnewb.github.io/Valthorne/";
-    private static final String[][] NAVIGATION = {
-        {"engine", "Engine"}, {"examples", "Demos"}, {"docs", "Docs"},
-        {"start", "Get started"}, {"lab", "Lab"}, {"about", "About"}
-    };
 
     private HtmlExporter() { }
 
-    /** Writes deployment documents without copying assets or deleting any files. */
+    /** Writes documents without deleting output files or copying branding assets. */
     public static void main(String[] args) throws IOException {
         if (args.length != 2) throw new IllegalArgumentException("Usage: HtmlExporter output-directory revision");
         export(Path.of(args[0]), args[1]);
     }
 
-    /** Writes all public pages, native-control styles, and search-engine support files. */
+    /** Exports one public route; retired routes deliberately receive the generated 404 page. */
     public static void export(Path output, String revision) throws IOException {
         if (!revision.matches("[a-zA-Z0-9._-]+")) throw new IllegalArgumentException("Invalid build revision");
-        Files.createDirectories(output);
-        for (Page page : WebsiteContent.pages()) write(output, page.id() + ".html", document(page, revision));
+        Files.createDirectories(output.resolve("assets"));
+        write(output, "index.html", document(revision));
         write(output, "shell.css", BrowserStyles.css());
+        write(output, "assets/world.svg", WorldArtwork.svg());
         write(output, "404.html", notFound(revision));
         write(output, ".nojekyll", "");
         write(output, "robots.txt", "User-agent: *\nAllow: /\nSitemap: " + PUBLIC_URL + "sitemap.xml\n");
-        StringBuilder sitemap = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
-        for (Page page : WebsiteContent.pages()) sitemap.append("<url><loc>").append(canonical(page)).append("</loc></url>");
-        write(output, "sitemap.xml", sitemap.append("</urlset>\n").toString());
-        System.out.println("Exported " + WebsiteContent.pages().size() + " Java-authored website pages.");
+        write(output, "sitemap.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>" + PUBLIC_URL + "</loc></url></urlset>\n");
+        System.out.println("Exported one Java-authored landing page and its artwork.");
     }
 
-    /** Builds one route, including stable page/build markers for Java navigation. */
-    public static String document(Page page, String revision) {
-        String title = page.id().equals("index") ? "Valthorne — Java game engine" : page.title() + " — Valthorne";
-        StringBuilder html = new StringBuilder(16000);
-        html.append("<!doctype html>\n<html lang=\"en\" data-page-id=\"").append(escape(page.id())).append("\"><head>");
-        html.append("""
-                <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-                """);
-        html.append("<title>").append(escape(title)).append("</title>");
-        meta(html, "name", "description", page.description());
-        meta(html, "name", "theme-color", "#141414");
+    /** Builds the accessible landing document and the minimal compiled-application entry point. */
+    public static String document(String revision) {
+        StringBuilder html = new StringBuilder(14000);
+        html.append("<!doctype html>\n<html lang=\"en\" data-page-id=\"index\"><head>");
+        html.append("<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+        html.append("<title>Valthorne — ").append(escape(LandingContent.TITLE)).append("</title>");
+        meta(html, "name", "description", LandingContent.DESCRIPTION);
+        meta(html, "name", "theme-color", "#101114");
         meta(html, "name", "valthorne-build", revision);
-        html.append("<link rel=\"canonical\" href=\"").append(canonical(page)).append("\">");
-        meta(html, "property", "og:title", page.title());
-        meta(html, "property", "og:description", page.description());
+        meta(html, "property", "og:title", "Valthorne — " + LandingContent.TITLE);
+        meta(html, "property", "og:description", LandingContent.DESCRIPTION);
         meta(html, "property", "og:type", "website");
-        meta(html, "property", "og:url", canonical(page));
+        meta(html, "property", "og:url", PUBLIC_URL);
         meta(html, "property", "og:image", PUBLIC_URL + "assets/banner.png");
+        html.append("<link rel=\"canonical\" href=\"").append(PUBLIC_URL).append("\">");
         html.append("<link rel=\"icon\" href=\"assets/valthorne.png\" type=\"image/png\"><link rel=\"stylesheet\" href=\"shell.css?v=")
                 .append(escape(revision)).append("\"></head>\n");
         html.append("""
                 <body><a class="skip-link" href="?view=text#content">Skip to text content</a>
                 <canvas id="scene" aria-hidden="true"></canvas><div id="scroll-space" aria-hidden="true"></div>
-                <nav id="engine-links" aria-label="Engine view navigation and actions"></nav>
-                <div id="scene-interaction" role="group" tabindex="0" aria-label="Interactive geometry lab. Drag to orbit. Use arrow keys to rotate, or Home to reset the view." hidden></div>
-                <input id="engine-search" type="search" aria-label="Search this collection" placeholder="Search titles and systems…" hidden>
-                <button id="motion-toggle" type="button" aria-label="Pause motion" title="Pause motion"><span aria-hidden="true" class="pause-icon">Ⅱ</span><span aria-hidden="true" class="play-icon">▷</span></button>
+                <nav id="engine-links" aria-label="Page navigation and actions"></nav>
                 <button id="back-top" type="button" aria-label="Back to top" title="Back to top" hidden>↑</button>
                 """);
-        html.append(semanticContent(page));
+        html.append(semanticContent());
         html.append("""
-                <footer id="access-bar"><span id="status" role="status">Loading Valthorne…</span><a id="view-toggle" href="?view=text">Text version</a><a href="https://github.com/tehnewb/Valthorne">GitHub ↗</a></footer>
+                <footer id="access-bar"><span id="status" role="status">Valthorne · Java game engine</span><a id="view-toggle" href="?view=text">Text version</a>
+                <button id="motion-toggle" type="button" aria-label="Pause motion" title="Pause motion"><span aria-hidden="true" class="pause-icon">Ⅱ</span><span aria-hidden="true" class="play-icon">▷</span><span>Motion</span></button>
                 """);
+        html.append("<a href=\"").append(escape(LandingContent.REPOSITORY)).append("\">GitHub ↗</a></footer>\n");
         html.append("<script type=\"module\" src=\"browser-host.js?v=").append(escape(revision)).append("\"></script>\n</body></html>\n");
         return html.toString();
     }
 
-    /** Complete semantic page content; IDs and classes match the browser's native-control layer. */
-    public static String semanticContent(Page page) {
-        StringBuilder html = new StringBuilder(12000);
-        html.append("<main id=\"content\"><header class=\"masthead\"><a class=\"brand\" href=\"index.html\"");
-        if (page.id().equals("index")) html.append(" aria-current=\"page\"");
-        html.append("\"><img src=\"assets/valthorne.png\" alt=\"Valthorne logo\" width=\"31\" height=\"48\">Valthorne</a><nav aria-label=\"Main navigation\">");
-        for (String[] link : NAVIGATION) {
-            html.append("<a href=\"").append(link[0]).append(".html\"");
-            if (page.id().equals(link[0])) html.append(" aria-current=\"page\"");
-            html.append('>').append(link[1]).append("</a>");
+    /** Returns the complete text-mode document, using the renderer's same anchors and destinations. */
+    public static String semanticContent() {
+        StringBuilder html = new StringBuilder(11000);
+        html.append("<main id=\"content\"><header class=\"masthead\"><div class=\"wrap\">");
+        brand(html);
+        html.append("<nav aria-label=\"Main navigation\"><a href=\"#engine\">Engine</a><a href=\"#resources\">Resources</a><a href=\"")
+                .append(escape(LandingContent.REPOSITORY)).append("\">GitHub ↗</a></nav>");
+        action(html, "Get started", "#start", true, false);
+        html.append("</div></header>\n<header class=\"hero\">");
+        html.append("<figure class=\"hero-media\"><img src=\"assets/world.svg\" alt=\"An imagined mountain world beneath a monumental stone arch.\" width=\"1920\" height=\"1080\" fetchpriority=\"high\"></figure>");
+        html.append("<div class=\"wrap\"><p class=\"eyebrow\">").append(escape(LandingContent.EYEBROW)).append("</p><h1>")
+                .append(escape(LandingContent.TITLE)).append("</h1><p class=\"hero-copy\">").append(escape(LandingContent.DESCRIPTION))
+                .append("</p><div class=\"hero-actions\">");
+        action(html, "Get started", LandingContent.GET_STARTED, true, true);
+        action(html, "Explore engine", "#engine", false, false);
+        html.append("</div><p class=\"hero-caption\">JAVA 25 &nbsp;·&nbsp; APACHE-2.0 &nbsp;·&nbsp; VERSION ")
+                .append(escape(LandingContent.VERSION)).append("</p></div></header>\n");
+        html.append("<section id=\"engine\"><div class=\"wrap\"><header class=\"section-intro\"><h2>")
+                .append(escape(LandingContent.INTRO_TITLE)).append("</h2><p>").append(escape(LandingContent.INTRO_TEXT)).append("</p></header>");
+        for (Feature feature : LandingContent.FEATURES) {
+            html.append("<article class=\"feature\"><p class=\"feature-number\">").append(escape(feature.number()))
+                    .append("</p><div><h3>").append(escape(feature.title())).append("</h3><p>").append(escape(feature.text())).append("</p>");
+            textLink(html, "Explore " + feature.number().substring(feature.number().indexOf('/') + 1).trim().toLowerCase(java.util.Locale.ROOT), feature.href());
+            html.append("</div></article>");
         }
-        html.append("</nav></header>\n<header class=\"page-hero");
-        if (!page.heroImage().isEmpty()) html.append(" has-media");
-        html.append("\"><div class=\"hero-copy\"><p class=\"eyebrow\">").append(escape(page.eyebrow()))
-                .append("</p><h1>").append(escape(page.title())).append("</h1><p class=\"intro\">")
-                .append(escape(page.description())).append("</p>");
-        if (page.id().equals("index")) html.append("<div class=\"hero-actions\"><a class=\"action primary\" href=\"start.html\">Start building</a><a class=\"action\" href=\"examples.html\">Explore demos</a></div>");
-        html.append("</div>");
-        if (!page.heroImage().isEmpty()) media(html, page.heroImage(), page.heroCaption(), "hero-media");
-        html.append("</header>\n");
-        if (page.id().equals("about")) html.append("<div class=\"project-identity\"><img class=\"brand-banner\" src=\"assets/banner.png\" alt=\"Valthorne — original gold lettering and blue flame\" width=\"1511\" height=\"623\"></div>");
-        for (int index = 0; index < page.sections().size(); index++) section(html, page, page.sections().get(index), index);
-        html.append("<div class=\"project-footer\"><p>Created by Albert Beaupre. Valthorne is open source under Apache-2.0.</p><a href=\"about.html\">About the project →</a></div></main>\n");
+        html.append("</div></section>\n<section id=\"resources\"><div class=\"wrap\"><header class=\"section-intro\"><h2>")
+                .append(escape(LandingContent.RESOURCES_TITLE)).append("</h2><p>").append(escape(LandingContent.RESOURCES_TEXT))
+                .append("</p></header><div class=\"resources\">");
+        for (Resource resource : LandingContent.RESOURCES) {
+            html.append("<article class=\"resource\"><h3>").append(escape(resource.title())).append("</h3><p>")
+                    .append(escape(resource.text())).append("</p>");
+            textLink(html, resource.label(), resource.href());
+            html.append("</article>");
+        }
+        html.append("</div></div></section>\n<section id=\"start\"><div class=\"wrap\"><h2>")
+                .append(escape(LandingContent.CTA_TITLE)).append("</h2><p>").append(escape(LandingContent.CTA_TEXT))
+                .append("</p><div class=\"hero-actions\">");
+        action(html, "Read the quick start", LandingContent.GET_STARTED, true, true);
+
+        html.append("</div></div></section>\n<footer class=\"project-footer\"><div class=\"wrap\">");
+        brand(html);
+        html.append("<p>Created by Albert Beaupre.<br>Open source under <a href=\"").append(escape(LandingContent.LICENSE))
+                .append("\">Apache-2.0</a>.</p></div></footer></main>\n");
         return html.toString();
     }
 
-    private static void section(StringBuilder html, Page page, Section section, int index) {
-        String layout = section.layout();
-        if (layout.isEmpty()) layout = switch (section.catalog()) { case "guides" -> "rows"; case "examples" -> "examples"; default -> "cards"; };
-        html.append("<section class=\"section-").append(escape(layout)).append("\"><div class=\"section-copy\"><header class=\"section-heading\"><h2>")
-                .append(escape(section.title())).append("</h2>");
-        if (!section.description().isEmpty()) html.append("<p>").append(escape(section.description())).append("</p>");
-        html.append("</header>\n");
-        if (!section.code().isEmpty()) html.append("<p class=\"code-filename\">").append(escape(section.filename()))
-                .append("</p><pre id=\"code-").append(index).append("\" tabindex=\"0\"><code>")
-                .append(escape(section.code())).append("</code></pre>");
-        if (section.lab()) html.append("<p class=\"lab-note\">The interactive scene is available in the <a href=\"").append(escape(page.id()))
-                .append(".html\">engine view</a>. Drag to orbit, use the arrow keys to rotate, or pause playback. System reduced-motion settings are respected.</p>");
-        if (!section.cards().isEmpty()) {
-            html.append("<div class=\"cards\">");
-            for (Card card : section.cards()) card(html, card);
-            html.append("</div>");
-        }
-        html.append("</div>");
-        if (!section.image().isEmpty()) media(html, section.image(), section.imageCaption(), "section-media");
-        html.append("</section>\n");
+    private static void brand(StringBuilder html) {
+        html.append("<a class=\"brand\" href=\"#content\" aria-label=\"Valthorne home\"><img src=\"assets/valthorne.png\" alt=\"\" width=\"27\" height=\"43\">Valthorne</a>");
     }
 
-    private static void card(StringBuilder html, Card card) {
-        html.append("<article>");
-        if (!card.image().isEmpty()) html.append("<img src=\"assets/").append(escape(card.image())).append("\" alt=\"")
-                .append(escape(card.title())).append(" running in Valthorne\" loading=\"lazy\" width=\"800\" height=\"460\">");
-        html.append("<div class=\"card-copy\">");
-        if (!card.category().isEmpty()) html.append("<p class=\"card-category\">").append(escape(card.category())).append("</p>");
-        html.append("<h3>").append(escape(card.title())).append("</h3><p>").append(escape(card.text()))
-                .append("</p></div><div class=\"card-links\"><a href=\"").append(escape(card.href())).append("\">")
-                .append(escape(card.label())).append(" <span aria-hidden=\"true\">&nbsp;→</span></a>");
-        if (!card.guide().isEmpty()) html.append("<a href=\"").append(escape(card.guide()))
-                .append("\">Controls and source <span aria-hidden=\"true\">&nbsp;↗</span></a>");
-        html.append("</div></article>");
+    private static void action(StringBuilder html, String label, String href, boolean primary, boolean arrow) {
+        html.append("<a class=\"action").append(primary ? " primary" : "").append("\" href=\"")
+                .append(escape(href)).append("\">").append(escape(label));
+        if (arrow) html.append("<span aria-hidden=\"true\">↗</span>");
+        html.append("</a>");
     }
 
-    private static void media(StringBuilder html, String file, String caption, String className) {
-        html.append("<figure class=\"").append(className).append("\"><img src=\"assets/").append(escape(file))
-                .append("\" alt=\"").append(escape(caption.isEmpty() ? "A scene rendered with Valthorne" : caption))
-                .append("\" width=\"800\" height=\"460\"")
-                .append(className.equals("hero-media") ? " fetchpriority=\"high\"" : " loading=\"lazy\"").append('>');
-        if (!caption.isEmpty()) html.append("<figcaption>").append(escape(caption)).append("</figcaption>");
-        html.append("</figure>");
+    private static void textLink(StringBuilder html, String label, String href) {
+        html.append("<a class=\"text-link\" href=\"").append(escape(href)).append("\">").append(escape(label))
+                .append("<span aria-hidden=\"true\">↗</span></a>");
     }
 
-    private static void meta(StringBuilder html, String attribute, String name, String content) {
-        html.append("<meta ").append(attribute).append("=\"").append(name).append("\" content=\"").append(escape(content)).append("\">");
+    private static void meta(StringBuilder html, String attribute, String name, String value) {
+        html.append("<meta ").append(attribute).append("=\"").append(name).append("\" content=\"").append(escape(value)).append("\">");
     }
 
-    private static String canonical(Page page) { return PUBLIC_URL + (page.id().equals("index") ? "" : page.id() + ".html"); }
-
-    /** Escapes both HTML text and double-quoted attribute values without interpreting content as markup. */
+    /** Treats all authored copy as text, including values placed in quoted HTML attributes. */
     private static String escape(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
-    private static void write(Path output, String name, String content) throws IOException {
-        Files.writeString(output.resolve(name), content, StandardCharsets.UTF_8);
+    private static void write(Path output, String name, String value) throws IOException {
+        Files.writeString(output.resolve(name), value, StandardCharsets.UTF_8);
     }
 
+    /** Removed multipage routes remain honest missing pages with one clear way home. */
     private static String notFound(String revision) {
         return """
-                <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page not found — Valthorne</title><link rel="stylesheet" href="/Valthorne/shell.css?v=%s"><link rel="icon" href="/Valthorne/assets/valthorne.png"></head><body><main id="content"><img class="brand-banner" src="/Valthorne/assets/banner.png" alt="Valthorne" width="1511" height="623"><div class="eyebrow">404 / PAGE NOT FOUND</div><h1>The page could not be found.</h1><p>Check the address, or continue exploring the engine.</p><a href="/Valthorne/">Return to Valthorne</a></main></body></html>
+                <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Page not found — Valthorne</title><link rel="stylesheet" href="/Valthorne/shell.css?v=%s"><link rel="icon" href="/Valthorne/assets/valthorne.png"></head><body><main class="not-found wrap"><p class="eyebrow">404 / PAGE NOT FOUND</p><h1>Let's get you<br>back to building.</h1><p>This page is no longer available.</p><a class="action primary" href="/Valthorne/">Explore Valthorne <span aria-hidden="true">→</span></a></main></body></html>
                 """.formatted(escape(revision));
     }
 }

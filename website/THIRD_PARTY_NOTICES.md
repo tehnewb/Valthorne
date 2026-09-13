@@ -1,9 +1,10 @@
 # Website distribution notices
 
-The website source and Valthorne browser backend snapshots are licensed under
-the repository's Apache License 2.0 (`runtime/LICENSE-Valthorne.txt`).
-The generated `runtime/valthorne.js` contains the compiled website, reachable
-Valthorne classes, TeaVM runtime/class-library code, and reachable JOML math code.
+The website source, generated landscape artwork, and Valthorne browser backend
+snapshots use the repository's Apache License 2.0
+(`runtime/LICENSE-Valthorne.txt`). The generated `runtime/valthorne.js` contains
+the compiled Java website, reachable Valthorne classes, TeaVM runtime and
+class-library code, and reachable JOML math code.
 
 | Component | Version | License copy | Source |
 | --- | --- | --- | --- |
@@ -14,12 +15,10 @@ Valthorne classes, TeaVM runtime/class-library code, and reachable JOML math cod
 | Atkinson Hyperlegible Regular | bundled engine font | `runtime/ui/OFL-AtkinsonHyperlegible.txt` | https://www.brailleinstitute.org/freefont/ |
 | Urbanist | normal variable, weights 100–900 | `assets/fonts/OFL-Urbanist.txt` | https://github.com/google/fonts/tree/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/urbanist |
 
-Screenshots are captures of Valthorne examples. The original game asset sources,
-authors, conversions, and licenses are recorded in the separate
-[examples repository](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
-This website distributes screenshots rather than the example model/resource trees.
-The original logo and banner are copied from this repository's
-`images/logo-transparent.png` and `images/banner.png`, without alterations.
+`WorldArtwork.java` generates the original `assets/world.svg` illustration.
+It contains no third-party imagery, models, textures, or remote references.
+The original logo and banner are copied without alterations from this
+repository's `images/logo-transparent.png` and `images/banner.png`.
 
 Playwright is an Apache-2.0 development dependency used for verification. It is
 not included in the deployed site. The website does not ship the full Filament,

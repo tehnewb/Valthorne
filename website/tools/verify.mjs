@@ -1,15 +1,17 @@
-/** Browser acceptance checks; artifacts stay in build/, with no test source directory. */
+/** Single-page browser acceptance checks. Reports and screenshots stay in ignored build/. */
 import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+
 const require = createRequire(import.meta.url);
 let playwright;
 try { playwright = require('@playwright/test'); }
 catch { playwright = require('../../portable/web/node_modules/@playwright/test'); }
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-await fs.mkdir(path.join(root, 'build'), { recursive: true });
+const output = path.join(root, 'build');
+await fs.mkdir(output, { recursive: true });
 const base = process.env.SITE_URL || 'http://127.0.0.1:8097/Valthorne/';
 const selected = process.env.TEST_BROWSER || 'chromium';
 const browser = await (playwright[selected] || playwright.chromium).launch({
@@ -17,220 +19,181 @@ const browser = await (playwright[selected] || playwright.chromium).launch({
 });
 const context = await browser.newContext({ viewport: { width: 1440, height: 980 } });
 context.setDefaultTimeout(20000);
-const page = await context.newPage(), errors = [];
+const page = await context.newPage();
+const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
-page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-async function open(name = '') {
-  await page.goto(base + name);
-  await page.waitForFunction(() => globalThis.valthorneReady === true);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Horizontal overflow');
-  assert.equal(await page.evaluate(() => globalThis.valthorneError), undefined, 'Engine failure');
-}
-async function settle() {
-  await page.waitForTimeout(120);
-  await page.waitForFunction(() => !globalThis.websiteMetrics?.revealing);
-}
-const report = { browser: selected, pages: [], checks: [] };
-try {
-  for (const name of ['index','engine','examples','docs','start','lab','about']) {
-    console.log('Verifying ' + name);
-    await open(name + '.html');
-    await settle();
-    if (name === 'about') assert.equal(await page.locator('.brand-banner').getAttribute('src'), 'assets/banner.png');
-    const ink = await page.evaluate(() => {
-      const canvas = valthorneHost.nano.get(1).canvas;
-      // Inspect the engine's vector surface before WebGL composition; WebGL's
-      // non-preserved drawing buffer may already be cleared after presentation.
-      const copy = document.createElement('canvas'); copy.width = canvas.width; copy.height = canvas.height;
-      const ctx = copy.getContext('2d'); ctx.drawImage(canvas, 0, 0);
-      const data = ctx.getImageData(0, 0, copy.width, copy.height).data;
-      let nonBackground = 0;
-      for (let i = 0; i < data.length; i += 64) if (data[i] > 80 || data[i + 1] > 80 || data[i + 2] > 80) nonBackground++;
-      return nonBackground;
-    });
-    assert.ok(ink > 100, 'Canvas has no visible content on ' + name);
-    report.pages.push({ name, coloredSamples: ink });
-    if (name === 'index') await page.screenshot({ path: path.join(root,'build/home-desktop.png') });
-    if (name === 'lab') await page.screenshot({ path: path.join(root,'build/lab-desktop.png') });
-    await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await settle();
-    await page.setViewportSize({ width: 390, height: 844 }); await settle();
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Mobile overflow on ' + name);
-    await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await settle();
-    const footerLink = await page.locator('#access-bar a[href^="https://github.com"]').boundingBox();
-    const backTop = await page.locator('#back-top').boundingBox();
-    assert.ok(!backTop || footerLink.x + footerLink.width <= backTop.x || footerLink.y + footerLink.height <= backTop.y || footerLink.y >= backTop.y + backTop.height, 'Back-to-top obscures a footer link on ' + name);
-    await page.evaluate(() => scrollTo(0, 0)); await settle();
-    await page.screenshot({ path: path.join(root,`build/${name}-mobile.png`) });
-    await page.setViewportSize({ width: 1440, height: 980 });
-  }
-  report.checks.push('Seven pages render visible engine pixels at desktop and mobile sizes');
+page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+const report = { browser: selected, viewports: [], checks: [] };
 
-  await open('index.html'); await page.waitForTimeout(800);
-  const identity = await page.evaluate(() => ({
-    hero: document.querySelector('.hero-media img').getAttribute('src'),
-    logo: document.querySelector('.brand img').getAttribute('src'),
-    unwantedScreenshot: [...document.images].some(image => image.src.endsWith('/fps.png')),
+async function settle(target = page) {
+  await target.waitForTimeout(150);
+  await target.waitForFunction(() => globalThis.websiteMetrics && !websiteMetrics.revealing);
+}
+async function open() {
+  await page.goto(new URL('index.html', base).href);
+  await page.waitForFunction(() => globalThis.valthorneReady === true);
+  await page.waitForLoadState('networkidle');
+  await settle();
+  assert.equal(await page.evaluate(() => globalThis.valthorneError), undefined, 'The Java landing page failed');
+}
+async function assertIdle(target = page) {
+  await settle(target);
+  await target.waitForTimeout(200);
+  const before = await target.evaluate(() => websiteMetrics.frames);
+  await target.waitForTimeout(450);
+  assert.equal(await target.evaluate(() => websiteMetrics.frames), before, 'An idle landing page keeps rendering');
+}
+async function semanticContent(target) {
+  assert.equal(await target.locator('#content h1').count(), 1, 'The landing page needs one primary heading');
+  for (const id of ['engine', 'resources', 'start']) {
+    assert.equal(await target.locator(`#content #${id}`).count(), 1, `Missing semantic section: ${id}`);
+    assert.ok((await target.locator(`#content #${id}`).textContent()).trim().length > 40, `Empty semantic section: ${id}`);
+  }
+  const content = await target.locator('#content').innerText();
+  assert.doesNotMatch(content, /\b(?:examples?|demos?)\b/i, 'Retired example content remains on the landing page');
+  const hrefs = await target.locator('a[href]').evaluateAll(anchors => anchors.map(anchor => anchor.getAttribute('href')));
+  for (const href of hrefs) {
+    assert.doesNotMatch(href, /(?:examples?|demos?)(?:[/.?#_-]|$)|\.(?:zip|jar|exe|msi|dmg)(?:[?#]|$)/i,
+      'The landing page still links to an example or packaged application: ' + href);
+  }
+  assert.ok(hrefs.some(href => /github\.com\/tehnewb\/Valthorne\/blob\/main\/docs\//.test(href)), 'No direct documentation link');
+  assert.ok(hrefs.some(href => href.includes('#start-a-game')), 'No direct quick-start link');
+}
+
+try {
+  await open();
+  await semanticContent(page);
+  assert.equal(await page.locator('#engine-search,#scene-interaction,a[href^="#copy="],a[href^="#filter="]').count(), 0,
+    'Retired catalog, copy, or lab controls remain');
+  const branding = await page.evaluate(() => ({
+    logo: document.querySelector('.brand img')?.getAttribute('src'),
+    artwork: document.querySelector('.hero-media img')?.getAttribute('src'),
+    artworkLoaded: document.querySelector('.hero-media img')?.naturalWidth > 0,
     fontLoaded: document.fonts.check('400 20px UrbanistWebsite') && document.fonts.check('700 20px UrbanistWebsite')
   }));
-  assert.equal(identity.hero, 'assets/lighting-studio.png');
-  assert.equal(identity.logo, 'assets/valthorne.png');
-  assert.equal(identity.unwantedScreenshot, false);
-  assert.equal(identity.fontLoaded, true, 'Urbanist did not load');
-  // Check the shipped CSS palette and actual engine pixels, not just design documentation.
-  const theme = await page.evaluate(() => {
-    const style = getComputedStyle(document.documentElement);
-    const palette = Object.fromEntries(['ink','muted','primary','link','panel','border'].map(key => [key, style.getPropertyValue('--' + key).trim()]));
-    palette.background = style.backgroundColor;
-    const surface = valthorneHost.nano.get(1), data = surface.ctx.getImageData(0, 0, surface.canvas.width, surface.canvas.height).data;
-    let purple = 0, white = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] === 112 && data[i + 1] === 59 && data[i + 2] === 247) purple++;
-      if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255) white++;
+  assert.equal(branding.logo, 'assets/valthorne.png', 'The original logo is missing');
+  assert.equal(branding.artwork, 'assets/world.svg', 'The Java-generated hero artwork is missing');
+  assert.equal(branding.artworkLoaded, true, 'The hero artwork did not decode');
+  assert.equal(branding.fontLoaded, true, 'The self-hosted Urbanist font did not load');
+  report.checks.push('One complete landing page, original branding, Java-generated artwork, local typography, and direct documentation links');
+
+  for (const viewport of [
+    { name: 'desktop', width: 1440, height: 980 },
+    { name: 'mobile', width: 390, height: 844 },
+    { name: 'short', width: 1024, height: 600 }
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.evaluate(() => scrollTo(0, 0));
+    await settle();
+    const pixels = await page.evaluate(() => {
+      // Read the persistent vector surface; WebGL may clear its displayed buffer after presentation.
+      const surface = valthorneHost.nano.get(1);
+      const data = surface.ctx.getImageData(0, 0, surface.canvas.width, surface.canvas.height).data;
+      let colored = 0, dark = 0, light = 0;
+      for (let i = 0; i < data.length; i += 64) {
+        const low = Math.min(data[i], data[i + 1], data[i + 2]), high = Math.max(data[i], data[i + 1], data[i + 2]);
+        if (high - low > 20) colored++;
+        if (high < 70) dark++;
+        if (low > 190) light++;
+      }
+      return { colored, dark, light };
+    });
+    assert.ok(pixels.colored > 30 && pixels.dark > 50 && pixels.light > 50, 'The engine did not paint the landing composition at ' + viewport.name);
+    const stops = await page.evaluate(() => [0, Math.round((document.body.scrollHeight - innerHeight) / 2), document.body.scrollHeight]);
+    for (const top of stops) {
+      await page.evaluate(top => scrollTo(0, top), top);
+      await settle();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Horizontal overflow at ' + viewport.name);
+      const overflow = await page.locator('#engine-links a:visible').evaluateAll(anchors => anchors
+        .map(anchor => ({ label: anchor.getAttribute('aria-label'), rect: anchor.getBoundingClientRect().toJSON() }))
+        .filter(({ rect }) => rect.left < -1 || rect.right > innerWidth + 1));
+      assert.deepEqual(overflow, [], 'A native action extends outside the viewport');
     }
-    return { palette, purple, white };
-  });
-  function luminance(color) {
-    const hex = color.slice(1);
-    const rgb = color.startsWith('#') ? (hex.length === 3 ? [...hex].map(value => value + value) : hex.match(/../g)).map(value => parseInt(value,16)) : color.match(/[\d.]+/g).slice(0,3).map(Number);
-    const linear = rgb.map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
-    return linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
+    await page.screenshot({ path: path.join(output, `landing-${viewport.name}-footer.png`) });
+    await page.evaluate(() => scrollTo(0, 0)); await settle();
+    await page.screenshot({ path: path.join(output, `landing-${viewport.name}.png`) });
+    report.viewports.push({ ...viewport, pixels });
   }
-  function contrast(a, b) { const first = luminance(a), second = luminance(b); return (Math.max(first,second) + .05) / (Math.min(first,second) + .05); }
-  const colors = theme.palette;
-  report.contrast = {
-    primaryText: contrast(colors.ink, colors.panel), secondaryText: contrast(colors.muted, colors.panel),
-    links: contrast(colors.link, colors.panel), primaryButton: contrast(colors.ink, colors.primary),
-    controlBorder: contrast(colors.border, colors.panel)
-  };
-  for (const [name, ratio] of Object.entries(report.contrast)) assert.ok(ratio >= (name === 'controlBorder' ? 3 : 4.5), 'Insufficient contrast: ' + name);
-  assert.ok(theme.purple > 500 && theme.white > 50, 'The engine did not paint the purple/white theme');
-  report.checks.push('High-contrast text, links, primary buttons and control borders; matching engine theme pixels');
-  const primary = await page.locator('#engine-links a[aria-label="Start building"]:visible').first().boundingBox();
-  const secondary = await page.locator('#engine-links a[aria-label="Explore demos"]:visible').boundingBox();
-  assert.ok(Math.abs(primary.x - 100) < 2 && secondary.x > primary.x + primary.width && Math.abs(primary.y - secondary.y) < 2, 'Hero actions are not aligned with the editorial column');
-  report.checks.push('Original logo, real engine hero image, locally loaded Urbanist, and aligned hero actions');
-  const idle = await page.evaluate(() => websiteMetrics.frames);
-  await page.waitForTimeout(600);
-  assert.equal(await page.evaluate(() => websiteMetrics.frames), idle, 'Site keeps rendering while idle');
-  await page.keyboard.press('Tab');
-  assert.match(await page.evaluate(() => document.activeElement.textContent), /Skip to text/);
-  await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Valthorne home');
-  await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Engine');
-  report.checks.push('Keyboard navigation skips the decorative drawing surface');
-  await page.locator('#engine-links').getByRole('link',{name:'Docs',exact:true}).click();
-  await page.waitForURL('**/docs.html'); await page.waitForFunction(() => globalThis.valthorneReady);
+  report.checks.push('Hero, middle, and footer render without overflow at desktop, mobile, and short viewport sizes');
+
+  await page.setViewportSize({ width: 1440, height: 980 });
   await settle();
-  const search = page.locator('#engine-search');
-  // Scroll until the collection search enters the viewport without relying on a particular text height.
-  for (let i=0; i<10 && !(await search.isVisible()); i++) { await page.mouse.wheel(0,250); await settle(); }
-  await search.fill('physics'); await settle();
-  assert.equal(await page.evaluate(() => site.query), 'physics');
-  assert.ok(page.url().includes('q=physics'));
-  await search.fill('no-such-system-xyz'); await settle();
-  assert.equal(await page.locator('#engine-links a[href*="/docs/systems/"]:visible').count(), 0);
-  await page.locator('#engine-links a[href="#clear"]').click(); await settle();
-  assert.equal(await search.inputValue(), '');
-  assert.equal(await page.evaluate(() => site.category), 'all');
-  await search.fill(''); await settle();
-  await page.locator('#engine-links a[href="#filter=ui"]').click(); await settle();
-  assert.equal(await page.evaluate(() => site.category), 'ui');
-  assert.ok((await page.locator('#engine-links a[href*="/docs/systems/ui-"]:visible').count()) > 0);
-  report.checks.push('Documentation search, URL persistence, empty results, and category filtering');
+  await assertIdle();
+  // Check actual keyboard behavior without tying the test to a particular skip-link label.
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  const focused = [];
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('Tab');
+    focused.push(await page.evaluate(() => ({ tag: document.activeElement.tagName, label: document.activeElement.getAttribute('aria-label') })));
+  }
+  assert.equal(focused.some(item => item.tag === 'CANVAS'), false, 'The decorative canvas captures keyboard focus');
+  assert.ok(focused.some(item => item.label === 'Engine'), 'Keyboard navigation cannot reach the engine section');
+  report.checks.push('Finite entrance motion settles completely; native navigation remains keyboard accessible');
 
-  await open('examples.html?q=fps');
-  await page.evaluate(() => scrollTo(0, 350)); await settle();
-  const download = page.locator('#engine-links a[href*="Valthorne-demo-fps-"]:visible');
-  assert.equal(await download.count(), 1);
-  assert.match(await download.getAttribute('href'), /releases\/download\/v2\.0\.1\/.+\.zip$/);
-  report.checks.push('FPS search exposes the direct release ZIP');
-
-  await open('lab.html'); await page.evaluate(() => scrollTo(0, 300)); await settle();
-  const animate = page.locator('#engine-links a[href="#animate"]');
-  assert.equal(await page.evaluate(() => websiteMetrics.animations), true);
-  const moving = await page.evaluate(() => websiteMetrics.frames);
-  await page.waitForTimeout(300); assert.ok(await page.evaluate(() => websiteMetrics.frames) > moving + 2);
-  await animate.click(); await settle(); const paused = await page.evaluate(() => websiteMetrics.frames);
-  await page.waitForTimeout(300); assert.equal(await page.evaluate(() => websiteMetrics.frames), paused);
-  const scene = page.locator('#scene-interaction');
-  const sceneBox = await scene.boundingBox();
-  await page.mouse.move(sceneBox.x + sceneBox.width / 2, sceneBox.y + sceneBox.height / 2);
-  await page.mouse.down(); await page.mouse.move(sceneBox.x + sceneBox.width / 2 + 90, sceneBox.y + sceneBox.height / 2 + 20, { steps: 5 }); await page.mouse.up();
-  assert.ok(await page.evaluate(() => site.orbit) > .5, 'Drag did not rotate the scene');
-  await scene.focus(); await page.keyboard.press('ArrowRight');
-  assert.ok(await page.evaluate(() => site.orbit) > .9, 'Keyboard did not rotate the scene');
-  await page.keyboard.press('Home');
-  assert.deepEqual(await page.evaluate(() => [site.orbit, site.tilt]), [0, 0]);
-  await animate.click(); await settle();
-  await page.evaluate(() => scrollTo(0, document.body.scrollHeight)); await settle();
-  assert.equal(await page.evaluate(() => websiteMetrics.sceneVisible), false);
-  const offscreen = await page.evaluate(() => websiteMetrics.frames);
-  await page.waitForTimeout(400); assert.equal(await page.evaluate(() => websiteMetrics.frames), offscreen, 'Offscreen scene keeps rendering');
-  await page.locator('#back-top').click(); await page.waitForFunction(() => scrollY === 0); await settle();
-  assert.equal(await page.evaluate(() => websiteMetrics.animations), true);
-  await page.locator('#motion-toggle').click(); await settle();
-  assert.equal(await page.evaluate(() => websiteMetrics.motionEnabled), false);
-  const motionPaused = await page.evaluate(() => websiteMetrics.frames);
-  await page.waitForTimeout(350); assert.equal(await page.evaluate(() => websiteMetrics.frames), motionPaused);
-  await open('engine.html'); await settle();
-  assert.equal(await page.evaluate(() => websiteMetrics.motionEnabled), false, 'Motion choice did not persist across navigation');
-  await page.locator('#motion-toggle').click(); await settle();
-  report.checks.push('3D pointer and keyboard orbit, reset, playback controls, offscreen suspension, back to top, and persistent motion preference');
-
+  const motion = page.locator('#motion-toggle');
+  await motion.scrollIntoViewIfNeeded(); await motion.click();
+  await page.waitForFunction(() => websiteMetrics.motionEnabled === false);
+  await assertIdle();
+  await open();
+  assert.equal(await page.evaluate(() => websiteMetrics.motionEnabled), false, 'Motion preference did not survive reload');
+  await motion.scrollIntoViewIfNeeded(); await motion.click();
+  await page.waitForFunction(() => websiteMetrics.motionEnabled === true);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await open('lab.html'); await settle();
-  assert.equal(await page.evaluate(() => websiteMetrics.animations), false);
-  assert.equal(await page.locator('#motion-toggle').isDisabled(), true);
-  const reduced = await page.evaluate(() => websiteMetrics.frames);
-  await page.waitForTimeout(400); assert.equal(await page.evaluate(() => websiteMetrics.frames), reduced);
-  await page.locator('#scene-interaction').focus(); await page.keyboard.press('ArrowLeft'); await settle();
-  assert.ok(await page.evaluate(() => site.orbit) < 0, 'Reduced motion should retain manual exploration');
-  await page.emulateMedia({ reducedMotion: 'no-preference' }); await settle();
-  report.checks.push('System reduced motion disables decorative movement while retaining manual scene controls');
+  await settle();
+  assert.equal(await page.evaluate(() => websiteMetrics.reducedMotion), true);
+  assert.equal(await page.evaluate(() => websiteMetrics.motionEnabled), false);
+  assert.equal(await motion.isDisabled(), true, 'System reduced motion should disable the motion toggle');
+  await assertIdle();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  report.checks.push('Motion preference persists, system reduced motion is respected, and settled pages stop drawing');
 
-  await open('start.html'); await page.evaluate(() => scrollTo(0, 250)); await settle();
-  await context.grantPermissions(['clipboard-read','clipboard-write']);
-  await page.locator('#engine-links a[href="#copy=0"]').click();
-  assert.match(await page.evaluate(() => navigator.clipboard.readText()), /io.github.tehnewb:Valthorne:2.0.0/);
-  await page.waitForFunction(() => site.copied === 0); await settle();
-  assert.equal(await page.locator('#engine-links a[href="#copy=0"]').getAttribute('aria-label'), 'Copied!');
-  const widths = await page.evaluate(() => {
-    const c = valthorneHost.nano.get(1), face = c.state.face; c.state.face = 'monospace';
-    const result = [site.measure(1, 'iiiiiiii', 13), site.measure(1, 'mmmmmmmm', 13)]; c.state.face = face; return result;
-  });
-  assert.equal(widths[0], widths[1], 'Code font is not actually monospace');
-  report.checks.push('Readable monospace code, original source copying, and visible copy confirmation');
+  const text = await context.newPage();
+  const textErrors = [];
+  text.on('pageerror', error => textErrors.push(String(error)));
+  await text.goto(new URL('index.html?view=text', base).href);
+  await text.waitForFunction(() => document.querySelector('#view-toggle')?.textContent === 'Engine version');
+  await semanticContent(text);
+  assert.equal(await text.locator('#content h1').isVisible(), true);
+  assert.equal(await text.evaluate(() => globalThis.valthorneReady), undefined);
+  assert.equal(await text.evaluate(() => globalThis.valthorneHost), undefined, 'Text mode started graphics');
+  assert.deepEqual(textErrors, []);
+  await text.close();
+  const noScript = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+  const readable = await noScript.newPage();
+  await readable.goto(new URL('index.html', base).href);
+  await semanticContent(readable);
+  assert.equal(await readable.locator('#content h1').isVisible(), true);
+  assert.equal(await readable.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await noScript.close();
+  report.checks.push('The complete landing page remains readable in text mode and with JavaScript disabled');
 
-  await page.goto(base + 'docs.html?view=text');
-  await page.waitForFunction(() => document.querySelector('#view-toggle').textContent === 'Engine version');
-  assert.equal(await page.locator('#content article').count(), 50);
-  assert.equal(await page.evaluate(() => globalThis.valthorneReady), undefined);
-  assert.equal(await page.evaluate(() => globalThis.valthorneHost), undefined, 'Text mode initialized the graphics runtime');
-  assert.equal(await page.locator('#view-toggle').textContent(), 'Engine version');
-  const noJS = await browser.newContext({ javaScriptEnabled: false });
-  const textPage = await noJS.newPage(); await textPage.goto(base + 'examples.html');
-  assert.equal(await textPage.locator('#content a[href*="Valthorne-demo-"]').count(), 10);
-  await noJS.close();
-  report.checks.push('Java selects text mode without graphics startup; no-JavaScript view retains all ten downloads');
-  const fallbackPage = await context.newPage();
-  await fallbackPage.addInitScript(() => {
+  const unavailable = await context.newPage();
+  await unavailable.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (type, ...args) { return type === 'webgl2' ? null : original.call(this,type,...args); };
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) { return type === 'webgl2' ? null : original.call(this, type, ...args); };
   });
-  await fallbackPage.goto(base + 'index.html');
-  await fallbackPage.waitForFunction(() => globalThis.valthorneError);
-  assert.equal(await fallbackPage.locator('#content h1').isVisible(), true);
-  assert.equal(await fallbackPage.evaluate(() => document.documentElement.classList.contains('engine-ready')), false);
-  await fallbackPage.close();
-  report.checks.push('Graphics-unavailable browsers retain the readable semantic site');
-  assert.deepEqual(errors, [], 'Browser errors or missing resources');
-  await fs.writeFile(path.join(root,'build/verification.json'), JSON.stringify(report,null,2) + '\n');
-  console.log(JSON.stringify(report,null,2));
+  await unavailable.goto(new URL('index.html', base).href);
+  await unavailable.waitForFunction(() => globalThis.valthorneError);
+  assert.equal(await unavailable.locator('#content h1').isVisible(), true);
+  assert.equal(await unavailable.evaluate(() => document.documentElement.classList.contains('engine-ready')), false);
+  await unavailable.close();
+  report.checks.push('Graphics-unavailable browsers retain the semantic landing page');
+
+  // Probe removed content independently so expected 404 responses do not mask actual page errors.
+  const removed = [
+    'engine.html', 'examples.html', 'docs.html', 'start.html', 'lab.html', 'about.html',
+    ...['audio', 'ui', 'scene', 'physics', 'physics-studio', 'path-tracing', 'lighting2d', 'lighting-studio', 'fps'].map(name => `assets/${name}.png`)
+  ];
+  const responses = await Promise.all(removed.map(async file => ({ file, status: (await context.request.get(new URL(file, base).href)).status() })));
+  for (const response of responses) assert.equal(response.status, 404, 'Retired site content is still served: ' + response.file);
+  report.checks.push('All six retired pages and former example captures return 404');
+  assert.deepEqual(errors, [], 'Browser errors or missing landing resources');
+  await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');
+  console.log(JSON.stringify(report, null, 2));
 } catch (error) {
   console.error('Browser findings:', errors);
   console.error('Last page:', page.url(), await page.evaluate(() => globalThis.valthorneError).catch(() => 'unavailable'));
-  await page.screenshot({ path: path.join(root,'build/failure.png') }).catch(() => {});
+  await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {});
   throw error;
 } finally { await browser.close(); }
