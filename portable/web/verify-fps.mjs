@@ -11,6 +11,11 @@ const softwareGpu=process.env.WEBGPU_SOFTWARE==='1'&&['chrome','edge'].includes(
 // Software runs exercise the same behavior but collect a shorter timing sample
 // to leave CI time for the complete cross-platform compatibility suite.
 const timingFrames=softwareGpu?60:360;
+// SwiftShader can spend several minutes in one particle-heavy Filament frame
+// after a grenade burst. Keep the simulation deadline bounded, but give the
+// hosted software path enough wall time to recover and prove the fuse/cleanup
+// assertions. Hardware runs retain the shorter budget.
+const simulationTimeout=softwareGpu?300000:180000;
 // Keep the full menu, including Exit, within its fixed-height layout while
 // avoiding the normal high-resolution raster workload on CI's software GPU.
 const viewport=softwareGpu?{width:1200,height:800}:{width:1600,height:960};
@@ -43,7 +48,7 @@ try{
  },softwareGpu);
  const waitClock=async(field,amount)=>{
   const target=await page.evaluate(([field,amount])=>fpsSmoke[field]+amount,[field,amount]);
-  await page.waitForFunction(([field,target])=>fpsSmoke[field]+1e-6>=target,[field,target],{timeout:field==='seconds'?180000:120000});
+  await page.waitForFunction(([field,target])=>fpsSmoke[field]+1e-6>=target,[field,target],{timeout:field==='seconds'?simulationTimeout:120000});
  };
  const frames=count=>waitClock('frames',count),simulate=seconds=>waitClock('seconds',seconds);
  await frames(2);await mkdir('build/verification',{recursive:true});await page.screenshot({path:'build/verification/full-fps.png'});
