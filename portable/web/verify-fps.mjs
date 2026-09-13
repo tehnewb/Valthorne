@@ -51,7 +51,7 @@ try{
   await page.waitForFunction(([field,target])=>fpsSmoke[field]+1e-6>=target,[field,target],{timeout:field==='seconds'?simulationTimeout:120000});
  };
  const frames=count=>waitClock('frames',count),simulate=seconds=>waitClock('seconds',seconds);
- await frames(2);await mkdir('build/verification',{recursive:true});await page.screenshot({path:'build/verification/full-fps.png'});
+ await frames(2);await mkdir('build/verification',{recursive:true});await page.screenshot({path:'build/verification/full-fps.png',timeout:softwareGpu?simulationTimeout:30000});
  async function click(text){await page.waitForFunction(text=>fpsLabels.has(text),text);const point=await page.evaluate(text=>fpsLabels.get(text),text);assert(point.x+12>=0&&point.x+12<viewport.width&&point.y+2>=0&&point.y+2<viewport.height,`Control outside viewport: ${text} ${JSON.stringify(point)}`);await page.mouse.click(point.x+12,point.y+2);}
  async function capture(text){
   // Chromium rate-limits repeated pointer locks within a two-second window.
@@ -90,7 +90,7 @@ try{
  await page.mouse.down();await simulate(.45);await page.mouse.up();
  await page.keyboard.press('r');await page.keyboard.press('f');await page.keyboard.press('g');await simulate(.15);
  const combat=await page.evaluate(()=>{const r=[...valthorneHost.sceneRenderers][0],w=[...valthorneHost.physicsWorlds][0];return {lights:r.lightCount(),bodies:w.handles.size,effects:[...w.handles.values()].filter(b=>b.GetObjectLayer()===7).length,grenades:[...w.handles.values()].filter(b=>b.GetObjectLayer()===9).length,labels:[...fpsLabels.keys()]};});
- assert(combat.lights>4&&combat.effects>0&&combat.grenades===1,JSON.stringify(combat));await page.screenshot({path:'build/verification/full-fps-combat.png'});
+  assert(combat.lights>4&&combat.effects>0&&combat.grenades===1,JSON.stringify(combat));await page.screenshot({path:'build/verification/full-fps-combat.png',timeout:softwareGpu?simulationTimeout:30000});
  await simulate(2.8);assert.equal(await page.evaluate(()=>[...[...valthorneHost.physicsWorlds][0].handles.values()].filter(b=>b.GetObjectLayer()===9).length),0,'Grenade fuse');
  await page.keyboard.press('Escape');await page.waitForFunction(()=>fpsLabels.has('Resume run'));const paused=await player(),pausedClock=await page.evaluate(()=>fpsSmoke.seconds);await frames(3);assert.deepEqual(await player(),paused,'Pause must stop physics');assert.equal(await page.evaluate(()=>fpsSmoke.seconds),pausedClock,'Pause must stop physics steps');
  await click('Particle lights: on');await page.waitForFunction(()=>fpsLabels.has('Particle lights: off'));assert.equal(await page.evaluate(()=>[...valthorneHost.sceneRenderers][0].lightCount()),4);
