@@ -50,9 +50,30 @@ graphics tests. Filament requires Windows x64; compute rendering requires OpenGL
 Keep optional local JUnit tests under the ignored `src/test/java/valthorne/`. Tag tests that create an
 OpenGL context with `@Tag("graphics")`; do not silently skip driver failures on
 supported graphics hosts. Local default-package demos and `src/test/java/games`
-use private assets and are excluded from the maintained source sets. Local demos
-may use `src/examples/java/valthorne/examples` and `src/examples/resources`;
-neither directory is included in the repository or library publication.
+use private assets and are excluded from the maintained source sets.
+
+## Repository ownership
+
+Keep engine code and runtime resources under `src/main`. Release and generated
+consumer checks live in `gradle/release.gradle` and `gradle/consumer-check.gradle`;
+optional local benchmark configuration lives in `gradle/benchmarks.gradle`.
+
+Make runnable demo and demo-resource changes in
+[Valthorne-examples](https://github.com/tehnewb/Valthorne-examples), not the legacy
+`src/examples` directory. With both repositories cloned alongside each other, run
+the following from the examples repository to test unpublished engine changes:
+
+```sh
+./gradlew "-PvalthorneDir=../Valthorne" runMinimalExample --args="--smoke"
+```
+
+Use `./gradlew.bat` in PowerShell. Other launcher names are listed in the
+[example catalog](docs/examples.md). Keep example packages, documentation, and
+resource notices together in that repository.
+
+Make website changes in [Valthorne-website](https://github.com/tehnewb/Valthorne-website).
+Its Pages workflow deploys the site; this engine repository only retains a redirect
+for the former website address.
 
 Keep benchmark outputs produced during development under `build/`. Curated reports
 under `docs/benchmarks` retain their source hashes and measured-environment notes;

@@ -5,6 +5,7 @@ build/
 out/
 bin/
 target/
+node_modules/
 *.class
 *.jar
 *.war
@@ -37,6 +38,8 @@ replay_pid*
 core.*
 
 # Local downloads, prototypes, and assistant scratch/reference checkouts
+# Applications are maintained in the sibling examples and website repositories.
+/website/
 /src/examples/
 /src/test/
 /src/benchmark/

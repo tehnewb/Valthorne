@@ -51,7 +51,16 @@ checks need a compatible driver and display. See the companion project's
 
 Examples remain separate from the engine dependency, sources JAR, Javadoc JAR,
 normal engine build, and release checks. No example or test folders are required
-in an engine checkout. Optional legacy launchers still work for developers with
-ignored `src/examples/` files locally; the public companion is the maintained
-collection for users. Historical benchmark reports retain their original source
-paths and describe the revisions measured at the time.
+in an engine checkout. Launchers and asset validations are owned by the companion
+repository; the engine build does not compile or launch legacy `src/examples` files.
+
+With both repositories cloned alongside each other, run this from
+`Valthorne-examples` to use an unpublished engine checkout:
+
+```sh
+./gradlew "-PvalthorneDir=../Valthorne" runMinimalExample --args="--smoke"
+```
+
+The same option works with the other companion launchers. Historical benchmark
+reports retain their original source paths and describe the revisions measured
+at the time.
