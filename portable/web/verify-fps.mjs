@@ -11,13 +11,16 @@ const softwareGpu=process.env.WEBGPU_SOFTWARE==='1'&&['chrome','edge'].includes(
 // Software runs exercise the same behavior but collect a shorter timing sample
 // to leave CI time for the complete cross-platform compatibility suite.
 const timingFrames=softwareGpu?60:360;
+// Keep the full menu, including Exit, within its fixed-height layout while
+// avoiding the normal high-resolution raster workload on CI's software GPU.
+const viewport=softwareGpu?{width:1200,height:800}:{width:1600,height:960};
 const engines={chrome:chromium,edge:chromium,firefox,webkit};
 if(!engines[browserName]){server.kill();throw new Error('Unknown TEST_BROWSER: '+browserName);}
 let browser,stage='startup';
 try{
  browser=await engines[browserName].launch({...(browserName==='chrome'?{channel:'chrome'}:browserName==='edge'?{channel:'msedge'}:{}),headless:true,...(['chrome','edge'].includes(browserName)?{args:browserTestOptions.args}:{})});
  const url=await new Promise((resolve,reject)=>{server.on('error',reject);server.stdout.on('data',data=>{const match=String(data).match(/http:\/\/127\.0\.0\.1:\d+/);if(match)resolve(match[0]);});});
- const page=await browser.newPage({viewport:{width:1600,height:960}}),errors=[],messages=[];
+ const page=await browser.newPage({viewport}),errors=[],messages=[];
  await page.addInitScript(()=>{globalThis.fpsLabels=new Map();for(const Type of [globalThis.CanvasRenderingContext2D,globalThis.OffscreenCanvasRenderingContext2D].filter(Boolean)){const original=Type.prototype.fillText;Type.prototype.fillText=function(text,x,y,...args){const frame=globalThis.valthorneHost?.frames||0;if(globalThis.fpsLabelFrame!==frame){fpsLabels.clear();globalThis.fpsLabelFrame=frame;}const point=new DOMPoint(x,y).matrixTransform(this.getTransform());fpsLabels.set(String(text),{x:point.x,y:point.y});return original.call(this,text,x,y,...args);};}});
  page.on('pageerror',error=>{errors.push(String(error));console.log(error.stack||String(error));});page.on('console',m=>{messages.push(m.text());if(m.type()==='error')console.log(m.text());});
  await page.goto(url);await page.waitForFunction(()=>globalThis.valthorneReady||globalThis.valthorneError,null,{timeout:120000});
@@ -34,11 +37,11 @@ try{
  });
  const waitClock=async(field,amount)=>{
   const target=await page.evaluate(([field,amount])=>fpsSmoke[field]+amount,[field,amount]);
-  await page.waitForFunction(([field,target])=>fpsSmoke[field]+1e-6>=target,[field,target],{timeout:120000});
+  await page.waitForFunction(([field,target])=>fpsSmoke[field]+1e-6>=target,[field,target],{timeout:field==='seconds'?180000:120000});
  };
  const frames=count=>waitClock('frames',count),simulate=seconds=>waitClock('seconds',seconds);
  await frames(2);await mkdir('build/verification',{recursive:true});await page.screenshot({path:'build/verification/full-fps.png'});
- async function click(text){await page.waitForFunction(text=>fpsLabels.has(text),text);const point=await page.evaluate(text=>fpsLabels.get(text),text);await page.mouse.click(point.x+12,point.y+2);}
+ async function click(text){await page.waitForFunction(text=>fpsLabels.has(text),text);const point=await page.evaluate(text=>fpsLabels.get(text),text);assert(point.x+12>=0&&point.x+12<viewport.width&&point.y+2>=0&&point.y+2<viewport.height,`Control outside viewport: ${text} ${JSON.stringify(point)}`);await page.mouse.click(point.x+12,point.y+2);}
  const player=()=>page.evaluate(()=>{const world=[...valthorneHost.physicsWorlds][0],body=[...world.handles.values()].find(b=>b.GetObjectLayer()===3),p=body.GetPosition();return [p.GetX(),p.GetY(),p.GetZ()];});
  await click('Enter arena');await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene'),null,{timeout:10000});
  // The first captured event must turn immediately; camera-local weapon placement
