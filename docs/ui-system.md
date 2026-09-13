@@ -1,8 +1,9 @@
 # UI system guide
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
@@ -13,11 +14,9 @@ assets. See [mixed rendering](ui-rendering.md) for the drawing contract.
 ## Run and verify
 
 ```powershell
+.\gradlew.bat build
 .\gradlew.bat runUIShowcase
-.\gradlew.bat build
-.\gradlew.bat benchmarkUITable
 .\gradlew.bat runUIShowcase --args=--smoke
-.\gradlew.bat build
 ```
 
 The showcase includes core controls, mixed grids/images, nested scrolling,
@@ -25,11 +24,12 @@ cross-renderer modals, text editing, a dropdown, light/dark themes, a 10,000-ite
 virtual grid, searchable/sortable table, collapsible sections, and an opt-in inspector.
 The smoke run creates an invisible window,
 captures seven pages into `build/ui-showcase`, checks OpenGL errors, and exits.
-`verifyUI` uses only versioned UI tests, independently of local ignored demo
-sources. Native tests and the smoke run require a working OpenGL/GLFW context.
-The UI showcase compiles in an isolated source set, so unrelated examples cannot
-break its launch. See [performance methodology and results](ui-performance.md)
-for the forked JMH suite and optional allocation-budget gate.
+Native tests and the smoke run require a working OpenGL/GLFW context. The
+companion project runs the showcase through its shared launcher. Engine tasks
+such as `verifyUI` and `benchmarkUITable` belong to the Valthorne checkout and
+require its local regression/benchmark fixtures. See
+[performance methodology and results](ui-performance.md) for the forked JMH
+suite and optional allocation-budget gate.
 
 ## Shared behavior, distinct skins
 

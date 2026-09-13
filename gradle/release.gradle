@@ -22,22 +22,6 @@ tasks.register('graphicsTest', Test) {
     shouldRunAfter tasks.named('test')
 }
 
-tasks.register('runMinimalExample', JavaExec) {
-    description = 'Opens an asset-free OpenGL 3.3 starter window.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.MinimalExample'
-}
-
-tasks.withType(JavaExec).configureEach {
-    doFirst {
-        if (mainClass.getOrElse('').startsWith('valthorne.examples.') &&
-                !repositoryRoot.resolve('src/examples/java').toFile().isDirectory()) {
-            throw new GradleException('This optional launcher requires local src/examples files, which are excluded from Git and releases. See docs/examples.md.')
-        }
-    }
-}
-
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
     reproducibleFileOrder = true

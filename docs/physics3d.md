@@ -1,8 +1,9 @@
 # 3D physics with Jolt
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
@@ -21,15 +22,15 @@ or OpenGL context, so the same simulation can run on a server or in tests.
 
 ```shell
 ./gradlew runPhysics3DExample
-./gradlew verifyPhysics3D
 ./gradlew runPhysics3DExample --args="--snapshot=build/physics3d-example.png"
 ```
 
 On Windows, use `gradlew.bat`. Space drops a ball, clicking pushes the closest physical
 object, left/right arrows orbit the camera, R resets the scene, and Escape exits.
 The example generates its own textures. Snapshot mode runs 150 fixed frames in a
-hidden window, saves the scene, and exits. The playground needs OpenGL 3.3;
-`verifyPhysics3D` runs against native Jolt without graphics.
+hidden window, saves the scene, and exits. The playground needs OpenGL 3.3.
+The engine's `verifyPhysics3D` task runs against native Jolt without graphics; run it
+from the Valthorne checkout when its local regression fixtures are available.
 
 The playground also uses the [new 3D lighting system](lighting.md), shows live FPS and
 frame time, and lets you toggle VSync with **V**.

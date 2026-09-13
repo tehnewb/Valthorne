@@ -1,8 +1,9 @@
 # UI performance: measured costs and regression checks
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions. Engine `verify*` and benchmark tasks in
 those records still require their optional local test/benchmark sources; use the
@@ -14,9 +15,11 @@ capture or lifecycle. Correctness tests remain mandatory alongside benchmarks.
 
 ## Reproduce
 
+Run engine regression and benchmark tasks from the Valthorne checkout with its
+local test and benchmark fixtures:
+
 ```powershell
 .\gradlew.bat verifyUI
-.\gradlew.bat runUIShowcase --args=--smoke
 .\gradlew.bat verifyUIBenchmark
 ```
 
@@ -25,7 +28,13 @@ on this host), writes `build/reports/ui-benchmark/results.json`, and checks allo
 budgets. It is intentionally separate from `build`/`check`: timing/GL benchmarks
 should not silently burden every development build or require a display on CPU-only CI.
 
-Run a subset without the complete-suite gate:
+Run the visual smoke check separately from the Valthorne-examples checkout:
+
+```powershell
+.\gradlew.bat runUIShowcase --args=--smoke
+```
+
+Run a benchmark subset from the Valthorne checkout without the complete-suite gate:
 
 ```powershell
 .\gradlew.bat benchmarkUI '--args=UIHotPathBenchmark -foe true -prof gc -rf json -rff build/reports/ui-benchmark/hot.json'

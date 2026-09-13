@@ -1,0 +1,113 @@
+// Optional local benchmarks. Their sources and generated reports stay out of Git.
+// Keep the source set name stable for historical benchmark scripts.
+sourceSets {
+    uiBenchmark {
+        java.srcDir 'src/benchmark/java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    uiBenchmarkImplementation.extendsFrom implementation, api
+    uiBenchmarkRuntimeOnly.extendsFrom runtimeOnly
+}
+dependencies {
+    uiBenchmarkImplementation 'org.openjdk.jmh:jmh-core:1.37'
+    uiBenchmarkAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+}
+
+tasks.register('benchmarkUI', JavaExec) {
+    description = 'Runs forked UI microbenchmarks with allocation profiling and JSON output.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('uiBenchmarkReport').orElse('build/reports/ui-benchmark/results.json')
+    args 'valthorne.ui.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('benchmarkSlug', JavaExec) {
+    group = 'verification'
+    description = 'Benchmarks retained Slug layout and native drawing with allocation profiling.'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('slugReport').orElse('build/reports/slug/results.json')
+    args 'valthorne.font.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('verifyUIBenchmark') {
+    description = 'Runs the complete UI benchmark suite and checks Java allocation budgets (not hardware-specific timing).'
+    group = 'verification'
+    dependsOn 'benchmarkUI'
+    doLast {
+        def report = file(providers.gradleProperty('uiBenchmarkReport').orElse('build/reports/ui-benchmark/results.json').get())
+        def results = new groovy.json.JsonSlurper().parse(report)
+        def expected = [
+            'UIHotPathBenchmark.childrenView:': 1d,
+            'UIHotPathBenchmark.cursorMovement:': 1d,
+            'UIHotPathBenchmark.replaceText:': 1d,
+            'UIHotPathBenchmark.sanitizeCleanText:': 1d
+        ]
+        ['100', '1000'].each { count ->
+            expected["UIFrameBenchmark.idleUpdate:${count}".toString()] = 1d
+            expected["UIFrameBenchmark.changedLayout:${count}".toString()] = 256d
+            expected["UIFrameBenchmark.mixedDraw:${count}".toString()] = 1024d
+        }
+        ['1000', '1000000'].each { count ->
+            ['pixelLookup', 'updateHeight', 'toggleSelection'].each { method ->
+                expected["UIDataBenchmark.${method}:${count}".toString()] = 1d
+            }
+        }
+        results.each { result ->
+            def name = result.benchmark.replace('valthorne.ui.benchmark.', '')
+            def key = name + ':' + (result.params?.nodeCount ?: result.params?.count ?: '')
+            def limit = expected.remove(key)
+            if (limit == null) throw new GradleException("Unexpected or duplicate UI benchmark: ${key}")
+            def metric = result.secondaryMetrics['gc.alloc.rate.norm']
+            def score = metric?.score
+            if (!(score instanceof Number) || !Double.isFinite(score.doubleValue()) || score.doubleValue() > limit)
+                throw new GradleException("${key}: allocation ${score} B/op exceeds ${limit} B/op (or profiler data is missing)")
+        }
+        if (!expected.isEmpty()) throw new GradleException("Missing UI benchmarks: ${expected.keySet()}")
+        logger.lifecycle('All 16 UI benchmark allocation budgets passed. See JSON for timing and uncertainty.')
+    }
+}
+
+tasks.register('benchmarkEngine', JavaExec) {
+    description = 'Runs forked engine CPU benchmarks with allocation profiling.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('engineBenchmarkReport').orElse('build/reports/engine-benchmark/results.json')
+    args 'valthorne.engine.benchmark.*', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('benchmarkSceneSnapshot', JavaExec) {
+    description = 'Measures small/large static/moving scene collection with JMH allocation profiling.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('sceneSnapshotReport').orElse('build/reports/scene-snapshot/results.json')
+    args 'valthorne.graphics.model.SceneSnapshotBenchmark', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('benchmarkAudio', JavaExec) {
+    description = 'Measures ambient-zone geometry with JMH allocation profiling.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    args 'valthorne.audio.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', 'build/reports/audio-benchmark/results.json'
+    doFirst { file('build/reports/audio-benchmark').mkdirs() }
+}
+
+tasks.register('benchmarkUITable', JavaExec) {
+    description = 'Measures table projection read, stable sorting and filtering costs.'
+    group = 'verification'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    args 'valthorne.ui.tablebenchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', 'build/reports/ui-benchmark/table.json'
+    doFirst { file('build/reports/ui-benchmark').mkdirs() }
+}

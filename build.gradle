@@ -75,186 +75,19 @@ java {
     withJavadocJar()
 }
 
-// Give each source directory a single owner so IntelliJ imports an unambiguous
-// module/classpath for every main class and test. Select regression suites with
-// Test filters below, rather than overlapping source sets.
+// Optional local regression suites; runnable demos belong to Valthorne-examples.
 sourceSets {
-    // Root-level default-package files are local legacy demos using private assets.
-    // All maintained regressions live under valthorne, without package allowlists.
     test { java.include 'valthorne/**' }
-    uiBenchmark {
-        java.srcDir 'src/benchmark/java'
-        compileClasspath += sourceSets.main.output
-        runtimeClasspath += sourceSets.main.output
-    }
-    examples {
-        java.srcDir 'src/examples/java'
-        compileClasspath += sourceSets.main.output
-        runtimeClasspath += sourceSets.main.output
-    }
-}
-configurations {
-    uiBenchmarkImplementation.extendsFrom implementation, api
-    uiBenchmarkRuntimeOnly.extendsFrom runtimeOnly
-    examplesImplementation.extendsFrom implementation, api
-    examplesRuntimeOnly.extendsFrom runtimeOnly
-}
-// Examples are optional local development files. Compile them only when an
-// example task is explicitly requested; releases and CI do not require them.
-dependencies {
-    uiBenchmarkImplementation 'org.openjdk.jmh:jmh-core:1.37'
-    uiBenchmarkAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
-}
-tasks.register('benchmarkUI', JavaExec) {
-    description = 'Runs forked UI microbenchmarks with allocation profiling and JSON output.'
-    group = 'verification'
-    classpath = sourceSets.uiBenchmark.runtimeClasspath
-    mainClass = 'org.openjdk.jmh.Main'
-    def report = providers.gradleProperty('uiBenchmarkReport').orElse('build/reports/ui-benchmark/results.json')
-    args 'valthorne.ui.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
-    doFirst { file(report.get()).parentFile.mkdirs() }
 }
 
-tasks.register('benchmarkSlug', JavaExec) {
-    group = 'verification'
-    description = 'Benchmarks retained Slug layout and native drawing with allocation profiling.'
-    classpath = sourceSets.uiBenchmark.runtimeClasspath
-    mainClass = 'org.openjdk.jmh.Main'
-    def report = providers.gradleProperty('slugReport').orElse('build/reports/slug/results.json')
-    args 'valthorne.font.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
-    doFirst { file(report.get()).parentFile.mkdirs() }
-}
-tasks.register('verifyUIBenchmark') {
-    description = 'Runs the complete UI benchmark suite and checks Java allocation budgets (not hardware-specific timing).'
-    group = 'verification'
-    dependsOn 'benchmarkUI'
-    doLast {
-        def report = file(providers.gradleProperty('uiBenchmarkReport').orElse('build/reports/ui-benchmark/results.json').get())
-        def results = new groovy.json.JsonSlurper().parse(report)
-        def expected = [
-            'UIHotPathBenchmark.childrenView:': 1d,
-            'UIHotPathBenchmark.cursorMovement:': 1d,
-            'UIHotPathBenchmark.replaceText:': 1d,
-            'UIHotPathBenchmark.sanitizeCleanText:': 1d
-        ]
-        ['100', '1000'].each { count ->
-            expected["UIFrameBenchmark.idleUpdate:${count}".toString()] = 1d
-            expected["UIFrameBenchmark.changedLayout:${count}".toString()] = 256d
-            expected["UIFrameBenchmark.mixedDraw:${count}".toString()] = 1024d
-        }
-        ['1000', '1000000'].each { count ->
-            ['pixelLookup', 'updateHeight', 'toggleSelection'].each { method ->
-                expected["UIDataBenchmark.${method}:${count}".toString()] = 1d
-            }
-        }
-        results.each { result ->
-            def name = result.benchmark.replace('valthorne.ui.benchmark.', '')
-            def key = name + ':' + (result.params?.nodeCount ?: result.params?.count ?: '')
-            def limit = expected.remove(key)
-            if (limit == null) throw new GradleException("Unexpected or duplicate UI benchmark: ${key}")
-            def metric = result.secondaryMetrics['gc.alloc.rate.norm']
-            def score = metric?.score
-            if (!(score instanceof Number) || !Double.isFinite(score.doubleValue()) || score.doubleValue() > limit)
-                throw new GradleException("${key}: allocation ${score} B/op exceeds ${limit} B/op (or profiler data is missing)")
-        }
-        if (!expected.isEmpty()) throw new GradleException("Missing UI benchmarks: ${expected.keySet()}")
-        logger.lifecycle('All 16 UI benchmark allocation budgets passed. See JSON for timing and uncertainty.')
-    }
-}
-tasks.register('benchmarkEngine', JavaExec) {
-    description = 'Runs forked engine CPU benchmarks with allocation profiling.'
-    group = 'verification'
-    classpath = sourceSets.uiBenchmark.runtimeClasspath
-    mainClass = 'org.openjdk.jmh.Main'
-    def report = providers.gradleProperty('engineBenchmarkReport').orElse('build/reports/engine-benchmark/results.json')
-    args 'valthorne.engine.benchmark.*', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
-    doFirst { file(report.get()).parentFile.mkdirs() }
-}
+apply from: 'gradle/benchmarks.gradle'
 
-tasks.register('benchmarkSceneSnapshot', JavaExec) {
-    description = 'Measures small/large static/moving scene collection with JMH allocation profiling.'
-    group = 'verification'
-    classpath = sourceSets.uiBenchmark.runtimeClasspath
-    mainClass = 'org.openjdk.jmh.Main'
-    def report = providers.gradleProperty('sceneSnapshotReport').orElse('build/reports/scene-snapshot/results.json')
-    args 'valthorne.graphics.model.SceneSnapshotBenchmark', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
-    doFirst { file(report.get()).parentFile.mkdirs() }
-}
-
-tasks.register('benchmarkAudio', JavaExec) {
-    description = 'Measures ambient-zone geometry with JMH allocation profiling.'
-    group = 'verification'
-    classpath = sourceSets.uiBenchmark.runtimeClasspath
-    mainClass = 'org.openjdk.jmh.Main'
-    args 'valthorne.audio.benchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', 'build/reports/audio-benchmark/results.json'
-    doFirst { file('build/reports/audio-benchmark').mkdirs() }
-}
 tasks.register('verifyPhysics3D', Test) {
     description = 'Runs native Jolt physics regression tests without a graphics context.'
     group = 'verification'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     filter { includeTestsMatching 'valthorne.physics3d.*' }
-}
-tasks.register('runPhysics3DExample', JavaExec) {
-    description = 'Runs the Jolt rigid-body playground.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.Physics3DExample'
-}
-tasks.register('runPhysicsStudio', JavaExec) {
-    description = 'Runs the interactive Jolt and Filament physics laboratory.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.PhysicsStudio'
-}
-
-tasks.register('runLighting2DExample', JavaExec) {
-    description = 'Runs the cached 2D lighting and soft-shadow playground.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.Lighting2DExample'
-}
-tasks.register('runPathTracingExample', JavaExec) {
-    description = 'Runs the progressive GPU path-traced material studio (OpenGL 4.3).'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.PathTracingExample'
-}
-tasks.register('runLightingStudio', JavaExec) {
-    description = 'Runs the editable lighting workbench; --smoke verifies the UI and --benchmark records frame times.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.LightingStudio'
-}
-
-tasks.register('runFpsArena', JavaExec) {
-    description = 'Runs the first-person combat arena; --smoke checks controls, --benchmark measures combat workloads.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.FpsArena'
-}
-
-tasks.register('verifyFpsArena', JavaExec) {
-    description = 'Checks native player movement, combat, waves and gameplay resource ownership without a window.'
-    group = 'verification'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.FpsArenaValidation'
-}
-
-['Combat', 'Environment'].each { category ->
-    tasks.register("verifyFps${category}Assets", JavaExec) {
-        description = "Checks packaged FPS ${category.toLowerCase()} geometry, materials and dependencies."
-        group = 'verification'
-        classpath = sourceSets.examples.runtimeClasspath
-        mainClass = "valthorne.examples.Fps${category}Models"
-    }
-}
-
-tasks.register('verifyFpsAssets') {
-    description = 'Validates all downloaded FPS combat and environment assets without a window.'
-    group = 'verification'
-    dependsOn 'verifyFpsCombatAssets', 'verifyFpsEnvironmentAssets'
 }
 
 // Material packages are committed so consumers do not need a native compiler.
@@ -296,52 +129,7 @@ tasks.register('verify3D', Test) {
     classpath = sourceSets.test.runtimeClasspath
     filter { includeTestsMatching 'valthorne.model3d.*' }
 }
-tasks.register('verifyPhysicsStudioAssets', JavaExec) {
-    description = 'Validates packaged gallery geometry and materials without a graphics context.'
-    group = 'verification'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.PhysicsStudioModels'
-}
-tasks.register('verifyStudioLightRig', JavaExec) {
-    description = 'Validates light editing and persistence using isolated temporary files.'
-    group = 'verification'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.StudioLightRigValidation'
-}
-tasks.register('verifyPhysicsStudio') {
-    description = 'Runs the headless physics studio asset and light editor validations.'
-    group = 'verification'
-    dependsOn 'verifyPhysicsStudioAssets', 'verifyStudioLightRig'
-}
-tasks.register('run3DExample', JavaExec) {
-    description = 'Runs the interactive 3D scene example.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.Scene3DExample'
-}
 
-// UI assets are versioned in src/main/resources/ui, including their font license.
-tasks.register('benchmarkUITable', JavaExec) {
-    description = 'Measures table projection read, stable sorting and filtering costs.'
-    group = 'verification'
-    classpath = sourceSets.uiBenchmark.runtimeClasspath
-    mainClass = 'org.openjdk.jmh.Main'
-    args 'valthorne.ui.tablebenchmark.*', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', 'build/reports/ui-benchmark/table.json'
-    doFirst { file('build/reports/ui-benchmark').mkdirs() }
-}
-tasks.register('runUIShowcase', JavaExec) {
-    description = 'Runs the mixed-renderer UI gallery and inspector.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.UIShowcase'
-}
-
-tasks.register('runAudioStudio', JavaExec) {
-    description = 'Runs the interactive 3D sound-zone laboratory; --smoke validates and captures it.'
-    group = 'application'
-    classpath = sourceSets.examples.runtimeClasspath
-    mainClass = 'valthorne.examples.AudioStudio'
-}
 tasks.register('verifyUI', Test) {
     description = 'Runs headless UI models and native mixed-renderer regressions.'
     group = 'verification'

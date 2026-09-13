@@ -76,8 +76,9 @@ are not currently consumed by this OBJ material path.
 material groups, finite vertices and unit normals. All five entries pass these checks. Renderer and
 gameplay validation is performed by the FPS arena verification tasks.
 
-See [`source-manifest.json`](../src/examples/resources/valthorne/fps-arena/combat/source-manifest.json)
+This archived asset description records the 2026-09-09 conversion. See the
+preserved [`combat-source-manifest.json`](combat-source-manifest.json)
 for exact public download URLs, archive sizes and SHA-256 values, generated-file hashes, original
 texture metadata, conversion bounds, and source object names. The bundled
-[`CC0 legal text`](../src/examples/resources/valthorne/fps-arena/combat/licenses/CC0-1.0.txt) applies
+[`CC0 legal text`](https://github.com/tehnewb/Valthorne-examples/blob/main/src/main/resources/valthorne/fps-arena/combat/licenses/CC0-1.0.txt), now maintained with the companion assets, applies
 to these asset releases; the engine's own source license is unchanged.

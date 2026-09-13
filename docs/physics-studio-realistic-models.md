@@ -14,7 +14,7 @@ The vase retains its blue floral pattern and crackled finish; the crate retains 
 
 Poly Haven identifies all three asset pages as CC0 and explains redistribution rights in its [asset license](https://polyhaven.com/license). The **CC0 1.0 Universal** legal text is included as `realistic/CC0-1.0.txt`, downloaded unchanged from [Creative Commons](https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt). Author credit is retained for provenance.
 
-The runtime files live in `src/examples/resources/valthorne/physics-studio/realistic/`. They consist of three OBJ files, three MTL files, three original JPEG textures, the CC0 text and `source-manifest.json`, totaling 8,240,888 bytes (approximately 8.24 MB). The separate Kenney furniture drop options add 83 KB. No Blender installation, network download or conversion step is needed to run the example.
+The runtime files live in the examples repository under [`src/main/resources/valthorne/physics-studio/realistic/`](https://github.com/tehnewb/Valthorne-examples/tree/main/src/main/resources/valthorne/physics-studio/realistic). They consist of three OBJ files, three MTL files, three original JPEG textures, the CC0 text and `source-manifest.json`, totaling 8,240,888 bytes (approximately 8.24 MB). The separate Kenney furniture drop options add 83 KB. No Blender installation, network download or conversion step is needed to run the example.
 
 The manifest records each source download URL, byte length, provider MD5 and independently calculated SHA-256, plus the hashes of every converted OBJ/MTL and unchanged JPEG. All downloaded source checksums matched the official API responses:
 

@@ -1,8 +1,9 @@
 # Path-traced lighting and culling
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
@@ -119,4 +120,4 @@ Culling does not stop physics or animation. Camera culling does not remove secon
 
 ## Verification
 
-`verify3D` includes 24,000 randomized frustum comparisons against an independent corner-transform reference, transformed sprite boundaries, GPU pixel equivalence with culling on/off, 100-model subtree rejection and mutable-transform restoration, actual compute shader execution, area lighting, texture alpha cutouts, orthographic lighting, accumulation invalidation and GL state restoration. Run `build verify3D verifyPhysics3D verifyUI` for complete regression checks.
+`verify3D` includes 24,000 randomized frustum comparisons against an independent corner-transform reference, transformed sprite boundaries, GPU pixel equivalence with culling on/off, 100-model subtree rejection and mutable-transform restoration, actual compute shader execution, area lighting, texture alpha cutouts, orthographic lighting, accumulation invalidation and GL state restoration. Run `build verify3D verifyPhysics3D verifyUI` from the Valthorne checkout with its local regression fixtures; these engine tasks are separate from the companion launcher.

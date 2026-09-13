@@ -1,8 +1,9 @@
 # 3D particles
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 

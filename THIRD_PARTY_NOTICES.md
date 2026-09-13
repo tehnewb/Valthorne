@@ -29,17 +29,7 @@ binaries. Distribute the licenses accompanying those dependencies with your game
 Examples and their assets are available in the separate [examples project](https://github.com/tehnewb/Valthorne-examples),
 with its own [notices and provenance](https://github.com/tehnewb/Valthorne-examples/blob/main/THIRD_PARTY_NOTICES.md).
 They are excluded from all engine library publication artifacts.
-The following paths describe optional local files
-and are not part of a fresh checkout. When
-redistributing an example, preserve its resource directories and notices:
+When redistributing a demo, preserve the resource directories, author credits,
+source manifests, and licenses from that examples repository.
 
-- Kenney furniture: `src/examples/resources/valthorne/physics-studio/models/kenney-LICENSE.txt`.
-- Poly Haven gallery: `src/examples/resources/valthorne/physics-studio/realistic/source-manifest.json`
-  and `CC0-1.0.txt`.
-- FPS combat models: `src/examples/resources/valthorne/fps-arena/combat/source-manifest.json`
-  and `licenses/`.
-- FPS environment: `src/examples/resources/valthorne/fps-arena/environment/ATTRIBUTION.md`,
-  `SOURCES.json`, `SHA256SUMS.txt`, and `CC0-1.0.txt`.
-
-Those manifests record authors, source URLs, conversions, and license information.
 JUnit and JMH are development dependencies and are not published as engine dependencies.

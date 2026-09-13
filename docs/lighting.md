@@ -1,8 +1,9 @@
 # Lighting and FPS
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
@@ -248,8 +249,9 @@ does not imply every small scene becomes faster.
 `verifyLighting` exercises CPU culling/caches and actual offscreen OpenGL output:
 equivalence to all-light shading, overflow fallback, alpha-cutout shadows, 2D occlusion,
 moving obstacles, spotlights, resizing, resource guards, and caller-state restoration.
-The existing 3D and physics suites are also kept available through `verify3D` and
-`verifyPhysics3D`.
+The existing 3D and physics suites are also available through `verify3D` and
+`verifyPhysics3D`. Run these engine verification tasks from the Valthorne checkout
+with its local regression fixtures, separately from the companion launchers.
 
 Shading references: [Filament's physically based rendering equations](https://google.github.io/filament/main/filament.html)
 and [Krzysztof Narkowicz's filmic tone-mapping fit](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/).

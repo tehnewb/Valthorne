@@ -1,8 +1,9 @@
 # Audio performance and area sounds
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
@@ -130,6 +131,9 @@ the copy: the old path could free an interior pointer and crash the native heap.
 Loop refills no longer reset the consumed-time counter ahead of audible playback.
 
 ## Verification and measurements
+
+Run these engine checks from the Valthorne checkout with its local test and
+benchmark fixtures:
 
 ```powershell
 .\gradlew.bat test --tests valthorne.AudioPlaybackTest --tests "valthorne.audio.*"

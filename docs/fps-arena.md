@@ -1,8 +1,9 @@
 # Live Fire: first-person feature arena
 
 Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
+[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
+from that repository. Example source and resources are separate from the engine
+checkout and library artifacts.
 See the [example catalog](examples.md). Historical measurements retain their
 original commands and source revisions.
 
@@ -49,7 +50,7 @@ The HUD displays FPS, render/simulation timings, particles, lights and body coun
 ./gradlew runFpsArena --args="--benchmark --visual-particles"
 ```
 
-`verifyFpsArena` passes 1,425 checks of native movement, walls, jumping, shooting, reloads, cover, grenades, waves, effect placement, opacity/glow fading, camera-facing geometry and resource ownership without a window. `verifyFpsAssets` checks the 16 new combat/environment entries, including bounds, material groups and texture dependencies. The native smoke test clicks the real console controls and injects native input events for movement, aiming, firing, reloading, grenades, flares, pause and restart. It writes framebuffer captures under `build/fps-arena`.
+The archived `verifyFpsArena` run passed 1,425 checks of native movement, walls, jumping, shooting, reloads, cover, grenades, waves, effect placement, opacity/glow fading, camera-facing geometry and resource ownership without a window. Use the companion project's `verifyCombatAssets` and `verifyEnvironmentAssets` tasks for combat/environment bounds, material groups and texture dependencies; `verifyAssets` also covers the shared gallery. Current check counts appear in task output. The native smoke test clicks the real console controls and injects native input events for movement, aiming, firing, reloading, grenades, flares, pause and restart. It writes framebuffer captures under `build/fps-arena`.
 
 Benchmarks run hidden and uncapped with fixed simulation time, 90 warmup frames and 360 measured completed frames. The same scripted combat and moving camera compare physical effects with/without lights and cosmetic effects. Do not run them alongside the visible preview. See the [current realistic/transparent arena report](benchmarks/fps-realistic-alpha/README.md), [earlier particle-light CPU measurements](benchmarks/particle-lights/README.md), and [historical procedural-arena workload](benchmarks/fps-arena/README.md). Different asset sets and particle budgets are not equivalent performance workloads.
 

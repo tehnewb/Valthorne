@@ -6,8 +6,8 @@ physics, particles, lighting, and a shared texture/NanoVG UI system.
 
 **Version 2.0.0 · Java 25 · Apache-2.0**
 
-Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) for engine
-features, demo downloads, and documentation. The [website repository](https://github.com/tehnewb/Valthorne-website)
+Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) for an
+overview of the engine. The [website repository](https://github.com/tehnewb/Valthorne-website)
 is itself a Java Valthorne application compiled for the browser.
 
 Version 2.0.0 contains breaking API changes from 1.4.6, including public JOML math
@@ -90,6 +90,18 @@ coordinate spaces, resource ownership, and subsystem contracts.
 Historical benchmark reports describe their recorded source revisions and hardware;
 use them as evidence for those measurements, not as a guarantee for another machine.
 
+## Repository layout
+
+- `src/main/java/valthorne`: engine implementation and public APIs.
+- `src/main/resources`: runtime shaders, materials, fonts, and their licenses.
+- `gradle`: release checks, consumer checks, and optional benchmark configuration.
+- `docs`: guides, API contracts, and historical performance evidence.
+- `images`: Valthorne project branding.
+
+Runnable demos live in [Valthorne-examples](https://github.com/tehnewb/Valthorne-examples);
+site development lives in [Valthorne-website](https://github.com/tehnewb/Valthorne-website).
+See [contributing](CONTRIBUTING.md) for testing examples against a local engine checkout.
+
 ## Build and verify
 
 ```sh
@@ -98,8 +110,8 @@ use them as evidence for those measurements, not as a guarantee for another mach
 ./gradlew verifyGraphicsConsumer   # Published-library OpenGL launch and pixel check
 ```
 
-Tests, integration-test folders, benchmarks, and the engine's local `src/examples/`
-directory are ignored by Git. Public examples live in the companion project above.
+Local test and benchmark sources, integration-test folders, and legacy examples
+are ignored by Git. Example launchers belong to the companion project above.
 CI generates disposable consumers under `build/`, so release
 checks require none of those folders. `test`, `graphicsTest`, `verify3D`,
 `verifyLighting`, and `verifyUI` can still run separately available local tests.
