@@ -48,13 +48,19 @@ try{
  const frames=count=>waitClock('frames',count),simulate=seconds=>waitClock('seconds',seconds);
  await frames(2);await mkdir('build/verification',{recursive:true});await page.screenshot({path:'build/verification/full-fps.png'});
  async function click(text){await page.waitForFunction(text=>fpsLabels.has(text),text);const point=await page.evaluate(text=>fpsLabels.get(text),text);assert(point.x+12>=0&&point.x+12<viewport.width&&point.y+2>=0&&point.y+2<viewport.height,`Control outside viewport: ${text} ${JSON.stringify(point)}`);await page.mouse.click(point.x+12,point.y+2);}
+ async function capture(text){
+  // Chromium rate-limits repeated pointer locks within a two-second window.
+  // Space real button clicks using the actual prior request timestamp, then
+  // verify capture each time; never bypass browser policy or retry a denial.
+  await page.waitForFunction(()=>{const previous=fpsSmoke.capture.findLast(event=>event.event==='request'&&event.enabled);return !previous||performance.now()-previous.atMs>=2100;},null,{polling:50,timeout:10000});
+  await click(text);
+  // Capture completion is an input event, independent of rendered frames.
+  await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene')||valthorneHost.platform.captureError,null,{polling:50,timeout:10000});
+  assert.equal(await page.evaluate(()=>valthorneHost.platform.captureError),undefined,`Browser denied pointer capture after ${text}`);
+  assert(await page.evaluate(()=>document.pointerLockElement===document.querySelector('#scene')),`Pointer capture failed after ${text}`);
+ }
  const player=()=>page.evaluate(()=>{const world=[...valthorneHost.physicsWorlds][0],body=[...world.handles.values()].find(b=>b.GetObjectLayer()===3),p=body.GetPosition();return [p.GetX(),p.GetY(),p.GetZ()];});
- stage='initial pointer capture';await click('Enter arena');
- // Pointer-lock completion is an input event, not a rendered-frame event.
- // Poll independently of RAF and surface a real browser denial immediately.
- await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene')||valthorneHost.platform.captureError,null,{polling:50,timeout:10000});
- assert.equal(await page.evaluate(()=>valthorneHost.platform.captureError),undefined,'Browser denied pointer capture');
- assert(await page.evaluate(()=>document.pointerLockElement===document.querySelector('#scene')),'Pointer capture failed');
+ stage='initial pointer capture';await capture('Enter arena');
  // The first captured event must turn immediately; camera-local weapon placement
  // must remain fixed through yaw and pitch.
  await frames(1);
@@ -86,13 +92,13 @@ try{
  await click('Particle physics: Jolt');await page.waitForFunction(()=>fpsLabels.has('Particle physics: visual only'));await click('Particle physics: visual only');await click('Particle lights: off');
  stage='restart ownership';const restarts=[];
  for(let cycle=0;cycle<5;cycle++){
-  await click('Restart run');await simulate(.3);await page.keyboard.press('Escape');await page.waitForFunction(()=>fpsLabels.has('Resume run'));
+  await capture('Restart run');await simulate(.3);await page.keyboard.press('Escape');await page.waitForFunction(()=>fpsLabels.has('Resume run'));
   restarts.push(await page.evaluate(()=>{const h=valthorneHost,r=[...h.sceneRenderers][0],w=[...h.physicsWorlds][0];return {worlds:h.physicsWorlds.size,bodies:w.handles.size,meshes:r.meshes.size,entries:r.entries.length,graphics:h.graphics.objects.size,free:w.physics.sGetFreeMemory(),heap:h.J.HEAP8.byteLength};}));
  }
  assert(restarts.every(s=>s.worlds===1&&s.bodies===restarts[0].bodies&&s.meshes===restarts[0].meshes&&s.graphics===restarts[0].graphics),JSON.stringify(restarts));assert(restarts.at(-1).free>=restarts[1].free-1024,JSON.stringify(restarts));
  const measure=()=>page.evaluate(async count=>{const times=[];let last=performance.now();for(let i=0;i<count;i++){await new Promise(requestAnimationFrame);const now=performance.now();times.push(now-last);last=now;}times.sort((a,b)=>a-b);return {frames:times.length,meanMs:times.reduce((a,b)=>a+b)/times.length,p95Ms:times[Math.floor(times.length*.95)]};},timingFrames);
  console.log('FULL_FPS_BEHAVIOR_VALIDATED '+JSON.stringify({combat,restarts}));
- stage='normal frame timing';await click('Resume run');const normalPlay=await measure();console.log('FULL_FPS_NORMAL_TIMING '+JSON.stringify(normalPlay));
+ stage='normal frame timing';await capture('Resume run');const normalPlay=await measure();console.log('FULL_FPS_NORMAL_TIMING '+JSON.stringify(normalPlay));
  stage='combat frame timing';
  await page.mouse.down();await page.keyboard.press('f');await page.keyboard.press('g');const combatTiming=await measure();await page.mouse.up();
  const state={moved:moved[1]-start[1],combat,restarts,frameInterval:{normalPlay,combat:combatTiming},environment:{softwareGpu,quality:softwareGpu?'performance':'high',...await page.evaluate(()=>{const gl=document.querySelector('#scene').getContext('webgl2'),debug=gl?.getExtension('WEBGL_debug_renderer_info');return {userAgent:navigator.userAgent,width:innerWidth,height:innerHeight,devicePixelRatio,renderer:gl?gl.getParameter(debug?debug.UNMASKED_RENDERER_WEBGL:gl.RENDERER):null};})}};

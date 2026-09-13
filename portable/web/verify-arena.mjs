@@ -15,17 +15,38 @@ try{
  await page.waitForFunction(()=>valthorneHost.media.items.size===2&&valthorneHost.media.pending.size===0);
  const mediaBytes=await page.evaluate(()=>valthorneHost.media.bytes);assert(mediaBytes>0&&mediaBytes<65536);
  await page.waitForTimeout(500);
- await page.getByRole('button',{name:'Enter arena'}).click();
- await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene'));
- const start=await page.evaluate(()=>valthorneHost.firstPerson.z);
- // The Java loop advances at 60 Hz and limits catch-up after slow frames. Wait
- // for 0.6 simulated seconds so software rendering does not shorten the input.
- await page.keyboard.down('w');
+ const inputState=()=>page.evaluate(()=>({
+  steps:valthorneHost.steps,z:valthorneHost.firstPerson?.z,keys:[...valthorneHost.platform.keys],
+  captured:document.pointerLockElement===document.querySelector('#scene'),playing:document.body.classList.contains('playing'),
+  focused:document.hasFocus(),activeElement:document.activeElement?.tagName,hidden:document.hidden,
+  captureError:valthorneHost.platform.captureError??null,engineError:globalThis.valthorneError??null
+ }));
+ let movement;
  try{
-  const steps=await page.evaluate(()=>valthorneHost.steps);
-  await page.waitForFunction(start=>valthorneHost.steps>=start+36,steps);
- }finally{await page.keyboard.up('w');}
- const moved=start-await page.evaluate(()=>valthorneHost.firstPerson.z);assert(moved>1.5&&moved<3.5,`Movement after 36 physics steps: ${moved}`);
+  await page.getByRole('button',{name:'Enter arena'}).click();
+  // The browser grants capture before dispatching pointerlockchange. Its platform
+  // listener clears held input, then marks the page as playing; wait for that reset.
+  await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene')&&document.body.classList.contains('playing'));
+  await page.keyboard.down('w');
+  try{
+   await page.waitForFunction(()=>valthorneHost.platform.keys.has('KeyW'));
+   const start=await inputState();
+   // Measure from acknowledged input, not key dispatch or wall time. Sampling the
+   // endpoint in the condition also excludes time spent sending the release event.
+   const endpoint=await page.waitForFunction(start=>{
+    const h=valthorneHost;
+    if(globalThis.valthorneError)throw new Error(globalThis.valthorneError);
+    if(!h.platform.keys.has('KeyW'))throw new Error('Movement input was cleared before 36 physics steps');
+    return h.steps>=start.steps+36?{steps:h.steps,z:h.firstPerson.z}:false;
+   },start);
+   try{movement={start,end:await endpoint.jsonValue()};}finally{await endpoint.dispose();}
+  }finally{await page.keyboard.up('w');}
+ }catch(error){
+  const state=await inputState();
+  await writeFile('build/arena-input-failure.json',JSON.stringify({error:String(error),state,errors},null,2));
+  throw new Error(`Arena input failed: ${error.message}; state=${JSON.stringify(state)}`,{cause:error});
+ }
+ const moved=movement.start.z-movement.end.z;assert(moved>1.5&&moved<3.5,`Movement after 36 physics steps: ${moved}; ${JSON.stringify(movement)}`);
  async function fire(){
   const shots=await page.evaluate(()=>valthorneHost.arenaShots);
   await page.mouse.down();

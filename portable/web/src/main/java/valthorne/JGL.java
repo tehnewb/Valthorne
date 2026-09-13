@@ -11,6 +11,8 @@ import java.util.Objects;
 public class JGL {
     private static final EventPublisher events=new EventPublisher();
     private static final ArrayDeque<Runnable> tasks=new ArrayDeque<>();
+    private static final ArrayDeque<Runnable> inputTasks=new ArrayDeque<>();
+    private static final double INPUT_WAKE=-1;
     private static Application application;
     private static boolean running,closing;
     private static float delta,elapsed,fpsTime;
@@ -25,12 +27,22 @@ public class JGL {
         Objects.requireNonNull(app);Objects.requireNonNull(config);
         if(running)throw new IllegalStateException("JGL is already running");
         running=true;closing=false;application=app;startTime=clock();
-        try{Window.configure(config);Keyboard.init();Mouse.init();app.init();connect(JGL::nextFrame,JGL::requestClose);while(running)frame(awaitFrame());}catch(RuntimeException|Error failure){try{shutdown();}catch(Throwable cleanup){failure.addSuppressed(cleanup);}throw failure;}
+        try{Window.configure(config);Keyboard.init();Mouse.init();app.init();connect(JGL::nextFrame,JGL::requestClose);while(running){double next=awaitFrame();if(next==INPUT_WAKE)input();else frame(next);}}catch(RuntimeException|Error failure){try{shutdown();}catch(Throwable cleanup){failure.addSuppressed(cleanup);}throw failure;}
     }
+    /** Dispatches trusted input on the suspended application coroutine, without a frame. */
+    private static void input(){
+        if(!running)return;
+        try{
+            drainInput();
+            if(closing)shutdown();
+        }catch(RuntimeException|Error failure){stop(failure);throw failure;}
+    }
+    private static void drainInput(){Runnable task;while((task=inputTasks.poll())!=null)task.run();}
     private static void frame(double dt){
         if(!running)return;
         try{
             Runnable task;while((task=tasks.poll())!=null)task.run();
+            drainInput();
             if(closing){shutdown();return;}
             delta=(float)dt;elapsed+=delta;
             application.update(delta);application.render();
@@ -54,20 +66,33 @@ public class JGL {
         else if(failure instanceof Error error)throw error;
     }
     // Keep init, update, render and dispose on the same TeaVM coroutine. Native
-    // callbacks only deliver timing; game callbacks may safely suspend for I/O.
+    // callbacks only resume this wait; game callbacks may safely suspend for I/O.
     @Async private static native double awaitFrame();
-    private static void awaitFrame(AsyncCallback<Double> callback){if(closing)callback.complete(0d);else pendingFrame=callback;}
+    private static void awaitFrame(AsyncCallback<Double> callback){if(closing)callback.complete(0d);else if(!inputTasks.isEmpty())callback.complete(INPUT_WAKE);else pendingFrame=callback;}
     private static void nextFrame(double dt){var callback=pendingFrame;pendingFrame=null;if(callback!=null)callback.complete(dt);}
     public static void runTask(Runnable task){tasks.add(Objects.requireNonNull(task));}
+    /**
+     * Preserve the browser's transient user activation while awaiting a frame.
+     * If Java is already executing or suspended in application I/O, queue input
+     * until that same coroutine resumes; never enter application code twice.
+     * Ordinary runTask work remains deferred until an actual animation frame.
+     */
+    static void runInputTask(Runnable task){
+        Objects.requireNonNull(task);
+        if(!running)return;
+        inputTasks.add(task);
+        if(pendingFrame!=null)nextFrame(INPUT_WAKE);
+    }
     public static <T extends Event> void subscribe(EventType<T> type,EventHandler<? super T> listener){events.register(type,listener);}
     public static <T extends Event> void subscribe(EventType<T> type,int priority,EventHandler<? super T> listener){events.register(type,priority,listener);}
     public static <T extends Event> void unsubscribe(EventType<T> type,EventHandler<? super T> listener){events.unregister(type,listener);}
     public static void publish(Event event){events.publish(Objects.requireNonNull(event));}
-    static void postEvent(Event event){runTask(()->publish(event));}
+    // Native focus/resize events must retain their order relative to mouse/key input.
+    static void postEvent(Event event){runInputTask(()->publish(event));}
     public static float getTime(){return running?(float)((clock()-startTime)/1000):0;}
     public static float getDeltaTime(){return delta;}
     public static short getFramesPerSecond(){return fps;}
-    static void resetState(){tasks.clear();events.clear();delta=elapsed=fpsTime=0;frames=0;fps=0;running=closing=false;}
+    static void resetState(){tasks.clear();inputTasks.clear();events.clear();delta=elapsed=fpsTime=0;frames=0;fps=0;running=closing=false;}
     @JSBody(params={"frame","shutdown"},script="valthorneHost.connectApplication(frame,shutdown);") private static native void connect(Frame frame,Shutdown shutdown);
     @JSBody(script="valthorneHost.close();") private static native void closeHost();
     @JSBody(script="return performance.now();") private static native double clock();

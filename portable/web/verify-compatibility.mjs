@@ -13,8 +13,11 @@ function gradle(task,target,main,resources){
 }
 try{
     let verified=0;
-    for(const [main,script,flags,resources] of [
+    for(const [main,script,flags,resources,browserOnly] of [
         ['CommonApplication','verify-common.mjs',[]],['FailureApplication','verify-common.mjs',['--failure']],
+        // This shared-API consumer needs the browser runner to drive trusted input
+        // and suspend RAF/I/O; it has no unattended desktop input driver.
+        ['CommonGestureApplication','verify-common-gesture.mjs',[],undefined,true],
         ['CommonGraphicsApplication','verify-common-graphics.mjs',[]],
         ['CommonAudioApplication','verify-common-audio.mjs',[],'portable/compatibility/assets'],['CommonFontApplication','verify-common-font.mjs',[]],
         ['CommonFileApplication','verify-common-files.mjs',[]],
@@ -33,7 +36,7 @@ try{
         ['CommonPhysicsApplication','verify-common.mjs',['--physics']],['CommonSceneApplication','verify-common-scene.mjs',[]]
     ]){
         if(selected&&!selected.includes(main))continue;
-        if(desktop)await gradle('runGame','desktop',main,resources);
+        if(desktop&&!browserOnly)await gradle('runGame','desktop',main,resources);
         await gradle('buildGame','web',main,resources);await run(process.execPath,[script,...flags],web);
         verified++;
     }

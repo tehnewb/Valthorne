@@ -14,7 +14,7 @@ public final class Mouse {
     public static final int CURSOR_ARROW=0x36001,CURSOR_IBEAM=0x36002,CURSOR_CROSSHAIR=0x36003,CURSOR_HAND=0x36004,CURSOR_HRESIZE=0x36005,CURSOR_VRESIZE=0x36006;
     @JSFunctor private interface Callback extends JSObject {void accept(int kind,int button,int mods,int fromX,int fromY,int x,int y);}
     @JSFunctor private interface Scroll extends JSObject {void accept(float x,float y);}
-    static void init(){java.util.Arrays.fill(buttons,false);mouseX=0;mouseY=Window.getHeight();scrollX=scrollY=0;install((kind,button,mods,fromX,fromY,x,y)->JGL.runTask(()->{
+    static void init(){java.util.Arrays.fill(buttons,false);mouseX=0;mouseY=Window.getHeight();scrollX=scrollY=0;install((kind,button,mods,fromX,fromY,x,y)->JGL.runInputTask(()->{
         mouseX=x;mouseY=y;if(button>=0&&button<buttons.length&&(kind==0||kind==1))buttons[button]=kind==0;
         Event event=switch(kind){
             case 0 -> new MousePressEvent(button,mods,x,y);
@@ -23,7 +23,7 @@ public final class Mouse {
             case 3 -> new MouseDragEvent(button,mods,fromX,fromY,x,y);
             default -> new MouseScrollEvent(x,y);
         };JGL.publish(event);
-    }));installScroll((x,y)->JGL.runTask(()->{scrollX=x;scrollY=y;JGL.publish(new MouseScrollEvent(0,0).setPreciseOffsets(x,y));}));}
+    }));installScroll((x,y)->JGL.runInputTask(()->{scrollX=x;scrollY=y;JGL.publish(new MouseScrollEvent(0,0).setPreciseOffsets(x,y));}));}
     public static void addMouseListener(MouseListener listener){JGL.subscribe(EventTypes.MOUSE_PRESS,listener);JGL.subscribe(EventTypes.MOUSE_RELEASE,listener);JGL.subscribe(EventTypes.MOUSE_MOVE,listener);JGL.subscribe(EventTypes.MOUSE_DRAG,listener);}
     public static void removeMouseListener(MouseListener listener){JGL.unsubscribe(EventTypes.MOUSE_PRESS,listener);JGL.unsubscribe(EventTypes.MOUSE_RELEASE,listener);JGL.unsubscribe(EventTypes.MOUSE_MOVE,listener);JGL.unsubscribe(EventTypes.MOUSE_DRAG,listener);}
     public static void addScrollListener(MouseScrollListener listener){JGL.subscribe(EventTypes.MOUSE_SCROLL,listener);}
