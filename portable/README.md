@@ -395,7 +395,8 @@ culling, mesh sharing and teardown.
 The screenshots are in `web/build/verification/`. This does not prove full-engine
 portability or pixel-identical rendering across platforms.
 
-The Linux browser CI sets `WEBGPU_SOFTWARE=1` to select Chrome's software GPU.
+The Linux browser CI runs shared-source/browser checks and the full FPS check in
+independent parallel jobs. Both set `WEBGPU_SOFTWARE=1` to select Chrome's software GPU.
 Frame-based graphics checks allow up to two minutes while the application makes
 progress, but fail after ten seconds without progress. Their timing reports record
 frame counts and distinguish a stalled loop, an application error and an overall

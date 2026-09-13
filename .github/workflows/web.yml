@@ -41,16 +41,6 @@ jobs:
       - name: Test browser examples
         working-directory: portable/web
         run: npm run verify:examples
-      - name: Check out maintained examples
-        uses: actions/checkout@v4
-        with:
-          repository: tehnewb/Valthorne-examples
-          ref: d9c8ba498674686efc41f8e7ce0a343d95159e5e
-          path: Valthorne-examples
-      - name: Test full shared FPS application
-        env:
-          VALTHORNE_EXAMPLES_DIR: Valthorne-examples
-        run: node portable/fps.mjs verify web
       - name: Retain browser reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,4 +51,43 @@ jobs:
             portable/web/build/verification/
             portable/web/build/*.json
             portable/web/build/*.png
+          if-no-files-found: ignore
+
+  shared-fps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WEBGPU_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: portable/web/package-lock.json
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install pinned browser tooling
+        working-directory: portable/web
+        run: npm ci && npx playwright install --with-deps chrome
+      - name: Check out maintained examples
+        uses: actions/checkout@v4
+        with:
+          repository: tehnewb/Valthorne-examples
+          ref: d9c8ba498674686efc41f8e7ce0a343d95159e5e
+          path: Valthorne-examples
+      - name: Test full shared FPS application
+        env:
+          VALTHORNE_EXAMPLES_DIR: Valthorne-examples
+        run: node portable/fps.mjs verify web
+      - name: Retain FPS reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-shared-fps
+          path: |
+            portable/web/build/verification/
           if-no-files-found: ignore

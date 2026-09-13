@@ -2,14 +2,16 @@ import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({channel:'chrome',headless:true});
+import {browserTestOptions} from './browser-test-options.mjs';
+import {waitForFixtureCondition,waitForFixtureCompletion} from './browser-fixture-wait.mjs';
+const browser=await chromium.launch(browserTestOptions);
 try{
     const page=await browser.newPage({viewport:{width:960,height:640}}),errors=[],messages=[];
     page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>messages.push(m.text()));
     await page.goto(process.env.TEST_URL||'http://127.0.0.1:8095');
     await page.waitForFunction(()=>globalThis.valthorneReady||globalThis.valthorneError,null,{timeout:20000});
     assert.equal(await page.evaluate(()=>globalThis.valthorneError),undefined,messages.join('\n'));
-    await page.waitForFunction(()=>valthorneHost.frames>=30||valthorneHost.closed);
+    await waitForFixtureCondition(page,()=>valthorneHost.frames>=30,{fixture:'common-scene',phase:'warm-up',messages,errors});
     assert(!await page.evaluate(()=>valthorneHost.closed),messages.join('\n'));
     const output=new URL('./build/verification/',import.meta.url);await mkdir(output,{recursive:true});
     await page.screenshot({path:fileURLToPath(new URL('common-scene.png',output))});
@@ -33,8 +35,21 @@ try{
     const unlit=await read();assert.equal(unlit.lights,2);assert(unlit.sum<lit.sum*.95,`Light did not affect image: ${JSON.stringify({lit,unlit})}`);
     await page.keyboard.up('b');await page.keyboard.down('t');await page.waitForFunction(()=>![...valthorneHost.sceneRenderers][0].entries.some(e=>e.texture>0));
     const plain=await read();assert.equal(plain.textured,false);assert(plain.vivid<lit.vivid*.5,JSON.stringify({lit,plain}));
-    await page.keyboard.up('t');await page.keyboard.press('n');
-    await page.keyboard.press('Escape');await page.waitForFunction(()=>valthorneHost.closed||globalThis.valthorneError);
+    await page.keyboard.up('t');
+    // The application polls held keys in update(). A press/release pair may
+    // happen entirely between frames on a software renderer.
+    await page.keyboard.down('n');
+    try {
+        const cameraInputFrame=await page.evaluate(()=>valthorneHost.frames);
+        await page.waitForFunction(start=>valthorneHost.frames>start+1||globalThis.valthorneError||valthorneHost.closed,cameraInputFrame);
+        assert(!await page.evaluate(()=>valthorneHost.closed),'Scene closed before processing the camera input');
+    }finally{await page.keyboard.up('n');}
+    await page.keyboard.down('Escape');
+    let closed;
+    try {
+        closed=await waitForFixtureCompletion(page,{fixture:'common-scene',messages,errors});
+    }finally{await page.keyboard.up('Escape');}
+    assert(closed.renderedFrames<600,'Escape must close the scene before its automatic frame limit');
     assert.equal(await page.evaluate(()=>globalThis.valthorneError),undefined,messages.join('\n'));assert.deepEqual(errors,[]);
     assert(messages.some(m=>m.includes('COMMON_SCENE_VALIDATED')),messages.join('\n'));
     assert.equal(await page.evaluate(()=>valthorneHost.sceneRenderers.size+valthorneHost.physicsWorlds.size),0);
