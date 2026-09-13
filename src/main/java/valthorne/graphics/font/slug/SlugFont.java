@@ -60,7 +60,7 @@ import static org.lwjgl.stb.STBTruetype.*;
  * @since July 7th, 2026
  */
 public final class SlugFont implements Dimensional {
-    private SlugTextRun retainedRun;
+    private SlugTextRun retainedRun; // Reusable convenience-draw layout; separate runs are required for independent retained text.
 
     /**
      * Fixed data-texture row width. Shader address packing and CPU row shifts assume 4096.
@@ -649,15 +649,25 @@ public final class SlugFont implements Dimensional {
         }
     }
 
-    /** Isolates uploads from texture streaming/PBO state owned by other renderers. */
+    /**
+     * Scopes texture-upload state on the current GL context. Construction disables the
+     * pixel-unpack buffer and establishes tightly packed rows; close restores the previous
+     * texture binding and unpack settings even when upload exits exceptionally.
+     * Instances belong to one context-thread operation and must be closed on that thread.
+     * @author Albert Beaupre
+     */
     private static final class UploadState implements AutoCloseable {
-        private final int texture = glGetInteger(GL_TEXTURE_BINDING_2D);
-        private final int pbo = glGetInteger(GL_PIXEL_UNPACK_BUFFER_BINDING);
-        private final int alignment = glGetInteger(GL_UNPACK_ALIGNMENT);
-        private final int rowLength = glGetInteger(GL_UNPACK_ROW_LENGTH);
-        private final int skipRows = glGetInteger(GL_UNPACK_SKIP_ROWS);
-        private final int skipPixels = glGetInteger(GL_UNPACK_SKIP_PIXELS);
-        private final int swapBytes = glGetInteger(GL_UNPACK_SWAP_BYTES);
+        private final int texture = glGetInteger(GL_TEXTURE_BINDING_2D); // Texture binding captured on the active unit before upload.
+        private final int pbo = glGetInteger(GL_PIXEL_UNPACK_BUFFER_BINDING); // Pixel-unpack buffer binding restored after CPU uploads.
+        private final int alignment = glGetInteger(GL_UNPACK_ALIGNMENT); // Saved unpack row alignment in bytes.
+        private final int rowLength = glGetInteger(GL_UNPACK_ROW_LENGTH); // Saved unpack row-length override.
+        private final int skipRows = glGetInteger(GL_UNPACK_SKIP_ROWS); // Saved unpack row skip count.
+        private final int skipPixels = glGetInteger(GL_UNPACK_SKIP_PIXELS); // Saved unpack pixel skip count.
+        private final int swapBytes = glGetInteger(GL_UNPACK_SWAP_BYTES); // Saved unpack byte-swap flag.
+        /**
+         * Captures texture and pixel-unpack state, then selects CPU-buffer uploads with
+         * four-byte alignment and no row skips, row-length override, or byte swapping.
+         */
         UploadState() {
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
@@ -666,6 +676,10 @@ public final class SlugFont implements Dimensional {
             glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
             glPixelStorei(GL_UNPACK_SWAP_BYTES, 0);
         }
+        /**
+         * Restores the captured texture binding, pixel-unpack buffer, alignment, row layout,
+         * skip offsets, and byte-swap flag on the same context used during construction.
+         */
         @Override public void close() {
             glBindTexture(GL_TEXTURE_2D, texture);
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -1165,8 +1179,8 @@ public final class SlugFont implements Dimensional {
      */
     private static final class FloatTexelWriter {
         private final int width; // Texture row width in texels.
-        private float[] values = new float[4096];
-        private int count;
+        private float[] values = new float[4096]; // Growable primitive component storage for staged texels.
+        private int count; // Number of populated primitive components in staging storage.
 
         /**
          * Creates empty curve staging storage.
@@ -1250,8 +1264,8 @@ public final class SlugFont implements Dimensional {
      */
     private static final class UIntTexelWriter {
         private final int width; // Texture row width in texels.
-        private int[] values = new int[4096];
-        private int count;
+        private int[] values = new int[4096]; // Growable primitive component storage for staged texels.
+        private int count; // Number of populated primitive components in staging storage.
 
         /**
          * Creates empty integer band staging storage.

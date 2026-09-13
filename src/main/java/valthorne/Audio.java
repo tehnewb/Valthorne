@@ -105,10 +105,12 @@ public final class Audio {
      * Registry of all active sound players that should be updated by the audio thread.
      */
     private static final Set<SoundPlayer> PLAYERS = ConcurrentHashMap.newKeySet();
+
     /**
      * Cached player iteration array rebuilt after registry changes on the audio thread.
      */
     private static SoundPlayer[] playerSnapshot = new SoundPlayer[0];
+
     /**
      * Whether player registration changes require rebuilding the iteration snapshot.
      */
@@ -138,12 +140,13 @@ public final class Audio {
      * OpenAL's panning transform. Use the same world-coordinate units as the sound areas.
      *
      * @param x listener horizontal coordinate
-     *
      * @param y listener vertical coordinate
      * @param z listener depth coordinate
      * @author Albert Beaupre
      */
-    public record ListenerPosition(float x, float y, float z) {}
+    public record ListenerPosition(float x, float y, float z) {
+    }
+
     /**
      * Latest immutable ambient listener coordinates, published atomically across threads.
      */
@@ -156,7 +159,6 @@ public final class Audio {
      * spatial listener transform.
      *
      * @param x finite horizontal world coordinate
-     *
      * @param y finite vertical world coordinate
      * @param z finite depth world coordinate
      * @throws IllegalArgumentException if any coordinate is infinite or NaN
@@ -176,7 +178,7 @@ public final class Audio {
      *
      * @return current logical listener snapshot
      */
-    public static ListenerPosition getListenerPosition() { return listenerPosition; }
+    public static ListenerPosition getListenerPosition() {return listenerPosition;}
 
     /**
      * <p>
@@ -556,7 +558,7 @@ public final class Audio {
             return;
         }
 
-        run(() -> { if (PLAYERS.remove(player)) playersChanged = true; });
+        run(() -> {if (PLAYERS.remove(player)) playersChanged = true;});
     }
 
     /**

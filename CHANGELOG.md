@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Add the development browser target, shared Java compatibility applications,
+  and platform adapters for rendering, input, audio, storage, and UI.
+- Add conservative 3D occlusion, indexed Filament uploads, sprite-shaped 2D
+  shadows, and desktop graphics capability selection.
+- Implement a Filament readback transfer path for additional desktop runtimes;
+  native Linux/macOS rendering validation remains pending.
+- Keep browser integration fixtures outside published engine artifacts, preserve
+  required browser source packages in Git, and run committed core/native
+  compatibility checks without requiring local test folders.
+- Expose an optional raw desktop mouse-motion preference through the shared API.
+
+These changes require a development checkout; they are not a new Maven Central
+release. The companion examples CI selects a matching engine revision.
+
 ## 2.0.0
 
 This major release changes the public math API and adds the desktop 3D engine

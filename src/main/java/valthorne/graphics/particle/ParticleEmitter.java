@@ -278,6 +278,8 @@ public class ParticleEmitter {
     }
 
     /**
+     * Reads the configured continuous spawn rate. ParticleSystem combines this rate with elapsed seconds and the accumulator; this is not the number of currently alive particles.
+     *
      * @return continuous emission rate in particles per second
      */
     public float getEmissionRate() {return emissionRate;}
@@ -296,6 +298,8 @@ public class ParticleEmitter {
     // ---- Getters used by ParticleSystem ----
 
     /**
+     * Reads fractional spawn progress maintained by ParticleSystem. Observe it as scheduling state rather than an alive-particle count or an independent emission rate.
+     *
      * @return spawn accumulator used to convert fractional spawns into whole spawns
      */
     public float getSpawnAccumulator() {return spawnAccumulator;}
@@ -310,121 +314,169 @@ public class ParticleEmitter {
     public void setSpawnAccumulator(float spawnAccumulator) {this.spawnAccumulator = spawnAccumulator;}
 
     /**
+     * Reads the lower lifetime bound used when initializing newly spawned particles. Existing particles retain their assigned lifetime.
+     *
      * @return minimum lifetime in seconds
      */
     public float getLifeMin() {return lifeMin;}
 
     /**
+     * Reads the upper lifetime sampling bound used for new particles. Reading it does not resample or extend existing particles.
+     *
      * @return maximum lifetime in seconds
      */
     public float getLifeMax() {return lifeMax;}
 
     /**
+     * Reads the minimum initial velocity magnitude in world units per second. Direction is selected separately from the configured angle range.
+     *
      * @return minimum initial speed magnitude
      */
     public float getSpeedMin() {return speedMin;}
 
     /**
+     * Reads the maximum initial velocity magnitude in world units per second. Acceleration can change a particle's speed after spawning.
+     *
      * @return maximum initial speed magnitude
      */
     public float getSpeedMax() {return speedMax;}
 
     /**
+     * Reads the lower bound for initial velocity direction sampling in degrees, distinct from the sprite's visual rotation.
+     *
      * @return minimum initial velocity angle in degrees
      */
     public float getAngleMinDeg() {return angleMinDeg;}
 
     /**
+     * Reads the upper bound for initial velocity direction sampling in degrees. Visual starting rotation uses its own range.
+     *
      * @return maximum initial velocity angle in degrees
      */
     public float getAngleMaxDeg() {return angleMaxDeg;}
 
     /**
+     * Reads vertical acceleration in world units per second squared. Only the Y component supplied to setGravity is retained by this emitter.
+     *
      * @return constant Y acceleration (gravity) in units/second^2
      */
     public float getGravityY() {return gravityY;}
 
     /**
+     * Reads horizontal acceleration in world units per second squared. Only the X component supplied to setWind is retained by this emitter.
+     *
      * @return constant X acceleration (wind) in units/second^2
      */
     public float getWindX() {return windX;}
 
     /**
+     * Reads unscaled particle width in world units; per-particle scale modifies the rendered extent.
+     *
      * @return base particle width before per-particle scaling
      */
     public float getBaseWidth() {return baseWidth;}
 
     /**
+     * Reads unscaled particle height in world units; per-particle scale modifies the rendered extent.
+     *
      * @return base particle height before per-particle scaling
      */
     public float getBaseHeight() {return baseHeight;}
 
     /**
+     * Reads the dimensionless scale assigned at the beginning of particle lifetime. It multiplies the configured base dimensions.
+     *
      * @return starting scale used when initializing particles
      */
     public float getStartScale() {return startScale;}
 
     /**
+     * Reads the dimensionless target scale for lifetime interpolation, rather than a current particle's interpolated value.
+     *
      * @return ending scale used during lifetime interpolation
      */
     public float getEndScale() {return endScale;}
 
     /**
+     * Reads the lower initial sprite-rotation bound in degrees. It does not control the initial velocity direction.
+     *
      * @return minimum initial rotation in degrees
      */
     public float getStartRotMinDeg() {return startRotMinDeg;}
 
     /**
+     * Reads the upper initial sprite-rotation bound in degrees, sampled independently of angular speed.
+     *
      * @return maximum initial rotation in degrees
      */
     public float getStartRotMaxDeg() {return startRotMaxDeg;}
 
     /**
+     * Reads the lower angular-velocity bound in degrees per second for newly initialized particles. Negative values rotate in the opposite direction.
+     *
      * @return minimum rotation speed in degrees/second
      */
     public float getRotSpeedMinDegPerSec() {return rotSpeedMinDegPerSec;}
 
     /**
+     * Reads the upper angular-velocity bound in degrees per second for newly initialized particles.
+     *
      * @return maximum rotation speed in degrees/second
      */
     public float getRotSpeedMaxDegPerSec() {return rotSpeedMaxDegPerSec;}
 
     /**
+     * Borrows the emitter's mutable starting color. Mutations affect later particle initialization; each initialized particle receives its own copied color values.
+     *
      * @return reusable start color instance (do not replace; you may mutate its channels if desired)
      */
     public Color getStartColor() {return startColor;}
 
     /**
+     * Borrows the emitter's mutable ending color used to initialize lifetime interpolation. Copy it before retaining an independent configuration snapshot.
+     *
      * @return reusable end color instance (do not replace; you may mutate its channels if desired)
      */
     public Color getEndColor() {return endColor;}
 
     /**
+     * Reads whether drawing should use the configured texture region. Disabling region use leaves stored coordinates available for later re-enabling.
+     *
      * @return true if region rendering is enabled
      */
     public boolean isUseRegion() {return useRegion;}
 
     /**
+     * Reads the stored left texture-region coordinate in the units expected by Texture.setRegion. The value remains available when region rendering is disabled.
+     *
      * @return region left coordinate
      */
     public float getRegionLeft() {return regionLeft;}
 
     /**
+     * Reads the stored top texture-region coordinate in the units expected by Texture.setRegion. The value remains available when region rendering is disabled.
+     *
      * @return region top coordinate
      */
     public float getRegionTop() {return regionTop;}
 
     /**
+     * Reads the stored right texture-region coordinate in the units expected by Texture.setRegion. The value remains available when region rendering is disabled.
+     *
      * @return region right coordinate
      */
     public float getRegionRight() {return regionRight;}
 
     /**
+     * Reads the stored bottom texture-region coordinate in the units expected by Texture.setRegion. The value remains available when region rendering is disabled.
+     *
      * @return region bottom coordinate
      */
     public float getRegionBottom() {return regionBottom;}
 
     /**
+     * Borrows the current spawn-offset strategy. Particle initialization asks it for an offset relative to the system origin; the getter does not copy or invoke the strategy.
+     *
      * @return current spawn distribution strategy
      */
     public SpawnDistributor getShape() {return shape;}

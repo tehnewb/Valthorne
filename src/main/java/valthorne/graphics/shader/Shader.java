@@ -143,7 +143,13 @@ public class Shader {
      */
     private void buildProgram() {
         int newVert = compile(GL_VERTEX_SHADER, vertexSource);
-        int newFrag = compile(GL_FRAGMENT_SHADER, fragmentSource);
+        int newFrag;
+        try {
+            newFrag = compile(GL_FRAGMENT_SHADER, fragmentSource);
+        } catch (RuntimeException | Error failure) {
+            glDeleteShader(newVert);
+            throw failure;
+        }
         int newProg = glCreateProgram();
 
         glAttachShader(newProg, newVert);

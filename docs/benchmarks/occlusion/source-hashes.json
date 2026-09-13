@@ -1,0 +1,46 @@
+[
+  {
+    "path": "build.gradle",
+    "sha256": "8CB3D79D65F96688CBC6734AE31B9F7653E342AD94B7DB1EB8FF0209A966A0FB"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/OcclusionCuller3D.java",
+    "sha256": "E81A2B3EFBA4F535BA931776C57E6190C19409B58246514BE3373A2CF8DC6A80"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/Model3D.java",
+    "sha256": "E43BB601E105F908249083DB15FAAC9A9920A6A6E5D3838E80DCCF15DBEF2211"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/ModelBatch3D.java",
+    "sha256": "BF8CE0883BEBF806542F319164EDD33BEF83723B92BD6C8D5999C67D81DCB1D0"
+  },
+  {
+    "path": "src/main/java/valthorne/graphics/model/FilamentRenderer3D.java",
+    "sha256": "54796F516C3B511522C5EA190D320551CD17AAA4648148438EC1B60CCC97820C"
+  },
+  {
+    "path": "src/benchmark/java/valthorne/graphics/model/FilamentCullingBenchmark.java",
+    "sha256": "A2A682902687B7014E78FC8C9DD2433D961A0031EC9739FB8EE853DDEE9BF029"
+  },
+  {
+    "path": "src/benchmark/java/valthorne/graphics/model/OcclusionBenchmark.java",
+    "sha256": "8257400B77F6A0C920C30AAA3AC424AC9D427044FD7FB2EA08222CEAC4EB2B3A"
+  },
+  {
+    "path": "src/test/java/valthorne/model3d/OcclusionCuller3DTest.java",
+    "sha256": "716E325F628172397E653DF6628353FEB4A4E28D0C9789DFB0AEF46A78DC1CE3"
+  },
+  {
+    "path": "src/test/java/valthorne/model3d/FilamentOcclusionTest.java",
+    "sha256": "B54064B76A377C28D4F3EE2DDB37B7E83512D881835590EE64FF7C98E1185AE2"
+  },
+  {
+    "path": "src/test/java/valthorne/model3d/Rendering3DTest.java",
+    "sha256": "3B749952AC9AA4EF973874BA0F01859D44A8D0F090AD4648C88A6DBF5EA7A54E"
+  },
+  {
+    "path": "src/examples/java/valthorne/examples/FpsArena.java",
+    "sha256": "E9CA336964113993CA986D57841E35E19757A0865BB2B831647F2EAA2631C251"
+  }
+]

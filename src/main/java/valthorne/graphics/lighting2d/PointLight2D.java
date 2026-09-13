@@ -34,6 +34,19 @@ public final class PointLight2D {
     int mask = -1; // Accepted occluder category bits, initially all categories.
     boolean shadows = true, enabled = true; // Shadow casting and participation in lighting, both initially enabled.
     long revision, shadowRevision; // General configuration and shadow-geometry change counters.
+    float elevation;
+
+    /** Height above the ground plane; zero preserves the original planar light. */
+    public float getElevation() { return elevation; }
+    /** Current nonnegative emission multiplier. */
+    public float getIntensity() { return intensity; }
+    /** Whether occluder shadows are enabled for this light. */
+    public boolean isCastsShadows() { return shadows; }
+    public PointLight2D setElevation(float height) {
+        nonnegative(height);
+        if(elevation!=height){elevation=height;revision++;shadowRevision++;}
+        return this;
+    }
 
     /**
      * Rejects NaN and infinity before a scalar enters light configuration.

@@ -36,6 +36,16 @@ tasks.register('benchmarkSlug', JavaExec) {
     doFirst { file(report.get()).parentFile.mkdirs() }
 }
 
+tasks.register('benchmarkSpriteShadows', JavaExec) {
+    group = 'verification'
+    description = 'Measures alpha silhouette extraction and cached/moving 2D shadows.'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    args 'valthorne.lighting.benchmark.SpriteShadowBenchmark', '-foe', 'true', '-prof', 'gc',
+            '-rf', 'json', '-rff', 'build/reports/sprite-shadows/results.json'
+    doFirst { file('build/reports/sprite-shadows').mkdirs() }
+}
+
 tasks.register('verifyUIBenchmark') {
     description = 'Runs the complete UI benchmark suite and checks Java allocation budgets (not hardware-specific timing).'
     group = 'verification'
@@ -92,6 +102,25 @@ tasks.register('benchmarkSceneSnapshot', JavaExec) {
     def report = providers.gradleProperty('sceneSnapshotReport').orElse('build/reports/scene-snapshot/results.json')
     args 'valthorne.graphics.model.SceneSnapshotBenchmark', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
     doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('benchmarkOcclusion', JavaExec) {
+    group = 'verification'
+    description = 'Measures conservative CPU occlusion classification with JMH and allocation profiling.'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    def report = providers.gradleProperty('occlusionReport').orElse('build/reports/occlusion/cpu.json')
+    args 'valthorne.graphics.model.OcclusionBenchmark', '-foe', 'true', '-prof', 'gc', '-rf', 'json', '-rff', report.get()
+    doFirst { file(report.get()).parentFile.mkdirs() }
+}
+
+tasks.register('benchmarkOcclusionNative', JavaExec) {
+    group = 'verification'
+    description = 'Runs a GPU-completed occlusion workload; args: hidden|visible|offscreen true|false [batch].'
+    classpath = sourceSets.uiBenchmark.runtimeClasspath
+    mainClass = 'valthorne.graphics.model.FilamentCullingBenchmark'
+    args 'hidden', 'true'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
 }
 
 tasks.register('benchmarkAudio', JavaExec) {

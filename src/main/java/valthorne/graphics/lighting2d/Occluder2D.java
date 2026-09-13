@@ -25,9 +25,11 @@ package valthorne.graphics.lighting2d;
  *
  * @author Albert Beaupre
  */
-public final class Occluder2D {
-    final float[] vertices; // Copied local XY pairs in boundary order, with implicit closing edge.
-    final float minX, minY, maxX, maxY; // Fixed axis-aligned bounds of the local polygon.
+public class Occluder2D {
+    float[] vertices; // Polygon pairs, or independent endpoint pairs for alpha silhouettes.
+    int coordinateCount;
+    final boolean segments;
+    float minX, minY, maxX, maxY;
     float x, y; // World translation added to local vertex coordinates.
     int category = -1; // Occluder category bits tested against each light's mask.
     long revision; // Change counter for translation and category updates.
@@ -45,9 +47,11 @@ public final class Occluder2D {
      *                                  or the absolute doubled area is below 1e-8
      */
     public Occluder2D(float... xy) {
+        segments = false;
         if (xy.length < 6 || xy.length % 2 != 0)
             throw new IllegalArgumentException("At least three XY vertices are required");
         vertices = xy.clone();
+        coordinateCount = xy.length;
         float ax = Float.POSITIVE_INFINITY, ay = ax, bx = Float.NEGATIVE_INFINITY, by = bx;
         double area = 0;
         for (int i = 0; i < xy.length; i += 2) {
@@ -66,6 +70,11 @@ public final class Occluder2D {
         maxX = bx;
         maxY = by;
     }
+
+    Occluder2D() { segments = true; vertices = new float[0]; }
+    void synchronize() { }
+    int edgeStep() { return segments ? 4 : 2; }
+    int edgeEnd(int i) { return segments ? i + 2 : (i + 2) % coordinateCount; }
 
     /**
      * Creates an axis-aligned rectangle with local corners from (0,0) through
@@ -166,7 +175,8 @@ public final class Occluder2D {
         px -= x;
         py -= y;
         boolean inside = false;
-        for (int i = 0, j = vertices.length - 2; i < vertices.length; j = i, i += 2) {
+        for (int i = 0; i < coordinateCount; i += edgeStep()) {
+            int j = edgeEnd(i);
             float xi = vertices[i], yi = vertices[i + 1], xj = vertices[j], yj = vertices[j + 1];
             if ((yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
         }

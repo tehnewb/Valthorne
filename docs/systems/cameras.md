@@ -904,7 +904,6 @@ Camera camera = new OrthographicCamera();
 #### rebuild
 
 ```java
-@Override
     public void rebuild(float worldWidth, float worldHeight)
 ```
 
@@ -1104,7 +1103,6 @@ Camera uiCamera = new UIOrthographicCamera();
 #### rebuild
 
 ```java
-@Override
     public void rebuild(float worldWidth, float worldHeight)
 ```
 

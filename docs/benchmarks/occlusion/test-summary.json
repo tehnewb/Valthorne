@@ -1,0 +1,32 @@
+[
+  {
+    "suite": "test",
+    "tests": 148,
+    "failures": 0,
+    "skipped": 2
+  },
+  {
+    "suite": "verify3D",
+    "tests": 93,
+    "failures": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "verifyPhysics3D",
+    "tests": 32,
+    "failures": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "verifyLighting",
+    "tests": 27,
+    "failures": 0,
+    "skipped": 0
+  },
+  {
+    "suite": "graphicsTest",
+    "tests": 79,
+    "failures": 0,
+    "skipped": 0
+  }
+]

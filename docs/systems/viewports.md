@@ -99,7 +99,6 @@ Creates a fill viewport with the specified logical world size.
 #### update
 
 ```java
-@Override
     public void update(int screenWidth, int screenHeight)
 ```
 
@@ -165,7 +164,6 @@ Creates a fit viewport with the specified logical world size.
 #### update
 
 ```java
-@Override
     public void update(int screenWidth, int screenHeight)
 ```
 
@@ -593,7 +591,6 @@ matches the current screen size.
 #### update
 
 ```java
-@Override
     public void update(int screenWidth, int screenHeight)
 ```
 
@@ -657,7 +654,6 @@ Creates a stretch viewport with the specified logical world size.
 #### update
 
 ```java
-@Override
     public void update(int screenWidth, int screenHeight)
 ```
 

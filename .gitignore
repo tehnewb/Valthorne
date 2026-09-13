@@ -30,6 +30,9 @@ node_modules/
 .lwjgl/
 lwjgl/
 .filament-kmp/
+# These are authored Java packages, not build output or extracted native libraries.
+!/portable/web/src/main/java/valthorne/web/build/
+!/portable/web/src/main/java/org/lwjgl/
 *.log
 hs_err_pid*
 replay_pid*

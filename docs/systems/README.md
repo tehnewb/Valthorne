@@ -32,7 +32,7 @@ The checkout targets Java 25. Run repository examples using the Gradle wrapper; 
 | [Audio playback and ambient areas](audio.md) | 17 | `Audio`, `AudioFormat`, `Mp3SoundDecoder`, `Mp3SoundStream`, `OggSoundDecoder`, … |
 | [Textures, sprites, atlases, and batching](textures.md) | 24 | `Color`, `Drawable`, `DrawFunction`, `ImmediateTextureRenderer`, `Sprite`, … |
 | [Bitmap fonts and glyph styling](fonts.md) | 9 | `Font`, `FontData`, `FontLoader`, `FontParameters`, `FontSource`, … |
-| [Slug vector fonts](slug-fonts.md) | 7 | `SlugBatch`, `SlugCurve`, `SlugFont`, `SlugGlyph`, `SlugShader`, `SlugLabel`, … |
+| [Slug vector fonts](slug-fonts.md) | 6 | `SlugBatch`, `SlugCurve`, `SlugFont`, `SlugGlyph`, `SlugShader`, … |
 | [Frame and transform animation](animation.md) | 7 | `Animation`, `AnimationAdapter`, `AnimationFrame`, `AnimationListener`, `AnimationUtility`, … |
 | [Cameras and picking](cameras.md) | 7 | `Camera`, `Camera3D`, `OrbitCameraController`, `OrthographicCamera`, `OrthographicCamera3D`, … |
 | [Viewport scaling and coordinate conversion](viewports.md) | 6 | `FillViewport`, `FitViewport`, `PerspectiveViewport`, `ScreenViewport`, `StretchViewport`, … |
@@ -41,16 +41,17 @@ The checkout targets Java 25. Run repository examples using the Gradle wrapper; 
 | [Batched 2D lighting](lighting-2d.md) | 5 | `Lighting2D`, `Occluder2D`, `OccluderIndex2D`, `PointLight2D`, `PolarShadow2D` |
 | [Raster 3D lighting and shadow maps](lighting-3d.md) | 4 | `LightGrid3D`, `Lighting3D`, `PointLight3D`, `ShadowMap3D` |
 | [Screen-space radiance cascades](radiance-cascades.md) | 6 | `RadianceCascadeLevel`, `RadianceCascades`, `RadianceCascadeSettings`, `RadianceRenderTarget`, `RadianceSceneBuffer`, … |
-| [Filament rendering](filament.md) | 1 | `FilamentRenderer3D` |
+| [Filament rendering](filament.md) | 2 | `FilamentRenderer3D`, `VertexCompaction3D` |
 | [2D and 3D path tracing](path-tracing.md) | 3 | `PathTracer2D`, `PathTracer3D`, `PathTracingScene` |
 | [3D models, materials, scenes, and billboards](models.md) | 23 | `BillboardBatch3D`, `BillboardMode3D`, `BillboardRenderable3D`, `BillboardSprite3D`, `Material3D`, … |
+| [Conservative 3D visibility and occlusion](culling.md) | 1 | `OcclusionCuller3D` |
 | [Jolt rigid-body physics](physics.md) | 11 | `BodySettings3D`, `CollisionLayers3D`, `CollisionShape3D`, `ContactEvent3D`, `DistanceJoint3D`, … |
 | [3D particles and physics integration](particles-3d.md) | 2 | `Particle3D`, `ParticleEmitter3D` |
 | [2D particles and spawn distributions](particles-2d.md) | 13 | `BoxSpawnDistributor`, `CircleSpawnDistributor`, `ConeSpawnDistributor`, `LineSpawnDistributor`, `Particle`, … |
 | [Tiled maps and tilesets](tiled-maps.md) | 24 | `FileSystemResolver`, `MapChunk`, `MapLayer`, `ResolvedTile`, `TileAnimationFrame`, … |
 | [UI roots, nodes, and input routing](ui-core.md) | 8 | `NanoUtility`, `NodeAction`, `UIConstants`, `UIContainer`, `UIInputEvent`, … |
 | [UI layout and alignment](ui-layout.md) | 13 | `Dimensional`, `Align`, `Alignment`, `FlexDirection`, `FlexWrap`, … |
-| [Standard UI controls](ui-controls.md) | 16 | `Button`, `Checkbox`, `CollapsibleSection`, `DrawableNode`, `Grid`, … |
+| [Standard UI controls](ui-controls.md) | 17 | `Button`, `Checkbox`, `CollapsibleSection`, `DrawableNode`, `Grid`, … |
 | [NanoVG UI controls](ui-nano.md) | 15 | `NanoButton`, `NanoCheckbox`, `NanoComboBox`, `NanoContainer`, `NanoGrid`, … |
 | [Virtual lists, tables, and selection](ui-data.md) | 6 | `RowHeightIndex`, `SelectionModel`, `TableModel`, `DataTable`, `TableColumn`, … |
 | [Shared UI behavior and editing models](ui-behavior.md) | 6 | `ActivationBehavior`, `ChangeSignal`, `RangeModel`, `ScrollBehavior`, `TextEditing`, … |
@@ -78,8 +79,7 @@ Examples in component descriptions may be partial integration fragments rather t
 
 ## Source coverage
 
-The source index assigns engine Java files to the relevant guides. Related guides
-link across shared concepts without duplicating ownership of source coverage.
+Every one of the 410 Java files is assigned to exactly one of the 48 guides. Related guides link across shared concepts without duplicating ownership of source coverage.
 
 <details>
 <summary>Source-to-guide index</summary>
@@ -285,6 +285,7 @@ link across shared concepts without duplicating ownership of source coverage.
 | [graphics/model/ModelLoader.java](../../src/main/java/valthorne/graphics/model/ModelLoader.java) | [models](models.md) |
 | [graphics/model/ModelParameters.java](../../src/main/java/valthorne/graphics/model/ModelParameters.java) | [models](models.md) |
 | [graphics/model/ObjModel3D.java](../../src/main/java/valthorne/graphics/model/ObjModel3D.java) | [models](models.md) |
+| [graphics/model/OcclusionCuller3D.java](../../src/main/java/valthorne/graphics/model/OcclusionCuller3D.java) | [culling](culling.md) |
 | [graphics/model/PathTracer3D.java](../../src/main/java/valthorne/graphics/model/PathTracer3D.java) | [path-tracing](path-tracing.md) |
 | [graphics/model/PathTracingScene.java](../../src/main/java/valthorne/graphics/model/PathTracingScene.java) | [path-tracing](path-tracing.md) |
 | [graphics/model/PickResult3D.java](../../src/main/java/valthorne/graphics/model/PickResult3D.java) | [models](models.md) |
@@ -297,6 +298,7 @@ link across shared concepts without duplicating ownership of source coverage.
 | [graphics/model/Scene3D.java](../../src/main/java/valthorne/graphics/model/Scene3D.java) | [models](models.md) |
 | [graphics/model/SceneNode3D.java](../../src/main/java/valthorne/graphics/model/SceneNode3D.java) | [models](models.md) |
 | [graphics/model/ShadowMap3D.java](../../src/main/java/valthorne/graphics/model/ShadowMap3D.java) | [lighting-3d](lighting-3d.md) |
+| [graphics/model/VertexCompaction3D.java](../../src/main/java/valthorne/graphics/model/VertexCompaction3D.java) | [filament](filament.md) |
 | [graphics/particle/BoxSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/BoxSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/CircleSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/CircleSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/ConeSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/ConeSpawnDistributor.java) | [particles-2d](particles-2d.md) |
@@ -455,6 +457,7 @@ link across shared concepts without duplicating ownership of source coverage.
 | [ui/nodes/ProgressBar.java](../../src/main/java/valthorne/ui/nodes/ProgressBar.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/ScrollPanel.java](../../src/main/java/valthorne/ui/nodes/ScrollPanel.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/Slider.java](../../src/main/java/valthorne/ui/nodes/Slider.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/SlugLabel.java](../../src/main/java/valthorne/ui/nodes/SlugLabel.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/SplitPane.java](../../src/main/java/valthorne/ui/nodes/SplitPane.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/TabbedPane.java](../../src/main/java/valthorne/ui/nodes/TabbedPane.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/TableColumn.java](../../src/main/java/valthorne/ui/nodes/TableColumn.java) | [ui-data](ui-data.md) |
@@ -481,7 +484,6 @@ link across shared concepts without duplicating ownership of source coverage.
 | [ui/UINode.java](../../src/main/java/valthorne/ui/UINode.java) | [ui-core](ui-core.md) |
 | [ui/UIRenderContext.java](../../src/main/java/valthorne/ui/UIRenderContext.java) | [ui-core](ui-core.md) |
 | [ui/UIRoot.java](../../src/main/java/valthorne/ui/UIRoot.java) | [ui-core](ui-core.md) |
-| [ui/nodes/SlugLabel.java](../../src/main/java/valthorne/ui/nodes/SlugLabel.java) | [slug-fonts](slug-fonts.md) |
 | [utility/FileUtility.java](../../src/main/java/valthorne/utility/FileUtility.java) | [files](files.md) |
 | [utility/NumberUtility.java](../../src/main/java/valthorne/utility/NumberUtility.java) | [utilities](utilities.md) |
 | [utility/ReflectionUtility.java](../../src/main/java/valthorne/utility/ReflectionUtility.java) | [utilities](utilities.md) |

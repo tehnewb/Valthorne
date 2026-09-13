@@ -1,0 +1,5 @@
+newmtl mapped
+Kd 1 1 1
+map_Kd colors.png
+newmtl plain
+Kd 0.15 0.65 0.9

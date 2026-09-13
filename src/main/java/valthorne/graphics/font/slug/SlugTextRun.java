@@ -33,7 +33,7 @@ public final class SlugTextRun {
     private float size; // World units per em.
     private float width; // Measured width.
     private float height; // Measured height.
-    private float minX, minY, maxX, maxY;
+    private float minX, minY, maxX, maxY; // Drawable outline bounds relative to the run baseline, used for whole-run rejection.
 
     /**
      * Creates a reusable layout for the supplied font and immediately builds its

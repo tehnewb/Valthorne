@@ -1,5 +1,6 @@
 #version 330 core
 in vec2 local;flat in vec4 light;flat in vec4 color;flat in vec4 shape;
+flat in float elevation;
 uniform sampler2D u_shadows;uniform float u_rows, u_resolution;
 out vec4 fragColor;
 float compareShadow(float u, float row, float t, float width){
@@ -19,5 +20,6 @@ void main(){ float d = length(local), t = d / light.z;if (t >= 1.0)discard;
         visibility = sum * .2; }
     float cone = 1.0;
     if (shape.z > -.9999){ float c = cos(angle - shape.w);cone = shape.y - shape.z < .00001?step(shape.z, c):smoothstep(shape.z, shape.y, c); }
-    float window = 1.0 - t * t;float falloff = window * window / (1.0 + 6.0 * t * t);
+    float t3=length(vec3(local,elevation))/light.z;if(t3>=1.0)discard;
+    float window = 1.0 - t3 * t3;float falloff = window * window / (1.0 + 6.0 * t3 * t3);
     fragColor = vec4(color.rgb * color.a * falloff * visibility * cone, 0); }

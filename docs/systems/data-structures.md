@@ -671,7 +671,6 @@ Searches for a given integer value in the binary tree.
 #### toString
 
 ```java
-@Override
     public String toString()
 ```
 
@@ -707,7 +706,6 @@ Constructs a new node with the given value.
 #### toString
 
 ```java
-@Override
         public String toString()
 ```
 

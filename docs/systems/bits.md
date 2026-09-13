@@ -505,7 +505,6 @@ When `set` is `false`, this behaves the same as `clear(int)`.
 #### toString
 
 ```java
-@Override
     public String toString()
 ```
 
@@ -830,7 +829,6 @@ Sets or clears the bit at the specified index based on the supplied boolean valu
 #### toString
 
 ```java
-@Override
     public String toString()
 ```
 
@@ -917,7 +915,6 @@ Applies a bitwise OR operation using another `IntBits` instance.
 #### clone
 
 ```java
-@Override
     public IntBits clone()
 ```
 
@@ -1195,7 +1192,6 @@ and `clear(int)` when `set` is false.
 #### toString
 
 ```java
-@Override
     public String toString()
 ```
 
@@ -1297,7 +1293,6 @@ Any bit set in either mask becomes set in this instance afterward.
 #### clone
 
 ```java
-@Override
     public LongBits clone()
 ```
 
@@ -1552,7 +1547,6 @@ Sets or clears the bit at the specified index based on the supplied boolean valu
 #### toString
 
 ```java
-@Override
     public String toString()
 ```
 

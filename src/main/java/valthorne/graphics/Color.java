@@ -629,6 +629,8 @@ public class Color {
     }
 
     /**
+     * Creates an independent color retaining the packed RGB bytes and replacing alpha. Finite alpha is clamped to zero through one and truncated to an eight-bit value; this color is unchanged.
+     *
      * @param alpha normalized alpha in [0..1]
      * @return a new Color with the same RGB but a different alpha.
      */
@@ -638,6 +640,8 @@ public class Color {
     }
 
     /**
+     * Formats all four packed bytes as an uppercase, zero-padded eight-digit hexadecimal string prefixed with #. Alpha precedes red, green, and blue.
+     *
      * @return hex string in {@code #AARRGGBB} format.
      */
     public String toHex() {
@@ -645,6 +649,8 @@ public class Color {
     }
 
     /**
+     * Checks whether the stored eight-bit alpha is exactly 255. This tests color data only; texture alpha and blend state may still affect final coverage.
+     *
      * @return true if this color is fully opaque (alpha == 255).
      */
     public boolean isOpaque() {
@@ -652,6 +658,8 @@ public class Color {
     }
 
     /**
+     * Checks whether the stored eight-bit alpha is exactly zero. RGB bytes are retained and do not affect this predicate.
+     *
      * @return true if this color is fully transparent (alpha == 0).
      */
     public boolean isTransparent() {
@@ -659,6 +667,8 @@ public class Color {
     }
 
     /**
+     * Creates a separate mutable color with identical packed channel bytes. Later channel changes on either instance do not affect the other.
+     *
      * @return a copy of this color.
      */
     public Color copy() {

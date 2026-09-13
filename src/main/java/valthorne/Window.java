@@ -100,6 +100,13 @@ public final class Window {
      * Owned GLFW window handle, or zero when no window is registered.
      */
     private static long address;
+    private static valthorne.graphics.GraphicsCapabilities graphicsCapabilities;
+
+    /** @return actual capabilities of the initialized window, not the requested version */
+    public static valthorne.graphics.GraphicsCapabilities getGraphicsCapabilities() {
+        if (graphicsCapabilities == null) throw new IllegalStateException("Window is not initialized");
+        return graphicsCapabilities;
+    }
     /**
      * Cached desktop X and Y coordinates in GLFW screen-coordinate units.
      */
@@ -254,6 +261,8 @@ public final class Window {
     public static void init(JGLConfiguration config) {
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
         if (address != NULL) throw new IllegalStateException("Window is already initialized");
+        if (config.getClientApi() != GLFW_OPENGL_API)
+            throw new UnsupportedOperationException("Valthorne currently uses desktop OpenGL bindings; OpenGL ES and no-API windows require a separate backend.");
 
         Window.width = config.getWidth();
         Window.height = config.getHeight();
@@ -266,19 +275,44 @@ public final class Window {
 
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
 
-        address = glfwCreateWindow(config.getWidth(), config.getHeight(), config.getTitle(), monitor, NULL);
-        if (address == NULL) {
+        int[][] versions = config.isAutomaticContext() ? new int[][]{{4, 3}, {4, 1}, {3, 3}}
+                : new int[][]{{config.getContextVersionMajor(), config.getContextVersionMinor()}};
+        StringBuilder failures = new StringBuilder();
+        for (int[] version : versions) {
+            if (config.isAutomaticContext()) {
+                glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, version[0]);
+                glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, version[1]);
+                glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+                glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+            }
+            address = glfwCreateWindow(config.getWidth(), config.getHeight(), config.getTitle(), monitor, NULL);
+            if (address != NULL) break;
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 var description = stack.mallocPointer(1);
                 int error = glfwGetError(description);
                 String detail = description.get(0) == NULL ? "No native description"
                         : org.lwjgl.system.MemoryUtil.memUTF8(description.get(0));
-                throw new IllegalStateException("Failed to create the GLFW window (error " + error + "): " + detail);
+                failures.append("GL ").append(version[0]).append('.').append(version[1])
+                        .append(" (error ").append(error).append("): ").append(detail).append('\n');
             }
         }
+        if (address == NULL) throw new IllegalStateException("Failed to create the GLFW window:\n" + failures);
 
         glfwMakeContextCurrent(address);
-        GL.createCapabilities();
+        try {
+            if (glfwGetWindowAttrib(address, GLFW_CLIENT_API) != GLFW_OPENGL_API)
+                throw new UnsupportedOperationException("Extra window hints selected an unsupported client API; desktop OpenGL is required.");
+            GL.createCapabilities();
+            graphicsCapabilities = valthorne.graphics.GraphicsCapabilities.current();
+            graphicsCapabilities.requireRaster();
+        } catch (RuntimeException | Error failure) {
+            graphicsCapabilities = null;
+            glfwMakeContextCurrent(NULL);
+            GL.setCapabilities(null);
+            glfwDestroyWindow(address);
+            address = NULL;
+            throw failure;
+        }
         glfwSwapInterval(config.getSwapInterval().getValue());
 
         if (config.getSamples() > 0) glEnable(GL_MULTISAMPLE);
@@ -838,6 +872,7 @@ public final class Window {
 
         long handle = address;
         address = NULL;
+        graphicsCapabilities = null;
         if (handle != NULL) {
             failure = appendSuppressed(failure, runSafe(() -> {
                 glfwMakeContextCurrent(NULL);

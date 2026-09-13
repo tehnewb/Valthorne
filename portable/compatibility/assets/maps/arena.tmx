@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map name="Compatibility arena" orientation="orthogonal" width="4" height="3" tilewidth="80" tileheight="80">
+ <properties><property name="label" value="Map &amp; world"/></properties>
+ <tileset firstgid="1" source="terrain.tsx"/>
+ <layer name="ground" width="4" height="3"><data encoding="csv">
+  1,2,3,4,
+  3,4,1,2,
+  2,3,4,2147483649
+ </data></layer>
+ <objectgroup name="objects"><object id="1" name="Spawn" x="20" y="30"><point/></object></objectgroup>
+</map>

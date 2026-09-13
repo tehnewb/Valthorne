@@ -5,22 +5,40 @@ transitively and independently of the publisher's operating system. They are
 selected/extracted by the native loaders at runtime; users need no native compiler.
 This does not make every renderer available on every operating system.
 
+A separate [web build target](../portable/README.md) compiles Java applications
+with TeaVM and supplies the existing engine APIs through browser backends.
+Shared-source tests cover Jolt physics, Filament and raster 3D, 2D rendering and
+lighting, radiance cascades, particles, audio, fonts, UI, asset loading and Tiled maps.
+Select the backend in the build while keeping supported application source unchanged.
+The web target also implements WebGPU compute, WebGL2 path tracing, bounded
+compressed audio, persistent Java file operations and browser window controls;
+skeletal and morph deformation have rendered-pixel tests. Browser window/file
+semantics and graphics capabilities still differ from the desktop. Raw native
+calls remain desktop-specific. See the web target's supported/outstanding matrix
+before selecting it for a game.
+
 | Target JVM | Core / raster OpenGL | Jolt physics | Filament adapter | Compute effects |
 | --- | --- | --- | --- | --- |
 | Windows x86-64 | OpenGL 3.3+ | Native included | Windows x64 sharing path | OpenGL 4.3+ |
 | Windows ARM64 | OpenGL 3.3+ driver required | Native included | Unavailable with ARM64 JVM | OpenGL 4.3+ driver required |
-| Linux x86-64 / ARM64 | OpenGL 3.3+ | Native included | Unavailable | OpenGL 4.3+ |
-| macOS Intel / Apple Silicon | OpenGL 3.3 core | Native included | Unavailable | Unavailable |
+| Linux x86-64 / ARM64 | OpenGL 3.3+ | Native included | OpenGL 4.1 transfer path implemented; native validation pending | OpenGL 4.3+ |
+| macOS Apple Silicon | OpenGL 3.3 core | Native included | OpenGL 4.1 transfer path implemented; native validation pending | Unavailable |
+| macOS Intel | OpenGL 3.3 core | Native included | No runtime in the pinned binding release | Unavailable |
 | Linux ARM32 hard-float | Native artifacts included; suitable JDK 25 and drivers required | Native included | Unavailable | Driver-dependent |
 
 ARM32 is an artifact target, not a release-tested Java 25 environment. Android,
-iOS, browsers, other Unix systems, and Windows x86 are not supported by this build.
+iOS, browsers, other Unix systems, and Windows x86 are not supported by the desktop artifact.
 Native availability alone is not a claim of hardware validation. The CI workflow
 runs build/native-physics/consumer checks on Windows x64, Linux x64, and macOS
 Intel and ARM64;
 other listed CPUs require testing on their own hardware before game distribution.
 
 ## Graphics and launchers
+
+For opt-in desktop 4.3 → 4.1 → 3.3 context negotiation and a Filament-to-raster
+selection API, see [graphics capability selection](graphics-capabilities.md).
+OpenGL ES and Raspberry Pi rendering remain unimplemented; native ARM artifacts
+alone do not establish compatibility.
 
 The ordinary renderers use OpenGL 3.3 core. macOS needs
 `-XstartOnFirstThread`; Valthorne's repository Java launch tasks add it automatically.
@@ -38,10 +56,15 @@ Mac rendering remains unverified; run `verifyGraphicsConsumer` on a Mac with a
 working OpenGL driver before distributing a game for that target. The strict
 graphics check still fails if no context can be created.
 
-Filament's upstream runtime supports more platforms than Valthorne's current
-shared-texture adapter. Valthorne currently uses WGL and the Windows x64 binding;
-adding another native JAR does not implement another sharing backend. Use
-`ModelBatch3D` and the standard scene/physics examples for portable raster rendering.
+Filament uses WGL texture sharing on Windows x64. Linux x64/ARM64 and macOS
+ARM64 now have packaged runtimes and a separate OpenGL-context transfer path:
+material textures are uploaded on import/invalidation, and rendered pixels are
+read back into a reusable buffer for presentation. This path was exercised on
+Windows with `-Dvalthorne.filament.readback=true`; native Linux/macOS execution
+is still pending. The transfer incurs a GPU/CPU copy every frame. Unsupported
+runtime architectures retain AUTO's raster fallback. Android and iOS still
+require separate native launchers and engine adapters; this change does not
+complete those ports.
 See [Filament contracts](filament.md).
 
 On Linux, install your distribution's graphics driver and desktop display

@@ -35,6 +35,20 @@ import static org.lwjgl.opengl.GL33.*;
  * quad instead. That keeps the fragment shader from clipping antialiasing while making the vertex
  * shader much cheaper. This pass also sends the pixels-per-em value as a flat instance
  * attribute so the fragment shader does not need to call fwidth() for ordinary 2D text.</p>
+ * <p>Use one graphics context thread. Begin captures the GL state changed by this
+ * batch; end flushes pending instances and restores it, while cancel restores it
+ * without drawing pending work. Clip and viewport bounds reject outside glyphs
+ * and crop intersecting glyph quads on the CPU without changing hardware scissor state.</p>
+ * <pre>{@code
+ * SlugTextRun run = font.createRun("Ready", 24f);
+ * batch.begin(projection, viewportWidth, viewportHeight);
+ * try {
+ *     run.draw(batch, 20f, 40f, Color.WHITE);
+ *     batch.end();
+ * } finally {
+ *     batch.cancel();
+ * }
+ * }</pre>
  *
  * @author Albert Beaupre
  * @since July 7th, 2026
@@ -91,8 +105,13 @@ public final class SlugBatch {
     private final int maxGlyphs; // Maximum queued glyph instances before an automatic flush.
     private final ByteBuffer instanceBuffer; // CPU staging buffer for streamed glyph instances.
     private final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16); // Temporary matrix upload buffer.
-    private final IntBuffer stateBuffer = BufferUtils.createIntBuffer(1);
+    private final IntBuffer stateBuffer = BufferUtils.createIntBuffer(1); // Reusable direct storage for scalar GL state queries.
 
+    /**
+     * Reads one integer GL state value into reusable direct scratch on the context thread.
+     * @param name scalar OpenGL state selector
+     * @return captured integer value
+     */
     private int integerState(int name) {
         glGetIntegerv(name, stateBuffer);
         return stateBuffer.get(0);
@@ -105,28 +124,64 @@ public final class SlugBatch {
     private SlugFont activeFont; // Font whose curve/band textures are bound for the current queue.
     private int instanceCount; // Number of queued glyph instances.
     private boolean drawing; // True between begin and end.
-    private boolean disposed, oldDepth, oldCull, oldDepthMask;
-    private int oldProgram, oldVao, oldBuffer, oldActive, oldTexture0, oldTexture1, oldSampler0, oldSampler1;
-    private int oldSrcAlpha, oldDstAlpha, oldEquationRgb, oldEquationAlpha;
-    private float projectionScale = 1, effectivePadding;
-    private float viewMinX, viewMinY, viewMaxX, viewMaxY;
-    private float clipMinX = Float.NEGATIVE_INFINITY, clipMinY = Float.NEGATIVE_INFINITY;
-    private float clipMaxX = Float.POSITIVE_INFINITY, clipMaxY = Float.POSITIVE_INFINITY;
-    private int glyphsSubmitted, drawCalls;
+    private boolean disposed, oldDepth, oldCull, oldDepthMask; // Disposal flag and saved depth-test, cull, and depth-write state.
+    private int oldProgram, oldVao, oldBuffer, oldActive, oldTexture0, oldTexture1, oldSampler0, oldSampler1; // Saved program, vertex/buffer bindings, active unit, textures, and samplers.
+    private int oldSrcAlpha, oldDstAlpha, oldEquationRgb, oldEquationAlpha; // Saved alpha blend factors and separate RGB/alpha blend equations.
+    private float projectionScale = 1, effectivePadding; // Pixels-per-world-unit estimate and conservative world-space antialiasing padding.
+    private float viewMinX, viewMinY, viewMaxX, viewMaxY; // World-space viewport rejection bounds derived from compatible projections.
+    private float clipMinX = Float.NEGATIVE_INFINITY, clipMinY = Float.NEGATIVE_INFINITY; // Optional CPU clip minimum coordinates; negative infinity disables the lower limits.
+    private float clipMaxX = Float.POSITIVE_INFINITY, clipMaxY = Float.POSITIVE_INFINITY; // Optional CPU clip maximum coordinates; positive infinity disables the upper limits.
+    private int glyphsSubmitted, drawCalls; // Accepted glyph and actual draw counters reset at each begin.
 
-    /** Restricts subsequent glyphs in world coordinates. Does not alter hardware scissor state. */
+    /**
+     * Restricts subsequently submitted glyphs to intersection with a world-space rectangle.
+     * Outside glyphs are rejected; intersecting quads and their em-space coordinates
+     * are cropped before upload. Hardware scissor state and existing queued glyphs
+     * are unchanged. The rectangle follows world axes, including under rotated projections.
+     * @param x rectangle left coordinate in glyph world units
+     * @param y rectangle lower coordinate in glyph world units
+     * @param width finite nonnegative rectangle width
+     * @param height finite nonnegative rectangle height
+     * @throws IllegalArgumentException if any component is nonfinite or a dimension is negative
+     */
     public void setClip(float x, float y, float width, float height) {
         if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(width) || !Float.isFinite(height) || width < 0 || height < 0)
             throw new IllegalArgumentException("Clip must be finite with nonnegative dimensions");
         clipMinX = x; clipMinY = y; clipMaxX = x + width; clipMaxY = y + height;
     }
+    /**
+     * Removes the optional CPU clip rectangle for subsequent submissions. Viewport
+     * rejection still applies when begin can derive bounds from the projection.
+     */
     public void clearClip() {
         clipMinX = clipMinY = Float.NEGATIVE_INFINITY;
         clipMaxX = clipMaxY = Float.POSITIVE_INFINITY;
     }
+    /**
+     * Reads accepted glyph submissions since the latest begin, including flushed glyphs.
+     * @return accepted instance count for the current or most recently completed pass
+     */
     public int getGlyphsSubmitted() { return glyphsSubmitted; }
+    /**
+     * Reads actual nonempty batch draws since the latest begin; font changes and capacity
+     * flushes can make this exceed one even during a single text pass.
+     * @return draw-call count for the current or most recently completed pass
+     */
     public int getDrawCalls() { return drawCalls; }
+    /**
+     * Rejects submission unless this batch is alive and inside a begin/end interval.
+     * @throws IllegalStateException if disposed or not drawing
+     */
     void requireDrawing() { if (!drawing || disposed) throw new IllegalStateException("SlugBatch must be alive and drawing"); }
+    /**
+     * Tests a world-space glyph or run rectangle against viewport and optional clip bounds,
+     * expanding it by the effective antialiasing padding. Intersection does not crop pixels.
+     * @param x0 minimum x
+     * @param y0 minimum y
+     * @param x1 maximum x
+     * @param y1 maximum y
+     * @return whether submission may contribute visible coverage
+     */
     boolean intersects(float x0, float y0, float x1, float y1) {
         return x1 + effectivePadding > Math.max(viewMinX, clipMinX) && y1 + effectivePadding > Math.max(viewMinY, clipMinY)
                 && x0 - effectivePadding < Math.min(viewMaxX, clipMaxX) && y0 - effectivePadding < Math.min(viewMaxY, clipMaxY);
@@ -306,9 +361,17 @@ public final class SlugBatch {
         try { flush(); } finally { restore(); }
     }
 
-    /** Drops pending glyphs and restores entry state after a failed drawing callback. */
+    /**
+     * Abandons unflushed glyphs and restores captured GL state if a pass is active.
+     * Already flushed draws remain visible. Safe to call after end or from a finally block.
+     */
     public void cancel() { if (drawing) restore(); }
 
+    /**
+     * Restores the program, vertex/buffer bindings, texture and sampler units zero and one,
+     * active texture unit, depth/cull state, depth mask, and separate blend state captured
+     * by begin. Clears pending instances and ends drawing without issuing another draw.
+     */
     private void restore() {
         glBindBuffer(GL_ARRAY_BUFFER, oldBuffer);
         glBindVertexArray(oldVao);

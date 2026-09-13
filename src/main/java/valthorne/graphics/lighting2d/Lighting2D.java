@@ -97,7 +97,7 @@ public final class Lighting2D implements AutoCloseable {
             throw new IllegalArgumentException("Shadow atlas exceeds device limits");
         this.capacity = capacity;
         resolution = shadowResolution;
-        instanceData = BufferUtils.createFloatBuffer(capacity * 12);
+        instanceData = BufferUtils.createFloatBuffer(capacity * 16);
         shadowData = BufferUtils.createFloatBuffer(resolution);
         try (State ignored = new State()) {
             lightShader = new Shader(LIGHT_VERTEX, LIGHT_FRAGMENT);
@@ -116,10 +116,10 @@ public final class Lighting2D implements AutoCloseable {
             instances = glGenBuffers();
             glBindVertexArray(vao);
             glBindBuffer(GL_ARRAY_BUFFER, instances);
-            glBufferData(GL_ARRAY_BUFFER, (long) capacity * 12 * 4, GL_STREAM_DRAW);
-            for (int i = 0; i < 3; i++) {
+            glBufferData(GL_ARRAY_BUFFER, (long) capacity * 16 * 4, GL_STREAM_DRAW);
+            for (int i = 0; i < 4; i++) {
                 glEnableVertexAttribArray(i);
-                glVertexAttribPointer(i, 4, GL_FLOAT, false, 48, i * 16L);
+                glVertexAttribPointer(i, 4, GL_FLOAT, false, 64, i * 16L);
                 glVertexAttribDivisor(i, 1);
             }
         }
@@ -462,6 +462,7 @@ public final class Lighting2D implements AutoCloseable {
         glBindTexture(GL_TEXTURE_2D, atlas);
         long geometry = 17;
         for (Occluder2D o : occluders) {
+            o.synchronize();
             geometry = geometry * 31 + System.identityHashCode(o);
             geometry = geometry * 31 + o.revision;
         }
@@ -491,6 +492,7 @@ public final class Lighting2D implements AutoCloseable {
             instanceData.put(l.x).put(l.y).put(l.radius).put(l.shadows ? entry.slot : -1);
             instanceData.put(l.r).put(l.g).put(l.b).put(l.intensity);
             instanceData.put(l.sourceRadius).put((float) Math.cos(l.inner)).put((float) Math.cos(l.outer)).put(l.direction);
+            instanceData.put(l.elevation).put(0).put(0).put(0);
             visibleCount++;
         }
         if (fingerprint == mapFingerprint) return;

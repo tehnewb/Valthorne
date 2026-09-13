@@ -129,6 +129,13 @@ public final class TiledResolvers {
         public byte[] resolve(byte[] parentBytes, String parentPath, String dependencyPath) {
             String resolved = normalize(resolvePath(parentPath, dependencyPath));
             byte[] bytes = files.get(resolved);
+            // External TSX paths are made absolute by TiledXML. Keep an in-memory
+            // pack keyed by relative resource names usable for nested images too.
+            if (bytes == null) {
+                String root = normalize(System.getProperty("user.dir", ""));
+                if (!root.endsWith("/")) root += "/";
+                if (resolved.startsWith(root)) bytes = files.get(resolved.substring(root.length()));
+            }
             if (bytes == null) throw new RuntimeException("Missing tiled dependency: " + resolved);
             return bytes;
         }

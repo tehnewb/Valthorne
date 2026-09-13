@@ -19,6 +19,152 @@ Lighting2D renders visible planar lights in a batch and uses polar shadow data f
 
 ## Getting started
 
+### Stylized 2.5D forest
+
+The following describes a private local prototype retained for development. It is
+not a distributed demo or an engine Gradle task. For maintained runnable examples,
+see the [companion repository](https://github.com/tehnewb/Valthorne-examples).
+
+The forest enables rounded procedural sprite shading, compact contact shadows,
+distance-softened projected shadows, raised path edging and foreground-tree transparency.
+Use **Pause / settings → Compare 2D / 2.5D** to toggle the treatment without resetting gameplay.
+`SpriteVolumeRenderer2D` samples the same animated atlas frames and uses physical height/foot
+anchors to estimate a rounded surface normal. It modulates the existing light-map shading;
+it is not a normal-map reconstruction, PBR renderer, or self-shadowing mesh.
+`GroundShadowRenderer2D` accepts optional fill lights to steer one weighted virtual shadow
+source per caster. This avoids stacked dark overlays but is not independent per-light
+occlusion. Source height is bounded and maximum shadow lengths remain finite.
+Both passes preserve GL state and borrow sprite textures; close their owned renderers on
+the GL thread. The current volume pass draws per sprite, so benchmark larger scenes before
+adopting it for thousands of actors. Gameplay and harvesting remain strictly two-dimensional.
+
+### Sprite-shaped shadows
+
+Loads animated trees, a controllable character, campfire, grass/path tiles and rocks from the
+sibling `MyPixelArt` directory's Grass Land V. 1.6 pack, plus torches from Crypt V.1.6. Assets are not copied into
+the library or redistributed. Pass `--art-root=...` to override that directory.
+Trees use the supplied 128×192, eight-frame sheets. The character uses the combined
+192×128-cell sheet: idle (8), run (8), attack 1 (17), attack 2 (14), hurt (8), death (13).
+Live play uses movement and complete, non-looping attacks. Verification mode cycles all six clips.
+The forest uses the elevated ground-projection mode described below, sampling each
+animation frame directly from its sheet (no silhouette extraction). Add `--verify-sheets` together
+with `--snapshot=...` to run 650 fixed-time frames and verify every character frame
+was played before saving and exiting.
+WASD moves, Shift sprints, J/K or left/right click attacks (faces the mouse), R resets.
+Arrow keys move the overhead light, Q/E lowers/raises its elevation. M toggles mouse-controlled light,
+Escape opens the pause/settings menu, F toggles ground shadows, V toggles VSync.
+The retained-mode HUD uses UIRoot and themed Nano controls, with FPS, wood inventory,
+trees felled, an objective progress bar, feedback and clickable attacks. The pause menu
+has brightness/elevation sliders, shadow toggle, resume, restart and quit.
+Trees have 100 health: a bolt deals 25 and a close strike deals 40, targeting the
+nearest living trunk in front of the character. Felled trees animate down, lose
+collision/shadow participation, and leave three wood; walk within 42 units to collect.
+Collect 12 wood to complete the camp-supply objective. Restart restores all trees
+and inventory. Harvest progress is session-only (not saved to disk).
+VSync starts off and FPS is displayed. Campfire and torches have independently flickering warm lights;
+attacks emit a blue pulse at their release frame. These reuse persistent light objects and do not
+generate extra polar shadow maps. Ground shadows remain an artistic projection, steered by
+nearby lights in 2.5D mode, not per-fire physically correct occlusion. The local `ForestControlsValidation` helper records deterministic
+movement, collision and attack timing checks; it is not an engine Gradle task. Add `--preview-attack` to a snapshot to capture the spell pulse.
+`--snapshot=build/reports/forest.png` renders
+150 fixed-time frames into a hidden window, saves the final frame and exits.
+
+Register a sprite caster once, alongside ordinary polygon blockers:
+
+```java
+import valthorne.graphics.lighting2d.SpriteOccluder2D;
+
+SpriteOccluder2D treeShadow = new SpriteOccluder2D(treeSprite);
+lighting.addOccluder(treeShadow);
+// Draw treeSprite normally inside lighting.beginScene(...) / endScene().
+// Sprite position, size, scale, pivot, rotation, flips and atlas-frame setters
+// are followed automatically when lighting.endScene() updates the shadow map.
+
+// When removing the tree:
+lighting.removeOccluder(treeShadow);
+```
+
+This uses RGBA alpha to extract the sprite's pixel silhouette, preserving transparent
+holes and disconnected islands. Straight adjacent pixel edges are merged. No GPU
+readback, per-frame pixel scan, or extra shadow draw per sprite is needed. Geometry
+feeds the existing polar shadow cache, light category masks and spatial index.
+
+The default cutoff is 127 out of 255; alpha above the cutoff blocks light. To choose
+the cutoff and maximum cached animation frames, use
+`new SpriteOccluder2D(treeSprite, 127, 32)`. Tint alpha participates in the threshold.
+The cache is bounded and uses cyclic replacement; unchanged sprites and previously
+cached frame switches do not allocate. Moving silhouettes reuse endpoint storage,
+but still require affected light shadows to rebuild. First-time frame extraction
+allocates and costs CPU; prewarm by selecting each frame and calling `update()`.
+For many copies, `AlphaShadowShape2D.fromRgba(...)` produces an immutable shareable
+shape for multiple `AlphaOccluder2D` instances with explicit `setTransform(...)` calls.
+
+The source must retain valid CPU-side RGBA pixels until extraction (normal `Texture`
+loading does). Modifying pixels in place requires `clearFrameCache()`; the next update
+re-extracts. Do not dispose the source texture/data while using its sprite caster.
+Removing the caster requires no GPU disposal. Sprite setters are observed, not custom
+per-draw transform overrides or GPU-only texture edits. Use pixel-aligned atlas frames;
+repeated/tiled UV regions are unsupported. The sprite's sampled UV orientation is used,
+so vertically flipped decoded images and explicit sprite flips remain consistent.
+
+This is **binary pixel-alpha occlusion in the XY plane**, not partial transmission,
+normal mapping or a height-projected 3D ground shadow. Silhouette detail is limited by
+source pixels, alpha cutoff, polar-map resolution and configured shadow softness;
+very narrow gaps can close at low angular resolution. Dense noisy foliage costs more
+than a simplified polygon. Use simpler blockers for distant/background trees when needed.
+
+Performance fixture: `./gradlew benchmarkSpriteShadows`. It measures 64×64 silhouette
+extraction plus cached and moving 1,024-bin CPU shadows, with allocation profiling.
+
+### Elevated lights and finite ground shadows (2.5D)
+
+`PointLight2D.setElevation(height)` enables height-aware distance attenuation. Zero
+preserves planar lighting. Use a `SpriteGroundShadow2D` instead of registering a polar
+`SpriteOccluder2D` for upright objects that should cast short ground silhouettes:
+
+```java
+PointLight2D sun = new PointLight2D().setPosition(500, 600)
+        .setElevation(520).setRadius(1500).setIntensity(2);
+lighting.addLight(sun);
+GroundShadowRenderer2D shadows = new GroundShadowRenderer2D();
+SpriteGroundShadow2D playerShadow = new SpriteGroundShadow2D(player)
+        .setFrameAnchors(.42f, .35f, .64f) // foot U/V and artwork top, bottom-up
+        .setHeight(45).setMaxLength(70).setOpacity(.45f);
+var casters = java.util.List.of(playerShadow);
+
+// Inside the matching world projection and lighting scene capture:
+batch.begin();
+drawGround(batch);
+shadows.draw(batch, sun, casters); // flushes pending ground, restores batch GL state
+drawActors(batch);                // actors are not painted over by their own shadows
+batch.end();
+// Complete lighting.endScene() as usual; close shadows on shutdown.
+```
+
+Anchors are asset-specific: exclude transparent frame padding and anchor to the feet
+or trunk, not the canvas bottom. Stable anchors prevent animation bobbing. Each shadow
+samples its sprite's current atlas frame directly on the GPU, with perspective-correct
+projection, frame-clamped soft sampling and no per-frame CPU silhouette extraction.
+Higher lights shorten shadows; object height increases their extent. Per-object maximum
+length and a light-height safety bound prevent near-horizon projections from spanning
+the world. The forest sets different heights/limits for characters, rocks and trees.
+
+This is an artistic **dominant-point-light ground-overlay** mode, not a full 3D receiver,
+material or per-light visibility system. It darkens the ground color before lighting
+composition; overlapping shadows blend, ambient is also darkened, and other lights do
+not independently fill each shadow. Do not draw one overlay per light. Normal mapping,
+sprite self-shadowing, elevated receivers and terrain height are not modeled. Exactly
+overhead, a vertical sprite card can project nearly edge-on. Use the existing 3D/path
+tracing systems if true volumetric geometry/visibility is required. Draw in world space;
+custom TextureBatch translations/shader clips are not inherited by this pass.
+
+Validation: finite projection bounds including low lights; elevation validation/cache
+revision behavior; native pixels for transparent gaps, frame changes, shadow toggles,
+and program/VAO restoration; full animation-cycle verification. The full standard/native
+suites completed with 244 passing tests and 2 skipped tests on this change.
+
+### Polygon/light setup
+
 1. Create the renderer with the required output dimensions and current context.
 2. Populate lights and occluders in the same world-coordinate convention.
 3. Update changed light/occluder state before rendering.

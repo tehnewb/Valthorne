@@ -1,0 +1,16 @@
+plugins { id 'base' }
+def target = providers.gradleProperty('target').orElse('desktop').get()
+if (!(target in ['desktop', 'web'])) throw new GradleException('target must be desktop or web')
+if (gradle.startParameter.taskNames.any { it.tokenize(':').last() in ['buildGame', 'runGame'] }
+        && !providers.gradleProperty('applicationMain').isPresent()) {
+    throw new GradleException('Set applicationMain to the same Java main class for both targets')
+}
+tasks.register('buildGame') {
+    group = 'build'
+    dependsOn target == 'web' ? ':web:webDist' : gradle.includedBuild('Valthorne').task(':gameClasses')
+}
+tasks.register('runGame') {
+    group = 'application'
+    if (target == 'desktop') dependsOn gradle.includedBuild('Valthorne').task(':runGame')
+    else doLast { throw new GradleException('Serve web/build/dist after buildGame -Ptarget=web') }
+}

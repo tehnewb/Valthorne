@@ -12,3 +12,6 @@ gradlew text eol=lf
 *.filamat binary
 *.ktx binary
 *.ttf binary
+# Preserve upstream license texts and recorded benchmark output verbatim.
+portable/web/public/licenses/** -text -whitespace
+docs/benchmarks/**/*.json -whitespace

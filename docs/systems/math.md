@@ -384,7 +384,6 @@ If the provided points are null or less than three, an `IllegalArgumentException
 #### move
 
 ```java
-@Override
     public void move(Vector2f offset)
 ```
 
@@ -397,7 +396,6 @@ stored vertex can change the offset while the traversal is still in progress.
 #### points
 
 ```java
-@Override
     public Vector2f[] points()
 ```
 
@@ -566,7 +564,6 @@ Retrieves the center point of the rectangle without allocating.
 #### move
 
 ```java
-@Override
     public void move(Vector2f offset)
 ```
 
@@ -579,7 +576,6 @@ is updated, allowing cached corner values to be used as an offset.
 #### points
 
 ```java
-@Override
     public Vector2f[] points()
 ```
 

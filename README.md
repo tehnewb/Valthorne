@@ -10,6 +10,12 @@ Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) fo
 overview of the engine. The [website repository](https://github.com/tehnewb/Valthorne-website)
 is itself a Java Valthorne application compiled for the browser.
 
+The development [web target](portable/README.md) builds shared Java applications with
+Filament and Jolt in the browser. Run the original FPS example with
+`node portable/fps.mjs run web`, or select `desktop` using the same source.
+Use matching engine and companion development checkouts for these unpublished
+APIs; see the [unreleased changes](CHANGELOG.md#unreleased).
+
 Version 2.0.0 contains breaking API changes from 1.4.6, including public JOML math
 types. See the [changelog](CHANGELOG.md) and [JOML migration guide](docs/joml-migration.md).
 
@@ -80,7 +86,7 @@ coordinate spaces, resource ownership, and subsystem contracts.
 | --- | --- |
 | Application and content | [Lifecycle](docs/systems/runtime.md), [assets](docs/systems/assets.md), [input](docs/systems/input.md), [scenes](docs/systems/scenes.md) |
 | 2D rendering | [Textures and batching](docs/systems/textures.md), [fonts](docs/systems/fonts.md), [Tiled maps](docs/systems/tiled-maps.md), [lighting](docs/lighting.md) |
-| 3D rendering | [Models, cameras and picking](docs/3D.md), [Filament](docs/filament.md), [path tracing](docs/path-tracing.md), [particles](docs/particles-3d.md) |
+| 3D rendering | [Models, cameras and picking](docs/3D.md), [Filament](docs/filament.md), [path tracing](docs/path-tracing.md), [culling](docs/systems/culling.md), [particles](docs/particles-3d.md) |
 | Physics | [Jolt rigid bodies, colliders, queries and joints](docs/physics3d.md), [physics studio](docs/physics-studio.md) |
 | UI | [Shared UI tree](docs/ui-system.md), [advanced controls](docs/ui-advanced.md), [themes](docs/systems/ui-themes.md) |
 | Audio | [Buffered/streaming audio and spatial sound areas](docs/audio-system.md) |

@@ -16,12 +16,15 @@ Slug renders font outlines from curve and band textures rather than storing only
 | Instanced glyphs | The batch expands compact glyph records into quads. |
 | Reusable runs | Precompute glyph placement, tabs, line breaks, and kerning for stable text. |
 | Scale and color | A run or glyph uses world units per em and per-draw color. |
+| UI text nodes | SlugLabel retains layout under ordinary or NanoVG containers and borrows a shared font and batch. |
+| CPU rejection and counters | Whole-run and glyph bounds avoid submissions outside compatible viewport/clip bounds; counters distinguish accepted glyphs from actual draws. |
+| Scoped GL state | Batch end or cancel restores the GL state it changed; texture uploads also restore pixel-unpack and texture-binding state. |
 
 ## Getting started
 
 1. Create the SlugFont and batch on the graphics owner thread.
 2. Create a text run for a stable string, or use the direct drawing entry points for changing text.
-3. Begin the batch with the projection and viewport dimensions, draw runs, and end.
+3. Begin with the projection and current viewport pixel dimensions, draw runs, and end. Call cancel in a finally block so failed drawing callbacks restore captured state.
 4. Rebuild runs when text or size changes; release batches and fonts after dependent runs stop drawing.
 
 ## Ownership and lifecycle
@@ -68,11 +71,19 @@ and pixel-unpack/PBO state. None of these objects is thread-safe.
 
 See [benchmark results and reproduction](../benchmarks/slug-2026-09-10/README.md).
 
+## Retained UI label reference
+
+See [SlugLabel and its complete operation contracts](ui-controls.md#type-sluglabel) for construction, text and size changes, tint ownership, and UI lifecycle integration.
+
 ## Important behavior
 
 - Keep pixel dimensions supplied to the batch consistent with the active viewport.
 - Font loading and layout coverage are limited to the characters and parsing supported by the implementation.
 - Use the bitmap path when atlas rendering is the intended tradeoff.
+- `setClip` uses glyph world coordinates, rejects outside glyphs, and crops intersecting quads and their em-space coordinates before upload. It does not change hardware scissor state or clip previously queued geometry.
+- Unchanged normalized text and size reuse run layout. A font convenience draw retains one run; use separate SlugTextRun objects for multiple independently retained strings.
+- The batch captures program, vertex/buffer bindings, texture/sampler units zero and one, active texture unit, depth/cull state, depth mask, and separate blend state. It must be used on the graphics context thread and must not be nested inside another pass on the same batch.
+- `getGlyphsSubmitted()` and `getDrawCalls()` reset at begin. Font changes and capacity limits may trigger multiple draws, while rejected glyphs do not count as accepted submissions.
 
 ## Components and examples
 
@@ -88,7 +99,7 @@ The sections below explain each component and its declared public or protected o
 
 ### SlugBatch
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugBatch.java#L36)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugBatch.java#L56)
 
 Fast 2D instanced batch renderer for `SlugFont` glyphs.
 
@@ -98,8 +109,72 @@ quad instead. That keeps the fragment shader from clipping antialiasing while ma
 shader much cheaper. This pass also sends the pixels-per-em value as a flat instance
 attribute so the fragment shader does not need to call fwidth() for ordinary 2D text.
 
+Use one graphics context thread. Begin captures the GL state changed by this
+batch; end flushes pending instances and restores it, while cancel restores it
+without drawing pending work. Clip and viewport bounds reject outside glyphs
+and crop intersecting glyph quads on the CPU without changing hardware scissor state.
+
+```java
+SlugTextRun run = font.createRun("Ready", 24f);
+batch.begin(projection, viewportWidth, viewportHeight);
+try {
+    run.draw(batch, 20f, 40f, Color.WHITE);
+    batch.end();
+} finally {
+    batch.cancel();
+}
+```
+
 <details>
-<summary>SlugBatch operation reference (11 declarations)</summary>
+<summary>SlugBatch operation reference (16 declarations)</summary>
+
+#### setClip
+
+```java
+public void setClip(float x, float y, float width, float height)
+```
+
+Restricts subsequently submitted glyphs to intersection with a world-space rectangle.
+Outside glyphs are rejected; intersecting quads and their em-space coordinates
+are cropped before upload. Hardware scissor state and existing queued glyphs
+are unchanged. The rectangle follows world axes, including under rotated projections.
+
+- **`x`** — rectangle left coordinate in glyph world units
+- **`y`** — rectangle lower coordinate in glyph world units
+- **`width`** — finite nonnegative rectangle width
+- **`height`** — finite nonnegative rectangle height
+
+**Throws `IllegalArgumentException`:** if any component is nonfinite or a dimension is negative
+
+#### clearClip
+
+```java
+public void clearClip()
+```
+
+Removes the optional CPU clip rectangle for subsequent submissions. Viewport
+rejection still applies when begin can derive bounds from the projection.
+
+#### getGlyphsSubmitted
+
+```java
+public int getGlyphsSubmitted()
+```
+
+Reads accepted glyph submissions since the latest begin, including flushed glyphs.
+
+**Returns:** accepted instance count for the current or most recently completed pass
+
+#### getDrawCalls
+
+```java
+public int getDrawCalls()
+```
+
+Reads actual nonempty batch draws since the latest begin; font changes and capacity
+flushes can make this exceed one even during a single text pass.
+
+**Returns:** draw-call count for the current or most recently completed pass
 
 #### Constructor
 
@@ -127,8 +202,12 @@ public void begin(Matrix4f mvp, float viewportW, float viewportH)
 
 Begins collecting Slug glyph draw calls.
 
-The viewport arguments determine pixel-correct coverage and conservative axis-aligned
-culling. Pass the active framebuffer viewport dimensions in pixels.
+Viewport dimensions must be the active framebuffer viewport's pixel dimensions.
+Axis-aligned projections enable CPU culling and pixel-correct coverage. Other
+projections use derivative-based coverage without viewport CPU culling.
+This is an overlay renderer: depth testing/writes and face culling are disabled
+temporarily. Program, bindings, samplers, and blend/depth/cull state are restored
+by end or cancel. Framebuffer, viewport, scissor, and stencil state are untouched.
 
 - **`mvp`** — model-view-projection matrix used to transform glyph world positions
 - **`viewportW`** — current viewport width in pixels
@@ -141,6 +220,15 @@ public void end()
 ```
 
 Ends the current batch and flushes remaining glyphs.
+
+#### cancel
+
+```java
+public void cancel()
+```
+
+Abandons unflushed glyphs and restores captured GL state if a pass is active.
+Already flushed draws remain visible. Safe to call after end or from a finally block.
 
 #### flush
 
@@ -168,8 +256,9 @@ public void setQuadPadding(float quadPadding)
 
 Sets CPU-side quad padding in world units.
 
-The default is 0.5 world units. Axis-aligned projections enforce at least half a screen
-pixel of padding. Other projections require enough world padding at the smallest scale.
+The default is 0.5 world units. Axis-aligned projections automatically raise
+this to at least half a screen pixel. For other projections choose enough
+world-space padding to cover antialiasing at the smallest visible scale.
 
 - **`quadPadding`** — quad padding in world units
 
@@ -284,7 +373,7 @@ Returns the largest y coordinate used by this curve.
 
 ### SlugFont
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L59)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L62)
 
 Owns GPU outline data and font metrics for a contiguous character range,
 using Slug-style banded curve evaluation. Loading compiles glyph outlines into
@@ -362,7 +451,7 @@ public static SlugFont load(byte[] fontBytes, int firstCodepoint, int characterC
 Copies source bytes into retained direct storage, initializes STB, compiles
 glyphs and kerning, and uploads the two owned data textures. The caller may
 reuse its byte array afterward. Character-count validation does not validate
-the first codepoint. Texture creation preserves the active unit's 2D binding and pixel-unpack state.
+the first codepoint. Texture creation preserves texture and pixel-unpack state.
 
 - **`fontBytes`** — nonnull, nonempty font data
 - **`firstCodepoint`** — first codepoint in the lookup table
@@ -655,11 +744,36 @@ and font-byte data, so measurement still works while drawing is no longer valid.
 
 </details>
 
+<a id="type-slugfont-uploadstate"></a>
+
+### SlugFont.UploadState — internal support type
+
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L659)
+
+Scopes texture-upload state on the current GL context. Construction disables the
+pixel-unpack buffer and establishes tightly packed rows; close restores the previous
+texture binding and unpack settings even when upload exits exceptionally.
+Instances belong to one context-thread operation and must be closed on that thread.
+
+<details>
+<summary>SlugFont.UploadState operation reference (1 declarations)</summary>
+
+#### close
+
+```java
+@Override public void close()
+```
+
+Restores the captured texture binding, pixel-unpack buffer, alignment, row layout,
+skip offsets, and byte-swap flag on the same context used during construction.
+
+</details>
+
 <a id="type-slugfont-floattexelwriter"></a>
 
 ### SlugFont.FloatTexelWriter — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L1130)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L1180)
 
 CPU staging writer for four-float curve texels. Each quadratic occupies two
 adjacent texels, with row-end padding to keep the pair on the same row.
@@ -669,7 +783,7 @@ Address packing assumes the production width of 4096.
 
 ### SlugFont.UIntTexelWriter — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L1218)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L1265)
 
 CPU staging writer for two-integer band headers and curve-address texels.
 Tracks linear texel offsets before padding rows for an RG32UI upload.
@@ -873,16 +987,4 @@ Returns the number of drawable glyphs in this run.
 - [Bitmap fonts and glyph styling](fonts.md)
 - [Viewport scaling and coordinate conversion](viewports.md)
 - [Shaders and visual effects](shaders.md)
-
-## Retained UI label
-
-[`SlugLabel`](../../src/main/java/valthorne/ui/nodes/SlugLabel.java) places retained
-curve text in the shared UI tree, including regular and NanoVG containers. Construct
-it with a `SlugFont`, a shared `SlugBatch`, text and size. `text(String)` and
-`size(float)` rebuild the retained run and update its measured layout dimensions;
-unchanged run content can reuse its glyph arrays. `color(Color)` borrows the tint.
-
-The label borrows its font and renderer. Keep both alive while labels reference
-them, then dispose each owner once after removing the labels. Create and render
-these graphics resources on the owning OpenGL context thread. This UI adapter
-uses the same retained glyph run and curve shader described above.
+- [Standard UI controls](ui-controls.md)

@@ -54,24 +54,32 @@ public class Mp3SoundStream implements SoundStream {
     }
 
     /**
+     * Reads the decoded PCM channel count without advancing the stream cursor.
+     *
      * @return the channel count produced by this stream
      */
     @Override
     public int channels() {return channels;}
 
     /**
+     * Reads the decoded PCM sampling frequency in frames per second (Hz), independent of playback position.
+     *
      * @return the sample rate produced by this stream
      */
     @Override
     public int sampleRate() {return sampleRate;}
 
     /**
+     * Reads the decoded PCM bit depth per channel sample, rather than the compressed file bitrate.
+     *
      * @return the bits per sample produced by this stream
      */
     @Override
     public int bitsPerSample() {return bitsPerSample;}
 
     /**
+     * Reads total decoded-content duration in seconds, not remaining time or the current playback position.
+     *
      * @return the total stream duration in seconds
      */
     @Override

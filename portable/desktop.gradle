@@ -1,0 +1,19 @@
+// Compile the exact web compatibility application against the desktop engine.
+sourceSets {
+    game {
+        java.srcDir providers.gradleProperty('applicationSources').orElse('portable/compatibility')
+        if (providers.gradleProperty('applicationIncludes').isPresent()) java.include providers.gradleProperty('applicationIncludes').get().split(',')
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+        if (providers.gradleProperty('applicationResources').isPresent()) resources.srcDir providers.gradleProperty('applicationResources').get()
+    }
+}
+configurations {
+    gameImplementation.extendsFrom implementation, api
+    gameRuntimeOnly.extendsFrom runtimeOnly
+}
+tasks.register('runGame', JavaExec) {
+    group = 'application'
+    classpath = sourceSets.game.runtimeClasspath
+    mainClass = providers.gradleProperty('applicationMain').orElse('compatibility.CommonApplication')
+}
