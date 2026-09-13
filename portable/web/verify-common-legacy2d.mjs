@@ -1,8 +1,10 @@
+import {browserTestOptions} from './browser-test-options.mjs';
+import {waitForFixtureCompletion} from './browser-fixture-wait.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:640,height:480}}),messages=[],errors=[];
  page.on('console',m=>messages.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
@@ -25,6 +27,6 @@ try{
  assert(result.right[2]>result.right[0]*2&&result.right[2]>100,JSON.stringify(result));
  assert(result.dark[0]<60&&result.dark[1]<60&&result.dark[2]<60,JSON.stringify(result));
  const output=new URL('./build/verification/',import.meta.url);await mkdir(output,{recursive:true});await page.screenshot({path:fileURLToPath(new URL('common-legacy2d.png',output))});
- await page.waitForFunction(()=>valthorneHost.closed,null,{timeout:10000});assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_LEGACY2D_VALIDATED checks=4'),messages.join('\n'));assert(messages.includes('COMMON_LEGACY2D_RETURNED'),messages.join('\n'));assert.equal(await page.evaluate(()=>legacyLeaks),0);
+ await waitForFixtureCompletion(page,{fixture:'common-legacy2d',messages,errors});assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_LEGACY2D_VALIDATED checks=4'),messages.join('\n'));assert(messages.includes('COMMON_LEGACY2D_RETURNED'),messages.join('\n'));assert.equal(await page.evaluate(()=>legacyLeaks),0);
  for(const message of messages)if(message.startsWith('LEGACY2D_BENCHMARK'))console.log(message);console.log('COMMON_LEGACY2D_BROWSER_VALIDATED');
 }finally{await browser.close();}

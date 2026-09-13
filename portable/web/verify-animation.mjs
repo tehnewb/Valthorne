@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {validateBytes} from 'gltf-validator';
 import {deformingGlb} from './animation-fixture.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
-const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
+import {browserTestOptions} from './browser-test-options.mjs';
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:800,height:600}}),errors=[];
  page.on('pageerror',e=>errors.push(String(e)));

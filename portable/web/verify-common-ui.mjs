@@ -1,8 +1,10 @@
+import {browserTestOptions} from './browser-test-options.mjs';
+import {waitForFixtureCompletion} from './browser-fixture-wait.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:640,height:480}}),messages=[],errors=[];
  page.on('console',m=>messages.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
@@ -22,7 +24,7 @@ try{
  await page.setViewportSize({width:800,height:600});
  await page.waitForTimeout(100);
  assert.deepEqual(await page.evaluate(()=>[valthorneHost.graphics.canvas.width,valthorneHost.graphics.canvas.height]),[800,600]);
- await page.waitForFunction(()=>valthorneHost.closed,null,{timeout:20000});
+ await waitForFixtureCompletion(page,{fixture:'common-ui',messages,errors});
  assert.deepEqual(errors,[],messages.join('\n'));
  assert(messages.includes('UI_VECTOR_CLICK'),messages.join('\n'));assert(messages.includes('UI_TEXTURE_CLICK'),messages.join('\n'));
  const validation=messages.find(m=>m.startsWith('COMMON_UI_VALIDATED'));

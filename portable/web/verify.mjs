@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { animatedGlb } from './animation-fixture.mjs';
 import {validateBytes} from 'gltf-validator';
+import {browserTestOptions} from './browser-test-options.mjs';
 
 await mkdir('build',{recursive:true});
-const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
+const browser=await chromium.launch(browserTestOptions);
 try {
     const page=await browser.newPage({viewport:{width:1280,height:800}});
     page.setDefaultTimeout(15000);

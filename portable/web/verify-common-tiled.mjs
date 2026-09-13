@@ -1,8 +1,10 @@
+import {browserTestOptions} from './browser-test-options.mjs';
+import {waitForFixtureCompletion} from './browser-fixture-wait.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:640,height:480}}),messages=[],errors=[];
  page.on('console',m=>messages.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
@@ -18,7 +20,7 @@ try{
  const pixels=await page.evaluate(()=>tiledPixels);assert.equal(pixels.error,0);
  assert(pixels.red[0]>240&&pixels.red[1]<10,JSON.stringify(pixels));assert(pixels.green[1]>240&&pixels.green[2]<10,JSON.stringify(pixels));assert(pixels.blue[2]>240&&pixels.blue[0]<10,JSON.stringify(pixels));
  const output=new URL('./build/verification/',import.meta.url);await mkdir(output,{recursive:true});await page.screenshot({path:fileURLToPath(new URL('common-tiled.png',output))});
- await page.waitForFunction(()=>valthorneHost.closed,null,{timeout:10000});assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_TILED_VALIDATED checks=17'),messages.join('\n'));assert(messages.includes('COMMON_TILED_RETURNED'),messages.join('\n'));assert.equal(await page.evaluate(()=>globalThis.tiledLeaks),0);
+ await waitForFixtureCompletion(page,{fixture:'common-tiled',messages,errors});assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_TILED_VALIDATED checks=17'),messages.join('\n'));assert(messages.includes('COMMON_TILED_RETURNED'),messages.join('\n'));assert.equal(await page.evaluate(()=>globalThis.tiledLeaks),0);
  for(const message of messages)if(message.startsWith('TILED_BENCHMARK'))console.log(message);
  console.log('COMMON_TILED_BROWSER_VALIDATED '+JSON.stringify(pixels));
 }finally{await browser.close();}

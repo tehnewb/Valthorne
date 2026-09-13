@@ -1,5 +1,6 @@
 import {chromium}from'@playwright/test';import assert from'node:assert/strict';
-const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
+import {browserTestOptions} from './browser-test-options.mjs';
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:900,height:700}});
  await page.route('**/platform-test.html',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><style>#scene{width:100%;height:100%}</style><canvas id="scene"></canvas><script type="module">import {BrowserPlatform} from "./platform.js";globalThis.platformTest=new BrowserPlatform(document.querySelector("#scene"));platformTest.window.fullscreen(true);</script>'}));

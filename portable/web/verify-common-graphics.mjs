@@ -1,8 +1,10 @@
+import {browserTestOptions} from './browser-test-options.mjs';
+import {waitForFixtureCompletion} from './browser-fixture-wait.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:640,height:480}}),messages=[],errors=[];
  page.on('console',m=>messages.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
@@ -28,7 +30,7 @@ try{
  near(pixels.alpha,[0,128,0],'alpha blending');near(pixels.clipInside,[255,0,0],'clip interior');near(pixels.clipOutside,[0,0,0],'clip exterior');near(pixels.fbo,[255,0,0],'framebuffer blit');
  assert.equal(pixels.error,0,'WebGL reported an error');
  const output=new URL('./build/verification/',import.meta.url);await mkdir(output,{recursive:true});await page.screenshot({path:fileURLToPath(new URL('common-graphics.png',output))});
- await page.waitForFunction(()=>valthorneHost.closed||globalThis.valthorneError,null,{timeout:10000});
+ await waitForFixtureCompletion(page,{fixture:'common-graphics',messages,errors});
  assert(messages.some(m=>m.includes('COMMON_GRAPHICS_VALIDATED')),messages.join('\n'));assert(messages.some(m=>m.includes('COMMON_GRAPHICS_RETURNED')),messages.join('\n'));assert.deepEqual(errors,[]);
  assert.equal(await page.evaluate(()=>valthorneHost.graphics.objects.size+valthorneHost.graphics.images.size),0);
  assert.equal(await page.evaluate(()=>globalThis.graphicsLeaks),0,'Application disposal left graphics handles alive before host cleanup');

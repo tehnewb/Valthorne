@@ -1,8 +1,10 @@
+import {browserTestOptions} from './browser-test-options.mjs';
+import {waitForFixtureCompletion} from './browser-fixture-wait.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await chromium.launch(browserTestOptions);
 try{
  const page=await browser.newPage({viewport:{width:640,height:480}}),messages=[],errors=[];
  page.on('console',m=>messages.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
@@ -12,6 +14,6 @@ try{
  assert(data.white>1000,JSON.stringify(data));assert.equal(data.error,0);
  assert(await page.evaluate(()=>[...valthorneHost.fonts.fonts].every(f=>f.ctx.canvas.width===1&&f.pixels===null&&f.glyphs===null)),'Font retained transferred atlas copies');
  const output=new URL('./build/verification/',import.meta.url);await mkdir(output,{recursive:true});await page.screenshot({path:fileURLToPath(new URL('common-font.png',output))});
- await page.waitForFunction(()=>valthorneHost.closed,null,{timeout:10000});assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_FONT_RETURNED'),messages.join('\n'));assert.equal(await page.evaluate(()=>globalThis.fontLeaks),0);
+ await waitForFixtureCompletion(page,{fixture:'common-font',messages,errors});assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_FONT_RETURNED'),messages.join('\n'));assert.equal(await page.evaluate(()=>globalThis.fontLeaks),0);
  console.log('COMMON_FONT_BROWSER_VALIDATED '+JSON.stringify(data));
 }finally{await browser.close();}

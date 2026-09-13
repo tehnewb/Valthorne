@@ -1,7 +1,8 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-const browser = await chromium.launch({channel:process.env.BROWSER_CHANNEL || 'chrome',headless:true});
+import {browserTestOptions} from './browser-test-options.mjs';
+const browser = await chromium.launch(browserTestOptions);
 try {
  const page = await browser.newPage();
  await page.route('**/audio-test.html', route => route.fulfill({contentType:'text/html',body:'<!doctype html><title>Audio streaming verification</title>'}));
