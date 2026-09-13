@@ -403,9 +403,11 @@ frame counts and distinguish a stalled loop, an application error and an overall
 timeout. The model check still requires all 180 frames and its resource cleanup.
 Arena and FPS input checks wait for rendered frames or simulated physics time;
 slow rendering must not shorten a movement, reload or grenade-fuse check. Software
-FPS checks use a 1200×800 viewport, keep all menu controls visible, and allow up
-to three minutes for each simulation-time condition. Normal FPS checks retain
-1600×960. Software runs collect 60 timing samples per phase; normal runs collect
+FPS checks select the engine's Performance preset at 1200×800, keep all menu
+controls visible, and allow up to three minutes for each simulation-time condition.
+Normal FPS checks retain the game's High preset at 1600×960. Both exercise the
+same gameplay, lights, shadows and resource ownership assertions.
+Software runs collect 60 timing samples per phase; normal runs collect
 360. Software GPU frame timings are diagnostic results, not hardware performance
 benchmarks.
 
