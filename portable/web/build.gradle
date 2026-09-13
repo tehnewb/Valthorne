@@ -202,3 +202,21 @@ tasks.register('webDist', Sync) {
             throw new GradleException('Run npm ci in portable/web before webDist')
     }
 }
+
+/**
+ * Public one-command web export. Application authors provide only Java and
+ * optional application resources; the portable target supplies the generated
+ * browser shell, runtime, bindings, and third-party backends.
+ */
+tasks.register('webExport', Sync) {
+    dependsOn 'webDist'
+    from(layout.buildDirectory.dir('dist'))
+    into(layout.buildDirectory.dir('export'))
+    doLast {
+        copy {
+            from('public/application.html')
+            into(layout.buildDirectory.dir('export'))
+            rename { 'index.html' }
+        }
+    }
+}
