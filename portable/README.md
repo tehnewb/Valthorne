@@ -130,6 +130,12 @@ real keyboard/mouse input and checks the original event API and polling state.
 application disposal. Browser lifecycle suspension uses TeaVM coroutines rather
 than blocking the browser event loop.
 
+`CommonGestureApplication` verifies trusted Java UI input while browser animation
+is suspended for more than six seconds. It checks mouse capture, queued input
+during filesystem I/O, deferred tasks, frame timing and shutdown. This fixture
+uses only engine APIs, but runs only in the browser suite because its driver
+controls browser input and scheduling; `--desktop` still runs this case in Chrome.
+
 ```powershell
 ./gradlew -p portable runGame '-Ptarget=desktop' '-PapplicationMain=compatibility.CommonApplication'
 ./gradlew -p portable buildGame '-Ptarget=web' '-PapplicationMain=compatibility.CommonApplication'
@@ -143,11 +149,11 @@ Backend replacement is explicit: the build filters overridden classes out of the
 engine API artifact, then compiles their browser implementations. There is only
 one implementation of each overridden class on TeaVM's classpath. `webDist` also
 compares compiled public signatures and constants with the desktop artifact to
-catch API drift: JGL 10/10, Keyboard 130/130, Mouse 30/30 and Window 39/39 public
+catch API drift: JGL 10/10, Keyboard 130/130, Mouse 31/31 and Window 39/39 public
 static members currently match. The replacement physics world (29), body (31),
 shape (8), joint (2), and Filament renderer (17) match every declared public member,
 including constructors, with nested settings/enums and `SceneRenderer3D` checked too.
-The report currently checks 104 classes and 1,804 public members, all matching.
+The report currently checks 106 classes and 1,832 public members, all matching.
 These counts describe API surface, not exhaustive
 behavioral or hardware coverage. Engine API
 bytecode is reused without pulling in the desktop native dependency graph.
@@ -220,9 +226,14 @@ verify actual tile rendering, and the same fixture runs on desktop. This preserv
 the existing parser/renderer feature set; unsupported desktop Tiled features such
 as XML-encoded tile payloads are not added by the port.
 
-Native input callbacks queue delivery to the application coroutine, allowing
-handlers to load assets without blocking the browser. Key/button polling advances
-with event delivery, including press/release pairs arriving within one frame.
+Native input callbacks deliver events on the application coroutine, allowing
+handlers to load assets without blocking the browser. When the coroutine is
+waiting for its next frame, input wakes it immediately without advancing the
+game simulation or rendering another frame. This lets click/key handlers request
+mouse capture while the browser's user activation is still valid. Input that
+arrives during a suspended asset load stays queued until the application can
+handle it; browser permissions can expire during that wait. Key/button polling
+advances with event delivery, including press/release pairs within one frame.
 
 The existing `ObjModel3D` and `ModelLoader` now load OBJ, MTL and diffuse images
 from asset URLs or custom resolvers. Parsing, material grouping, coordinate
@@ -407,6 +418,9 @@ FPS checks select the engine's Performance preset at 1200×800, keep all menu
 controls visible, and allow up to three minutes for each simulation-time condition.
 Normal FPS checks retain the game's High preset at 1600×960. Both exercise the
 same gameplay, lights, shadows and resource ownership assertions.
+Each entry, restart and resume must acquire mouse capture. Repeated capture
+requests are spaced to respect browser rate limits; failure reports include
+activation, focus and capture events alongside the current gameplay phase.
 Software runs collect 60 timing samples per phase; normal runs collect
 360. Software GPU frame timings are diagnostic results, not hardware performance
 benchmarks.
