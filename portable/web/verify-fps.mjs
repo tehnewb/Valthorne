@@ -27,14 +27,20 @@ try{
  assert.equal(await page.evaluate(()=>globalThis.valthorneError),undefined,messages.join('\n'));assert.deepEqual(errors,[]);
  // Observe completed rendering and actual fixed physics steps. The game caps its
  // update delta, so wall time is not simulation time on a software GPU.
- await page.evaluate(()=>{
-  const h=valthorneHost,clock=globalThis.fpsSmoke={frames:0,seconds:0,steps:0};
+ await page.evaluate(software=>{
+  const h=valthorneHost,clock=globalThis.fpsSmoke={frames:0,seconds:0,steps:0,capture:[]};
   const observe=world=>{const step=world.step;world.step=function(dt){const result=step.call(this,dt);clock.seconds+=dt;clock.steps++;return result;};return world;};
   for(const world of h.physicsWorlds)observe(world);
   const create=h.createPhysicsWorld;h.createPhysicsWorld=function(...args){return observe(create.apply(this,args));};
   const renderer=[...h.sceneRenderers][0],render=renderer.render;
+  // This is the public PERFORMANCE preset: half-resolution AO and no MSAA.
+  // Geometry, lights, shadow casters, physics and gameplay remain unchanged.
+  if(software)renderer.quality(0);
   renderer.render=function(projection,model,...args){globalThis.fpsCamera=Array.from(model);globalThis.fpsProjection=Array.from(projection);const result=render.call(this,projection,model,...args);clock.frames++;return result;};
- });
+  const record=(event,enabled)=>clock.capture.push({event,enabled,atMs:performance.now(),frame:clock.frames,active:navigator.userActivation?.isActive,focused:document.hasFocus(),locked:document.pointerLockElement?.id||null,error:h.platform.captureError||null});
+  const capture=h.platform.capture;h.platform.capture=function(enabled){record('request',enabled);return capture.call(this,enabled);};
+  for(const event of ['pointerlockchange','pointerlockerror'])document.addEventListener(event,()=>record(event));
+ },softwareGpu);
  const waitClock=async(field,amount)=>{
   const target=await page.evaluate(([field,amount])=>fpsSmoke[field]+amount,[field,amount]);
   await page.waitForFunction(([field,target])=>fpsSmoke[field]+1e-6>=target,[field,target],{timeout:field==='seconds'?180000:120000});
@@ -43,7 +49,12 @@ try{
  await frames(2);await mkdir('build/verification',{recursive:true});await page.screenshot({path:'build/verification/full-fps.png'});
  async function click(text){await page.waitForFunction(text=>fpsLabels.has(text),text);const point=await page.evaluate(text=>fpsLabels.get(text),text);assert(point.x+12>=0&&point.x+12<viewport.width&&point.y+2>=0&&point.y+2<viewport.height,`Control outside viewport: ${text} ${JSON.stringify(point)}`);await page.mouse.click(point.x+12,point.y+2);}
  const player=()=>page.evaluate(()=>{const world=[...valthorneHost.physicsWorlds][0],body=[...world.handles.values()].find(b=>b.GetObjectLayer()===3),p=body.GetPosition();return [p.GetX(),p.GetY(),p.GetZ()];});
- await click('Enter arena');await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene'),null,{timeout:10000});
+ stage='initial pointer capture';await click('Enter arena');
+ // Pointer-lock completion is an input event, not a rendered-frame event.
+ // Poll independently of RAF and surface a real browser denial immediately.
+ await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#scene')||valthorneHost.platform.captureError,null,{polling:50,timeout:10000});
+ assert.equal(await page.evaluate(()=>valthorneHost.platform.captureError),undefined,'Browser denied pointer capture');
+ assert(await page.evaluate(()=>document.pointerLockElement===document.querySelector('#scene')),'Pointer capture failed');
  // The first captured event must turn immediately; camera-local weapon placement
  // must remain fixed through yaw and pitch.
  await frames(1);
@@ -84,10 +95,10 @@ try{
  stage='normal frame timing';await click('Resume run');const normalPlay=await measure();console.log('FULL_FPS_NORMAL_TIMING '+JSON.stringify(normalPlay));
  stage='combat frame timing';
  await page.mouse.down();await page.keyboard.press('f');await page.keyboard.press('g');const combatTiming=await measure();await page.mouse.up();
- const state={moved:moved[1]-start[1],combat,restarts,frameInterval:{normalPlay,combat:combatTiming},environment:{softwareGpu,...await page.evaluate(()=>{const gl=document.querySelector('#scene').getContext('webgl2'),debug=gl?.getExtension('WEBGL_debug_renderer_info');return {userAgent:navigator.userAgent,width:innerWidth,height:innerHeight,devicePixelRatio,renderer:gl?gl.getParameter(debug?debug.UNMASKED_RENDERER_WEBGL:gl.RENDERER):null};})}};
+ const state={moved:moved[1]-start[1],combat,restarts,frameInterval:{normalPlay,combat:combatTiming},environment:{softwareGpu,quality:softwareGpu?'performance':'high',...await page.evaluate(()=>{const gl=document.querySelector('#scene').getContext('webgl2'),debug=gl?.getExtension('WEBGL_debug_renderer_info');return {userAgent:navigator.userAgent,width:innerWidth,height:innerHeight,devicePixelRatio,renderer:gl?gl.getParameter(debug?debug.UNMASKED_RENDERER_WEBGL:gl.RENDERER):null};})}};
  stage='shutdown';
  await page.keyboard.press('Escape');await click('Exit arena');await page.waitForFunction(()=>valthorneHost.closed);assert.deepEqual(errors,[],messages.join('\n'));
- const remaining=await page.evaluate(()=>({worlds:valthorneHost.physicsWorlds.size,renderers:valthorneHost.sceneRenderers.size,graphics:valthorneHost.graphics.objects.size,yoga:valthorneHost.yoga.objects.size,nano:valthorneHost.nano.contexts.size}));assert(Object.values(remaining).every(n=>n===0),JSON.stringify(remaining));state.remaining=remaining;
+ const remaining=await page.evaluate(()=>({worlds:valthorneHost.physicsWorlds.size,renderers:valthorneHost.sceneRenderers.size,graphics:valthorneHost.graphics.objects.size,yoga:valthorneHost.yoga.objects.size,nano:valthorneHost.nano.contexts.size}));assert(Object.values(remaining).every(n=>n===0),JSON.stringify(remaining));state.remaining=remaining;state.capture=await page.evaluate(()=>fpsSmoke.capture);
  await writeFile(`build/verification/full-fps-${browserName}.json`,JSON.stringify(state,null,2));await writeFile('build/verification/full-fps.json',JSON.stringify(state,null,2));console.log('FULL_FPS_VALIDATED '+browserName+' '+JSON.stringify(state));
 }catch(error){
  const page=browser?.contexts()[0]?.pages()[0];let details=null;await mkdir('build/verification',{recursive:true});
