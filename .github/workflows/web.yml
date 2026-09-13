@@ -45,6 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: tehnewb/Valthorne-examples
+          ref: d9c8ba498674686efc41f8e7ce0a343d95159e5e
           path: Valthorne-examples
       - name: Test full shared FPS application
         env:
