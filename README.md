@@ -4,7 +4,7 @@ A Java library for desktop 2D and 3D games, built on LWJGL, JOML, and Jolt Physi
 Valthorne provides an application loop, rendering, assets, input, audio, scenes,
 physics, particles, lighting, and a shared texture/NanoVG UI system.
 
-**Version 2.0.0 · Java 25 · Apache-2.0**
+**Version 2.1.0 · Java 25 · Apache-2.0**
 
 Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) for an
 overview of the engine. The [website repository](https://github.com/tehnewb/Valthorne-website)
@@ -13,11 +13,12 @@ is itself a Java Valthorne application compiled for the browser.
 The development [web target](portable/README.md) builds shared Java applications with
 Filament and Jolt in the browser. Run the original FPS example with
 `node portable/fps.mjs run web`, or select `desktop` using the same source.
-Use matching engine and companion development checkouts for these unpublished
-APIs; see the [unreleased changes](CHANGELOG.md#unreleased).
+The browser target and its compatibility checks are included in this release;
+the maintained runnable examples remain in the companion project.
 
-Version 2.0.0 contains breaking API changes from 1.4.6, including public JOML math
-types. See the [changelog](CHANGELOG.md) and [JOML migration guide](docs/joml-migration.md).
+Version 2.1.0 includes the breaking API changes from 1.4.6, including public JOML
+math types, plus the validated browser target and cross-platform release checks.
+See the [changelog](CHANGELOG.md) and [JOML migration guide](docs/joml-migration.md).
 
 ## Start a game
 
@@ -29,7 +30,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:2.0.0'
+    implementation 'io.github.tehnewb:Valthorne:2.1.0'
 }
 ```
 
@@ -134,4 +135,4 @@ Report reproducible bugs through [GitHub issues](https://github.com/tehnewb/Valt
 Community discussion is available on [Discord](https://discord.gg/APqcDzppDv).
 The [Wiki](https://github.com/tehnewb/Valthorne/wiki) and
 [Project Builder](https://github.com/tehnewb/ValthorneProjectBuilder) may describe
-older releases; this checkout's integration guide is the reference for 2.0.0.
+older releases; this checkout's integration guide is the reference for 2.1.0.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Future changes will be listed here after the 2.1.0 release.
+
+## 2.1.0
+
 - Add the development browser target, shared Java compatibility applications,
   and platform adapters for rendering, input, audio, storage, and UI.
 - Add conservative 3D occlusion, indexed Filament uploads, sprite-shaped 2D
@@ -12,9 +16,18 @@
   required browser source packages in Git, and run committed core/native
   compatibility checks without requiring local test folders.
 - Expose an optional raw desktop mouse-motion preference through the shared API.
+- Deliver browser keyboard, mouse, text, scroll, focus, and window events on the
+  application coroutine so trusted input can retain browser activation without
+  advancing simulation or rendering an extra frame.
+- Add executable browser and native compatibility consumers, including a delayed
+  trusted-input regression and full FPS gameplay/resource verification.
+- Validate all seven FPS pointer-capture cycles, restart ownership, and final
+  browser resource cleanup on software rendering and discrete GPU hardware.
+- Publish browser source backends and compatibility fixtures without leaking
+  examples, tests, or development sources into the library artifacts.
 
-These changes require a development checkout; they are not a new Maven Central
-release. The companion examples CI selects a matching engine revision.
+This release includes the browser target and the cross-platform release checks.
+The companion examples project remains the source of truth for runnable demos.
 
 ## 2.0.0
 
