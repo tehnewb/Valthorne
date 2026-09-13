@@ -395,6 +395,15 @@ culling, mesh sharing and teardown.
 The screenshots are in `web/build/verification/`. This does not prove full-engine
 portability or pixel-identical rendering across platforms.
 
+The Linux browser CI sets `WEBGPU_SOFTWARE=1` to select Chrome's software GPU.
+Frame-based graphics checks allow up to two minutes while the application makes
+progress, but fail after ten seconds without progress. Their timing reports record
+frame counts and distinguish a stalled loop, an application error and an overall
+timeout. The model check still requires all 180 frames and its resource cleanup.
+Arena and FPS input checks wait for rendered frames or simulated physics time;
+slow rendering must not shorten a movement, reload or grenade-fuse check. Software
+GPU frame timings are diagnostic results, not hardware performance benchmarks.
+
 `npm run benchmark:physics` measures the WASM bridge without a renderer or Java
 overhead. On this Windows machine with Node 24.14, 1,200 steps with 96 active bodies
 averaged about 0.31 ms (0.47 ms p95); 32 bodies averaged 0.073 ms. Bodies receive
