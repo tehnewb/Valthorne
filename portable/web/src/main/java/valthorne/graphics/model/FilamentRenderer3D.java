@@ -20,6 +20,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
     private final Float32Array transform=Float32Array.create(16),projection=Float32Array.create(16),cameraModel=Float32Array.create(16),state=Float32Array.create(22),light=Float32Array.create(9);
     private final Matrix4f inverseView=new Matrix4f();
     private final long[] profileNanos=new long[4];
+    private final int[] viewport=new int[4];
     private boolean closed,occlusionEnabled=true;
     private long uploadedSourceVertices,uploadedUniqueVertices;
     private int occludedCount,offscreenCount,updatedEntryCount;
@@ -41,7 +42,8 @@ public final class FilamentRenderer3D implements AutoCloseable {
     public void invalidate(){check();invalidate(handle);}
     public void render(Scene3D source,Camera3D camera){
         check();Objects.requireNonNull(source);Objects.requireNonNull(camera);
-        camera.rebuild(Window.getWidth(),Window.getHeight());copy(camera.getProjection(),projection);copy(inverseView.set(camera.getView()).invert(),cameraModel);
+        valthorne.web.graphics.BrowserGL.glGetIntegerv(valthorne.web.graphics.BrowserGL.GL_VIEWPORT,viewport);
+        camera.rebuild(Math.max(1,viewport[2]),Math.max(1,viewport[3]));copy(camera.getProjection(),projection);copy(inverseView.set(camera.getView()).invert(),cameraModel);
         var snapshot=collector.capture(source);
         boolean reject=occlusionEnabled;
         for(var item:snapshot.instances)if(item.material().getTransmission()>.01f){reject=false;break;}

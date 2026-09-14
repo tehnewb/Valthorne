@@ -16,7 +16,7 @@ export class BrowserGraphics {
         }
         return this.gl;
     }
-    resize(){if(!this.gl)return;const w=this.host.platform.window.width,h=this.host.platform.window.height;if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;this.gl.viewport(0,0,w,h);}}
+    resize(){if(!this.gl)return;const ratio=Math.max(1,Math.min(this.host.pixelRatio||window.devicePixelRatio||1,2)),w=Math.max(1,Math.round(this.host.platform.window.width*ratio)),h=Math.max(1,Math.round(this.host.platform.window.height*ratio));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;this.gl.viewport(0,0,w,h);}}
     add(object,kind){if(!object)throw new Error('Could not allocate '+kind);const id=this.next++;this.objects.set(id,{object,kind});this.reverse.set(object,id);return id;}
     get(id){if(id===0||id===-1)return null;const item=this.objects.get(id);if(!item)throw new Error('Invalid or disposed graphics handle '+id);return item.object;}
     create(kind){return this.add(this.context()['create'+kind](),kind);}
@@ -121,7 +121,13 @@ export class BrowserGraphics {
         const {program,vao,texture}=this.vector;
         gl.useProgram(program);gl.bindVertexArray(vao);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-        const premultiply=gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,premultiply);
+        const premultiply=gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+        if(this.vector.width!==canvas.width||this.vector.height!==canvas.height){
+            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,canvas.width,canvas.height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+            this.vector.width=canvas.width;this.vector.height=canvas.height;
+        }
+        gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,gl.RGBA,gl.UNSIGNED_BYTE,canvas);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,premultiply);
         const depth=gl.isEnabled(gl.DEPTH_TEST),scissor=gl.isEnabled(gl.SCISSOR_TEST),cull=gl.isEnabled(gl.CULL_FACE);gl.disable(gl.DEPTH_TEST);gl.disable(gl.SCISSOR_TEST);gl.disable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.drawArrays(gl.TRIANGLES,0,3);if(depth)gl.enable(gl.DEPTH_TEST);if(scissor)gl.enable(gl.SCISSOR_TEST);if(cull)gl.enable(gl.CULL_FACE);
     }
     async decode(path,bytes,flip){

@@ -1,4 +1,5 @@
 import { BrowserWindow } from './window-backend.js';
+const getDevicePixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
 /** Owns browser listeners and voices. Never installs process-wide prototype patches. */
 export class BrowserPlatform {
     constructor(canvas) {
@@ -87,7 +88,7 @@ export class BrowserPlatform {
         oscillator.start(now);oscillator.stop(now+seconds);return true;
     }
     beginOverlay(){
-        this.check();const ratio=Math.min(devicePixelRatio||1,1.5),w=Math.round(this.window.width*ratio),h=Math.round(this.window.height*ratio);
+        this.check();const ratio=getDevicePixelRatio(),w=Math.round(this.window.width*ratio),h=Math.round(this.window.height*ratio);
         if(this.overlay.width!==w||this.overlay.height!==h){this.overlay.width=w;this.overlay.height=h;}
         this.ctx.setTransform(ratio,0,0,ratio,0,0);this.ctx.clearRect(0,0,this.window.width,this.window.height);
     }

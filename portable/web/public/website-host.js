@@ -13,6 +13,8 @@ if (location.hash === '#builder' && new URLSearchParams(location.search).get('vi
  * Website behavior lives in Java. This adapter only connects the compiled
  * application to the portable graphics backends and browser-only resources.
  */
+const getPixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
 /** Startup failures leave the generated HTML available without a renderer. */
 function bootstrapFailure(error) {
   document.querySelector('#status').textContent = 'Engine unavailable. Text version is ready.';
@@ -67,7 +69,7 @@ function createHost(BrowserGraphics, BrowserPlatform, BrowserNano, BrowserYoga, 
     fontResolver: null,
     opacity: 1,
     offset: 0,
-    pixelRatio: 1,
+    pixelRatio: getPixelRatio(),
     closed: false,
 
     connectApplication(frame, shutdown) {
@@ -166,6 +168,12 @@ function createHost(BrowserGraphics, BrowserPlatform, BrowserNano, BrowserYoga, 
     }
   };
   host.graphics.context();
+  host.resize(host.pixelRatio);
+  const updatePixelRatio = () => host.resize(getPixelRatio());
+  window.addEventListener('resize', updatePixelRatio, {passive:true, signal:host.platform.events.signal});
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updatePixelRatio, {passive:true, signal:host.platform.events.signal});
+  }
   host.graphics.canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault();
     if (!host.closed) host.onFailure?.('Graphics context lost');
@@ -189,7 +197,7 @@ globalThis.valthornePort = {
 
 // Only compiled-program loading happens before the Java entry point takes over.
 const runtime = document.createElement('script');
-const revision = document.querySelector('meta[name="valthorne-build"]').content;
+const revision = document.querySelector('meta[name="valthorne-build"]')?.content || 'engine';
 runtime.src = 'runtime/valthorne.js?v=' + encodeURIComponent(revision);
 runtime.onerror = () => bootstrapFailure(new Error('Compiled runtime could not load'));
 runtime.onload = () => {

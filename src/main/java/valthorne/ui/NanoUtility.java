@@ -24,6 +24,28 @@ import static org.lwjgl.nanovg.NanoVG.nvgTextMetrics;
  * @author Albert Beaupre
  */
 public final class NanoUtility {
+    /** Sets opacity for a custom UI node within its root-managed draw callback. */
+    public static void opacity(long vg, float alpha) { org.lwjgl.nanovg.NanoVG.nvgGlobalAlpha(vg, Math.max(0, Math.min(1, alpha))); }
+    /** Registers a font from a filesystem path, including extracted classpath fonts. */
+    public static int loadFont(long vg, String name, String path) { return org.lwjgl.nanovg.NanoVG.nvgCreateFont(vg, name, path); }
+    /** Registers a bundled classpath font; the browser fetches the exported resource directly. */
+    public static int loadResourceFont(long vg, String name, String resource) {
+        return loadFont(vg, name, valthorne.io.file.ValthorneFiles.extractToTempPath(resource));
+    }
+    /** Draws one line without allocating geometry or color buffers per call. */
+    public static void strokeLine(long vg, float x, float y, float xx, float yy, int color, float width) {
+        org.lwjgl.nanovg.NanoVG.nvgBeginPath(vg); org.lwjgl.nanovg.NanoVG.nvgMoveTo(vg,x,y); org.lwjgl.nanovg.NanoVG.nvgLineTo(vg,xx,yy);
+        org.lwjgl.nanovg.NanoVG.nvgStrokeColor(vg,color1(color)); org.lwjgl.nanovg.NanoVG.nvgStrokeWidth(vg,width); org.lwjgl.nanovg.NanoVG.nvgStroke(vg);
+    }
+    public static void strokeCircle(long vg, float x, float y, float radius, int color, float width) {
+        org.lwjgl.nanovg.NanoVG.nvgBeginPath(vg); org.lwjgl.nanovg.NanoVG.nvgCircle(vg,x,y,radius);
+        org.lwjgl.nanovg.NanoVG.nvgStrokeColor(vg,color1(color)); org.lwjgl.nanovg.NanoVG.nvgStrokeWidth(vg,width); org.lwjgl.nanovg.NanoVG.nvgStroke(vg);
+    }
+    public static void strokeDiamond(long vg, float x, float y, float radius, int color, float width) {
+        org.lwjgl.nanovg.NanoVG.nvgBeginPath(vg); org.lwjgl.nanovg.NanoVG.nvgMoveTo(vg,x,y-radius); org.lwjgl.nanovg.NanoVG.nvgLineTo(vg,x+radius,y);
+        org.lwjgl.nanovg.NanoVG.nvgLineTo(vg,x,y+radius); org.lwjgl.nanovg.NanoVG.nvgLineTo(vg,x-radius,y); org.lwjgl.nanovg.NanoVG.nvgClosePath(vg);
+        org.lwjgl.nanovg.NanoVG.nvgStrokeColor(vg,color1(color)); org.lwjgl.nanovg.NanoVG.nvgStrokeWidth(vg,width); org.lwjgl.nanovg.NanoVG.nvgStroke(vg);
+    }
 
     /**
      * Per-thread color scratch slot 1, shared by its Color and packed-int overloads.

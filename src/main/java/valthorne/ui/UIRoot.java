@@ -171,6 +171,70 @@ public class UIRoot extends UIContainer {
     private final valthorne.event.EventHandler<TextInputEvent> textListener = event -> route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false); // Persistent committed-text listener targeting the current focus.
     private UINode pressed; // Node currently being pressed by the mouse
     private int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
+    private final java.util.ArrayList<valthorne.ui.nodes.nano.NanoLabel> selectionLabels = new java.util.ArrayList<>();
+    private boolean textDragPending, textDragActive;
+    private float textPressX, textPressY;
+    private int textAnchorLabel, textAnchorOffset;
+
+    private void collectSelectableText(UINode node) {
+        if (!isNodeInteractiveNow(node)) return;
+        if (node instanceof valthorne.ui.nodes.nano.NanoLabel label && label.isSelectable())
+            selectionLabels.add(label);
+        if (node instanceof UIContainer container)
+            for (UINode child : container.getChildren()) collectSelectableText(child);
+    }
+
+    private void clearDocumentSelection() {
+        for (var label : selectionLabels) label.documentSelection(0, 0);
+        selectionLabels.clear();
+        textDragPending = textDragActive = false;
+    }
+
+    private int nearestText(float x, float y) {
+        int best = -1;
+        float distance = Float.POSITIVE_INFINITY;
+        for (int i = 0; i < selectionLabels.size(); i++) {
+            var label = selectionLabels.get(i);
+            if (!isNodeFocusableNow(label) || !label.isSelectable()) continue;
+            var point = label.screenToLayout(x, y);
+            float dx = Math.max(0, Math.max(label.getAbsoluteX() - point.x(),
+                    point.x() - label.getAbsoluteX() - label.getWidth()));
+            float dy = Math.max(0, Math.max(label.getAbsoluteY() - point.y(),
+                    point.y() - label.getAbsoluteY() - label.getHeight()));
+            float score = dx * dx + dy * dy;
+            if (score < distance) { best = i; distance = score; }
+        }
+        return best;
+    }
+
+    private boolean extendDocumentSelection(MouseDragEvent event) {
+        if (!textDragPending || event.getButton() != Mouse.LEFT) return false;
+        if (!textDragActive) {
+            float dx = event.getToX() - textPressX, dy = event.getToY() - textPressY;
+            if (dx * dx + dy * dy < 16) return false;
+            textAnchorLabel = nearestText(textPressX, textPressY);
+            if (textAnchorLabel < 0) return false;
+            textAnchorOffset = selectionLabels.get(textAnchorLabel).selectionIndexAt(textPressX, textPressY);
+            textDragActive = true;
+            setFocusTo(selectionLabels.get(textAnchorLabel));
+        }
+        int endLabel = nearestText(event.getToX(), event.getToY());
+        if (endLabel < 0) return false;
+        int endOffset = selectionLabels.get(endLabel).selectionIndexAt(event.getToX(), event.getToY());
+        int low = Math.min(textAnchorLabel, endLabel), high = Math.max(textAnchorLabel, endLabel);
+        boolean forward = textAnchorLabel <= endLabel;
+        for (int i = 0; i < selectionLabels.size(); i++) {
+            var label = selectionLabels.get(i);
+            if (!isNodeFocusableNow(label) || !label.isSelectable() || i < low || i > high) {
+                label.documentSelection(0, 0); continue;
+            }
+            int start = i == low ? (forward ? textAnchorOffset : endOffset) : 0;
+            int end = i == high ? (forward ? endOffset : textAnchorOffset) : label.selectionTextLength();
+            label.documentSelection(start, end);
+        }
+        event.consume();
+        return true;
+    }
     private UINode hovered; // Node currently being hovered by the mouse
     private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
     private float hoverTime; // Time accumulated while hovering the current node
@@ -892,6 +956,7 @@ public class UIRoot extends UIContainer {
      * onPointerCancel. Does not synthesize a release or click event.
      */
     private void cancelPointer() {
+        clearDocumentSelection();
         UINode previous = pressed;
         pressed = null;
         pressedButton = -1;
@@ -1052,6 +1117,29 @@ public class UIRoot extends UIContainer {
     private void handleKeyPressed(KeyPressEvent event) {
         hideActiveTooltip();
         if (!isNodeFocusableNow(focused)) setFocusTo(null);
+        if (focused instanceof valthorne.ui.nodes.nano.NanoLabel && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.A) {
+            clearDocumentSelection(); collectSelectableText(activeFocusScope());
+            for (var label : selectionLabels) label.documentSelection(0, label.selectionTextLength());
+            textDragActive = !selectionLabels.isEmpty(); textAnchorLabel = 0; textAnchorOffset = 0;
+            event.consume(); return;
+        }
+        if (textDragActive && focused instanceof valthorne.ui.nodes.nano.NanoLabel
+                && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.C) {
+            StringBuilder text = new StringBuilder();
+            for (var label : selectionLabels) {
+                if (!isNodeFocusableNow(label) || !label.isSelectable()) continue;
+                String selected = label.getSelectedText();
+                if (selected.isEmpty()) continue;
+                if (text.length() > 0) text.append('\n');
+                text.append(selected);
+            }
+            valthorne.ui.behavior.TextEditing.copyText(text.toString());
+            event.consume();
+            return;
+        }
+        if (textDragActive && (event.getKey() == Keyboard.TAB
+                || event.getKey() == Keyboard.A && (event.isCtrlDown() || event.isSuperDown())))
+            clearDocumentSelection();
 
         if (event.getKey() == Keyboard.TAB) {
             if (event.isShiftDown()) focusPrevious();
@@ -1099,6 +1187,23 @@ public class UIRoot extends UIContainer {
 
         UINode target = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
 
+        if (event.getButton() == Mouse.LEFT && event.isShiftDown() && textDragActive) {
+            textDragPending = true;
+            extendDocumentSelection(new MouseDragEvent(Mouse.LEFT, 0, (int) textPressX, (int) textPressY, event.getX(), event.getY()));
+            event.consume(); return;
+        }
+        clearDocumentSelection();
+        boolean textSurface = target == this
+                || target instanceof valthorne.ui.nodes.nano.NanoLabel label && label.isSelectable()
+                || target != null && (target.getClass() == valthorne.ui.nodes.nano.NanoPanel.class
+                    || target.getClass() == valthorne.ui.nodes.nano.NanoContainer.class
+                    || target.getClass() == valthorne.ui.nodes.nano.NanoImage.class);
+        if (event.getButton() == Mouse.LEFT && textSurface) {
+            collectSelectableText(activeFocusScope());
+            textPressX = event.getX(); textPressY = event.getY();
+            textDragPending = !selectionLabels.isEmpty();
+        }
+
         if (target != null) {
             if (target.isFocusable()) setFocusTo(target);
             else setFocusTo(null);
@@ -1129,6 +1234,15 @@ public class UIRoot extends UIContainer {
      * @param event the mouse release event
      */
     private void handleMouseReleased(MouseReleaseEvent event) {
+        if (event.getButton() == Mouse.LEFT) {
+            textDragPending = false;
+            if (textDragActive) {
+                if (pressed != null) { pressed.setPressed(false); pressed.onPointerCancel(); }
+                pressed = null; pressedButton = -1;
+                event.consume();
+                return;
+            }
+        }
         if (pressed != null && event.getButton() == pressedButton) {
             UINode target = pressed;
             pressed = null;
@@ -1153,6 +1267,7 @@ public class UIRoot extends UIContainer {
     private void handleMouseDragged(MouseDragEvent event) {
         hideActiveTooltip();
         hoverTime = 0f;
+        if (extendDocumentSelection(event)) return;
 
         if (event.getButton() == pressedButton)
             route(pressed, event, event.getToX(), event.getToY(), node -> node.onMouseDrag(event), false);
@@ -1299,19 +1414,22 @@ public class UIRoot extends UIContainer {
      * registration fails. Logs a diagnostic when all bundled candidates fail.
      */
     private void registerDefaultNanoFont() {
-        Path overridePath = getOverrideNanoFontPath();
-        if (overridePath != null) {
-            registerNanoFont("default", overridePath.toString());
-            return;
+        try {
+            Path overridePath = getOverrideNanoFontPath();
+            if (overridePath != null) {
+                registerNanoFont("default", overridePath.toString());
+                return;
+            }
+            for (String resource : DEFAULT_NANO_FONT_RESOURCES) {
+                Path fontPath = extractBundledNanoFont(resource);
+                if (fontPath == null) continue;
+                if (registerNanoFont("default", fontPath.toString())) return;
+            }
+            // Browser ports may provide a vector font through their Nano bridge.
+        } catch (Throwable ignored) {
+            // Browser ports provide their own vector-font bridge; filesystem
+            // extraction is unavailable there and must not abort application startup.
         }
-
-        for (String resource : DEFAULT_NANO_FONT_RESOURCES) {
-            Path fontPath = extractBundledNanoFont(resource);
-            if (fontPath == null) continue;
-            if (registerNanoFont("default", fontPath.toString())) return;
-        }
-
-        System.err.println("UIRoot could not register a default NanoVG font. Set -D" + DEFAULT_NANO_FONT_PROPERTY + "=<font-path> to override it.");
     }
 
     /**

@@ -37,6 +37,10 @@ function replaceBody(source,name,body){
 }
 for(const name of sharedGraphics){
     let source=await readFile(path.join(root,'src/main/java/valthorne',name+'.java'),'utf8');
+    if(name==='ui/nodes/nano/NanoHyperlink'){
+        source=source.replace('import java.awt.Desktop;','');
+        source=replaceMethod(source,'private boolean openInBrowser(', 'return valthorne.web.BrowserNavigation.open(link);');
+    }
     if(name==='graphics/model/PathTracer3D'){
         source=source.replace('import org.lwjgl.system.MemoryUtil;','import valthorne.web.graphics.BrowserPathTraceGL;');
         source=source.replace(/if\(!GL.getCapabilities\(\).OpenGL43\)throw new IllegalStateException\([^\r\n]+/,'if(!BrowserPathTraceGL.supported())throw new IllegalStateException("Path tracing requires WebGL2 float rendering and filtering");');
@@ -120,6 +124,8 @@ for(const name of sharedGraphics){
     source=source.replace(/^(package [^;]+;)/m,'$1\nimport static valthorne.web.graphics.BrowserGL.*;');
     source=source.replace('import org.lwjgl.util.yoga.Yoga;','import valthorne.web.ui.BrowserYoga;').replaceAll('Yoga.','BrowserYoga.');
     source=source.replace(/^import static org\.lwjgl\.nanovg\.NanoVG(?:GL3)?\.[^;]+;\r?\n/gm,'');
+    source=source.replaceAll('org.lwjgl.nanovg.NanoVG.', 'valthorne.web.ui.BrowserNano.');
+    if(name==='ui/NanoUtility')source=source.replace('valthorne.io.file.ValthorneFiles.extractToTempPath(resource)', 'resource');
     if(name.startsWith('ui/'))source=source.replace(/^(package [^;]+;)/m,'$1\nimport static valthorne.web.ui.BrowserNano.*;');
     source=source.replaceAll('org.lwjgl.opengl.GL11.','').replaceAll('org.lwjgl.opengl.GL20.','').replaceAll('org.lwjgl.opengl.GL14.','').replaceAll('org.lwjgl.opengl.GL13.','');
     source=source.replace(/org\.lwjgl\.opengl\.GL\d+\./g,'');
@@ -164,6 +170,7 @@ for(const name of sharedGraphics){
         source=source.replace(/^import java\.awt[^;]+;\r?\n/gm,'');
         const start=source.indexOf('    public static boolean copy(');
         source=source.slice(0,start)+`public static boolean copy(TextEditModel model,boolean secret){return !secret&&model.hasSelection()&&valthorne.web.ui.BrowserClipboard.write(model.selectedText());}
+public static boolean copyText(String text){return text!=null&&!text.isEmpty()&&valthorne.web.ui.BrowserClipboard.write(text);}
 public static void paste(TextEditModel model){String text=valthorne.web.ui.BrowserClipboard.read();if(text!=null)model.insert(text);}
 }`;
     }

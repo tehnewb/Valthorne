@@ -4,6 +4,10 @@ public final class BrowserNano {
 private BrowserNano() {}
 public static final int NVG_ANTIALIAS=1,NVG_STENCIL_STROKES=2,NVG_ALIGN_LEFT=1,NVG_ALIGN_CENTER=2,NVG_ALIGN_RIGHT=4,NVG_ALIGN_TOP=8,NVG_ALIGN_MIDDLE=16,NVG_ALIGN_BOTTOM=32,NVG_ALIGN_BASELINE=64,NVG_ROUND=1,NVG_IMAGE_FLIPY=8;
 public static long nvgCreate(int flags){return bnvgCreate(flags);}
+public static void nvgClosePath(long vg){closePath((int)vg);}
+@JSBody(params="vg",script="valthorneHost.nano.path(vg,'closePath',[]);") private static native void closePath(int vg);
+public static void nvgGlobalAlpha(long vg,float alpha){globalAlpha((int)vg,alpha);}
+@JSBody(params={"vg","alpha"},script="valthorneHost.nano.set(vg,'alpha',Math.max(0,Math.min(1,alpha)));") private static native void globalAlpha(int vg,float alpha);
 @JSBody(params={"flags"},script="return valthorneHost.nano.create();") private static native int bnvgCreate(int flags);
 public static void nvgDelete(long vg){bnvgDelete((int)vg);}
 @JSBody(params={"vg"},script="valthorneHost.nano.delete(vg);") private static native void bnvgDelete(int vg);

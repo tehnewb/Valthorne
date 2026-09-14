@@ -97,8 +97,14 @@ public final class TextEditing {
      */
     public static boolean copy(TextEditModel model, boolean secret) {
         if (secret || !model.hasSelection()) return false;
+        return copyText(model.selectedText());
+    }
+
+    /** Copies read-only selected text, preserving line breaks. */
+    public static boolean copyText(String text) {
+        if (text == null || text.isEmpty()) return false;
         try {
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(model.selectedText()), null);
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
             return true;
         } catch (IllegalStateException | java.awt.HeadlessException | SecurityException unavailable) {return false;}
     }

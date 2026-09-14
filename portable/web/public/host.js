@@ -1,5 +1,5 @@
-import initJolt from './vendor/jolt-physics.wasm-compat.js';
 import { BrowserAssets } from './assets.js';
+import { loadPhysicsRuntime } from './physics-runtime.js';
 import { BrowserPlatform } from './platform.js';
 import { BrowserParticles } from './particles.js';
 import { BrowserMedia } from './media.js';
@@ -14,8 +14,9 @@ import { BrowserFiles } from './files.js';
 import { BrowserCompute } from './compute.js';
 
 const canvas = document.querySelector('#scene');
-const status = document.querySelector('#stats');
+const status = document.querySelector('#stats') || document.querySelector('#status');
 const errorBox = document.querySelector('#error');
+const getDevicePixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
 function fail(error) {
     errorBox.textContent = `Unable to run the scene: ${error.message || error}`;
     errorBox.style.display = 'block';
@@ -65,6 +66,7 @@ class BrowserHost {
         this.nextBodyId=1;this.bodyHandles=new Map();this.materialRefs=new Map();this.platform=new BrowserPlatform(canvas);
         this.commands=0; this.paused=false; this.frames=0; this.last=0; this.time=0; this.reportTime=0;
         this.yaw=.65; this.pitch=.42; this.distance=19; this.matrix=new Float32Array(16);
+        if(J){
         const settings = new J.JoltSettings();
         settings.mMaxBodies=128; settings.mMaxBodyPairs=2048; settings.mMaxContactConstraints=2048;
         const filter = new J.ObjectLayerPairFilterTable(2);
@@ -77,6 +79,7 @@ class BrowserHost {
         settings.mObjectVsBroadPhaseLayerFilter=new J.ObjectVsBroadPhaseLayerFilterTable(bp,2,filter,2);
         this.physics=new J.JoltInterface(settings); J.destroy(settings);
         this.bodies=this.physics.GetPhysicsSystem().GetBodyInterface();
+        }
         const e=this.engine=F.Engine.create(canvas, {antialias:false});
         this.scene=e.createScene(); this.view=e.createView(); this.renderer=e.createRenderer(); this.swap=e.createSwapChain();
         this.cameraEntity=F.EntityManager.get().create(); this.camera=e.createCamera(this.cameraEntity);
@@ -104,6 +107,7 @@ class BrowserHost {
     color(rgb) {return [(rgb>>16&255)/255,(rgb>>8&255)/255,(rgb&255)/255];}
     createPhysicsWorld(capacities,layers,contact){
         if(this.closed)throw new Error('Backend is closed');
+        if(!this.J)throw new Error('Physics is disabled for this export; enable webPhysics and export again.');
         const world=new BrowserPhysicsWorld(this.J,capacities,layers,contact);
         this.physicsWorlds.add(world);world.onClose=()=>this.physicsWorlds.delete(world);return world;
     }
@@ -115,6 +119,7 @@ class BrowserHost {
     box(x,y,z,hx,hy,hz,rgb,dynamic) {this.createBox(x,y,z,[hx,hy,hz],rgb,dynamic);}
     createBox(x,y,z,scale,rgb,dynamic,locked=false,overrideMaterial=null) {
         if(this.closed)throw new Error('Backend is closed');
+        if(!this.J)throw new Error('Physics is disabled for this export; enable webPhysics and export again.');
         if(![x,y,z,...scale].every(Number.isFinite)||scale.some(value=>value<=0))throw new Error('Invalid box');
         if(this.objects.length>=128)throw new Error('Browser body budget of 128 reached');
         const {J,F,engine:e}=this;
@@ -170,7 +175,7 @@ class BrowserHost {
         }finally{for(let i=owned.length-1;i>=0;i--)J.destroy(owned[i]);}
     }
     castRay(x,y,z,dx,dy,dz,range,ignore){const distance=this.rayDistance(x,y,z,dx,dy,dz,range,ignore);return distance<0?null:{id:this.lastHitId,distance};}
-    step(delta) {this.physics.Step(delta,1);this.particles.step(delta); this.steps=(this.steps||0)+1;}
+    step(delta) {if(this.physics)this.physics.Step(delta,1);this.particles.step(delta); this.steps=(this.steps||0)+1;}
     light(x,y,z,rgb,intensity) {
         const manager=this.engine.getLightManager(), instance=manager.getInstance(this.point);
         manager.setPosition(instance,[x,y,z]); manager.setColor(instance,this.color(rgb)); manager.setIntensity(instance,intensity);
@@ -187,7 +192,7 @@ class BrowserHost {
         manager.setTransform(instance,m); instance.delete();
     }
     render() {
-        const ratio=Math.min(devicePixelRatio||1,1.5),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));
+        const ratio=getDevicePixelRatio(),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));
         if (canvas.width!==w||canvas.height!==h) {canvas.width=w;canvas.height=h;this.view.setViewport([0,0,w,h]);}
         this.camera.setProjectionFov(this.firstPerson?.fov||45,w/h,.1,100,this.F.Camera$Fov.VERTICAL);
         const d=this.distance*Math.max(1,Math.sqrt(h/w)),c=Math.cos(this.pitch);
@@ -206,6 +211,8 @@ class BrowserHost {
         this.materials.clear();
     }
     input() {
+        canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.contextLost=true;cancelAnimationFrame(this.raf);this.platform.resetInput();fail(new Error('Graphics context lost. Reload to restore the scene.'));});
+        if (!document.querySelector('#enter')) return;
         const arena=new URLSearchParams(location.search).get('scene')==='arena';
         document.querySelector('#enter').hidden=!arena;
         document.querySelector('#drop').hidden=arena;
@@ -214,12 +221,32 @@ class BrowserHost {
         document.querySelector('#drop').onclick=()=>this.commands|=1;
         document.querySelector('#reset').onclick=()=>this.commands|=2;
         document.querySelector('#pause').onclick=()=>{this.paused=!this.paused;document.querySelector('#pause').textContent=this.paused?'Resume simulation':'Pause simulation';};
-        let dragging=false,lastX=0,lastY=0;
-        canvas.onpointerdown=e=>{if(arena||this.applicationMode)return;dragging=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId);};
-        canvas.onpointermove=e=>{if(dragging){this.yaw-=(e.clientX-lastX)*.006;this.pitch=Math.max(.05,Math.min(1.3,this.pitch+(e.clientY-lastY)*.006));lastX=e.clientX;lastY=e.clientY;}};
-        canvas.onpointerup=canvas.onpointercancel=()=>dragging=false;
+        let draggingId=null,lastX=0,lastY=0;
+        const updateDrag=e=>{
+            if (draggingId!==e.pointerId) return;
+            e.preventDefault();
+            this.yaw-=(e.clientX-lastX)*.006;
+            this.pitch=Math.max(.05,Math.min(1.3,this.pitch+(e.clientY-lastY)*.006));
+            lastX=e.clientX;lastY=e.clientY;
+        };
+        const startDrag=e=>{
+            if(arena||this.applicationMode||draggingId!==null) return;
+            draggingId=e.pointerId;lastX=e.clientX;lastY=e.clientY;
+            if (canvas.setPointerCapture) {try {canvas.setPointerCapture(e.pointerId);} catch (error) { }}
+        };
+        const stopDrag=e=>{
+            if (draggingId===null||draggingId!==e.pointerId) return;
+            if (canvas.releasePointerCapture && canvas.hasPointerCapture?.(e.pointerId)) {
+                try {canvas.releasePointerCapture(e.pointerId);} catch (error) {}
+            }
+            draggingId=null;
+        };
+        canvas.addEventListener('pointerdown', startDrag, {passive:false, signal:this.platform.events.signal});
+        window.addEventListener('pointermove', updateDrag, {passive:false, signal:this.platform.events.signal});
+        window.addEventListener('pointerup', stopDrag, {passive:false, signal:this.platform.events.signal});
+        window.addEventListener('pointercancel', stopDrag, {passive:false, signal:this.platform.events.signal});
+        canvas.addEventListener('lostpointercapture', () => {draggingId=null;}, {signal:this.platform.events.signal});
         canvas.addEventListener('wheel',e=>{if(this.applicationMode)return;e.preventDefault();this.distance=Math.max(7,Math.min(40,this.distance*Math.exp(e.deltaY*.001)));},{passive:false,signal:this.platform.events.signal});
-        canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.contextLost=true;cancelAnimationFrame(this.raf);this.platform.resetInput();fail(new Error('Graphics context lost. Reload to restore the scene.'));});
     }
     connect(frame,shutdown) {
         document.querySelectorAll('button').forEach(button=>button.disabled=false);
@@ -228,7 +255,7 @@ class BrowserHost {
             try {
                 const dt=this.last?(now-this.last)/1000:0;this.last=now;this.time+=dt;
                 const commands=this.commands|((this.paused||document.hidden)?4:0);this.commands=0;
-                frame(dt,commands,parseInt(document.querySelector('#color').value.slice(1),16));
+                frame(dt,commands,parseInt((document.querySelector('#color')?.value || '#65d9ff').slice(1),16));
                 if(!this.closed&&!this.contextLost)this.raf=requestAnimationFrame(animate);
             }catch(error){cancelAnimationFrame(this.raf);fail(error);}
         };
@@ -238,15 +265,34 @@ class BrowserHost {
     }
     connectApplication(frame,shutdown){
         this.applicationMode=true;
-        document.querySelector('aside').hidden=true;document.querySelector('header').hidden=true;document.querySelector('footer').hidden=true;
-        this.connect(dt=>frame(dt),shutdown);
+        for (const element of document.querySelectorAll('aside,header,footer')) element.hidden=true;
+        const profile=new URLSearchParams(location.search).has('profileMemory');
+        let nextSample=0;
+        this.connect(dt=>{
+            frame(dt);
+            if(profile&&performance.now()>=nextSample){
+                nextSample=performance.now()+5000;
+                console.info('VALTHORNE_MEMORY '+JSON.stringify({
+                    heapUsed:performance.memory?.usedJSHeapSize??null,
+                    heapTotal:performance.memory?.totalJSHeapSize??null,
+                    filamentHeap:this.F.HEAPU8?.byteLength??null,
+                    physicsHeap:this.J?.HEAPU8?.byteLength??0,
+                    layoutHandles:this.yoga.objects.size,
+                    graphicsHandles:this.graphics.objects.size,
+                    images:this.graphics.images.size,
+                    vectorContexts:this.nano.contexts.size,
+                    renderers:[...this.sceneRenderers].map(r=>({meshes:r.meshes.size,entries:r.entries.length,lights:r.lights.length})),
+                    canvas:[canvas.width,canvas.height]
+                }));
+            }
+        },shutdown);
     }
     report(bodies,seconds) {
         this.javaBodies=bodies; this.javaSeconds=seconds;
         if(this.time-this.reportTime<.5)return;
         const fps=Math.round((this.frames-(this.reportFrames||0))/(this.time-this.reportTime));
         let dynamic=0;for(const object of this.objects)if(object.dynamic)dynamic++;
-        status.textContent=`${fps} FPS · ${dynamic} dynamic bodies · ${this.assets.models.size} models · ${this.particles.items.length} particles · ${this.particles.lightCount} particle lights · ${seconds}s simulation`;
+        if (status) status.textContent=`${fps} FPS · ${dynamic} dynamic bodies · ${this.assets.models.size} models · ${this.particles.items.length} particles · ${this.particles.lightCount} particle lights · ${seconds}s simulation`;
         this.reportTime=this.time;this.reportFrames=this.frames;
     }
     close() {
@@ -263,19 +309,20 @@ class BrowserHost {
         e.destroyView(this.view);e.destroyScene(this.scene);e.destroyRenderer(this.renderer);e.destroySwapChain(this.swap);
         e.destroyCameraComponent(this.cameraEntity);this.F.EntityManager.get().destroy(this.cameraEntity);
         e.destroyMaterial(this.material);e.destroyVertexBuffer(this.mesh.vb);e.destroyIndexBuffer(this.mesh.ib);e.destroyIndirectLight(this.ambient);
-        this.F.Engine.destroy(e);this.J.destroy(this.physics);
+        this.F.Engine.destroy(e);if(this.physics)this.J.destroy(this.physics);
     }
 }
 
 try {
     if (!globalThis.WebAssembly) throw new Error('This browser does not support WebAssembly');
-    const J=await initJolt();
-    globalThis.valthorneFiles=await new BrowserFiles().initialize();
-    await new Promise((resolve,reject)=>{
+    const physicsEnabled=document.querySelector('meta[name="valthorne-physics"]')?.content!=='disabled';
+    const physicsRuntime=loadPhysicsRuntime(physicsEnabled);
+    const [J,files]=await Promise.all([physicsRuntime,new BrowserFiles().initialize(),new Promise((resolve,reject)=>{
         if(!globalThis.Filament) {reject(new Error('Filament runtime could not be loaded'));return;}
         const timer=setTimeout(()=>reject(new Error('Filament startup timed out')),30000);
         Filament.init(['lit.filamat','particle.filamat','engine-surface.filamat','engine-alpha.filamat','engine-glass.filamat'],()=>{clearTimeout(timer);resolve();});
-    });
+    })]);
+    globalThis.valthorneFiles=files;
     globalThis.valthorneHost=new BrowserHost(J,Filament);
     valthorneHost.compute=await BrowserCompute.create(valthorneHost);
     main();

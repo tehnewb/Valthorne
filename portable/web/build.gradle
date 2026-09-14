@@ -209,6 +209,8 @@ tasks.register('webDist', Sync) {
  * browser shell, runtime, bindings, and third-party backends.
  */
 tasks.register('webExport', Sync) {
+    def physicsEnabled = providers.gradleProperty('webPhysics').orElse('true')
+    inputs.property('webPhysics', physicsEnabled)
     dependsOn 'webDist'
     from(layout.buildDirectory.dir('dist'))
     into(layout.buildDirectory.dir('export'))
@@ -217,6 +219,7 @@ tasks.register('webExport', Sync) {
             from('public/application.html')
             into(layout.buildDirectory.dir('export'))
             rename { 'index.html' }
+            filter { line -> physicsEnabled.get() == 'false' ? line.replace('<head>', '<head><meta name="valthorne-physics" content="disabled">') : line }
         }
     }
 }
