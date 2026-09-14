@@ -7,6 +7,11 @@ import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.Keyboard;
+import valthorne.Mouse;
+import valthorne.event.events.*;
+import valthorne.ui.behavior.TextSelection;
+import valthorne.ui.behavior.TextEditing;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 
@@ -53,6 +58,105 @@ public class NanoLabel extends UINode implements NanoNode {
     private float tabSize = 4f; // Requested tab-stop interval rounded to integer character columns.
     private float lineSpacing; // Extra UI-unit distance between successive lines.
     private boolean fontLoaded; // Reserved font state; current implementation does not read or update it.
+    private TextSelection selection;
+    private boolean selecting;
+    private boolean documentSelection;
+    private long lastPressTime;
+    private float lastPressX, lastPressY;
+    private int clickCount;
+    private static final Color SELECTION_COLOR = new Color(0x995298CE);
+
+    /** Opts into read-only pointer selection and Ctrl/Cmd+C. Disabled by default. */
+    public NanoLabel selectable(boolean enabled) {
+        if (enabled && selection == null) {
+            selection = new TextSelection();
+            selection.text(normalizeText(text));
+        } else if (!enabled) selection = null;
+        selecting = false;
+        setFocusable(enabled);
+        return this;
+    }
+
+    public boolean isSelectable() { return selection != null; }
+    public String getSelectedText() { return selection == null ? "" : selection.selectedText(); }
+    public void selectAll() { if (selection != null) selection.selectAll(); }
+
+    /** Sets a root-managed range for selection spanning multiple labels. */
+    public void documentSelection(int start, int end) {
+        if (selection == null) return;
+        selection.move(start, false);
+        selection.move(end, true);
+        documentSelection = start != end;
+    }
+
+    /** Hit-tests a caret using the same layout coordinates as text drawing. */
+    public int selectionIndexAt(float screenX, float screenY) { return indexAt(screenX, screenY); }
+    public int selectionTextLength() { return normalizeText(text).length(); }
+
+    @Override public void onPointerCancel() { selecting = false; super.onPointerCancel(); }
+    @Override public void onMousePress(MousePressEvent event) {
+        if (selection == null || isDisabled() || event.getButton() != Mouse.LEFT) return;
+        selecting = true;
+        long now = System.nanoTime();
+        float dx = event.getX() - lastPressX, dy = event.getY() - lastPressY;
+        clickCount = now - lastPressTime < 450_000_000L && dx * dx + dy * dy < 25 ? clickCount % 3 + 1 : 1;
+        lastPressTime = now; lastPressX = event.getX(); lastPressY = event.getY();
+        int index = indexAt(event.getX(), event.getY());
+        if (clickCount == 2) selection.selectWord(index);
+        else if (clickCount == 3) selection.selectLine(index);
+        else selection.move(index, event.isShiftDown());
+        event.consume();
+    }
+    @Override public void onMouseDrag(MouseDragEvent event) {
+        if (!selecting || selection == null) return;
+        selection.move(indexAt(event.getToX(), event.getToY()), true);
+        event.consume();
+    }
+    @Override public void onMouseRelease(MouseReleaseEvent event) { selecting = false; }
+    @Override public void onKeyPress(KeyPressEvent event) {
+        if (selection == null || !isFocused() || isDisabled()) return;
+        boolean command = event.isCtrlDown() || event.isSuperDown();
+        if (command && event.getKey() == Keyboard.C) TextEditing.copyText(getSelectedText());
+        else if (command && event.getKey() == Keyboard.A) selectAll();
+        else if (event.getKey() == Keyboard.LEFT) { if (command) selection.wordStep(false, event.isShiftDown()); else selection.step(false, event.isShiftDown()); }
+        else if (event.getKey() == Keyboard.RIGHT) { if (command) selection.wordStep(true, event.isShiftDown()); else selection.step(true, event.isShiftDown()); }
+        else if (event.getKey() == Keyboard.UP) selection.vertical(false, event.isShiftDown());
+        else if (event.getKey() == Keyboard.DOWN) selection.vertical(true, event.isShiftDown());
+        else if (event.getKey() == Keyboard.HOME) { if (command) selection.move(0, event.isShiftDown()); else selection.lineEdge(false, event.isShiftDown()); }
+        else if (event.getKey() == Keyboard.END) { if (command) selection.move(normalizeText(text).length(), event.isShiftDown()); else selection.lineEdge(true, event.isShiftDown()); }
+        else return;
+        event.consume();
+    }
+
+    private int indexAt(float screenX, float screenY) {
+        // NanoVG draws in top-left layout space, including ancestor scroll offsets.
+        var point = screenToLayout(screenX, screenY);
+        if (point.y() < getAbsoluteY()) return 0;
+        if (point.y() >= getAbsoluteY() + getHeight()) return normalizeText(text).length();
+        long vg = getRoot() == null ? 0 : getRoot().getNanoVGHandle();
+        String[] lines = splitLines(normalizeText(text));
+        float height = vg == 0 ? fontSize : NanoUtility.measureTextHeight(vg, fontName, fontSize);
+        int line = Math.max(0, Math.min(lines.length - 1,
+                (int) Math.floor((point.y() - getAbsoluteY()) / (height + lineSpacing))));
+        int offset = 0;
+        for (int i = 0; i < line; i++) offset += lines[i].length() + 1;
+        float target = point.x() - getAbsoluteX();
+        float previous = 0;
+        String value = lines[line];
+        for (int i = 0; i < value.length();) {
+            int next = value.offsetByCodePoints(i, 1);
+            float edge = measure(vg, value.substring(0, next));
+            if (target < (previous + edge) * .5f) return offset + i;
+            previous = edge;
+            i = next;
+        }
+        return offset + value.length();
+    }
+
+    private float measure(long vg, String value) {
+        return vg == 0 ? value.length() * fontSize * .5f
+                : NanoUtility.measureTextWidth(vg, fontName, fontSize, value);
+    }
 
     /**
      * Creates an empty label using the default font name, size 18, white color,
@@ -91,6 +195,7 @@ public class NanoLabel extends UINode implements NanoNode {
     public NanoLabel text(String text) {
         this.text = text == null ? "" : text;
         markLayoutDirty();
+        if (selection != null) selection.text(normalizeText(this.text));
         return this;
     }
 
@@ -322,8 +427,23 @@ public class NanoLabel extends UINode implements NanoNode {
         float x = getAbsoluteX();
         float y = getAbsoluteY();
 
+        int offset = 0;
         for (int i = 0; i < lines.length; i++) {
+            if (selection != null && (isFocused() || documentSelection)) {
+                int start = Math.max(0, selection.start() - offset);
+                int end = Math.min(lines[i].length(), selection.end() - offset);
+                if (end > start) {
+                    float left = measure(vg, lines[i].substring(0, start));
+                    float right = measure(vg, lines[i].substring(0, end));
+                    nvgBeginPath(vg);
+                    nvgRect(vg, x + left, y + i * (lineHeight + lineSpacing), right - left, lineHeight);
+                    nvgFillColor(vg, NanoUtility.color1(SELECTION_COLOR));
+                    nvgFill(vg);
+                    nvgFillColor(vg, NanoUtility.color1(color));
+                }
+            }
             nvgText(vg, x, y + i * (lineHeight + lineSpacing), lines[i]);
+            offset += lines[i].length() + 1;
         }
     }
 

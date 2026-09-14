@@ -651,3 +651,16 @@ The collection package is compiled into the portable core; these tests run on th
 JVM and do not establish full TeaVM behavioral coverage for all 34 classes. The desktop build, native Jolt tests
 and 1,437 FPS gameplay checks also passed. Existing optional test/example sources
 remain excluded from publication by the repository's ignore/release rules.
+# Optional physics runtime and memory profiling
+
+Application web exports default to physics enabled. A document-only application
+can pass `-PwebPhysics=false` to `:web:webExport` to omit Jolt initialization and
+its WebAssembly heap. This is an explicit capability opt-out, not lazy physics:
+attempts to create physics bodies/worlds in that export report an error. Normal
+game exports need no changes. The exporter supplies the browser configuration.
+
+Append `?profileMemory` to an exported application URL to log five-second samples
+of JS heap estimates, available WASM heap capacities and live backend resource
+counts. These diagnostics are opt-in and do not measure total GPU/process RAM.
+Run `node --test web/physics-runtime.test.mjs` from this directory to check the
+runtime selection and its enabled-by-default behavior.
