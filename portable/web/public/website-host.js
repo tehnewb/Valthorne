@@ -13,7 +13,12 @@ if (location.hash === '#builder' && new URLSearchParams(location.search).get('vi
  * Website behavior lives in Java. This adapter only connects the compiled
  * application to the portable graphics backends and browser-only resources.
  */
-const getPixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+const isMobile = () => typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || matchMedia('(hover: none)').matches);
+const getPixelRatio = () => {
+  const deviceRatio = Number(window.devicePixelRatio) || 1;
+  const maxRatio = isMobile() ? 3 : 2;
+  return Math.max(1, Math.min(deviceRatio, maxRatio));
+};
 
 /** Startup failures leave the generated HTML available without a renderer. */
 function bootstrapFailure(error) {

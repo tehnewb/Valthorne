@@ -3,8 +3,8 @@ export class BrowserWindow {
  constructor(canvas,platform){
   this.platform=platform;this.canvas=canvas;this.resizable=true;this.borderless=true;
   this.stage=document.createElement('div');this.stage.id='valthorne-window';
-  this.stage.style.cssText='position:fixed;left:0;top:0;width:100vw;height:100vh;overflow:hidden;box-sizing:border-box;';
-  canvas.before(this.stage);this.stage.append(canvas);canvas.style.position='absolute';canvas.tabIndex=0;
+  this.stage.style.cssText='position:fixed;left:0;top:0;width:100vw;height:100vh;overflow:hidden;box-sizing:border-box;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;';
+  canvas.before(this.stage);this.stage.append(canvas);canvas.style.position='absolute';canvas.style.touchAction='none';canvas.style.userSelect='none';canvas.style.WebkitUserSelect='none';canvas.tabIndex=0;
   this.oldWidth=this.width;this.oldHeight=this.height;
   this.observer=new ResizeObserver(()=>this.changed());this.observer.observe(this.stage);
   const options={signal:platform.events.signal};

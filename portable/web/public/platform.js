@@ -1,9 +1,15 @@
 import { BrowserWindow } from './window-backend.js';
-const getDevicePixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+const isMobile = () => typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || matchMedia('(hover: none)').matches);
+const getDevicePixelRatio = () => {
+  const deviceRatio = Number(window.devicePixelRatio) || 1;
+  const maxRatio = isMobile() ? 3 : 2;
+  return Math.max(1, Math.min(deviceRatio, maxRatio));
+};
 /** Owns browser listeners and voices. Never installs process-wide prototype patches. */
 export class BrowserPlatform {
     constructor(canvas) {
         this.canvas=canvas;this.events=new AbortController();this.keys=new Set();this.pressed=new Set();this.buttons=new Set();
+        this.pointerId = null;
         this.look=[0,0];this.voices=new Set();this.closed=false;this.audio=null;
         this.window=new BrowserWindow(canvas,this);
         this.mouseX=0;this.mouseY=0;this.scrollX=0;this.scrollY=0;
@@ -20,10 +26,50 @@ export class BrowserPlatform {
             if(document.pointerLockElement===canvas&&['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
         });
         on(window,'keyup',e=>{if(this.keys.delete(e.code))this.publishKey(e,false);});
-        on(canvas,'pointerdown',e=>{this.buttons.add(e.button);this.mouseButton(e,0);this.unlockAudio();});
-        on(window,'pointerup',e=>{if(this.buttons.delete(e.button))this.mouseButton(e,1);});
+        on(canvas,'pointerdown',e=>{
+            if(this.pointerId !== null && this.pointerId !== e.pointerId) return;
+            if(this.pointerId === null)this.pointerId = e.pointerId;
+            if(this.canvas.setPointerCapture){
+                try { this.canvas.setPointerCapture(e.pointerId); } catch (error) {}
+            }
+            if(e.pointerType === 'touch' || e.pointerType === 'pen') e.preventDefault();
+            this.buttons.add(e.button);
+            this.mouseButton(e,0);
+            this.unlockAudio();
+        });
+        on(window,'pointerup',e=>{
+            if(this.pointerId !== null && this.pointerId !== e.pointerId) return;
+            if(this.pointerId === e.pointerId){
+                this.pointerId = null;
+                if(this.canvas.releasePointerCapture && this.canvas.hasPointerCapture?.(e.pointerId)){
+                    try { this.canvas.releasePointerCapture(e.pointerId); } catch (error) {}
+                }
+            }
+            if(this.buttons.delete(e.button))this.mouseButton(e,1);
+        });
+        on(window,'pointermove',e=>{
+            if(this.pointerId !== null && e.pointerId !== this.pointerId) return;
+            if(e.pointerType === 'touch' || e.pointerType === 'pen') e.preventDefault();
+            const locked=document.pointerLockElement===canvas;
+            if(!locked && this.pointerId===null && e.target!==canvas)return;
+            const fromX=this.mouseX,fromY=this.window.height-this.mouseY;
+            if(locked){this.look[0]+=e.movementX;this.look[1]+=e.movementY;this.mouseX+=e.movementX;this.mouseY+=e.movementY;}
+            else{const rect=this.canvas.getBoundingClientRect();this.mouseX=e.clientX-rect.left;this.mouseY=e.clientY-rect.top;}
+            const mods=this.modifiers(e);
+            if(this.buttons.size)for(const button of this.buttons)this.legacyMouseEvent?.(3,this.nativeButton(button),mods,fromX,fromY,this.mouseX,this.window.height-this.mouseY);
+            else this.legacyMouseEvent?.(2,-1,mods,fromX,fromY,this.mouseX,this.window.height-this.mouseY);
+        });
         on(canvas,'wheel',e=>{const scale=e.deltaMode===1?1:e.deltaMode===2?10:.01;this.scrollX=-e.deltaX*scale;this.scrollY=-e.deltaY*scale;this.legacyScrollEvent?.(this.scrollX,this.scrollY);});
-        on(window,'pointercancel',()=>this.resetInput());
+        on(window,'pointercancel',e=>{
+            if(this.pointerId !== null && e.pointerId !== this.pointerId) return;
+            if(this.pointerId === e.pointerId){
+                if(this.canvas.releasePointerCapture && this.canvas.hasPointerCapture?.(e.pointerId)){
+                    try { this.canvas.releasePointerCapture(e.pointerId); } catch (error) {}
+                }
+                this.pointerId = null;
+            }
+            this.resetInput();
+        });
         on(document,'pointerlockchange',()=>{
             this.resetInput();const locked=document.pointerLockElement===canvas;
             document.body.classList.toggle('playing',locked);
@@ -33,8 +79,10 @@ export class BrowserPlatform {
         });
         on(document,'pointerlockerror',()=>{this.captureError='Pointer capture was denied';});
         on(document,'mousemove',e=>{
-            const locked=document.pointerLockElement===canvas;if(!locked&&e.target!==canvas)return;
             const fromX=this.mouseX,fromY=this.window.height-this.mouseY;
+            const locked=document.pointerLockElement===canvas;
+            if(!locked&&e.target!==canvas)return;
+            if(this.pointerId !== null) return;
             if(locked){this.look[0]+=e.movementX;this.look[1]+=e.movementY;this.mouseX+=e.movementX;this.mouseY+=e.movementY;}
             else{const rect=this.canvas.getBoundingClientRect();this.mouseX=e.clientX-rect.left;this.mouseY=e.clientY-rect.top;}
             const mods=this.modifiers(e);
@@ -67,7 +115,7 @@ export class BrowserPlatform {
     legacyKeyDown(key){for(const code of this.keys)if(this.keyCode(code)===key)return true;return false;}
     publishKey(event,down){const key=this.keyCode(event.code);if(key>=0)this.legacyKeyEvent?.(key,(event.shiftKey?1:0)|(event.ctrlKey?2:0)|(event.altKey?4:0)|(event.metaKey?8:0),down);}
     takeKeyPress(code){this.check();return this.pressed.delete(code);}
-    resetInput(){const released=Array.from(this.keys),buttons=Array.from(this.buttons);this.keys.clear();this.pressed.clear();this.buttons.clear();this.look.fill(0);for(const code of released)this.publishKey({code},false);for(const button of buttons)this.legacyMouseEvent?.(1,this.nativeButton(button),0,0,0,this.mouseX,this.window.height-this.mouseY);}
+    resetInput(){const released=Array.from(this.keys),buttons=Array.from(this.buttons);this.keys.clear();this.pressed.clear();this.buttons.clear();this.pointerId=null;this.look.fill(0);for(const code of released)this.publishKey({code},false);for(const button of buttons)this.legacyMouseEvent?.(1,this.nativeButton(button),0,0,0,this.mouseX,this.window.height-this.mouseY);}
     takeLook(axis){this.check();const value=this.look[axis];this.look[axis]=0;return value;}
     capture(enabled){this.check();if(enabled){const result=this.canvas.requestPointerLock();result?.catch(error=>{this.captureError=String(error);});}else if(document.pointerLockElement===this.canvas)document.exitPointerLock();}
     settingKey(key){this.check();if(typeof key!=='string'||!key.length||key.length>128)throw new Error('Invalid setting key');return `valthorne:${key}`;}

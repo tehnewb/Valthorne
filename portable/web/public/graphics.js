@@ -1,5 +1,9 @@
 import {drawingCanvas} from './canvas.js';
 import { BrowserPathTracing } from './pathtrace.js';
+const getPixelRatio = (host) => {
+    const ratio = host.pixelRatio || Number(window.devicePixelRatio) || 1;
+    return Math.max(1, Math.min(ratio, 3));
+};
 // Internal WebGL backend for the unchanged engine batching and shader code.
 // A transparent compositing surface keeps Filament's private GL state isolated.
 export class BrowserGraphics {
@@ -16,7 +20,7 @@ export class BrowserGraphics {
         }
         return this.gl;
     }
-    resize(){if(!this.gl)return;const ratio=Math.max(1,Math.min(this.host.pixelRatio||window.devicePixelRatio||1,2)),w=Math.max(1,Math.round(this.host.platform.window.width*ratio)),h=Math.max(1,Math.round(this.host.platform.window.height*ratio));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;this.gl.viewport(0,0,w,h);}}
+    resize(){if(!this.gl)return;const ratio=getPixelRatio(this.host),w=Math.max(1,Math.round(this.host.platform.window.width*ratio)),h=Math.max(1,Math.round(this.host.platform.window.height*ratio));if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;this.gl.viewport(0,0,w,h);}}
     add(object,kind){if(!object)throw new Error('Could not allocate '+kind);const id=this.next++;this.objects.set(id,{object,kind});this.reverse.set(object,id);return id;}
     get(id){if(id===0||id===-1)return null;const item=this.objects.get(id);if(!item)throw new Error('Invalid or disposed graphics handle '+id);return item.object;}
     create(kind){return this.add(this.context()['create'+kind](),kind);}

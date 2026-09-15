@@ -4,14 +4,16 @@ plugins {
 }
 
 group = "io.github.tehnewb"
-version = providers.gradleProperty('releaseVersion').orElse(providers.gradleProperty('version')).get()
+version = providers.gradleProperty('releaseVersion')
+        .orElse(providers.gradleProperty('version'))
+        .get()
 description = "A 2D and 3D game development library"
 
 repositories {
     mavenCentral()
 }
 
-def lwjglVersion = "3.4.1"
+def lwjglVersion = "3.4.3"
 def joltVersion = "6.0.0"
 
 // If you want more modules, add them to both lists below.
@@ -38,7 +40,8 @@ def lwjglNativeClassifiers = [
 
 dependencies {
     api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
-    api 'org.joml:joml:1.10.8'
+
+    api 'org.joml:joml:1.10.9'
     api 'org.joml:joml-primitives:1.10.0'
 
     // API (what consumers compile against)
@@ -50,15 +53,27 @@ dependencies {
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
     implementation "org.apache.commons:commons-compress:1.28.0"
     implementation "io.github.erkko68.filament-ffm:filament-ffm:0.4.0"
+
     // Publish the same native runtime set regardless of the build host.
     ['windows-x64', 'linux-x64', 'linux-arm64', 'macos-arm64'].each { platform ->
         runtimeOnly "io.github.erkko68.filament-ffm:filament-ffm-runtime-${platform}:0.4.0"
     }
+
     // Platform-independent Jolt JNI classes; platform suffix is the upstream publication name.
     implementation "com.github.stephengold:jolt-jni-Windows64:$joltVersion"
-    ["Windows64", "Windows_ARM64", "Linux64", "Linux_ARM64", "Linux_ARM32hf", "MacOSX64", "MacOSX_ARM64"].each { platform ->
+
+    [
+            "Windows64",
+            "Windows_ARM64",
+            "Linux64",
+            "Linux_ARM64",
+            "Linux_ARM32hf",
+            "MacOSX64",
+            "MacOSX_ARM64"
+    ].each { platform ->
         runtimeOnly "com.github.stephengold:jolt-jni-${platform}:$joltVersion:ReleaseSp"
     }
+
     testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
 
@@ -66,20 +81,25 @@ dependencies {
     // These will be published so consumers get them transitively at runtime.
     lwjglModules.each { m ->
         lwjglNativeClassifiers.each { c ->
-            runtimeOnly "org.lwjgl:${m}::$c"
+            runtimeOnly "org.lwjgl:${m}::${c}"
         }
     }
 }
 
 java {
-    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+
     withSourcesJar()
     withJavadocJar()
 }
 
 // Optional local regression suites; runnable demos belong to Valthorne-examples.
 sourceSets {
-    test { java.include 'valthorne/**' }
+    test {
+        java.include 'valthorne/**'
+    }
 }
 
 apply from: 'gradle/benchmarks.gradle'
@@ -87,9 +107,13 @@ apply from: 'gradle/benchmarks.gradle'
 tasks.register('verifyPhysics3D', Test) {
     description = 'Runs native Jolt physics regression tests without a graphics context.'
     group = 'verification'
+
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    filter { includeTestsMatching 'valthorne.physics3d.*' }
+
+    filter {
+        includeTestsMatching 'valthorne.physics3d.*'
+    }
 }
 
 // Material packages are committed so consumers do not need a native compiler.
@@ -97,47 +121,95 @@ tasks.register('verifyPhysics3D', Test) {
 def filamentMaterialTasks = ['surface', 'solid', 'glass', 'alpha'].collect { materialName ->
     tasks.register("compileFilament${materialName.capitalize()}Material", Exec) {
         group = 'build'
+
         def source = file("src/main/resources/valthorne/filament/${materialName}.mat")
         def output = file("src/main/resources/valthorne/filament/${materialName}.filamat")
-        def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows') ? 'matc.exe' : 'matc'
-        def compiler = providers.gradleProperty('filamentMatc').orElse(file("build/filament-sdk-1.75/bin/${executable}").absolutePath)
+
+        def executable = System.getProperty('os.name')
+                .toLowerCase(Locale.ROOT)
+                .startsWith('windows')
+                ? 'matc.exe'
+                : 'matc'
+
+        def compiler = providers.gradleProperty('filamentMatc')
+                .orElse(file("build/filament-sdk-1.75/bin/${executable}").absolutePath)
+
         inputs.file(source)
         outputs.file(output)
+
         doFirst {
-            if (!file(compiler.get()).isFile()) throw new GradleException('Set -PfilamentMatc to matc from Filament 1.75.0.')
-            def abi = providers.exec { commandLine compiler.get(), '--version' }.standardOutput.asText.get().trim()
-            if (abi != '75') throw new GradleException("Filament material ABI must be 75, received ${abi}.")
-            commandLine compiler.get(), '-p', 'desktop', '-a', 'opengl', '-o', output.absolutePath, source.absolutePath
+            if (!file(compiler.get()).isFile()) {
+                throw new GradleException(
+                        'Set -PfilamentMatc to matc from Filament 1.75.0.'
+                )
+            }
+
+            def abi = providers.exec {
+                commandLine compiler.get(), '--version'
+            }.standardOutput.asText.get().trim()
+
+            if (abi != '75') {
+                throw new GradleException(
+                        "Filament material ABI must be 75, received ${abi}."
+                )
+            }
+
+            commandLine(
+                    compiler.get(),
+                    '-p', 'desktop',
+                    '-a', 'opengl',
+                    '-o', output.absolutePath,
+                    source.absolutePath
+            )
         }
     }
 }
+
 tasks.register('compileFilamentMaterials') {
     group = 'build'
     description = 'Rebuilds Filament material packages using the pinned SDK material ABI.'
+
     dependsOn filamentMaterialTasks
 }
-tasks.named('processResources') { mustRunAfter filamentMaterialTasks }
+
+tasks.named('processResources') {
+    mustRunAfter filamentMaterialTasks
+}
+
 tasks.register('verifyLighting', Test) {
     description = 'Runs CPU and actual OpenGL lighting regression tests.'
     group = 'verification'
+
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    filter { includeTestsMatching 'valthorne.model3d.Lighting*Test' }
+
+    filter {
+        includeTestsMatching 'valthorne.model3d.Lighting*Test'
+    }
 }
+
 tasks.register('verify3D', Test) {
     description = 'Runs the 3D geometry, asset and offscreen OpenGL regression tests.'
     group = 'verification'
+
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    filter { includeTestsMatching 'valthorne.model3d.*' }
+
+    filter {
+        includeTestsMatching 'valthorne.model3d.*'
+    }
 }
 
 tasks.register('verifyUI', Test) {
     description = 'Runs headless UI models and native mixed-renderer regressions.'
     group = 'verification'
+
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    filter { includeTestsMatching 'valthorne.ui.*' }
+
+    filter {
+        includeTestsMatching 'valthorne.ui.*'
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -151,38 +223,74 @@ tasks.withType(Javadoc).configureEach {
     options.addStringOption("Xdoclint:none", "-quiet")
     options.addStringOption("encoding", "UTF-8")
     options.addBooleanOption("html5", true)
+
     failOnError = true
 }
 
-tasks.matching { it.name == "plainJavadocJar" }.configureEach {
+tasks.matching {
+    it.name == "plainJavadocJar"
+}.configureEach {
     enabled = false
 }
 
-// Native access is required by LWJGL, Jolt JNI, and Filament FFM on Java 25.
-def lwjglJvmArgs = [
-        "--enable-native-access=ALL-UNNAMED"
+// JVM access required by LWJGL, Jolt JNI, Filament FFM, and JOML on Java 25.
+//
+// --enable-native-access:
+// Allows unnamed/classpath modules such as LWJGL to load native libraries.
+//
+// --add-exports:
+// Allows JOML 1.10.9 to use jdk.internal.misc.Unsafe instead of falling back
+// to the terminally deprecated sun.misc.Unsafe implementation.
+def valthorneJvmArgs = [
+        "--enable-native-access=ALL-UNNAMED",
+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED"
 ]
-def isMacOS = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('mac')
 
-// Apply to any JavaExec tasks (e.g., application plugin's run task, custom runners)
+def isMacOS = System.getProperty('os.name')
+        .toLowerCase(Locale.ROOT)
+        .contains('mac')
+
+// Apply to any JavaExec tasks
+// (e.g. application plugin's run task, IntelliJ-created Gradle Java runners,
+// or custom JavaExec tasks).
 tasks.withType(JavaExec).configureEach {
-    jvmArgs += lwjglJvmArgs
-    if (isMacOS) jvmArgs '-XstartOnFirstThread'
-    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+    jvmArgs += valthorneJvmArgs
+
+    if (isMacOS) {
+        jvmArgs '-XstartOnFirstThread'
+    }
+
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
 }
 
-// Apply to all tests
+// Apply the same Java 25 access configuration to all tests.
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
-    jvmArgs += lwjglJvmArgs
+
+    jvmArgs += valthorneJvmArgs
+
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
 }
 
 mavenPublishing {
     publishToMavenCentral()
-    if (providers.gradleProperty('releaseSigning').map { it.toBoolean() }.getOrElse(false)) {
+
+    if (providers.gradleProperty('releaseSigning')
+            .map { it.toBoolean() }
+            .getOrElse(false)) {
         signAllPublications()
     }
-    coordinates(group.toString(), project.name.toString(), version.toString())
+
+    coordinates(
+            group.toString(),
+            project.name.toString(),
+            version.toString()
+    )
+
     pom {
         name = "Valthorne"
         description = "2D and 3D game library"

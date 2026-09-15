@@ -16,7 +16,12 @@ import { BrowserCompute } from './compute.js';
 const canvas = document.querySelector('#scene');
 const status = document.querySelector('#stats') || document.querySelector('#status');
 const errorBox = document.querySelector('#error');
-const getDevicePixelRatio = () => Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+const isMobile = () => typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || matchMedia('(hover: none)').matches);
+const getDevicePixelRatio = () => {
+  const deviceRatio = Number(window.devicePixelRatio) || 1;
+  const maxRatio = isMobile() ? 3 : 2;
+  return Math.max(1, Math.min(deviceRatio, maxRatio));
+};
 function fail(error) {
     errorBox.textContent = `Unable to run the scene: ${error.message || error}`;
     errorBox.style.display = 'block';
