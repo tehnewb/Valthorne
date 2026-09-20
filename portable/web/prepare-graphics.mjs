@@ -158,6 +158,12 @@ for(const name of sharedGraphics){
         source=replaceBody(source,'cleanupExtractedNanoFonts','\n extractedNanoFonts.clear();\n');
     }
     if(name==='ui/theme/ProfessionalTheme')source=source.replace('Math.clamp(.5f - distance, 0, 1)','Math.max(0, Math.min(1, .5f - distance))');
+    if(name==='ui/nodes/ColorPicker'){
+        source=source.replaceAll('Math.clamp(saturation, 0, 1)','Math.max(0, Math.min(1, saturation))')
+            .replaceAll('Math.clamp(brightness, 0, 1)','Math.max(0, Math.min(1, brightness))')
+            .replaceAll('org.lwjgl.nanovg.NVGPaint.calloc(stack)','org.lwjgl.nanovg.NVGPaint.calloc()')
+            .replaceAll('org.lwjgl.nanovg.NVGColor.calloc(stack)','org.lwjgl.nanovg.NVGColor.calloc()');
+    }
     if(name==='ui/behavior/TextEditModel'){
         source=source.replace(/^    private static final Pattern GRAPHEME[^;]+;/m,'');
         source=source.replaceAll('Math.clamp(index, 0, text.length())','Math.max(0, Math.min(text.length(), index))');

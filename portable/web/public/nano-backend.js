@@ -34,7 +34,7 @@ export class BrowserNano {
     set(id,key,value){this.get(id).state[key]=value;}
     prepare(c){const {ctx,state:s}=c;ctx.save();ctx.resetTransform();ctx.globalAlpha=s.alpha??1;ctx.scale(c.ratio||1,c.ratio||1);const base=ctx.getTransform();for(const clip of s.clips){ctx.setTransform(base.multiply(clip.matrix));ctx.beginPath();ctx.rect(clip.x,clip.y,clip.w,clip.h);ctx.clip();}ctx.setTransform(base.multiply(s.matrix));ctx.fillStyle=s.fill;ctx.strokeStyle=s.stroke;ctx.lineWidth=s.width;ctx.lineCap=s.cap;ctx.lineJoin=s.join;this.font(c);return ctx;}
     font(c){const {ctx,state:s}=c;ctx.font=`${s.size}px "${c.fonts.get(s.face)?.family||s.face}"`;ctx.textAlign=s.align&2?'center':s.align&4?'right':'left';ctx.textBaseline=s.align&8?'top':s.align&16?'middle':s.align&32?'bottom':'alphabetic';}
-    fill(id){const c=this.get(id),ctx=this.prepare(c);try{const p=c.state.paint;if(p){const image=c.images.get(p.image);if(!image)throw new Error('Disposed UI image');ctx.clip(c.path);ctx.translate(p.x,p.y);ctx.rotate(p.angle);ctx.globalAlpha*=p.alpha;ctx.drawImage(image,0,0,p.w,p.h);}else ctx.fill(c.path);c.dirty=true;}finally{ctx.restore();}}
+    fill(id){const c=this.get(id),ctx=this.prepare(c);try{const p=c.state.paint;if(p?.kind==='gradient'){const gradient=ctx.createLinearGradient(p.sx,p.sy,p.ex,p.ey);gradient.addColorStop(0,p.inner);gradient.addColorStop(1,p.outer);ctx.fillStyle=gradient;ctx.fill(c.path);}else if(p){const image=c.images.get(p.image);if(!image)throw new Error('Disposed UI image');ctx.clip(c.path);ctx.translate(p.x,p.y);ctx.rotate(p.angle);ctx.globalAlpha*=p.alpha;ctx.drawImage(image,0,0,p.w,p.h);}else ctx.fill(c.path);c.dirty=true;}finally{ctx.restore();}}
     stroke(id){const c=this.get(id),ctx=this.prepare(c);try{ctx.stroke(c.path);c.dirty=true;}finally{ctx.restore();}}
     text(id,x,y,text){const c=this.get(id),ctx=this.prepare(c);try{ctx.fillText(text,x,y);c.dirty=true;return x+ctx.measureText(text).width;}finally{ctx.restore();}}
     bounds(id,x,y,text){const c=this.get(id);this.font(c);const m=c.ctx.measureText(text);return [x-m.actualBoundingBoxLeft,y-m.actualBoundingBoxAscent,x+m.actualBoundingBoxRight,y+m.actualBoundingBoxDescent,m.width];}
@@ -43,6 +43,7 @@ export class BrowserNano {
     image(id,w,h,flags,bytes){const canvas=drawingCanvas(w,h),ctx=canvas.getContext('2d'),data=new ImageData(new Uint8ClampedArray(bytes),w,h);if(flags&8){const row=w*4;for(let y=0;y<(h>>1);y++){const a=y*row,b=(h-1-y)*row;for(let i=0;i<row;i++){const v=data.data[a+i];data.data[a+i]=data.data[b+i];data.data[b+i]=v;}}}ctx.putImageData(data,0,0);const image=this.next++;this.get(id).images.set(image,canvas);return image;}
     deleteImage(id,image){this.get(id).images.delete(image);}
     paint(id,x,y,w,h,angle,image,alpha){this.get(id).state.paint={x,y,w,h,angle,image,alpha};}
+    gradient(id,sx,sy,ex,ey,r0,g0,b0,a0,r1,g1,b1,a1){this.get(id).state.paint={kind:'gradient',sx,sy,ex,ey,inner:`rgba(${r0*255},${g0*255},${b0*255},${a0})`,outer:`rgba(${r1*255},${g1*255},${b1*255},${a1})`};}
     delete(id){const c=this.contexts.get(id);if(!c)return;for(const f of c.fonts.values())document.fonts.delete(f.face);c.fonts.clear();c.images.clear();c.canvas.width=c.canvas.height=1;this.contexts.delete(id);}
     close(){for(const id of this.contexts.keys())this.delete(id);}
 }

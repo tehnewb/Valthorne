@@ -2,7 +2,7 @@ package valthorne.web.ui;
 import org.teavm.jso.*; import org.teavm.jso.typedarrays.Uint8Array; import org.teavm.interop.*; import org.lwjgl.nanovg.*; import java.nio.ByteBuffer;
 public final class BrowserNano {
 private BrowserNano() {}
-public static final int NVG_ANTIALIAS=1,NVG_STENCIL_STROKES=2,NVG_ALIGN_LEFT=1,NVG_ALIGN_CENTER=2,NVG_ALIGN_RIGHT=4,NVG_ALIGN_TOP=8,NVG_ALIGN_MIDDLE=16,NVG_ALIGN_BOTTOM=32,NVG_ALIGN_BASELINE=64,NVG_ROUND=1,NVG_IMAGE_FLIPY=8;
+public static final int NVG_ANTIALIAS=1,NVG_STENCIL_STROKES=2,NVG_ALIGN_LEFT=1,NVG_ALIGN_CENTER=2,NVG_ALIGN_RIGHT=4,NVG_ALIGN_TOP=8,NVG_ALIGN_MIDDLE=16,NVG_ALIGN_BOTTOM=32,NVG_ALIGN_BASELINE=64,NVG_ROUND=1,NVG_IMAGE_FLIPY=8,NVG_CW=1,NVG_CCW=2;
 public static long nvgCreate(int flags){return bnvgCreate(flags);}
 public static void nvgClosePath(long vg){closePath((int)vg);}
 @JSBody(params="vg",script="valthorneHost.nano.path(vg,'closePath',[]);") private static native void closePath(int vg);
@@ -43,6 +43,10 @@ public static void nvgRoundedRect(long vg,float x,float y,float w,float h,float 
 @JSBody(params={"vg","x","y","w","h","r"},script="valthorneHost.nano.roundedRect(vg,x,y,w,h,r);") private static native void bnvgRoundedRect(int vg,float x,float y,float w,float h,float r);
 public static void nvgCircle(long vg,float x,float y,float r){bnvgCircle((int)vg,x,y,r);}
 @JSBody(params={"vg","x","y","r"},script="valthorneHost.nano.circle(vg,x,y,r);") private static native void bnvgCircle(int vg,float x,float y,float r);
+public static void nvgArc(long vg,float x,float y,float r,float start,float end,int direction){bnvgArc((int)vg,x,y,r,start,end,direction==NVG_CCW);}
+@JSBody(params={"vg","x","y","r","start","end","ccw"},script="valthorneHost.nano.path(vg,'arc',[x,y,r,start,end,ccw]);") private static native void bnvgArc(int vg,float x,float y,float r,float start,float end,boolean ccw);
+/** Canvas antialiasing is browser-managed; retained for NanoVG source compatibility. */
+public static void nvgShapeAntiAlias(long vg,boolean enabled){}
 public static void nvgMoveTo(long vg,float x,float y){bnvgMoveTo((int)vg,x,y);}
 @JSBody(params={"vg","x","y"},script="valthorneHost.nano.path(vg,'moveTo',[x,y]);") private static native void bnvgMoveTo(int vg,float x,float y);
 public static void nvgLineTo(long vg,float x,float y){bnvgLineTo((int)vg,x,y);}
@@ -80,6 +84,8 @@ public static int nvgCreateImageRGBA(long vg,int width,int height,int flags,Byte
 public static void nvgDeleteImage(long vg,int image){bnvgDeleteImage((int)vg,image);}
 @JSBody(params={"vg","image"},script="valthorneHost.nano.deleteImage(vg,image);") private static native void bnvgDeleteImage(int vg,int image);
 public static NVGPaint nvgImagePattern(long vg,float x,float y,float w,float h,float angle,int image,float alpha,NVGPaint target){target.x=x;target.y=y;target.width=w;target.height=h;target.angle=angle;target.image=image;target.alpha=alpha;return target;}
-public static void nvgFillPaint(long vg,NVGPaint p){paint((int)vg,p.x,p.y,p.width,p.height,p.angle,p.image,p.alpha);}
+public static NVGPaint nvgLinearGradient(long vg,float sx,float sy,float ex,float ey,NVGColor inner,NVGColor outer,NVGPaint target){target.kind=1;target.x=sx;target.y=sy;target.width=ex;target.height=ey;target.r0=inner.r();target.g0=inner.g();target.b0=inner.b();target.a0=inner.a();target.r1=outer.r();target.g1=outer.g();target.b1=outer.b();target.a1=outer.a();return target;}
+public static void nvgFillPaint(long vg,NVGPaint p){if(p.kind==1)gradient((int)vg,p.x,p.y,p.width,p.height,p.r0,p.g0,p.b0,p.a0,p.r1,p.g1,p.b1,p.a1);else paint((int)vg,p.x,p.y,p.width,p.height,p.angle,p.image,p.alpha);}
 @JSBody(params={"vg","x","y","w","h","angle","image","alpha"},script="valthorneHost.nano.paint(vg,x,y,w,h,angle,image,alpha);") private static native void paint(int vg,float x,float y,float w,float h,float angle,int image,float alpha);
+@JSBody(params={"vg","sx","sy","ex","ey","r0","g0","b0","a0","r1","g1","b1","a1"},script="valthorneHost.nano.gradient(vg,sx,sy,ex,ey,r0,g0,b0,a0,r1,g1,b1,a1);") private static native void gradient(int vg,float sx,float sy,float ex,float ey,float r0,float g0,float b0,float a0,float r1,float g1,float b1,float a1);
 }
