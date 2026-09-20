@@ -1,5 +1,6 @@
 package compatibility;
 import valthorne.*;
+import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.ui.*;
 import valthorne.ui.nodes.*;
