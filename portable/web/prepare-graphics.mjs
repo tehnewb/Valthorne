@@ -164,6 +164,7 @@ for(const name of sharedGraphics){
             .replaceAll('org.lwjgl.nanovg.NVGPaint.calloc(stack)','org.lwjgl.nanovg.NVGPaint.calloc()')
             .replaceAll('org.lwjgl.nanovg.NVGColor.calloc(stack)','org.lwjgl.nanovg.NVGColor.calloc()');
     }
+    if(name==='ui/nodes/FileChooser')source=source.replaceAll('.getFirst()', '.get(0)');
     if(name==='ui/behavior/TextEditModel'){
         source=source.replace(/^    private static final Pattern GRAPHEME[^;]+;/m,'');
         source=source.replaceAll('Math.clamp(index, 0, text.length())','Math.max(0, Math.min(text.length(), index))');

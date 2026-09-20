@@ -92,11 +92,16 @@ export class BrowserSceneRenderer {
     render(projection,model,near,far){
         this.check();const h=this.host,canvas=h.platform.canvas||document.querySelector('#scene');
         h.graphics.context();
-        h.graphics.resize();h.graphics.clearOverlay();
+        h.graphics.resize();
         const ratio=getPixelRatio(),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),height=Math.max(1,Math.round(canvas.clientHeight*ratio));
         if(canvas.width!==w||canvas.height!==height){canvas.width=w;canvas.height=height;}
         this.view.setViewport([0,0,w,height]);this.camera.setCustomProjection(projection,near,far);this.camera.setModelMatrix(model);
-        h.renderer.render(h.swap,this.view);h.frames++;globalThis.valthorneReady=true;
+        h.renderer.render(h.swap,this.view);
+        // Preserve the last complete UI frame while Filament performs synchronous
+        // mesh uploads. The application redraws the overlay before the browser's
+        // next presentation, so users never see an intermediate cleared canvas.
+        h.graphics.clearOverlay();
+        h.frames++;globalThis.valthorneReady=true;
     }
     exposure(value){this.camera.setExposure(4,1/60,100*value);}
     environment(value){this.ambient.setIntensity(value);}
