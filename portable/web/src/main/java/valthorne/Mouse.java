@@ -11,7 +11,8 @@ public final class Mouse {
     private static int mouseX,mouseY;private static float scrollX,scrollY;
     public static final int LEFT=0,RIGHT=1,MIDDLE=2,BUTTON_3=3,BUTTON_4=4,BUTTON_5=5,BUTTON_6=6,BUTTON_7=7;
     public static final int CURSOR_NORMAL=0x34001,CURSOR_HIDDEN=0x34002,CURSOR_DISABLED=0x34003;
-    public static final int CURSOR_ARROW=0x36001,CURSOR_IBEAM=0x36002,CURSOR_CROSSHAIR=0x36003,CURSOR_HAND=0x36004,CURSOR_HRESIZE=0x36005,CURSOR_VRESIZE=0x36006;
+    public static final int CURSOR_ARROW=0x36001,CURSOR_IBEAM=0x36002,CURSOR_CROSSHAIR=0x36003,CURSOR_HAND=0x36004,CURSOR_HRESIZE=0x36005,CURSOR_VRESIZE=0x36006,CURSOR_RESIZE_NWSE=0x36007,CURSOR_RESIZE_NESW=0x36008;
+    private static Object cursorOwner;private static int cursorShape=CURSOR_ARROW;
     @JSFunctor private interface Callback extends JSObject {void accept(int kind,int button,int mods,int fromX,int fromY,int x,int y);}
     @JSFunctor private interface Scroll extends JSObject {void accept(float x,float y);}
     static void init(){java.util.Arrays.fill(buttons,false);mouseX=0;mouseY=Window.getHeight();scrollX=scrollY=0;install((kind,button,mods,fromX,fromY,x,y)->JGL.runInputTask(()->{
@@ -42,6 +43,15 @@ public final class Mouse {
         // Browser pointer-lock policy owns relative motion on this backend.
     }
     @JSBody(params="shape",script="valthorneHost.platform.cursorShape(shape);") public static native void setCursor(int shape);
+    public static void overrideCursor(Object owner,int shape){
+        if(owner==null)throw new IllegalArgumentException("owner");
+        cursorOwner=owner;cursorShape=shape;setCursor(shape);
+    }
+    public static void clearCursorOverride(Object owner){
+        if(cursorOwner!=owner)return;
+        cursorOwner=null;cursorShape=CURSOR_ARROW;setCursor(CURSOR_ARROW);
+    }
+    public static int getCursorShape(){return cursorShape;}
     public static void setCursor(valthorne.graphics.texture.TextureData texture,int hotX,int hotY){
         cursor(valthorne.web.WindowImages.pixels(texture),texture.width(),texture.height(),Math.max(0,Math.min(texture.width()-1,hotX)),Math.max(0,Math.min(texture.height()-1,texture.height()-hotY-1)));
     }
