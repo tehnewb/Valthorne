@@ -218,112 +218,200 @@ public final class PropertySet {
         PropertySetIO.write(this, path);
     }
 
-    /** Writes this set to a caller-owned stream without closing it.
+    /**
+     * Writes this set to a caller-owned stream without closing it.
+     *
      * @param output destination stream
-     * @throws IOException if writing fails */
+     * @throws IOException if writing fails
+     */
     public void write(OutputStream output) throws IOException {
         PropertySetIO.write(this, output);
     }
 
-    /** Writes this set at the buffer's current write position.
-     * @param buffer destination buffer */
+    /**
+     * Writes this set at the buffer's current write position.
+     *
+     * @param buffer destination buffer
+     */
     public void write(DynamicByteBuffer buffer) {
         PropertySetIO.write(this, buffer);
     }
 
-    /** Encodes this set into a new byte array.
-     * @return encoded bytes */
+    /**
+     * Encodes this set into a new byte array.
+     *
+     * @return encoded bytes
+     */
     public byte[] toBytes() {
         return PropertySetIO.toBytes(this);
     }
 
-    /** Reads a property set from a file.
+    /**
+     * Reads a property set from a file.
+     *
      * @param path source path
      * @return decoded set
-     * @throws IOException if reading fails or the file is invalid */
+     * @throws IOException if reading fails or the file is invalid
+     */
     public static PropertySet read(Path path) throws IOException {
         return PropertySetIO.read(path);
     }
 
-    /** Reads a property set from a caller-owned stream without closing it.
+    /**
+     * Reads a property set from a caller-owned stream without closing it.
+     *
      * @param input source stream
      * @return decoded set
-     * @throws IOException if reading fails or the data is invalid */
+     * @throws IOException if reading fails or the data is invalid
+     */
     public static PropertySet read(InputStream input) throws IOException {
         return PropertySetIO.read(input);
     }
 
-    /** Reads a property set at the buffer's current read position.
+    /**
+     * Reads a property set at the buffer's current read position.
+     *
      * @param buffer source buffer
      * @return decoded set
-     * @throws IOException if the data is invalid */
+     * @throws IOException if the data is invalid
+     */
     public static PropertySet read(DynamicByteBuffer buffer) throws IOException {
         return PropertySetIO.read(buffer);
     }
 
-    /** Decodes a property set from bytes.
+    /**
+     * Decodes a property set from bytes.
+     *
      * @param bytes encoded bytes
      * @return decoded set
-     * @throws IOException if the data is invalid */
+     * @throws IOException if the data is invalid
+     */
     public static PropertySet fromBytes(byte[] bytes) throws IOException {
         return PropertySetIO.fromBytes(bytes);
     }
 
-    /** Writes this set to a human-readable UTF-8 text file.
+    /**
+     * Writes this set to a human-readable UTF-8 text file.
+     *
      * @param path destination path
-     * @throws IOException if writing fails */
+     * @throws IOException if writing fails
+     */
     public void writeText(Path path) throws IOException {
         PropertySetTextIO.write(this, path);
     }
 
-    /** Writes this set as UTF-8 text to a caller-owned stream.
+    /**
+     * Writes this set and optional comments to a human-readable UTF-8 text file.
+     *
+     * @param path    destination path
+     * @param options header and entry comments
+     * @throws IOException if writing fails
+     */
+    public void writeText(Path path, PropertyTextOptions options) throws IOException {
+        PropertySetTextIO.write(this, path, options);
+    }
+
+    /**
+     * Writes this set as UTF-8 text to a caller-owned stream.
+     *
      * @param output destination stream
-     * @throws IOException if writing fails */
+     * @throws IOException if writing fails
+     */
     public void writeText(OutputStream output) throws IOException {
         PropertySetTextIO.write(this, output);
     }
 
-    /** Writes this set to a caller-owned character stream.
+    /**
+     * Writes this set and optional comments as UTF-8 text.
+     *
+     * @param output  destination stream
+     * @param options header and entry comments
+     * @throws IOException if writing fails
+     */
+    public void writeText(OutputStream output, PropertyTextOptions options) throws IOException {
+        PropertySetTextIO.write(this, output, options);
+    }
+
+    /**
+     * Writes this set to a caller-owned character stream.
+     *
      * @param writer destination writer
-     * @throws IOException if writing fails */
+     * @throws IOException if writing fails
+     */
     public void writeText(Writer writer) throws IOException {
         PropertySetTextIO.write(this, writer);
     }
 
-    /** Returns this set's editable text representation.
-     * @return typed property text */
+    /**
+     * Writes this set and optional comments to a character stream.
+     *
+     * @param writer  destination writer
+     * @param options header and entry comments
+     * @throws IOException if writing fails
+     */
+    public void writeText(Writer writer, PropertyTextOptions options) throws IOException {
+        PropertySetTextIO.write(this, writer, options);
+    }
+
+    /**
+     * Returns this set's editable text representation.
+     *
+     * @return typed property text
+     */
     public String toText() {
         return PropertySetTextIO.toText(this);
     }
 
-    /** Reads a human-readable UTF-8 property file.
+    /**
+     * Returns this set's editable text representation with optional comments.
+     *
+     * @param options header and entry comments
+     * @return typed property text
+     */
+    public String toText(PropertyTextOptions options) {
+        return PropertySetTextIO.toText(this, options);
+    }
+
+    /**
+     * Reads a human-readable UTF-8 property file.
+     *
      * @param path source path
      * @return decoded set
-     * @throws IOException if reading fails or the text is invalid */
+     * @throws IOException if reading fails or the text is invalid
+     */
     public static PropertySet readText(Path path) throws IOException {
         return PropertySetTextIO.read(path);
     }
 
-    /** Reads UTF-8 property text from a caller-owned stream.
+    /**
+     * Reads UTF-8 property text from a caller-owned stream.
+     *
      * @param input source stream
      * @return decoded set
-     * @throws IOException if reading fails or the text is invalid */
+     * @throws IOException if reading fails or the text is invalid
+     */
     public static PropertySet readText(InputStream input) throws IOException {
         return PropertySetTextIO.read(input);
     }
 
-    /** Reads property text from a caller-owned character stream.
+    /**
+     * Reads property text from a caller-owned character stream.
+     *
      * @param reader source reader
      * @return decoded set
-     * @throws IOException if reading fails or the text is invalid */
+     * @throws IOException if reading fails or the text is invalid
+     */
     public static PropertySet readText(Reader reader) throws IOException {
         return PropertySetTextIO.read(reader);
     }
 
-    /** Decodes a property set from human-readable text.
+    /**
+     * Decodes a property set from human-readable text.
+     *
      * @param text encoded text
      * @return decoded set
-     * @throws IOException if the text is invalid */
+     * @throws IOException if the text is invalid
+     */
     public static PropertySet fromText(String text) throws IOException {
         return PropertySetTextIO.fromText(text);
     }

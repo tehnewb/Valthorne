@@ -177,4 +177,32 @@ class PropertySetTest {
         assertThrows(java.io.IOException.class,
                 () -> PropertySet.fromText("broken:unknown=value\n"));
     }
+
+    @Test
+    void supportsAnyNumberOfHeadersAndInlineComments() throws Exception {
+        PropertySet properties = new PropertySet(Map.of(
+                "title", "Valthorne # literal",
+                "width", 1920,
+                "fullscreen", true
+        ));
+        PropertyTextOptions options = new PropertyTextOptions(
+                java.util.List.of("Display settings", "Change these before launching"),
+                Map.of("width", "Horizontal resolution", "fullscreen", "Use the whole display")
+        );
+
+        String text = properties.toText(options);
+        assertTrue(text.startsWith("# Display settings\n# Change these before launching\n"));
+        assertTrue(text.contains("width:integer=1920 # Horizontal resolution"));
+        assertTrue(text.contains("title:string=Valthorne \\# literal"));
+        assertEquals(properties.asMap(), PropertySet.fromText(text).asMap());
+
+        String manual = "# First header\n! Second header\n\n"
+                + "name:string=Example # visible label\n"
+                + "enabled:boolean=true ! feature toggle\n";
+        PropertySet parsed = PropertySet.fromText(manual);
+        assertEquals("Example", parsed.getRequired("name", String.class).value());
+        assertTrue(parsed.getRequired("enabled", Boolean.class).value());
+        assertThrows(IllegalArgumentException.class,
+                () -> PropertyTextOptions.withHeaders("invalid\nheader"));
+    }
 }
