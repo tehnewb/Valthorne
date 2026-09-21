@@ -34,7 +34,8 @@ import java.util.UUID;
 
 /**
  * Reads and writes the human-readable UTF-8 representation of a {@link PropertySet}.
- * Each property occupies one line in the form {@code escaped-name:type=escaped-value}.
+ * Each property occupies one line in the form {@code escaped-name:type=escaped-value}
+ * and may end with an optional {@code # comment} or {@code ! comment}.
  * Blank lines and lines whose first non-whitespace character is {@code #} or {@code !}
  * are ignored. Backslash escapes {@code \}, {@code :}, {@code =}, newline, carriage
  * return, tab, and comment-marker characters.
@@ -48,8 +49,6 @@ import java.util.UUID;
  */
 public final class PropertySetTextIO {
 
-    private static final String HEADER = "# Valthorne property set\n";
-
     private PropertySetTextIO() {
         // utility class
     }
@@ -62,9 +61,21 @@ public final class PropertySetTextIO {
      * @throws IOException if writing fails
      */
     public static void write(PropertySet properties, Path path) throws IOException {
+        write(properties, path, PropertyTextOptions.none());
+    }
+
+    /**
+     * Writes properties and optional comments to a UTF-8 text file.
+     *
+     * @param properties properties to write
+     * @param path destination path
+     * @param options header and entry comments
+     * @throws IOException if writing fails
+     */
+    public static void write(PropertySet properties, Path path, PropertyTextOptions options) throws IOException {
         Objects.requireNonNull(path, "path");
         try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-            write(properties, writer);
+            write(properties, writer, options);
         }
     }
 
@@ -76,8 +87,21 @@ public final class PropertySetTextIO {
      * @throws IOException if writing fails
      */
     public static void write(PropertySet properties, OutputStream output) throws IOException {
+        write(properties, output, PropertyTextOptions.none());
+    }
+
+    /**
+     * Writes properties and optional comments as UTF-8 to a caller-owned stream.
+     *
+     * @param properties properties to write
+     * @param output destination stream
+     * @param options header and entry comments
+     * @throws IOException if writing fails
+     */
+    public static void write(PropertySet properties, OutputStream output,
+                             PropertyTextOptions options) throws IOException {
         OutputStreamWriter writer = new OutputStreamWriter(Objects.requireNonNull(output, "output"), StandardCharsets.UTF_8);
-        write(properties, writer);
+        write(properties, writer, options);
         writer.flush();
     }
 
@@ -90,12 +114,31 @@ public final class PropertySetTextIO {
      * @throws IllegalArgumentException if a value type is unsupported
      */
     public static void write(PropertySet properties, Writer writer) throws IOException {
+        write(properties, writer, PropertyTextOptions.none());
+    }
+
+    /**
+     * Writes properties and optional comments to a caller-owned character stream.
+     *
+     * @param properties properties to write
+     * @param writer destination writer
+     * @param options header and entry comments
+     * @throws IOException if writing fails
+     * @throws IllegalArgumentException if a value type is unsupported
+     */
+    public static void write(PropertySet properties, Writer writer,
+                             PropertyTextOptions options) throws IOException {
         Objects.requireNonNull(properties, "properties");
         Objects.requireNonNull(writer, "writer");
+        Objects.requireNonNull(options, "options");
         List<String> names = new ArrayList<>(properties.asMap().keySet());
         names.sort(String::compareTo);
 
-        writer.write(HEADER);
+        for (String header : options.headers()) {
+            writer.write("# ");
+            writer.write(header);
+            writer.write('\n');
+        }
         for (String name : names) {
             EncodedValue encoded = encode(properties.getRequired(name).value());
             writer.write(escape(name));
@@ -103,6 +146,11 @@ public final class PropertySetTextIO {
             writer.write(encoded.type());
             writer.write('=');
             writer.write(escape(encoded.value()));
+            String comment = options.comments().get(name);
+            if (comment != null) {
+                writer.write(" # ");
+                writer.write(comment);
+            }
             writer.write('\n');
         }
     }
@@ -114,9 +162,20 @@ public final class PropertySetTextIO {
      * @return encoded text
      */
     public static String toText(PropertySet properties) {
+        return toText(properties, PropertyTextOptions.none());
+    }
+
+    /**
+     * Returns the human-readable representation with optional comments.
+     *
+     * @param properties properties to encode
+     * @param options header and entry comments
+     * @return encoded text
+     */
+    public static String toText(PropertySet properties, PropertyTextOptions options) {
         try {
             StringWriter writer = new StringWriter();
-            write(properties, writer);
+            write(properties, writer, options);
             return writer.toString();
         } catch (IOException impossible) {
             throw new AssertionError("StringWriter unexpectedly failed", impossible);
@@ -172,7 +231,10 @@ public final class PropertySetTextIO {
 
                 String name = unescape(line.substring(0, colon));
                 String type = line.substring(colon + 1, equals).trim();
-                String value = unescape(line.substring(equals + 1));
+                String encodedValue = line.substring(equals + 1);
+                int comment = inlineComment(encodedValue);
+                if (comment >= 0) encodedValue = encodedValue.substring(0, comment - 1);
+                String value = unescape(encodedValue);
                 if (name.isEmpty()) throw new IllegalArgumentException("Property name cannot be empty");
                 if (properties.contains(name)) throw new IllegalArgumentException("Duplicate property name: " + name);
                 properties.set(name, decode(type, value));
@@ -282,6 +344,17 @@ public final class PropertySetTextIO {
             if (escaped) escaped = false;
             else if (character == '\\') escaped = true;
             else if (character == expected) return i;
+        }
+        return -1;
+    }
+
+    private static int inlineComment(String value) {
+        boolean escaped = false;
+        for (int i = 1; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (escaped) escaped = false;
+            else if (character == '\\') escaped = true;
+            else if ((character == '#' || character == '!') && Character.isWhitespace(value.charAt(i - 1))) return i;
         }
         return -1;
     }
