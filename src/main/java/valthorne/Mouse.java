@@ -190,6 +190,16 @@ public final class Mouse {
     public static final int CURSOR_VRESIZE = GLFW_VRESIZE_CURSOR;
 
     /**
+     * Northwest/southeast diagonal resize cursor for top-left and bottom-right corners.
+     */
+    public static final int CURSOR_RESIZE_NWSE = GLFW_RESIZE_NWSE_CURSOR;
+
+    /**
+     * Northeast/southwest diagonal resize cursor for top-right and bottom-left corners.
+     */
+    public static final int CURSOR_RESIZE_NESW = GLFW_RESIZE_NESW_CURSOR;
+
+    /**
      * Reusable mouse press event instance. Consumers must copy values for a historical snapshot.
      */
     private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0); // Reusable mouse press event instance
@@ -250,6 +260,26 @@ public final class Mouse {
      * Native GLFW cursor handle currently assigned to the window.
      */
     private static long currentCursor = 0; // Native GLFW cursor handle currently assigned to the window
+
+    /**
+     * Application-selected standard shape, or zero when a custom image cursor is selected.
+     */
+    private static int currentCursorShape = CURSOR_ARROW;
+
+    /**
+     * Temporary UI cursor handle, owned independently so the application cursor survives.
+     */
+    private static long overrideCursor;
+
+    /**
+     * Identity token authorized to release the current temporary cursor.
+     */
+    private static Object cursorOwner;
+
+    /**
+     * Standard shape of the active override, used to avoid recreating it on every frame.
+     */
+    private static int overrideCursorShape;
 
     /**
      * <p>
@@ -360,9 +390,9 @@ public final class Mouse {
      * </p>
      *
      * <p>
-     * If a custom or previously created cursor is already active, it is destroyed
-     * before the new cursor is created and assigned. If the window address is invalid,
-     * the method returns immediately without doing anything.
+     * Replaces the application's previously selected cursor. A temporary UI override
+     * remains visible until its owner releases it, at which point this new choice is
+     * restored. If the window address is invalid, the method returns without changes.
      * </p>
      *
      * @param shape one of the supported {@code CURSOR_*} shape constants
@@ -374,8 +404,44 @@ public final class Mouse {
         if (currentCursor != 0) glfwDestroyCursor(currentCursor);
 
         currentCursor = glfwCreateStandardCursor(shape);
-        glfwSetCursor(win, currentCursor);
+        currentCursorShape = shape;
+        glfwSetCursor(win, overrideCursor != 0 ? overrideCursor : currentCursor);
     }
+
+    /**
+     * Temporarily displays a standard cursor while retaining the application's selected
+     * standard or custom image cursor. Identical shapes reuse the native cursor; changing
+     * owner transfers release responsibility without destroying the application cursor.
+     * @param owner nonnull identity token used later to release this override
+     * @param shape standard cursor shape such as CURSOR_HRESIZE or CURSOR_RESIZE_NWSE
+     */
+    public static void overrideCursor(Object owner, int shape) {
+        java.util.Objects.requireNonNull(owner);
+        long win = Window.getAddress(); if (win == 0) return;
+        if (overrideCursor != 0 && overrideCursorShape == shape) { cursorOwner = owner; return; }
+        long next = glfwCreateStandardCursor(shape);
+        if (next == 0) return;
+        glfwSetCursor(win, next);
+        if (overrideCursor != 0) glfwDestroyCursor(overrideCursor);
+        overrideCursor = next; overrideCursorShape = shape; cursorOwner = owner;
+    }
+
+    /**
+     * Restores the application's latest cursor only when the supplied owner still owns
+     * the override. Stale releases cannot clear a newer UI owner's cursor.
+     * @param owner identity token supplied to overrideCursor
+     */
+    public static void clearCursorOverride(Object owner) {
+        if (cursorOwner != owner || overrideCursor == 0) return;
+        long win = Window.getAddress(); if (win != 0) glfwSetCursor(win, currentCursor);
+        glfwDestroyCursor(overrideCursor); overrideCursor = 0; cursorOwner = null; overrideCursorShape = 0;
+    }
+
+    /**
+     * Reads the selected standard cursor, including any temporary UI override.
+     * @return standard CURSOR_* shape, or zero for an application custom image cursor
+     */
+    public static int getCursorShape() { return overrideCursor != 0 ? overrideCursorShape : currentCursorShape; }
 
     /**
      * <p>
@@ -390,8 +456,8 @@ public final class Mouse {
      * </p>
      *
      * <p>
-     * Any previously active cursor created by this class is destroyed before the new
-     * one is assigned.
+     * The previous application cursor is destroyed before the new one is assigned.
+     * A temporary UI override remains visible and retains this image cursor for restoration.
      * </p>
      *
      * @param data the texture data used as the cursor image
@@ -429,7 +495,8 @@ public final class Mouse {
 
         if (currentCursor == 0) throw new RuntimeException("Failed to create GLFW cursor from TextureData");
 
-        glfwSetCursor(win, currentCursor);
+        currentCursorShape = 0;
+        glfwSetCursor(win, overrideCursor != 0 ? overrideCursor : currentCursor);
     }
 
     /**
@@ -584,6 +651,9 @@ public final class Mouse {
      * </p>
      */
     static void dispose() {
+        if (overrideCursor != 0) {
+            glfwDestroyCursor(overrideCursor); overrideCursor = 0; cursorOwner = null; overrideCursorShape = 0;
+        }
         if (cursorPosCallback != null) {
             if (Window.getAddress() != 0) glfwSetCursorPosCallback(Window.getAddress(), null);
             cursorPosCallback.free();
@@ -604,6 +674,7 @@ public final class Mouse {
             currentCursor = 0;
         }
         resetState();
+        currentCursorShape = CURSOR_ARROW;
     }
 
     /**

@@ -33,6 +33,8 @@ Global input callbacks live with the active window. Remove application subscript
 - Raw cursor coordinates are not automatically a widget's local coordinates.
 - Consuming an event affects routed delivery; polling still represents device state.
 - Use pointer cancellation when abandoning a drag, so a control does not remain armed.
+- Resize cursors include `Mouse.CURSOR_HRESIZE`, `CURSOR_VRESIZE`, `CURSOR_RESIZE_NWSE`, and `CURSOR_RESIZE_NESW`. A UI node can override `getCursorShape()` to request one during hover or capture; return zero to retain the application's cursor.
+- `Mouse.overrideCursor(owner, shape)` temporarily borrows cursor ownership without destroying the application's standard or custom cursor. `clearCursorOverride(owner)` restores that cursor only if the owner still matches. Repeated requests for the same shape reuse the native cursor. `getCursorShape()` reports the active standard shape, or zero for a custom image.
 
 ## Components and examples
 

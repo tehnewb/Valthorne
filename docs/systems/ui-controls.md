@@ -6,6 +6,13 @@ Author: Albert Beaupre
 
 ## Purpose
 
+For draggable, resizable titled panels, see the [floating window guide](../ui-windows.md).
+
+For file browsing, command menus, dropdowns, color editing, numeric inputs, and
+radio choices, see the [additional widget guide](../ui-widgets.md). It documents
+`FileExplorer`, `FileChooser`, `DirectoryTree`, `BreadcrumbBar`, `MenuBar`, `PopupMenu`, `ComboBox`, `ColorPicker`,
+`NumberSpinner`, and `RadioGroup`, including callbacks and regression-test commands.
+
 Standard controls render through the texture-oriented UI path. Choose controls by interaction rather than appearance alone: buttons activate, checkboxes toggle, sliders select a range value, and text fields edit text. Containers such as panels, grids, tabs, split panes, and modals organize other controls.
 
 ## Features and when to use them
