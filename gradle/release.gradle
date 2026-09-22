@@ -106,7 +106,7 @@ tasks.register('verifyReleaseArtifacts') {
         dependsOn 'verifyReleaseArtifacts', 'prepareReleaseConsumer'
         workingDir rootDir
         def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows')
-        def wrapper = isWindows ? ['cmd', '/c', file('gradlew.bat').absolutePath] : ['sh', file('gradlew').absolutePath]
+        def wrapper = isWindows ? ['cmd', '/d', '/c', 'gradlew.bat'] : ['sh', file('gradlew').absolutePath]
         commandLine wrapper + ['-p', layout.buildDirectory.dir('release-consumer').get().asFile.absolutePath, '--no-daemon', '--console=plain',
                 "-PvalthorneVersion=${project.version}",
                 "-PvalthorneRepository=${layout.buildDirectory.dir('release-repository').get().asFile.toURI()}",

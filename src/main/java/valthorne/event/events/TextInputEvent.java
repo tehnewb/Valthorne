@@ -2,6 +2,7 @@ package valthorne.event.events;
 
 import valthorne.event.Event;
 import valthorne.event.EventTypes;
+import java.util.Objects;
 
 /**
  * Carries committed text on the {@link EventTypes#TEXT_INPUT} route.
@@ -28,7 +29,7 @@ public final class TextInputEvent extends Event {
      */
     public TextInputEvent(String text) {
         super(EventTypes.TEXT_INPUT);
-        this.text = java.util.Objects.requireNonNull(text);
+        this.text = Objects.requireNonNull(text);
     }
 
     /**

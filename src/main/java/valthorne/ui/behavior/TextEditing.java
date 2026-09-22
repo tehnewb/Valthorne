@@ -6,6 +6,9 @@ import valthorne.event.events.KeyPressEvent;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
+import java.awt.HeadlessException;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.io.IOException;
 
 /**
  * Shared keyboard-shortcut and system-clipboard adapter for texture and NanoVG
@@ -106,7 +109,7 @@ public final class TextEditing {
         try {
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
             return true;
-        } catch (IllegalStateException | java.awt.HeadlessException | SecurityException unavailable) {return false;}
+        } catch (IllegalStateException | HeadlessException | SecurityException unavailable) {return false;}
     }
 
     /**
@@ -124,8 +127,8 @@ public final class TextEditing {
         try {
             Object value = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
             if (value instanceof String text) model.insert(text);
-        } catch (java.awt.datatransfer.UnsupportedFlavorException | java.io.IOException
-                 | IllegalStateException | java.awt.HeadlessException | SecurityException unavailable) {
+        } catch (UnsupportedFlavorException | IOException
+                 | IllegalStateException | HeadlessException | SecurityException unavailable) {
             // Clipboard access can be temporarily unavailable; editing remains usable.
         }
     }

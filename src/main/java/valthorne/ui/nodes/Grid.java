@@ -128,11 +128,9 @@ public class Grid extends UIContainer {
      * @throws IllegalArgumentException if {@code columns} is less than {@code 1}
      */
     public Grid columns(int columns) {
-        if (columns < 1)
-            throw new IllegalArgumentException("columns must be at least 1");
+        if (columns < 1) throw new IllegalArgumentException("columns must be at least 1");
 
-        if (this.columns == columns)
-            return this;
+        if (this.columns == columns) return this;
 
         this.columns = columns;
         markLayoutDirty();
@@ -165,8 +163,7 @@ public class Grid extends UIContainer {
      * @throws NullPointerException if {@code cellWidth} is {@code null}
      */
     public Grid cellWidth(LayoutValue cellWidth) {
-        if (cellWidth == null)
-            throw new NullPointerException("cellWidth");
+        if (cellWidth == null) throw new NullPointerException("cellWidth");
 
         this.cellWidth = cellWidth;
         markLayoutDirty();
@@ -213,8 +210,7 @@ public class Grid extends UIContainer {
      * @throws NullPointerException if {@code cellHeight} is {@code null}
      */
     public Grid cellHeight(LayoutValue cellHeight) {
-        if (cellHeight == null)
-            throw new NullPointerException("cellHeight");
+        if (cellHeight == null) throw new NullPointerException("cellHeight");
 
         this.cellHeight = cellHeight;
         markLayoutDirty();
@@ -324,49 +320,26 @@ public class Grid extends UIContainer {
             UINode child = get(i);
 
             if (!cellWidth.isAuto()) {
-                child.getLayout()
-                        .width(cellWidth)
-                        .minWidth(cellWidth)
-                        .maxWidth(cellWidth)
-                        .flexBasis(cellWidth)
-                        .noGrow()
-                        .noShrink();
+                child.getLayout().width(cellWidth).minWidth(cellWidth).maxWidth(cellWidth).flexBasis(cellWidth).noGrow().noShrink();
             }
 
             if (!cellHeight.isAuto()) {
-                child.getLayout()
-                        .height(cellHeight)
-                        .minHeight(cellHeight)
-                        .maxHeight(cellHeight)
-                        .noGrow()
-                        .noShrink();
+                child.getLayout().height(cellHeight).minHeight(cellHeight).maxHeight(cellHeight).noGrow().noShrink();
             }
         }
 
         if (!cellWidth.isAuto() && cellWidth.isPoints()) {
             float totalWidth = usedColumns == 0 ? 0f : (usedColumns * cellWidth.getValue()) + Math.max(0, usedColumns - 1) * horizontalGap;
-            getLayout()
-                    .width(totalWidth)
-                    .minWidth(totalWidth)
-                    .maxWidth(totalWidth);
+            getLayout().width(totalWidth).minWidth(totalWidth).maxWidth(totalWidth);
         } else {
-            getLayout()
-                    .widthAuto()
-                    .minWidthAuto()
-                    .maxWidthAuto();
+            getLayout().widthAuto().minWidthAuto().maxWidthAuto();
         }
 
         if (!cellHeight.isAuto() && cellHeight.isPoints()) {
             float totalHeight = rows == 0 ? 0f : (rows * cellHeight.getValue()) + Math.max(0, rows - 1) * verticalGap;
-            getLayout()
-                    .height(totalHeight)
-                    .minHeight(totalHeight)
-                    .maxHeight(totalHeight);
+            getLayout().height(totalHeight).minHeight(totalHeight).maxHeight(totalHeight);
         } else {
-            getLayout()
-                    .heightAuto()
-                    .minHeightAuto()
-                    .maxHeightAuto();
+            getLayout().heightAuto().minHeightAuto().maxHeightAuto();
         }
 
         super.applyLayout();

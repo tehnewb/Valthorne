@@ -11,6 +11,8 @@ import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import valthorne.Mouse;
+import valthorne.ui.behavior.ScrollBehavior;
 
 /**
  * Scrollable NanoVG container with one managed content node and optional horizontal
@@ -460,7 +462,7 @@ public class NanoScrollPanel extends NanoContainer {
      */
     @Override
     public void onMouseScroll(MouseScrollEvent event) {
-        Vector2f next = valthorne.ui.behavior.ScrollBehavior.wheel(event, horizontal, vertical,
+        Vector2f next = ScrollBehavior.wheel(event, horizontal, vertical,
                 getScrollX(), getScrollY(), getMaxScrollX(), getMaxScrollY(), scrollSpeed);
         scroll(next.x(), next.y());
     }
@@ -474,7 +476,7 @@ public class NanoScrollPanel extends NanoContainer {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        if (event.getButton() != valthorne.Mouse.LEFT) return;
+        if (event.getButton() != Mouse.LEFT) return;
         Vector2f position = screenToLayout(event.getX(), event.getY());
         float mouseX = position.x();
         float mouseY = position.y();

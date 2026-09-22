@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Encodes and decodes {@link PropertySet} instances using Valthorne's
@@ -223,7 +225,7 @@ public final class PropertySetIO {
             case UUID v -> taggedText(buffer, UUID_VALUE, v.toString());
             case Path v -> taggedText(buffer, PATH_VALUE, v.toString());
             case URI v -> taggedText(buffer, URI_VALUE, v.toString());
-            case java.net.URL v -> taggedText(buffer, URL_VALUE, v.toString());
+            case URL v -> taggedText(buffer, URL_VALUE, v.toString());
             case Duration v -> taggedText(buffer, DURATION, v.toString());
             case Period v -> taggedText(buffer, PERIOD, v.toString());
             case Instant v -> taggedText(buffer, INSTANT, v.toString());
@@ -278,7 +280,7 @@ public final class PropertySetIO {
     }
 
     private static void writeText(DynamicByteBuffer buffer, String value) {
-        byte[] bytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_TEXT_BYTES) throw new IllegalArgumentException("Property text is too large");
         buffer.writeInt(bytes.length).writeBytes(bytes);
     }
@@ -288,6 +290,6 @@ public final class PropertySetIO {
         if (length < 0 || length > MAX_TEXT_BYTES || length > buffer.remainingRead()) {
             throw new IOException("Invalid property text length: " + length);
         }
-        return new String(buffer.readBytes(length), java.nio.charset.StandardCharsets.UTF_8);
+        return new String(buffer.readBytes(length), StandardCharsets.UTF_8);
     }
 }

@@ -16,23 +16,34 @@ public final class SoundArea {
      * Validates and stores immutable geometry in double precision, including the
      * round zone's squared outer radius. Zero dimensions and zero fade are allowed.
      *
-     * @param x center X
-     * @param y center Y
-     * @param z center Z
-     * @param a radius for round zones, otherwise half-width
-     * @param b half-height for rectangular zones
-     * @param c half-depth for box zones
-     * @param fade nonnegative distance outside the full-gain boundary
-     * @param round whether to use radial rather than box distance
+     * @param x              center X
+     * @param y              center Y
+     * @param z              center Z
+     * @param a              radius for round zones, otherwise half-width
+     * @param b              half-height for rectangular zones
+     * @param c              half-depth for box zones
+     * @param fade           nonnegative distance outside the full-gain boundary
+     * @param round          whether to use radial rather than box distance
      * @param twoDimensional whether listener Z is ignored after validation
      * @throws IllegalArgumentException if coordinates are non-finite or dimensions are negative/non-finite
      */
-    private SoundArea(float x, float y, float z, float a, float b, float c,
-                      float fade, boolean round, boolean twoDimensional) {
-        finite(x); finite(y); finite(z); positive(a); positive(b); positive(c); positive(fade);
-        this.x = x; this.y = y; this.z = z;
-        this.a = a; this.b = b; this.c = c; this.fade = fade;
-        this.round = round; this.twoDimensional = twoDimensional;
+    private SoundArea(float x, float y, float z, float a, float b, float c, float fade, boolean round, boolean twoDimensional) {
+        finite(x);
+        finite(y);
+        finite(z);
+        positive(a);
+        positive(b);
+        positive(c);
+        positive(fade);
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.a = a;
+        this.b = b;
+        this.c = c;
+        this.fade = fade;
+        this.round = round;
+        this.twoDimensional = twoDimensional;
         double outer = a + (double) fade;
         outerSquared = outer * outer;
     }
@@ -42,10 +53,10 @@ public final class SoundArea {
      * beyond its radius. A zero fade makes the boundary abrupt; listener Z is
      * ignored geometrically but must still be finite during evaluation.
      *
-     * @param x finite center X
-     * @param y finite center Y
+     * @param x      finite center X
+     * @param y      finite center Y
      * @param radius finite nonnegative full-gain radius
-     * @param fade finite nonnegative outer fade distance
+     * @param fade   finite nonnegative outer fade distance
      * @return immutable circular zone
      * @throws IllegalArgumentException if inputs violate the stated ranges
      */
@@ -57,11 +68,11 @@ public final class SoundArea {
      * Creates a spherical full-gain zone with smooth attenuation outside its
      * surface. At a zero fade distance, gain drops immediately outside the sphere.
      *
-     * @param x finite center X
-     * @param y finite center Y
-     * @param z finite center Z
+     * @param x      finite center X
+     * @param y      finite center Y
+     * @param z      finite center Z
      * @param radius finite nonnegative full-gain radius
-     * @param fade finite nonnegative outer fade distance
+     * @param fade   finite nonnegative outer fade distance
      * @return immutable spherical zone
      * @throws IllegalArgumentException if inputs violate the stated ranges
      */
@@ -74,11 +85,11 @@ public final class SoundArea {
      * Outside attenuation uses Euclidean distance to the rectangle, producing
      * rounded fade corners rather than a larger rectangular border.
      *
-     * @param x finite center X
-     * @param y finite center Y
-     * @param halfWidth finite nonnegative X half-extent
+     * @param x          finite center X
+     * @param y          finite center Y
+     * @param halfWidth  finite nonnegative X half-extent
      * @param halfHeight finite nonnegative Y half-extent
-     * @param fade finite nonnegative distance outside the rectangle
+     * @param fade       finite nonnegative distance outside the rectangle
      * @return immutable two-dimensional zone
      * @throws IllegalArgumentException if inputs violate the stated ranges
      */
@@ -90,18 +101,17 @@ public final class SoundArea {
      * Creates an axis-aligned full-gain box with Euclidean-distance attenuation
      * outside its surface. Half-extents and fade may be zero; no rotation is stored.
      *
-     * @param x finite center X
-     * @param y finite center Y
-     * @param z finite center Z
-     * @param halfWidth finite nonnegative X half-extent
+     * @param x          finite center X
+     * @param y          finite center Y
+     * @param z          finite center Z
+     * @param halfWidth  finite nonnegative X half-extent
      * @param halfHeight finite nonnegative Y half-extent
-     * @param halfDepth finite nonnegative Z half-extent
-     * @param fade finite nonnegative distance outside the box
+     * @param halfDepth  finite nonnegative Z half-extent
+     * @param fade       finite nonnegative distance outside the box
      * @return immutable three-dimensional zone
      * @throws IllegalArgumentException if inputs violate the stated ranges
      */
-    public static SoundArea box(float x, float y, float z, float halfWidth,
-                                float halfHeight, float halfDepth, float fade) {
+    public static SoundArea box(float x, float y, float z, float halfWidth, float halfHeight, float halfDepth, float fade) {
         return new SoundArea(x, y, z, halfWidth, halfHeight, halfDepth, fade, false, false);
     }
 
@@ -118,7 +128,9 @@ public final class SoundArea {
      * @throws IllegalArgumentException if any listener coordinate is non-finite
      */
     public float gainAt(float listenerX, float listenerY, float listenerZ) {
-        finite(listenerX); finite(listenerY); finite(listenerZ);
+        finite(listenerX);
+        finite(listenerY);
+        finite(listenerZ);
         double dx = listenerX - x, dy = listenerY - y, dz = twoDimensional ? 0 : listenerZ - z;
         double distance;
         if (round) {

@@ -58,7 +58,9 @@ public final class SelectionModel {
      *
      * @return the nonnegative item count
      */
-    public int itemCount() {return count;}
+    public int itemCount() {
+        return count;
+    }
 
     /**
      * Returns the origin used for extended selection ranges. Toggling an item
@@ -66,7 +68,9 @@ public final class SelectionModel {
      *
      * @return the range-origin index, or -1 when unset
      */
-    public int anchor() {return anchor;}
+    public int anchor() {
+        return anchor;
+    }
 
     /**
      * Returns the latest selection target used by keyboard navigation and range
@@ -74,7 +78,9 @@ public final class SelectionModel {
      *
      * @return the lead index, or -1 when unset
      */
-    public int lead() {return lead;}
+    public int lead() {
+        return lead;
+    }
 
     /**
      * Reports whether toggle and range policies are enabled. When false,
@@ -82,7 +88,9 @@ public final class SelectionModel {
      *
      * @return whether multiple selection is enabled
      */
-    public boolean isMultiple() {return multiple;}
+    public boolean isMultiple() {
+        return multiple;
+    }
 
     /**
      * Tests membership without requiring the caller to validate an index first.
@@ -91,7 +99,9 @@ public final class SelectionModel {
      * @param index the position to test
      * @return true only for an in-range selected item
      */
-    public boolean isSelected(int index) {return index >= 0 && index < count && selected.get(index);}
+    public boolean isSelected(int index) {
+        return index >= 0 && index < count && selected.get(index);
+    }
 
     /**
      * Counts the currently selected bits, independently of anchor and lead.
@@ -99,7 +109,9 @@ public final class SelectionModel {
      *
      * @return the number of selected items
      */
-    public int selectedCount() {return selected.cardinality();}
+    public int selectedCount() {
+        return selected.cardinality();
+    }
 
     /**
      * Finds the next selected position at or after the supplied starting index.
@@ -109,7 +121,9 @@ public final class SelectionModel {
      * @return the next selected index, or -1 if none remains
      * @throws IndexOutOfBoundsException if fromIndex is negative
      */
-    public int nextSelected(int fromIndex) {return selected.nextSetBit(fromIndex);}
+    public int nextSelected(int fromIndex) {
+        return selected.nextSetBit(fromIndex);
+    }
 
     /**
      * Registers a synchronous observer of selection and configuration changes.
@@ -121,7 +135,9 @@ public final class SelectionModel {
      * @return an independently removable subscription
      * @throws NullPointerException if listener is null
      */
-    public AutoCloseable onChange(Runnable listener) {return changes.subscribe(listener);}
+    public AutoCloseable onChange(Runnable listener) {
+        return changes.subscribe(listener);
+    }
 
     /**
      * Visits selected positions in ascending order without taking a snapshot.

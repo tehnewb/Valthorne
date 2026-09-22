@@ -13,6 +13,9 @@ import static org.lwjgl.opengl.GL43.GL_COMPUTE_SHADER;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL43.glDispatchCompute;
+import java.nio.ByteBuffer;
+import org.lwjgl.opengl.GL;
+import valthorne.graphics.GraphicsCapabilities;
 
 /**
  * Minimal wrapper for an OpenGL compute shader program (GL 4.3+).
@@ -76,7 +79,7 @@ public class ComputeShader {
      * @return whether the version or extension probe reports support
      */
     public static boolean isComputeSupported() {
-        return valthorne.graphics.GraphicsCapabilities.supportsCompute(org.lwjgl.opengl.GL.getCapabilities());
+        return GraphicsCapabilities.supportsCompute(GL.getCapabilities());
     }
 
     /**
@@ -151,7 +154,7 @@ public class ComputeShader {
      * @param offset destination byte offset
      * @param data source bytes from position through limit
      */
-    public static void updateSSBO(int ssboId, long offset, java.nio.ByteBuffer data) {
+    public static void updateSSBO(int ssboId, long offset, ByteBuffer data) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboId);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, data);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);

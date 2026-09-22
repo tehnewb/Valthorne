@@ -10,6 +10,13 @@ import valthorne.math.geometry.Rectangle;
 import valthorne.ui.nodes.Tooltip;
 import valthorne.ui.theme.*;
 import valthorne.viewport.Viewport;
+import java.util.Objects;
+import valthorne.Mouse;
+import valthorne.ui.nodes.Button;
+import valthorne.ui.nodes.TextField;
+import valthorne.ui.nodes.nano.NanoButton;
+import valthorne.ui.nodes.nano.NanoNode;
+import valthorne.ui.nodes.nano.NanoTextField;
 
 /**
  * <h1>UINode</h1>
@@ -282,7 +289,7 @@ public abstract class UINode implements Dimensional {
      *
      * @param event routed text-input event
      */
-    public void onTextInput(valthorne.event.events.TextInputEvent event) {}
+    public void onTextInput(TextInputEvent event) {}
 
     /**
      * Called when a mouse button is pressed on this node.
@@ -823,7 +830,7 @@ public abstract class UINode implements Dimensional {
      */
     public final <T> void setStyle(StyleKey<T> key, T value) {
         if (styleOverrides == null) styleOverrides = new StyleMap();
-        if (styleOverrides.contains(key) && java.util.Objects.equals(styleOverrides.get(key), value)) return;
+        if (styleOverrides.contains(key) && Objects.equals(styleOverrides.get(key), value)) return;
         styleOverrides.set(key, value);
         invalidateStyle();
         if (key.affectsLayout()) markLayoutDirty();
@@ -1405,8 +1412,8 @@ public abstract class UINode implements Dimensional {
     /**
      * True for a primary-button release over this control's visible hit target.
      */
-    public final boolean isActivationRelease(valthorne.event.events.MouseReleaseEvent event) {
-        return event.getButton() == valthorne.Mouse.LEFT && isEnabled() && root != null
+    public final boolean isActivationRelease(MouseReleaseEvent event) {
+        return event.getButton() == Mouse.LEFT && isEnabled() && root != null
                 && root.findNodeAt(event.getX(), event.getY(), CLICKABLE_BIT) == this;
     }
 
@@ -1463,7 +1470,7 @@ public abstract class UINode implements Dimensional {
         if (context != null) {
             if (context.getBatch() != batch) throw new IllegalArgumentException("Use the active UI batch.");
             context.draw(this);
-        } else if (this instanceof valthorne.ui.nodes.nano.NanoNode) {
+        } else if (this instanceof NanoNode) {
             throw new IllegalStateException("Render Nano nodes through UIRoot.draw().");
         } else if (isVisible()) {
             draw(batch);
@@ -1482,9 +1489,9 @@ public abstract class UINode implements Dimensional {
         UIConstants.applyLayout(yogaMemoryAddress, layout);
         ResolvedStyle style = getStyle();
         if (style != null && layout.getMinHeight().isAuto() && layout.getHeight().isAuto()
-                && (this instanceof valthorne.ui.nodes.Button || this instanceof valthorne.ui.nodes.TextField
-                || this instanceof valthorne.ui.nodes.nano.NanoButton || this instanceof valthorne.ui.nodes.nano.NanoTextField)) {
-            Float height = style.get(valthorne.ui.theme.UITokens.CONTROL_HEIGHT);
+                && (this instanceof Button || this instanceof TextField
+                || this instanceof NanoButton || this instanceof NanoTextField)) {
+            Float height = style.get(UITokens.CONTROL_HEIGHT);
             if (height != null) Yoga.YGNodeStyleSetMinHeight(yogaMemoryAddress, height);
         }
     }

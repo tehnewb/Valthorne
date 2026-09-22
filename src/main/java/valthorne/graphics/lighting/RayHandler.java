@@ -67,7 +67,8 @@ public final class RayHandler {
      * Creates shared meshes, compiles lighting programs, and allocates the light
      * framebuffer. Requires a current OpenGL context. Dimensions are passed to
      * texture allocation without application-level validation.
-     * @param width light-map width and visible screen extent in pixels
+     *
+     * @param width  light-map width and visible screen extent in pixels
      * @param height light-map height and visible screen extent in pixels
      * @throws IllegalStateException if the framebuffer is incomplete
      */
@@ -89,6 +90,7 @@ public final class RayHandler {
 
     /**
      * Returns the borrowed world consulted by this handler's lights.
+     *
      * @return configured occlusion world, or null for unobstructed rays
      */
     public RayCastWorld getRayCastWorld() {
@@ -98,6 +100,7 @@ public final class RayHandler {
     /**
      * Replaces the borrowed occlusion world without dirtying any light. Mark
      * existing lights dirty when the replacement must affect cached endpoints.
+     *
      * @param rayCastWorld new world, or null to disable world occlusion
      */
     public void setRayCastWorld(RayCastWorld rayCastWorld) {
@@ -107,6 +110,7 @@ public final class RayHandler {
     /**
      * Copies the supplied components into the light-map clear color. Values are
      * forwarded to the color object; no geometry recast is needed.
+     *
      * @param r ambient red
      * @param g ambient green
      * @param b ambient blue
@@ -119,6 +123,7 @@ public final class RayHandler {
     /**
      * Exposes the live ambient color used when clearing the light map. Mutations
      * take effect on the next render without additional notification.
+     *
      * @return owned mutable ambient color; not a copy
      */
     public Color getAmbientLight() {
@@ -128,6 +133,7 @@ public final class RayHandler {
     /**
      * Appends a non-null light unless the list already contains it. The light's
      * constructor-supplied handler is not changed or validated by registration.
+     *
      * @param light light to render with this handler
      * @throws NullPointerException if light is null
      */
@@ -141,6 +147,7 @@ public final class RayHandler {
     /**
      * Removes the first matching light from the render list without disposing it.
      * An absent value, including null in a normally managed list, has no effect.
+     *
      * @param light light to remove
      */
     public void removeLight(Light light) {
@@ -151,6 +158,7 @@ public final class RayHandler {
      * Returns the live mutable render list. Direct changes bypass addLight's
      * null and duplicate checks; keep entries valid and avoid mutation during
      * update or render iteration.
+     *
      * @return backing list in draw order
      */
     public List<Light> getLights() {
@@ -178,7 +186,7 @@ public final class RayHandler {
      * Clears the light framebuffer to ambient color, additively draws visible
      * active lights and optional fringes, then multiplies the default framebuffer
      * by the resulting light map. Dirty visible lights are updated before drawing.
-     *
+     * <p>
      * The caller must establish a suitable viewport; this method does not set one.
      * It finishes with framebuffer zero bound and does not restore prior OpenGL
      * state. Draw the scene first, then composite lighting, then draw any UI that
@@ -206,33 +214,11 @@ public final class RayHandler {
 
             Color color = light.getColor();
 
-            lightMesh.setFan(
-                    light.getX(),
-                    light.getY(),
-                    light.getDistance(),
-                    light.getEndX(),
-                    light.getEndY(),
-                    color.r(),
-                    color.g(),
-                    color.b(),
-                    color.a()
-            );
+            lightMesh.setFan(light.getX(), light.getY(), light.getDistance(), light.getEndX(), light.getEndY(), color.r(), color.g(), color.b(), color.a());
             lightMesh.render();
 
             if (light.isSoft()) {
-                softShadowMesh.setTriangles(
-                        light.getX(),
-                        light.getY(),
-                        light.getDistance(),
-                        light.getSoftnessLength(),
-                        light.getEndX(),
-                        light.getEndY(),
-                        light.getFractions(),
-                        color.r(),
-                        color.g(),
-                        color.b(),
-                        color.a()
-                );
+                softShadowMesh.setTriangles(light.getX(), light.getY(), light.getDistance(), light.getSoftnessLength(), light.getEndX(), light.getEndY(), light.getFractions(), color.r(), color.g(), color.b(), color.a());
                 softShadowMesh.render();
             }
         }
@@ -247,7 +233,8 @@ public final class RayHandler {
      * Updates screen culling extents and reallocates the light-map texture when
      * either dimension changes. Equal dimensions are a no-op. The viewport and
      * light geometry are not updated; framebuffer zero is bound after resizing.
-     * @param width requested pixel width
+     *
+     * @param width  requested pixel width
      * @param height requested pixel height
      */
     public void resize(int width, int height) {
@@ -277,7 +264,8 @@ public final class RayHandler {
      * Allocates and attaches a light texture, then checks framebuffer completeness.
      * On success framebuffer zero is bound; the prior framebuffer is not restored.
      * A failure does not roll back partially allocated resources.
-     * @param width requested texture width
+     *
+     * @param width  requested texture width
      * @param height requested texture height
      * @throws IllegalStateException if the framebuffer is incomplete
      */
@@ -317,7 +305,8 @@ public final class RayHandler {
      * Reallocates the existing light texture and reattaches it, or creates the
      * framebuffer if absent. The existing-framebuffer path does not recheck
      * completeness and finishes with framebuffer zero bound.
-     * @param width requested texture width
+     *
+     * @param width  requested texture width
      * @param height requested texture height
      */
     private void resizeFramebuffer(int width, int height) {
@@ -336,6 +325,7 @@ public final class RayHandler {
      * Tests inclusive overlap of a light's radial square with the screen extent.
      * Soft lights expand that square by nonnegative fringe length. This is a
      * conservative bounds test and does not inspect occlusion or cone direction.
+     *
      * @param light light whose bounds are tested
      * @return true when its expanded square touches the screen extent
      */

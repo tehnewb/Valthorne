@@ -41,7 +41,9 @@ final class OccluderIndex2D {
      * @param value the world coordinate along either grid axis
      * @return the signed cell coordinate
      */
-    private static int cell(float value) {return (int) Math.floor(value / CELL);}
+    private static int cell(float value) {
+        return (int) Math.floor(value / CELL);
+    }
 
     /**
      * Packs two signed cell coordinates into distinct halves of a long without
@@ -52,7 +54,9 @@ final class OccluderIndex2D {
      * @param y the signed vertical cell coordinate
      * @return the unique packed key for this pair of integer coordinates
      */
-    private static long key(int x, int y) {return ((long) x << 32) | (y & 0xffffffffL);}
+    private static long key(int x, int y) {
+        return ((long) x << 32) | (y & 0xffffffffL);
+    }
 
     /**
      * Replaces grid buckets and the oversized-polygon list using current world

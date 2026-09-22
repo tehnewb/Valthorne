@@ -3,6 +3,11 @@ package valthorne;
 import java.nio.file.*;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.glfw.GLFW.*;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import javax.imageio.ImageIO;
 
 /** Platform rendering and diagnostic operations shared by application launchers. */
 public final class PlatformTools {
@@ -15,13 +20,13 @@ public final class PlatformTools {
     public static void textureUnit(int unit){glActiveTexture(GL_TEXTURE0+unit);}
     public static void capture(String path,int width,int height){
         try{
-            var bytes=java.nio.ByteBuffer.allocateDirect(Math.multiplyExact(Math.multiplyExact(width,height),4));
+            var bytes=ByteBuffer.allocateDirect(Math.multiplyExact(Math.multiplyExact(width,height),4));
             glReadPixels(0,0,width,height,GL_RGBA,GL_UNSIGNED_BYTE,bytes);
-            var image=new java.awt.image.BufferedImage(width,height,java.awt.image.BufferedImage.TYPE_INT_RGB);
+            var image=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
             for(int y=0;y<height;y++)for(int x=0;x<width;x++){int at=(y*width+x)*4;image.setRGB(x,height-y-1,(bytes.get(at)&255)<<16|(bytes.get(at+1)&255)<<8|bytes.get(at+2)&255);}
             Path file=Path.of(path);if(file.getParent()!=null)Files.createDirectories(file.getParent());
-            javax.imageio.ImageIO.write(image,"png",file.toFile());
-        }catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
+            ImageIO.write(image,"png",file.toFile());
+        }catch(IOException error){throw new UncheckedIOException(error);}
     }
     /** Replays input through the installed engine callbacks for deterministic diagnostics. */
     public static void injectKey(int code,int action){long window=Window.getAddress();var callback=glfwSetKeyCallback(window,null);glfwSetKeyCallback(window,callback);if(callback!=null)callback.invoke(window,code,0,action,0);}

@@ -6,6 +6,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.nio.ShortBuffer;
 import java.nio.file.Path;
 
@@ -66,7 +67,9 @@ public class OggSoundStream implements SoundStream {
      * @return the channel count produced by this stream
      */
     @Override
-    public int channels() {return data.channels();}
+    public int channels() {
+        return data.channels();
+    }
 
     /**
      * Reads the decoded PCM sampling frequency in frames per second (Hz), independent of playback position.
@@ -74,7 +77,9 @@ public class OggSoundStream implements SoundStream {
      * @return the sample rate produced by this stream
      */
     @Override
-    public int sampleRate() {return data.sampleRate();}
+    public int sampleRate() {
+        return data.sampleRate();
+    }
 
     /**
      * Reads the decoded PCM bit depth per channel sample, rather than the compressed file bitrate.
@@ -82,7 +87,9 @@ public class OggSoundStream implements SoundStream {
      * @return the bits per sample produced by this stream
      */
     @Override
-    public int bitsPerSample() {return data.bitsPerSample();}
+    public int bitsPerSample() {
+        return data.bitsPerSample();
+    }
 
     /**
      * Reads total decoded-content duration in seconds, not remaining time or the current playback position.
@@ -90,7 +97,9 @@ public class OggSoundStream implements SoundStream {
      * @return the total stream duration in seconds
      */
     @Override
-    public float duration() {return data.duration();}
+    public float duration() {
+        return data.duration();
+    }
 
     /**
      * Seeks to a target playback time.
@@ -113,7 +122,6 @@ public class OggSoundStream implements SoundStream {
      * them. A cached short view is reused while the same destination object is supplied.
      *
      * @param pcmBuffer writable direct buffer for complete interleaved PCM frames
-     *
      * @return bytes produced, or zero when no more frames can be decoded
      * @throws IllegalStateException if this stream has been closed
      */
@@ -121,7 +129,7 @@ public class OggSoundStream implements SoundStream {
     public int read(ByteBuffer pcmBuffer) {
         ensureOpen();
         if (!pcmBuffer.isDirect()) throw new IllegalArgumentException("OGG decoding requires a direct PCM buffer");
-        if (pcmBuffer.isReadOnly()) throw new java.nio.ReadOnlyBufferException();
+        if (pcmBuffer.isReadOnly()) throw new ReadOnlyBufferException();
         pcmBuffer.clear();
 
         if (lastDestination != pcmBuffer) {

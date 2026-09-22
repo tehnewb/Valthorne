@@ -65,7 +65,9 @@ public final class PolarShadow2D {
      *
      * @return the number of updates that rebuilt distance data
      */
-    public long getRebuildCount() {return rebuilds;}
+    public long getRebuildCount() {
+        return rebuilds;
+    }
 
     /**
      * Reads a normalized radial depth from current storage. Multiply by the light
@@ -76,7 +78,9 @@ public final class PolarShadow2D {
      * @return the cached distance relative to the last light radius
      * @throws ArrayIndexOutOfBoundsException if bin is outside the allocated samples
      */
-    public float getDistance(int bin) {return distances[bin];}
+    public float getDistance(int bin) {
+        return distances[bin];
+    }
 
     /**
      * Exposes the live depth array for rendering uploads without making a copy.
@@ -85,7 +89,9 @@ public final class PolarShadow2D {
      *
      * @return the owned normalized-distance array, overwritten by later rebuilds
      */
-    float[] data() {return distances;}
+    float[] data() {
+        return distances;
+    }
 
     /**
      * Rebuilds the map only when the computed geometry fingerprint changes.
@@ -123,8 +129,7 @@ public final class PolarShadow2D {
             }
             for (int i = 0; i < o.coordinateCount; i += o.edgeStep()) {
                 int j = o.edgeEnd(i);
-                edge(o.x + o.vertices[i] - light.x, o.y + o.vertices[i + 1] - light.y,
-                        o.x + o.vertices[j] - light.x, o.y + o.vertices[j + 1] - light.y, light.radius);
+                edge(o.x + o.vertices[i] - light.x, o.y + o.vertices[i + 1] - light.y, o.x + o.vertices[j] - light.x, o.y + o.vertices[j + 1] - light.y, light.radius);
             }
         }
         fingerprint = hash;

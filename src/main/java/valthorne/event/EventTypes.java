@@ -102,8 +102,7 @@ public final class EventTypes {
      * Global theme mutation route for token, resource and registered rule-map
      * notifications. Listeners inspect the event payload to identify the theme.
      */
-    public static final EventType<ThemeDataChangeEvent> THEME_DATA_CHANGE =
-            new EventType<>(10, "theme-data-change");
+    public static final EventType<ThemeDataChangeEvent> THEME_DATA_CHANGE = new EventType<>(10, "theme-data-change");
 
     /**
      * Number of slots needed for built-in route IDs zero through twelve. This

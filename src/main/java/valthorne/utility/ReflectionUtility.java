@@ -1,6 +1,7 @@
 package valthorne.utility;
 
 import java.util.Objects;
+import java.lang.reflect.Field;
 
 /**
  * Provides JavaBean-style accessor names and exact-signature method discovery.
@@ -35,7 +36,7 @@ public class ReflectionUtility {
      * @return The getter method name.
      * @throws IllegalArgumentException if field is null.
      */
-    public static String toGetterName(java.lang.reflect.Field field) {
+    public static String toGetterName(Field field) {
         if (field == null) {
             throw new IllegalArgumentException("Field cannot be null");
         }

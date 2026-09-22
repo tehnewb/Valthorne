@@ -1,5 +1,6 @@
 package valthorne.audio.sound;
 
+import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.ByteArrayInputStream;
@@ -23,7 +24,7 @@ public class Mp3SoundStream implements SoundStream {
     private final byte[] encodedData; // Memory-backed source bytes when streaming from memory
     private final byte[] seekScratch = new byte[32 * 1024]; // Scratch buffer used while seeking by discard
 
-    private javax.sound.sampled.AudioFormat pcmFormat; // PCM format used after transcoding
+    private AudioFormat pcmFormat; // PCM format used after transcoding
     private AudioInputStream sourceStream; // Encoded source stream from Java Sound
     private AudioInputStream pcmStream; // Transcoded PCM stream consumed by reads
     private int channels; // Channel count of the transcoded stream
@@ -59,7 +60,9 @@ public class Mp3SoundStream implements SoundStream {
      * @return the channel count produced by this stream
      */
     @Override
-    public int channels() {return channels;}
+    public int channels() {
+        return channels;
+    }
 
     /**
      * Reads the decoded PCM sampling frequency in frames per second (Hz), independent of playback position.
@@ -67,7 +70,9 @@ public class Mp3SoundStream implements SoundStream {
      * @return the sample rate produced by this stream
      */
     @Override
-    public int sampleRate() {return sampleRate;}
+    public int sampleRate() {
+        return sampleRate;
+    }
 
     /**
      * Reads the decoded PCM bit depth per channel sample, rather than the compressed file bitrate.
@@ -75,7 +80,9 @@ public class Mp3SoundStream implements SoundStream {
      * @return the bits per sample produced by this stream
      */
     @Override
-    public int bitsPerSample() {return bitsPerSample;}
+    public int bitsPerSample() {
+        return bitsPerSample;
+    }
 
     /**
      * Reads total decoded-content duration in seconds, not remaining time or the current playback position.
@@ -83,7 +90,9 @@ public class Mp3SoundStream implements SoundStream {
      * @return the total stream duration in seconds
      */
     @Override
-    public float duration() {return data.duration();}
+    public float duration() {
+        return data.duration();
+    }
 
     /**
      * Seeks by reopening the MP3 stream and discarding decoded PCM until the target time is reached.
@@ -164,11 +173,11 @@ public class Mp3SoundStream implements SoundStream {
             closeStreams();
             this.sourceStream = file != null ? AudioSystem.getAudioInputStream(file) : AudioSystem.getAudioInputStream(new ByteArrayInputStream(encodedData));
 
-            javax.sound.sampled.AudioFormat sourceFormat = sourceStream.getFormat();
-            this.pcmFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
+            AudioFormat sourceFormat = sourceStream.getFormat();
+            this.pcmFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
 
             this.pcmStream = AudioSystem.getAudioInputStream(pcmFormat, sourceStream);
-            javax.sound.sampled.AudioFormat actual = pcmStream.getFormat();
+            AudioFormat actual = pcmStream.getFormat();
             this.channels = actual.getChannels();
             this.sampleRate = Math.round(actual.getSampleRate());
             this.bitsPerSample = actual.getSampleSizeInBits() > 0 ? actual.getSampleSizeInBits() : 16;

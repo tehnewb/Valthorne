@@ -3,6 +3,8 @@ package valthorne.graphics.radiance;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL30.*;
+import java.nio.ByteBuffer;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Owns an RGBA16F texture and, optionally, a color-only framebuffer used by the
@@ -61,9 +63,9 @@ final class RadianceRenderTarget {
         glBindTexture(GL_TEXTURE_2D, textureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linear ? GL_LINEAR : GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linear ? GL_LINEAR : GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, (java.nio.ByteBuffer) null);
+        glTexParameteri(GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, (ByteBuffer) null);
         texture = new RadianceTexture(textureID, width, height, linear);
         if (renderable) {
             framebufferID = glGenFramebuffers();
@@ -88,7 +90,7 @@ final class RadianceRenderTarget {
     void begin() {
         if (!renderable) throw new IllegalStateException("Target is not renderable");
         previousFramebuffer = glGetInteger(GL_FRAMEBUFFER_BINDING);
-        glGetIntegerv(org.lwjgl.opengl.GL11.GL_VIEWPORT, previousViewport);
+        glGetIntegerv(GL11.GL_VIEWPORT, previousViewport);
         glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
         glViewport(0, 0, width, height);
     }

@@ -29,7 +29,7 @@ public final class LightTexture extends Texture {
      * Allocates an owned RGBA16F texture with linear filtering and clamp-to-edge wrapping.
      * Leaves the texture bound; dimension validity is delegated to the texture/GPU path.
      *
-     * @param width texture width in pixels
+     * @param width  texture width in pixels
      * @param height texture height in pixels
      */
     public LightTexture(int width, int height) {
@@ -46,9 +46,9 @@ public final class LightTexture extends Texture {
      * Wraps an existing texture with dimension metadata and a one-byte placeholder.
      * Does not allocate image storage or apply the recorded linear filter.
      *
-     * @param textureID existing OpenGL texture name
-     * @param width reported texture width
-     * @param height reported texture height
+     * @param textureID     existing OpenGL texture name
+     * @param width         reported texture width
+     * @param height        reported texture height
      * @param ownsGlTexture whether disposal deletes the native texture
      */
     public LightTexture(int textureID, int width, int height, boolean ownsGlTexture) {
@@ -61,7 +61,7 @@ public final class LightTexture extends Texture {
      * Reallocates RGBA16F storage and replaces dimension metadata, discarding contents.
      * Keeps the same native ID and placeholder buffer, including for borrowed textures.
      *
-     * @param width replacement pixel width
+     * @param width  replacement pixel width
      * @param height replacement pixel height
      */
     public void resize(int width, int height) {

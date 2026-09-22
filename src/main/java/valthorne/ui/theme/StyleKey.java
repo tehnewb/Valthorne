@@ -4,6 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
+import valthorne.graphics.Color;
+import valthorne.ui.NodeAction;
 
 /**
  * <p>
@@ -115,7 +118,7 @@ public final class StyleKey<T> {
      *
      * @return an unmodifiable snapshot of all registered key instances
      */
-    public static synchronized java.util.List<StyleKey<?>> registeredKeys() {return java.util.List.copyOf(REGISTRY.values());}
+    public static synchronized List<StyleKey<?>> registeredKeys() {return List.copyOf(REGISTRY.values());}
 
     /**
      * <p>
@@ -215,7 +218,7 @@ public final class StyleKey<T> {
      * @return whether a node override change should mark layout dirty
      */
     public boolean affectsLayout() {
-        return type != valthorne.graphics.Color.class && type != valthorne.ui.NodeAction.class;
+        return type != Color.class && type != NodeAction.class;
     }
 
     /**
