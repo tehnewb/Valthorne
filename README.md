@@ -110,8 +110,6 @@ import valthorne.Keyboard;
 import valthorne.Window;
 import valthorne.graphics.Color;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
-
 public final class Main implements Application {
     private final Color background = new Color(0.055f, 0.075f, 0.12f, 1.0f);
 
@@ -126,7 +124,7 @@ public final class Main implements Application {
 
     @Override
     public void update(float deltaSeconds) {
-        if (Keyboard.isKeyDown(GLFW_KEY_ESCAPE)) {
+        if (Keyboard.isKeyDown(Keyboard.ESCAPE)) {
             Window.requestClose();
         }
     }
