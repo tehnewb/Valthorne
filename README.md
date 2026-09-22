@@ -3,154 +3,238 @@
 </p>
 
 <p align="center">
-  A Java library for desktop 2D and 3D games, built on LWJGL, JOML, and Jolt Physics.
+  A Java 25 library for building desktop 2D and 3D games.
 </p>
 
 <p align="center">
-  <img alt="Version 2.3.0" src="https://img.shields.io/badge/version-2.3.0-blue" />
+  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 2.3.0" src="https://img.shields.io/badge/version-2.3.0-blue" /></a>
   &nbsp;&nbsp;&nbsp;
-  <img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" />
+  <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
-  <img alt="Apache-2.0 license" src="https://img.shields.io/github/license/tehnewb/Valthorne?cacheSeconds=60&color=orange" />
+  <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/github/license/tehnewb/Valthorne?cacheSeconds=60&color=orange" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://discord.gg/APqcDzppDv"><img alt="Discord" src="https://img.shields.io/discord/1480243912240136395?logo=discord&logoColor=white&label=Discord&color=green" /></a>
 </p>
 
 # Valthorne
 
-A Java library for desktop 2D and 3D games, built on LWJGL, JOML, and Jolt Physics.
-Valthorne provides an application loop, rendering, assets, input, audio, scenes,
-physics, particles, lighting, and a shared texture/NanoVG UI system.
+Valthorne is a Java game-development library built on LWJGL, JOML, Jolt Physics,
+OpenAL, NanoVG, Yoga, and an optional Filament renderer. It provides the runtime,
+rendering, content, physics, audio, UI, and utility systems needed to build a game
+without hiding the underlying desktop APIs.
 
-**Version 2.3.0 · Java 25 · Apache-2.0**
+The current release is **2.3.0** and requires **JDK 25**. Valthorne is licensed
+under [Apache-2.0](LICENSE).
 
-Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) for an
-overview of the engine. The [website repository](https://github.com/tehnewb/Valthorne-website)
-is itself a Java Valthorne application compiled for the browser.
+## What is included
 
-The development [web target](portable/README.md) builds shared Java applications with
-Filament and Jolt in the browser. Run the original FPS example with
-`node portable/fps.mjs run web`, or select `desktop` using the same source.
-The browser target and its compatibility checks are included in this release;
-the maintained runnable examples remain in the companion project.
+- **Application runtime:** configurable GLFW windows and OpenGL contexts, frame
+  lifecycle, input, typed events, scenes, state machines, fixed-rate ticks, and
+  timing utilities.
+- **2D rendering:** textures, sprites, atlases, batching, shaders, cameras,
+  viewports, animation, particles, raycast lighting, batched lighting, radiance
+  cascades, and 2D path tracing.
+- **Fonts and UI:** bitmap fonts, GPU-rendered Slug curve fonts, asset loaders,
+  retained UI trees, Yoga layout, texture and NanoVG controls, themes, tables,
+  virtual lists, text editing, diagnostics, and performance overlays.
+- **Maps:** Tiled TMX maps and tilesets, plus LDtk projects with embedded or
+  external levels, tiles, IntGrid data, entities, custom fields, backgrounds,
+  definitions, and direct `TextureBatch` rendering.
+- **3D rendering:** OBJ models, materials, scene graphs, raster and Filament
+  renderers, billboards, picking, shadow maps, lighting grids, culling, particles,
+  skeletal and morph animation support, and path tracing.
+- **Physics and audio:** Jolt rigid bodies, collision shapes, queries, contacts,
+  joints, WAV/OGG/MP3 decoding, buffered and streaming playback, and spatial
+  sound areas.
+- **Assets and utilities:** asynchronous asset loading and caching, primitive
+  collections, pools, geometry, dynamic byte buffers, file helpers, plugins,
+  compression, encryption, hashing, and typed property sets with binary and
+  human-readable text persistence.
+- **Portable target:** a development TeaVM browser backend for supported shared
+  application code, including WebGL2/WebGPU adapters and browser-specific file,
+  audio, and window behavior.
 
-Version 2.3.0 adds LDtk map loading, expanded state-machine and tick APIs, and
-UI, rendering, texture, and web-platform refinements.
-See the [changelog](CHANGELOG.md) and [JOML migration guide](docs/joml-migration.md).
+The [system manual](docs/systems/README.md) maps the public engine systems to the
+current Java source. Platform-specific capabilities and limitations are documented
+in the [platform matrix](docs/platforms.md).
 
-## Start a game
+## Add Valthorne to a project
 
-Follow the [complete Gradle and Maven integration guide](docs/getting-started.md).
-In your application:
+Valthorne 2.3.0 is available from Maven Central:
 
 ```groovy
 repositories {
     mavenCentral()
 }
+
 dependencies {
     implementation 'io.github.tehnewb:Valthorne:2.3.0'
 }
 ```
 
-Use JDK 25. Launch with `--enable-native-access=ALL-UNNAMED`; on macOS also use
-`-XstartOnFirstThread`. The integration guide includes complete launcher configuration,
-a minimal application, Kotlin DSL, Maven, IDE setup, and distribution instructions.
-Runtime native dependencies arrive transitively; no native compiler is required.
+Use the Java 25 toolchain and configure application launchers with the native-access
+and JOML access options used by Valthorne itself:
 
-To use a local source build, run `./gradlew publishToMavenLocal` (Windows:
-`./gradlew.bat publishToMavenLocal`) and add `mavenLocal()` before `mavenCentral()`
-in the application's repositories.
+```groovy
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
 
-## Application examples
+application {
+    mainClass = 'game.Main'
+    applicationDefaultJvmArgs = [
+        '--enable-native-access=ALL-UNNAMED',
+        '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED'
+    ]
+    if (System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('mac')) {
+        applicationDefaultJvmArgs += '-XstartOnFirstThread'
+    }
+}
+```
 
-The public [Valthorne examples project](https://github.com/tehnewb/Valthorne-examples) contains ten runnable demos with
-walkthroughs, documented source, and licensed assets. Clone it or
-[download the standalone ZIP](https://github.com/tehnewb/Valthorne-examples/releases/latest).
-It consumes Valthorne from Maven Central and has its own build and validation.
-See the [example catalog](docs/examples.md) for commands and platform requirements.
+Runtime native dependencies are selected transitively; consumers do not need a
+native compiler or manually selected LWJGL/Jolt classifiers. See the
+[integration guide](docs/getting-started.md) for Gradle Kotlin DSL, Maven, IDE,
+local-publication, and distribution setup.
 
-Click a demo below to download its Windows x64 package. Extract it and
-double-click **Start.bat**. Java, assets and dependencies are included; no Gradle,
-Java installation, or repository clone is needed.
+## Minimal application
 
-| Download demo | Download demo |
+```java
+package game;
+
+import valthorne.Application;
+import valthorne.JGL;
+import valthorne.Keyboard;
+import valthorne.Window;
+import valthorne.graphics.Color;
+
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
+
+public final class Main implements Application {
+    private final Color background = new Color(0.055f, 0.075f, 0.12f, 1.0f);
+
+    public static void main(String[] args) {
+        JGL.init(new Main(), "My Game", 1280, 720);
+    }
+
+    @Override
+    public void init() {
+        // Load assets and create graphics resources on the context thread.
+    }
+
+    @Override
+    public void update(float deltaSeconds) {
+        if (Keyboard.isKeyDown(GLFW_KEY_ESCAPE)) {
+            Window.requestClose();
+        }
+    }
+
+    @Override
+    public void render() {
+        Window.clear(background);
+    }
+
+    @Override
+    public void dispose() {
+        // Dispose application-owned resources before the context closes.
+    }
+}
+```
+
+`JGL.init` owns the synchronous application loop. Create and dispose GPU resources
+on the context thread, treat `deltaSeconds` as seconds, and keep packaged assets on
+the classpath under `src/main/resources`.
+
+## Documentation
+
+| Topic | Reference |
 | --- | --- |
-| [Application starter](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-starter-windows-x64-2.0.1.zip) | [3D scene](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-scene-windows-x64-2.0.1.zip) |
-| [Physics playground](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-physics-windows-x64-2.0.1.zip) | [2D lighting](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-lighting2d-windows-x64-2.0.1.zip) |
-| [UI gallery](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-ui-windows-x64-2.0.1.zip) | [Audio studio](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-audio-windows-x64-2.0.1.zip) |
-| [Lighting studio](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-lighting-studio-windows-x64-2.0.1.zip) | [Path tracing](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-path-tracing-windows-x64-2.0.1.zip) |
-| [Physics studio](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-physics-studio-windows-x64-2.0.1.zip) | [FPS arena](https://github.com/tehnewb/Valthorne-examples/releases/download/v2.0.1/Valthorne-demo-fps-windows-x64-2.0.1.zip) |
+| Setup and runtime | [Getting started](docs/getting-started.md), [lifecycle](docs/systems/runtime.md), [platform support](docs/platforms.md), [graphics capabilities](docs/graphics-capabilities.md) |
+| Application structure | [Assets](docs/systems/assets.md), [events](docs/systems/events.md), [scenes](docs/systems/scenes.md), [state machines](docs/systems/state-machines.md), [timing](docs/systems/timing.md) |
+| 2D graphics | [Textures](docs/systems/textures.md), [cameras](docs/systems/cameras.md), [shaders](docs/systems/shaders.md), [particles](docs/systems/particles-2d.md), [lighting](docs/systems/lighting-2d.md) |
+| Fonts and UI | [Bitmap fonts](docs/systems/fonts.md), [Slug fonts](docs/systems/slug-fonts.md), [UI foundations](docs/systems/ui-core.md), [controls](docs/systems/ui-controls.md), [themes](docs/systems/ui-themes.md) |
+| Maps | [Tiled maps](docs/systems/tiled-maps.md), [LDtk source package](src/main/java/valthorne/graphics/map/ldtk) |
+| 3D graphics | [Models and scenes](docs/systems/models.md), [3D lighting](docs/systems/lighting-3d.md), [Filament](docs/systems/filament.md), [path tracing](docs/systems/path-tracing.md), [culling](docs/systems/culling.md) |
+| Physics and audio | [Jolt physics](docs/systems/physics.md), [audio](docs/systems/audio.md) |
+| Foundation APIs | [Collections](docs/systems/arrays.md), [buffers](docs/systems/buffers.md), [files](docs/systems/files.md), [compression](docs/systems/compression.md), [encryption](docs/systems/encryption.md), [utilities](docs/systems/utilities.md) |
+| Browser target | [Portable desktop/web target](portable/README.md) |
 
-The [integration guide](docs/getting-started.md) also includes a minimal application
-you can copy into your own project. Example code and resources remain excluded
-from this engine repository's normal build and all published library artifacts.
+The [complete system index](docs/systems/README.md) covers the engine's 473 Java
+source files and links each documented area back to its implementation.
 
-## Platform support
+## Runnable examples
 
-The standard renderers target **OpenGL 3.3 core** on Windows, Linux, and macOS.
-The build includes LWJGL and Jolt native artifacts for their supported desktop CPU
-variants. **Filament texture sharing is Windows x64 only**. Path tracing and
-radiance cascades require **OpenGL 4.3** and do not run on macOS.
+Runnable applications are maintained in the separate
+[Valthorne-examples](https://github.com/tehnewb/Valthorne-examples) repository.
+It includes starter, audio, UI, physics, lighting, 3D scene, FPS, LDtk, and Tiled
+examples. The LDtk and Tiled viewers use matching 4096×1440 maps for direct
+format and renderer comparisons.
 
-Read the [platform matrix](docs/platforms.md) before choosing a renderer or shipping
-an installer. CPU artifact availability, automated checks, and actual GPU validation
-are documented separately; no universal OS or hardware compatibility is implied.
+Clone both repositories beside one another to test unpublished engine changes:
 
-## Explore the engine
+```sh
+cd ../Valthorne-examples
+./gradlew -PvalthorneDir=../Valthorne build
+```
 
-The [system manual](docs/systems/README.md) covers lifecycle, APIs, examples,
-coordinate spaces, resource ownership, and subsystem contracts.
+On Windows, use `gradlew.bat`. The examples repository also provides documented
+launch tasks and standalone Windows packages. Example source and assets do not
+belong in this engine repository.
 
-| Area | Guides |
-| --- | --- |
-| Application and content | [Lifecycle](docs/systems/runtime.md), [assets](docs/systems/assets.md), [input](docs/systems/input.md), [scenes](docs/systems/scenes.md) |
-| 2D rendering | [Textures and batching](docs/systems/textures.md), [fonts](docs/systems/fonts.md), [Tiled maps](docs/systems/tiled-maps.md), [lighting](docs/lighting.md) |
-| 3D rendering | [Models, cameras and picking](docs/3D.md), [Filament](docs/filament.md), [path tracing](docs/path-tracing.md), [culling](docs/systems/culling.md), [particles](docs/particles-3d.md) |
-| Physics | [Jolt rigid bodies, colliders, queries and joints](docs/physics3d.md), [physics studio](docs/physics-studio.md) |
-| UI | [Shared UI tree](docs/ui-system.md), [advanced controls](docs/ui-advanced.md), [themes](docs/systems/ui-themes.md) |
-| Audio | [Buffered/streaming audio and spatial sound areas](docs/audio-system.md) |
-| Playable example | [FPS arena](docs/fps-arena.md) |
-| Performance | [Measurement ledger](docs/performance-program.md), [UI measurements](docs/ui-performance.md) |
+## Platform notes
 
-Historical benchmark reports describe their recorded source revisions and hardware;
-use them as evidence for those measurements, not as a guarantee for another machine.
+The standard desktop renderers require OpenGL 3.3 core. OpenGL 4.3 compute
+features, including compute-based path tracing and radiance cascades, are not
+available on macOS. Filament has a direct Windows x64 sharing path and transfer
+paths for supported Linux and macOS ARM64 runtimes; consult the platform matrix
+before selecting it for distribution.
 
-## Repository layout
-
-- `src/main/java/valthorne`: engine implementation and public APIs.
-- `src/main/resources`: runtime shaders, materials, fonts, and their licenses.
-- `gradle`: release checks, consumer checks, and optional benchmark configuration.
-- `docs`: guides, API contracts, and historical performance evidence.
-- `images`: Valthorne project branding.
-
-Runnable demos live in [Valthorne-examples](https://github.com/tehnewb/Valthorne-examples);
-site development lives in [Valthorne-website](https://github.com/tehnewb/Valthorne-website).
-See [contributing](CONTRIBUTING.md) for testing examples against a local engine checkout.
+Desktop artifacts include native dependencies for the supported Windows, Linux,
+and macOS targets listed in [platform support](docs/platforms.md). Native artifact
+availability does not guarantee that a particular driver or machine supports every
+renderer. Android, iOS, Windows x86, and other Unix systems are not desktop targets.
 
 ## Build and verify
 
+Use the included Gradle wrapper:
+
 ```sh
-./gradlew build                    # Library, sources, Javadoc and documentation checks
-./gradlew verifyRelease            # Also checks publication and generated consumer applications
-./gradlew verifyGraphicsConsumer   # Published-library OpenGL launch and pixel check
+./gradlew build
+./gradlew verifyRelease
+./gradlew verifyGraphicsConsumer
 ```
 
-Local test and benchmark sources, integration-test folders, and legacy examples
-are ignored by Git. Example launchers belong to the companion project above.
-CI generates disposable consumers under `build/`, so release
-checks require none of those folders. `test`, `graphicsTest`, `verify3D`,
-`verifyLighting`, and `verifyUI` can still run separately available local tests.
-Javadoc is generated under `build/docs/javadoc`; Javadoc errors fail the build.
-CI includes desktop build/consumer checks and a separate Linux graphics job.
-See [contributing](CONTRIBUTING.md) and the [release procedure](docs/releasing.md).
+- `build` compiles the library and creates the binary, source, and Javadoc archives.
+- `verifyRelease` checks release packaging, metadata, native physics, and isolated
+  module-path and Maven-style consumers.
+- `verifyGraphicsConsumer` launches a published-library consumer with a real OpenGL
+  context and verifies rendered pixels; it requires a usable display and driver.
+
+Focused `verifyPhysics3D`, `verify3D`, `verifyLighting`, `verifyUI`, and benchmark
+tasks are also available when their local test sources and required graphics
+environment are present. See [contributing](CONTRIBUTING.md) and the
+[release procedure](docs/releasing.md) before submitting or publishing changes.
+
+## Repository organization
+
+- `src/main/java/valthorne` — engine implementation and public APIs.
+- `src/main/resources` — packaged shaders, Filament materials, fonts, and licenses.
+- `docs` — integration guides, subsystem contracts, and performance records.
+- `portable` — shared-source desktop and TeaVM web compatibility tooling.
+- `gradle` — verification, publication, consumer-test, and benchmark tasks.
+- `images` — project branding.
+
+The project website is maintained separately in
+[Valthorne-website](https://github.com/tehnewb/Valthorne-website).
 
 ## License and community
 
-Valthorne is [Apache-2.0 licensed](LICENSE). Fonts, native dependencies and example
-assets retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md).
+Valthorne is distributed under the [Apache License 2.0](LICENSE). Bundled fonts,
+native libraries, and other third-party components retain their own terms; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Report reproducible bugs through [GitHub issues](https://github.com/tehnewb/Valthorne/issues).
-Community discussion is available on [Discord](https://discord.gg/APqcDzppDv).
-The [Wiki](https://github.com/tehnewb/Valthorne/wiki) and
-[Project Builder](https://github.com/tehnewb/ValthorneProjectBuilder) may describe
-older releases; this checkout's integration guide is the reference for 2.3.0.
+Use [GitHub issues](https://github.com/tehnewb/Valthorne/issues) for reproducible
+bugs and feature requests. Community discussion is available on
+[Discord](https://discord.gg/APqcDzppDv).
