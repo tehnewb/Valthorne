@@ -1,10 +1,28 @@
+<p align="center">
+  <img width="761" height="322" alt="Valthorne" src="https://github.com/user-attachments/assets/5bca2ab7-aa5a-4272-a690-4e91a5965ff5" />
+</p>
+
+<p align="center">
+  A Java library for desktop 2D and 3D games, built on LWJGL, JOML, and Jolt Physics.
+</p>
+
+<p align="center">
+  <img alt="Version 2.3.0" src="https://img.shields.io/badge/version-2.3.0-blue" />
+  &nbsp;&nbsp;&nbsp;
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" />
+  &nbsp;&nbsp;&nbsp;
+  <img alt="Apache-2.0 license" src="https://img.shields.io/github/license/tehnewb/Valthorne?cacheSeconds=60&color=orange" />
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://discord.gg/APqcDzppDv"><img alt="Discord" src="https://img.shields.io/discord/1480243912240136395?logo=discord&logoColor=white&label=Discord&color=green" /></a>
+</p>
+
 # Valthorne
 
 A Java library for desktop 2D and 3D games, built on LWJGL, JOML, and Jolt Physics.
 Valthorne provides an application loop, rendering, assets, input, audio, scenes,
 physics, particles, lighting, and a shared texture/NanoVG UI system.
 
-**Version 2.1.0 · Java 25 · Apache-2.0**
+**Version 2.3.0 · Java 25 · Apache-2.0**
 
 Explore the [Valthorne website](https://tehnewb.github.io/Valthorne-website/) for an
 overview of the engine. The [website repository](https://github.com/tehnewb/Valthorne-website)
@@ -16,8 +34,8 @@ Filament and Jolt in the browser. Run the original FPS example with
 The browser target and its compatibility checks are included in this release;
 the maintained runnable examples remain in the companion project.
 
-Version 2.1.0 includes the breaking API changes from 1.4.6, including public JOML
-math types, plus the validated browser target and cross-platform release checks.
+Version 2.3.0 adds LDtk map loading, expanded state-machine and tick APIs, and
+UI, rendering, texture, and web-platform refinements.
 See the [changelog](CHANGELOG.md) and [JOML migration guide](docs/joml-migration.md).
 
 ## Start a game
@@ -30,7 +48,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:2.1.0'
+    implementation 'io.github.tehnewb:Valthorne:2.3.0'
 }
 ```
 
@@ -135,4 +153,4 @@ Report reproducible bugs through [GitHub issues](https://github.com/tehnewb/Valt
 Community discussion is available on [Discord](https://discord.gg/APqcDzppDv).
 The [Wiki](https://github.com/tehnewb/Valthorne/wiki) and
 [Project Builder](https://github.com/tehnewb/ValthorneProjectBuilder) may describe
-older releases; this checkout's integration guide is the reference for 2.1.0.
+older releases; this checkout's integration guide is the reference for 2.3.0.
