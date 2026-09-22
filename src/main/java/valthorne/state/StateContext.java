@@ -1,60 +1,29 @@
 package valthorne.state;
 
 /**
- * Context passed into states, guards, and transition actions.
+ * One reusable context per machine; it is a live view, not an event snapshot.
  *
- * <h2>Example</h2>
- * <pre>{@code
- * // Your data model.
- * public final class PlayerData {
- *     public boolean grounded;
- *     public float vx;
- * }
+ * <p>During exit and transition actions the source remains current. Before enter,
+ * the destination, last transition, and zero state time are committed. Explicit
+ * starts/changes create transition metadata; automatic transitions reuse their
+ * immutable registered definition.</p>
  *
- * State<PlayerData> run = new State<>() {
- *     @Override public void onEnter(StateContext<PlayerData> ctx) {
- *         // ctx.data() gives you your object.
- *         // ctx.timeInStateSec() starts at 0 on enter.
- *     }
- *
- *     @Override public void onUpdate(StateContext<PlayerData> ctx, float dt) {
- *         float time = ctx.timeInStateSec();
- *         Transition<PlayerData> last = ctx.lastTransition();
- *     }
- *
- *     @Override public void onExit(StateContext<PlayerData> ctx) {}
- * };
- * }</pre>
- *
- * <p>This object is owned by the {@link StateMachine} and is reused each update.</p>
- * <p>It provides:</p>
- * <ul>
- *     <li>Access to your user data via {@link #data()}.</li>
- *     <li>Current state via {@link #currentState()}.</li>
- *     <li>Time spent in the current state via {@link #timeInStateSec()}.</li>
- *     <li>Last transition taken via {@link #lastTransition()} (includes reason).</li>
- * </ul>
- *
- * @param <C> user-defined context type
+ * @param <C> user-data type
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
 public final class StateContext<C> {
-
-    private final StateMachine<C> machine;     // Owning FSM instance.
-    private final C data;                      // User-supplied shared data object.
-
-    State<C> current;                          // Current active state (package-private for machine).
-    float timeInStateSec;                      // Seconds spent in current state (package-private for machine).
-    Transition<C> lastTransition;              // Last transition taken (package-private for machine).
+    private final StateMachine<C> machine; // Owning runtime.
+    private final C data; // Per-machine user data; may be null.
+    double time; // Scaled seconds accumulated in the current state.
+    float delta; // Delta of the latest accepted state update.
+    Transition<C> last; // Last committed immutable transition definition.
 
     /**
-     * Creates a new context.
+     * Creates the machine's live context.
      *
-     * <p>This constructor is package-private because the {@link StateMachine} owns the lifecycle.</p>
-     *
-     * @param machine owning state machine
-     * @param data    user data object
+     * @param machine owner
+     * @param data    user data
      */
     StateContext(StateMachine<C> machine, C data) {
         this.machine = machine;
@@ -62,55 +31,65 @@ public final class StateContext<C> {
     }
 
     /**
-     * Returns the owning FSM.
+     * Returns the owner.
      *
-     * <p>Useful if a state wants to query current state, force changes, or fire triggers.</p>
-     *
-     * @return the state machine instance
+     * @return owning machine
      */
     public StateMachine<C> machine() {
         return machine;
     }
 
     /**
-     * Returns your shared user data object.
+     * Returns user data.
      *
-     * <p>This is the primary mechanism to share state between states and guards.</p>
-     *
-     * @return user context data (may be null depending on your design)
+     * @return data supplied at construction
      */
     public C data() {
         return data;
     }
 
     /**
-     * Returns the currently active state.
+     * Returns the active state.
      *
-     * @return current state (may be null if machine is idle)
+     * @return active state, or null when stopped
      */
     public State<C> currentState() {
-        return current;
+        return machine.getCurrentState();
     }
 
     /**
-     * Returns how many seconds have elapsed since the current state was entered.
+     * Returns state time through the original float API.
      *
-     * <p>This resets to 0 when a transition is taken or when the initial state is set.</p>
-     *
-     * @return time in current state, seconds
+     * @return scaled seconds in the current state
      */
     public float timeInStateSec() {
-        return timeInStateSec;
+        return (float) time;
     }
 
     /**
-     * Returns the last transition taken.
+     * Returns state time without narrowing to float.
      *
-     * <p>This can be used to inspect {@link Transition#reason()} or other transition metadata.</p>
+     * @return scaled seconds in the current state
+     */
+    public double timeInState() {
+        return time;
+    }
+
+    /**
+     * Returns the most recent accepted update delta.
      *
-     * @return last transition, or null if none taken yet
+     * @return scaled delta; zero after a start, reset, or stop
+     */
+    public float delta() {
+        return delta;
+    }
+
+    /**
+     * Returns the last committed transition; stable references may be retained.
+     *
+     * @return immutable metadata, or null before the first start or after reset
      */
     public Transition<C> lastTransition() {
-        return lastTransition;
+        return last;
     }
 }

@@ -1,12 +1,12 @@
 package valthorne.graphics;
 
+import org.joml.Vector2f;
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.graphics.texture.TextureRegion;
 import valthorne.io.pool.Poolable;
-import org.joml.Vector2f;
 import valthorne.math.geometry.Rectangle;
 
 import java.nio.FloatBuffer;
@@ -174,7 +174,7 @@ public class Sprite implements Poolable, Drawable {
      * constructor. Ownership controls whether later sprite disposal releases the
      * backing texture; no additional GPU texture is created.
      *
-     * @param texture texture supplying the entire source image
+     * @param texture     texture supplying the entire source image
      * @param ownsTexture whether this sprite is responsible for texture disposal
      */
     private Sprite(Texture texture, boolean ownsTexture) {
@@ -205,7 +205,7 @@ public class Sprite implements Poolable, Drawable {
      * and builds local vertices, UVs, and transformed vertex buffers. The region is
      * shared rather than copied, and ownership applies to its backing texture.
      *
-     * @param region initial source region
+     * @param region      initial source region
      * @param ownsTexture whether disposal releases the backing texture
      * @throws NullPointerException if region is null
      */
@@ -496,10 +496,10 @@ public class Sprite implements Poolable, Drawable {
      * rotation, flips, and tint. Stored position and dimensions remain unchanged.
      * A missing region is skipped.
      *
-     * @param batch active destination texture batch
-     * @param x horizontal destination position
-     * @param y vertical destination position
-     * @param width destination width in batch units
+     * @param batch  active destination texture batch
+     * @param x      horizontal destination position
+     * @param y      vertical destination position
+     * @param width  destination width in batch units
      * @param height destination height in batch units
      */
     @Override
@@ -515,12 +515,12 @@ public class Sprite implements Poolable, Drawable {
      * The sprite's scale, origin, rotation, and flips still apply without changing
      * stored bounds. A missing region is skipped.
      *
-     * @param batch active destination texture batch
-     * @param x horizontal destination position
-     * @param y vertical destination position
-     * @param width destination width in batch units
+     * @param batch  active destination texture batch
+     * @param x      horizontal destination position
+     * @param y      vertical destination position
+     * @param width  destination width in batch units
      * @param height destination height in batch units
-     * @param tint color multiplied by the sprite tint, or null to use its tint alone
+     * @param tint   color multiplied by the sprite tint, or null to use its tint alone
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, Color tint) {
@@ -535,15 +535,15 @@ public class Sprite implements Poolable, Drawable {
      * Origin offsets and rotation are added to the sprite's stored values; scale,
      * flips, and tint still apply. Stored sprite geometry is not changed.
      *
-     * @param batch active destination texture batch
-     * @param x horizontal destination position
-     * @param y vertical destination position
-     * @param width destination width in batch units
-     * @param height destination height in batch units
-     * @param originX horizontal rotation-origin offset in destination units
-     * @param originY vertical rotation-origin offset in destination units
+     * @param batch    active destination texture batch
+     * @param x        horizontal destination position
+     * @param y        vertical destination position
+     * @param width    destination width in batch units
+     * @param height   destination height in batch units
+     * @param originX  horizontal rotation-origin offset in destination units
+     * @param originY  vertical rotation-origin offset in destination units
      * @param rotation clockwise rotation in degrees
-     * @param tint optional tint multiplier, or null for the drawable's default tint
+     * @param tint     optional tint multiplier, or null for the drawable's default tint
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float originX, float originY, float rotation, Color tint) {
@@ -558,14 +558,14 @@ public class Sprite implements Poolable, Drawable {
      * Stored scale, rotation, origin, flips, and tint remain active, and source
      * coordinates are not clamped to the region.
      *
-     * @param batch active destination texture batch
-     * @param x horizontal destination position
-     * @param y vertical destination position
-     * @param width destination width in batch units
-     * @param height destination height in batch units
-     * @param regionX horizontal source offset in pixels
-     * @param regionY vertical source offset in pixels
-     * @param regionWidth source width in pixels
+     * @param batch        active destination texture batch
+     * @param x            horizontal destination position
+     * @param y            vertical destination position
+     * @param width        destination width in batch units
+     * @param height       destination height in batch units
+     * @param regionX      horizontal source offset in pixels
+     * @param regionY      vertical source offset in pixels
+     * @param regionWidth  source width in pixels
      * @param regionHeight source height in pixels
      */
     @Override
@@ -580,19 +580,19 @@ public class Sprite implements Poolable, Drawable {
      * regions/textures and zero-size backing textures are skipped. This does not
      * change stored bounds or clamp source coordinates to the region.
      *
-     * @param batch active destination texture batch
-     * @param x horizontal destination position
-     * @param y vertical destination position
-     * @param width destination width in batch units
-     * @param height destination height in batch units
-     * @param regionX horizontal source offset in pixels
-     * @param regionY vertical source offset in pixels
-     * @param regionWidth source width in pixels
+     * @param batch        active destination texture batch
+     * @param x            horizontal destination position
+     * @param y            vertical destination position
+     * @param width        destination width in batch units
+     * @param height       destination height in batch units
+     * @param regionX      horizontal source offset in pixels
+     * @param regionY      vertical source offset in pixels
+     * @param regionWidth  source width in pixels
      * @param regionHeight source height in pixels
-     * @param originX horizontal rotation-origin offset in destination units
-     * @param originY vertical rotation-origin offset in destination units
-     * @param rotation clockwise rotation in degrees
-     * @param tint optional tint multiplier, or null for the drawable's default tint
+     * @param originX      horizontal rotation-origin offset in destination units
+     * @param originY      vertical rotation-origin offset in destination units
+     * @param rotation     clockwise rotation in degrees
+     * @param tint         optional tint multiplier, or null for the drawable's default tint
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
@@ -639,14 +639,7 @@ public class Sprite implements Poolable, Drawable {
         float sin = (float) Math.sin(rad);
         float cos = (float) Math.cos(rad);
 
-        Color drawTint = tint == null
-                ? this.color
-                : new Color(
-                this.color.r() * tint.r(),
-                this.color.g() * tint.g(),
-                this.color.b() * tint.b(),
-                this.color.a() * tint.a()
-        );
+        Color drawTint = tint == null ? this.color : new Color(this.color.r() * tint.r(), this.color.g() * tint.g(), this.color.b() * tint.b(), this.color.a() * tint.a());
 
         batch.drawUV(texture, x, y, drawWidth, drawHeight, u0, v0, u1, v1, drawOriginX, drawOriginY, sin, cos, drawTint);
     }

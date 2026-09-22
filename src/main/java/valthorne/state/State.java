@@ -1,64 +1,40 @@
 package valthorne.state;
 
 /**
- * A state in a finite state machine (FSM).
+ * Optional lifecycle callbacks for one state. Override only the methods you need,
+ * or use {@link StateMachine#state(String)} to define a state with lambdas.
  *
- * <h2>Example</h2>
- * <pre>{@code
- * public final class IdleState implements State<PlayerCtx> {
- *     @Override
- *     public void onEnter(StateContext<PlayerCtx> ctx) {
- *         // Reset state-local timers, play enter animation, etc.
- *     }
+ * <p>States in a shared {@link StateGraph} must not keep per-machine mutable data.
+ * Store that data in {@link StateContext#data()} instead. Entry and exit callbacks
+ * may fire registered triggers, but must not recursively change states.</p>
  *
- *     @Override
- *     public void onUpdate(StateContext<PlayerCtx> ctx, float dtSec) {
- *         // Run logic for this state.
- *         // Transition rules are handled by the StateMachine, not here.
- *     }
- *
- *     @Override
- *     public void onExit(StateContext<PlayerCtx> ctx) {
- *         // Cleanup: stop sounds, clear flags, etc.
- *     }
- * }
- * }</pre>
- *
- * <p>States should be lightweight and typically stateless, with shared data stored in {@link StateContext#data()}.</p>
- *
- * @param <C> user-defined context type
+ * @param <C> shared user-data type
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
 public interface State<C> {
+    /**
+     * Called after this state becomes current and its timer is reset.
+     *
+     * @param ctx reused machine context
+     */
+    default void onEnter(StateContext<C> ctx) {
+    }
 
     /**
-     * Called when the state becomes active.
+     * Called once per running update, before automatic transition selection.
      *
-     * <p>This is called after a transition is taken and {@link StateContext#timeInStateSec()} has been reset to 0.</p>
-     * <p>If the transition had an action, the action is executed before this method.</p>
-     *
-     * @param ctx state context (shared, reused)
+     * @param ctx   reused machine context
+     * @param delta finite, nonnegative scaled seconds
      */
-    void onEnter(StateContext<C> ctx);
+    default void onUpdate(StateContext<C> ctx, float delta) {
+    }
 
     /**
-     * Called every update while the state is active.
+     * Called before leaving this state and before any transition action.
      *
-     * <p>This is called once per {@link StateMachine#update(float)} call (as long as this state remains active
-     * during the update).</p>
-     *
-     * @param ctx   state context (shared, reused)
-     * @param dtSec delta time in seconds (clamped >= 0 by the machine)
+     * @param ctx reused machine context
      */
-    void onUpdate(StateContext<C> ctx, float dtSec);
-
-    /**
-     * Called when the state stops being active.
-     *
-     * <p>This is called before the transition action (if any) and before entering the next state.</p>
-     *
-     * @param ctx state context (shared, reused)
-     */
-    void onExit(StateContext<C> ctx);
+    default void onExit(StateContext<C> ctx) {
+    }
 }
