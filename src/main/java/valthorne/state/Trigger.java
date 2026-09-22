@@ -18,7 +18,7 @@ import java.util.Objects;
  * }
  * }</pre>
  *
- * <p>Triggers are stored on the machine as string names.</p>
+ * <p>Trigger names are resolved to compact per-graph IDs; pending events are stored as bits.</p>
  * <p>A transition can require a trigger, and the trigger is consumed when that transition is taken.</p>
  *
  * @param name trigger name

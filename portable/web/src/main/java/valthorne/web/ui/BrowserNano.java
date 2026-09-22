@@ -1,9 +1,21 @@
 package valthorne.web.ui;
-import org.teavm.jso.*; import Uint8Array; import org.teavm.interop.*; import org.lwjgl.nanovg.*; import ByteBuffer;
+import org.teavm.jso.*; import org.teavm.interop.*; import org.lwjgl.nanovg.*;
 import java.nio.ByteBuffer;
 import org.teavm.jso.typedarrays.Uint8Array;
+/**
+ * TeaVM bridge that maps the engine's NanoVG calls onto the browser canvas host.
+ * Public methods retain NanoVG-compatible names and primitive signatures so the
+ * portable source transformer can redirect desktop rendering code without adding
+ * browser-specific branches to each widget.
+ *
+ * <p>This low-level compatibility facade is initialized and called by the web UI
+ * runtime; application code should use the ordinary Valthorne UI API.</p>
+ */
 public final class BrowserNano {
 private BrowserNano() {}
+/**
+ * NanoVG-compatible flags and alignment constants consumed by portable UI code.
+ */
 public static final int NVG_ANTIALIAS=1,NVG_STENCIL_STROKES=2,NVG_ALIGN_LEFT=1,NVG_ALIGN_CENTER=2,NVG_ALIGN_RIGHT=4,NVG_ALIGN_TOP=8,NVG_ALIGN_MIDDLE=16,NVG_ALIGN_BOTTOM=32,NVG_ALIGN_BASELINE=64,NVG_ROUND=1,NVG_IMAGE_FLIPY=8,NVG_CW=1,NVG_CCW=2;
 public static long nvgCreate(int flags){return bnvgCreate(flags);}
 public static void nvgClosePath(long vg){closePath((int)vg);}
@@ -47,7 +59,13 @@ public static void nvgCircle(long vg,float x,float y,float r){bnvgCircle((int)vg
 @JSBody(params={"vg","x","y","r"},script="valthorneHost.nano.circle(vg,x,y,r);") private static native void bnvgCircle(int vg,float x,float y,float r);
 public static void nvgArc(long vg,float x,float y,float r,float start,float end,int direction){bnvgArc((int)vg,x,y,r,start,end,direction==NVG_CCW);}
 @JSBody(params={"vg","x","y","r","start","end","ccw"},script="valthorneHost.nano.path(vg,'arc',[x,y,r,start,end,ccw]);") private static native void bnvgArc(int vg,float x,float y,float r,float start,float end,boolean ccw);
-/** Canvas antialiasing is browser-managed; retained for NanoVG source compatibility. */
+/**
+ * Retains the NanoVG shape-antialiasing entry point for source compatibility.
+ * Canvas antialiasing is browser-managed, so this operation has no side effects.
+ *
+ * @param vg ignored NanoVG-compatible context handle
+ * @param enabled ignored requested antialiasing state
+ */
 public static void nvgShapeAntiAlias(long vg,boolean enabled){}
 public static void nvgMoveTo(long vg,float x,float y){bnvgMoveTo((int)vg,x,y);}
 @JSBody(params={"vg","x","y"},script="valthorneHost.nano.path(vg,'moveTo',[x,y]);") private static native void bnvgMoveTo(int vg,float x,float y);

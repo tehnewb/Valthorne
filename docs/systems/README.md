@@ -7,7 +7,7 @@ This manual explains how to use every system represented in the current Java sou
 ## Start here
 
 First complete the [Gradle/Maven setup](../getting-started.md) and check
-[platform requirements](../platforms.md). This manual targets `2.2.0`;
+[platform requirements](../platforms.md). This manual targets `2.3.0`;
 see [runnable examples](../examples.md) for launch commands.
 
 1. [Application lifecycle](runtime.md): launch the engine and place initialization, updates, drawing, and cleanup correctly.

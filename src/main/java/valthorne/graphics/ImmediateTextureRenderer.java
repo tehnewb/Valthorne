@@ -11,9 +11,7 @@ import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
-import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Shared immediate quad renderer used by standalone textured draw helpers.
@@ -107,10 +105,10 @@ public final class ImmediateTextureRenderer {
      *
      * @param textureID borrowed 2D texture name
      * @param positions four XY corners per quad, starting at index zero
-     * @param uvs corresponding UV pairs
+     * @param uvs       corresponding UV pairs
      * @param quadCount number of quads; nonpositive values return immediately
-     * @param color tint copied to each vertex, or null for white
-     * @throws NullPointerException if a required buffer is null for positive quadCount
+     * @param color     tint copied to each vertex, or null for white
+     * @throws NullPointerException      if a required buffer is null for positive quadCount
      * @throws IndexOutOfBoundsException if an input buffer has insufficient readable elements
      */
     public static void drawQuads(int textureID, FloatBuffer positions, FloatBuffer uvs, int quadCount, Color color) {
@@ -222,9 +220,9 @@ public final class ImmediateTextureRenderer {
      * using white for a null tint, and flips shared staging storage for upload.
      *
      * @param positions four XY corners per quad
-     * @param uvs matching UV pairs
+     * @param uvs       matching UV pairs
      * @param quadCount number of quads
-     * @param color common tint, or null
+     * @param color     common tint, or null
      */
     private static void uploadVertices(FloatBuffer positions, FloatBuffer uvs, int quadCount, Color color) {
         vertexBuffer.clear();
@@ -251,14 +249,14 @@ public final class ImmediateTextureRenderer {
      * Copies one selected corner's position/UV and supplied RGBA into shared staging.
      * Input buffer positions are not changed.
      *
-     * @param positions absolute-index position source
-     * @param uvs absolute-index UV source
-     * @param quadBase float offset of the quad
+     * @param positions   absolute-index position source
+     * @param uvs         absolute-index UV source
+     * @param quadBase    float offset of the quad
      * @param vertexIndex corner index from zero through three
-     * @param r red tint
-     * @param g green tint
-     * @param b blue tint
-     * @param a alpha tint
+     * @param r           red tint
+     * @param g           green tint
+     * @param b           blue tint
+     * @param a           alpha tint
      */
     private static void putIndexedVertex(FloatBuffer positions, FloatBuffer uvs, int quadBase, int vertexIndex, float r, float g, float b, float a) {
         int index = quadBase + vertexIndex * 2;

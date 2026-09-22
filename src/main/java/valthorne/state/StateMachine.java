@@ -1,552 +1,1153 @@
 package valthorne.state;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
- * A condition-driven finite state machine (FSM).
+ * A manually driven, single-threaded finite state machine with a fluent rule API.
  *
- * <h2>Example</h2>
  * <pre>{@code
- * // Your shared data for states/guards/actions.
- * public record PlayerCtx(boolean grounded, float vx, boolean dead) {}
- *
- * // Example states.
- * State<PlayerCtx> idle = new State<>() {
- *     @Override public void onEnter(StateContext<PlayerCtx> ctx) {}
- *     @Override public void onUpdate(StateContext<PlayerCtx> ctx, float dt) {}
- *     @Override public void onExit(StateContext<PlayerCtx> ctx) {}
- * };
- *
- * State<PlayerCtx> run = new State<>() {
- *     @Override public void onEnter(StateContext<PlayerCtx> ctx) {}
- *     @Override public void onUpdate(StateContext<PlayerCtx> ctx, float dt) {}
- *     @Override public void onExit(StateContext<PlayerCtx> ctx) {}
- * };
- *
- * State<PlayerCtx> dead = new State<>() {
- *     @Override public void onEnter(StateContext<PlayerCtx> ctx) {}
- *     @Override public void onUpdate(StateContext<PlayerCtx> ctx, float dt) {}
- *     @Override public void onExit(StateContext<PlayerCtx> ctx) {}
- * };
- *
- * // Create the FSM with initial state.
- * StateMachine<PlayerCtx> fsm = new StateMachine<>(new PlayerCtx(true, 0f, false), idle);
- *
- * // Global "any state -> dead" transition.
- * fsm.addGlobalTransition(
- *     dead,
- *     1000, // priority
- *     null, // trigger
- *     ctx -> ctx.data().dead(), // guard
- *     0f,   // min time in state
- *     "player died",
- *     (ctx, tr) -> {
- *         // Transition action: reset something, play sound, fire event, etc.
- *     }
- * );
- *
- * // State-specific transitions.
- * fsm.addTransition(
- *     idle, run,
- *     10,
- *     null,
- *     ctx -> Math.abs(ctx.data().vx()) > 0.1f,
- *     0.05f, // debounce: must be in IDLE for 50ms before leaving
- *     "start moving",
- *     null
- * );
- *
- * fsm.addTransition(
- *     run, idle,
- *     10,
- *     null,
- *     ctx -> Math.abs(ctx.data().vx()) <= 0.1f,
- *     0.05f,
- *     "stop moving",
- *     null
- * );
- *
- * // Trigger-based transition (example: jump).
- * Trigger jump = new Trigger("jump");
- * State<PlayerCtx> jumpState = ...;
- *
- * fsm.addTransition(
- *     idle, jumpState,
- *     50,
- *     jump,
- *     ctx -> ctx.data().grounded(),
- *     0f,
- *     "jump pressed",
- *     (ctx, tr) -> {
- *         // e.g. set vertical velocity
- *     }
- * );
- *
- * // In your input handling:
- * // if (jumpPressed) fsm.fireTrigger("jump");
- *
- * // In your game loop:
- * fsm.update(deltaSeconds);
+ * StateMachine<Player> machine = new StateMachine<>(player);
+ * machine.state("Idle");
+ * machine.state("Run").onUpdate((ctx, dt) -> ctx.data().move(dt));
+ * machine.from("Idle").when(ctx -> ctx.data().moving).to("Run");
+ * machine.from("Run").unless(ctx -> ctx.data().moving).to("Idle");
+ * machine.start("Idle");
+ * machine.update(delta);
  * }</pre>
  *
- * <h2>How transition selection works</h2>
- * <ul>
- *     <li>Global transitions are evaluated first and compete with state-specific transitions by priority.</li>
- *     <li>Lists are pre-sorted by priority (descending), then insertion order (ascending).</li>
- *     <li>A transition is valid only if:
- *         <ul>
- *             <li>{@code timeInStateSec >= minTimeInStateSec}</li>
- *             <li>guard is null or {@code guard.allow(ctx)} returns true</li>
- *             <li>requiredTrigger is null or its name exists in the trigger queue</li>
- *         </ul>
- *     </li>
- *     <li>If a transition requires a trigger, the trigger is consumed when the transition is taken.</li>
- *     <li>By default, multiple transitions may occur per {@link #update(float)} call (capped by {@link #maxTransitionsPerUpdate}).</li>
- * </ul>
+ * <h2>Update order</h2>
+ * <p>Validate delta; evaluate end/pause/continuation/run conditions; advance scaled
+ * state time; call the current state's update once; evaluate end/pause/run again;
+ * choose a rule; exit, run its action, commit destination and zero state time,
+ * then enter. By default at most one automatic transition is taken per update.
+ * {@link #maxTransitionsPerUpdate(int)} explicitly enables bounded chaining.</p>
  *
- * <h2>Transition lifecycle</h2>
- * <ol>
- *     <li>oldState.onExit(ctx)</li>
- *     <li>transition.action.run(ctx, transition) (if present)</li>
- *     <li>current is switched, {@code timeInStateSec} resets to 0</li>
- *     <li>newState.onEnter(ctx)</li>
- * </ol>
+ * <p>Rules compete by descending priority, then registration order, regardless of
+ * whether they are local or global. Self-targeting rules are skipped. A time
+ * threshold and required event are checked before invoking a guard. Guards must
+ * be read-only and may not mutate this machine. Only the winning rule consumes
+ * its event. Unconsumed events persist until taken or explicitly cleared.</p>
  *
- * @param <C> user-defined context type
+ * <h2>Time and pausing</h2>
+ * <p>All time comes from update calls; there are no threads or wall-clock reads.
+ * A paused machine retains its state and timer but still checks end/pause/resume
+ * conditions. A resumed update accepts that call's delta. A zero time scale
+ * freezes state updates and automatic transitions, but not lifecycle conditions.
+ * Timed rules test time in the current state; they are not tick-style schedules.
+ * No frame splitting or leftover-time transfer occurs across state changes.</p>
+ *
+ * <h2>Mutation and exceptions</h2>
+ * <p>State update callbacks may pause, stop, or force a state change; such operations
+ * interrupt the remaining work of that update, even if immediately reversed.
+ * Enter/exit/action and machine lifecycle listeners must not recursively change lifecycle;
+ * registered events may be fired from them. Recursive update is rejected.
+ * Configure graph structure and named callbacks outside callbacks and updates.</p>
+ *
+ * <p>Exceptions propagate. If exit/action throws, the source remains current and
+ * any winning trigger is already consumed. If entry throws, the destination is
+ * committed. Timers and user side effects are not rolled back. Guards/callbacks
+ * should not throw routinely. Internal reentry flags are restored in finally blocks.</p>
+ *
+ * <h2>Storage</h2>
+ * <p>Normal updates and registered transitions allocate no machine-owned objects.
+ * Current adjacency is cached; local and global arrays are searched without scratch
+ * collections. Optional control storage and trigger overflow bits are lazy.
+ * Explicit start/change/stop can allocate immutable transition metadata. Builders,
+ * registration, capacity growth, exceptions, and user code may also allocate.
+ * Freeze and share the graph for many machines with identical behavior.</p>
+ *
+ * @param <C> user-data type
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
-public class StateMachine<C> {
-
-    private final Map<State<C>, List<Transition<C>>> perState = new IdentityHashMap<>(); // State -> sorted transition list.
-    private final Set<Transition<C>> temporarilyUnavailable = new HashSet<>();           // Transitions skipped this update due to trigger-consume conflicts.
-    private final List<Transition<C>> global = new ArrayList<>();                        // Sorted global transitions (any-state rules).
-    private final AtomicLong orderCounter = new AtomicLong(0);                           // Monotonic insertion order for tie-breaking.
-    private final Set<String> triggerQueue = new LinkedHashSet<>();                      // Unique queued trigger names, preserves insertion order.
-    private final StateContext<C> ctx;                                                   // Shared context passed to states/guards/actions.
-    private State<C> current;                                                            // Currently active state (may be null).
-    private boolean allowMultipleTransitionsPerUpdate = true;                            // If true, may chain transitions in one update.
-    private int maxTransitionsPerUpdate = 8;                                             // Safety cap to prevent infinite loops per update call.
+public final class StateMachine<C> {
+    /**
+     * Flag indicating an update is in progress.
+     */
+    private static final int UPDATING = 1;
+    /**
+     * Flag indicating a lifecycle transition callback is in progress.
+     */
+    private static final int CHANGING = 2;
+    /**
+     * Flag indicating a read-only predicate is being evaluated.
+     */
+    private static final int EVALUATING = 4;
+    private final StateGraph<C> graph; // Shared definitions, mutable until frozen.
+    private final StateContext<C> ctx; // Live per-machine user context and timer.
+    private StateSlot<C> current; // Current adjacency slot; null when stopped.
+    private StateControl<C> control; // Optional conditions, scaling, and listeners.
+    private long events; // First 64 pending event IDs without another allocation.
+    private long[] extraEvents; // Event IDs beyond 63, allocated only when needed.
+    private long revision; // Detects lifecycle or timing changes from callbacks.
+    private int flags; // Update, transition, and predicate execution flags.
+    private int transitionLimit = 8; // Maximum automatic transitions per update.
+    private boolean multiple; // Whether multiple automatic transitions are enabled.
+    private boolean paused; // Whether callback time is suspended in the current state.
 
     /**
-     * Creates a new FSM and immediately enters the initial state (if non-null).
-     *
-     * <p>The provided {@code userContext} becomes available through {@link StateContext#data()}.</p>
-     * <p>The initial enter reason is stored on {@link StateContext#lastTransition()} as {@code "initial"} (or your override).</p>
-     *
-     * @param userContext your context data object (may be null, depending on your design)
-     * @param initial     initial state (may be null)
+     * Creates a stopped machine with no user data.
      */
-    public StateMachine(C userContext, State<C> initial) {
-        this.ctx = new StateContext<>(this, userContext);
+    public StateMachine() {
+        this(null);
+    }
+
+    /**
+     * Creates a stopped machine with an empty editable graph.
+     *
+     * @param data user data, optionally null
+     */
+    public StateMachine(C data) {
+        this(data, new StateGraph<>());
+    }
+
+    /**
+     * Creates a machine and immediately enters a custom initial state.
+     * Register rules before the first update, or outside later updates.
+     *
+     * @param data    user data
+     * @param initial initial state, or null to remain stopped
+     */
+    public StateMachine(C data, State<C> initial) {
+        this(data);
         setInitialState(initial, "initial");
     }
 
     /**
-     * Enables or disables taking multiple transitions in a single {@link #update(float)} call.
+     * Creates independent runtime state using an existing graph.
      *
-     * <p>If enabled, the FSM will keep evaluating transitions after each state change until:
-     * it finds no valid transition, reaches {@link #maxTransitionsPerUpdate}, or this option is disabled.</p>
-     *
-     * @param allow true to allow multiple transitions per update
-     * @return this for chaining
+     * @param data  user data
+     * @param graph definitions
      */
-    public StateMachine<C> setAllowMultipleTransitionsPerUpdate(boolean allow) {
-        this.allowMultipleTransitionsPerUpdate = allow;
-        return this;
+    StateMachine(C data, StateGraph<C> graph) {
+        this.graph = graph;
+        this.ctx = new StateContext<>(this, data);
     }
 
     /**
-     * Sets the maximum number of transitions allowed in one {@link #update(float)}.
+     * Creates or returns a named state. Names are case-sensitive.
      *
-     * <p>This is a safety valve against conditions that form a cycle, e.g. A->B and B->A both valid.</p>
-     *
-     * @param max maximum transitions per update (minimum 1)
-     * @return this for chaining
+     * @param name nonblank name
+     * @return fluent callback definition
      */
-    public StateMachine<C> setMaxTransitionsPerUpdate(int max) {
-        this.maxTransitionsPerUpdate = Math.max(1, max);
-        return this;
+    public StateNode<C> state(String name) {
+        return graph.define(name);
     }
 
     /**
-     * Fires a trigger (queued event) by name.
+     * Begins a rule from a previously defined state name.
      *
-     * <p>Triggers are stored as unique names. Firing the same trigger multiple times before it is consumed
-     * will still result in only one queued instance.</p>
-     *
-     * <p>A transition that requires this trigger will consume it when taken.</p>
-     *
-     * @param triggerName trigger name (ignored if null/blank)
+     * @param name source name
+     * @return single-use transition builder
      */
-    public void fireTrigger(String triggerName) {
-        if (triggerName == null || triggerName.isBlank()) {
-            return;
+    public TransitionBuilder<C> from(String name) {
+        editable();
+        return new TransitionBuilder<>(this, graph.named(name));
+    }
+
+    /**
+     * Begins a rule from a custom state identity, registering it if needed.
+     *
+     * @param state non-null source
+     * @return single-use transition builder
+     */
+    public TransitionBuilder<C> from(State<C> state) {
+        editable();
+        return new TransitionBuilder<>(this, graph.resolve(state, true));
+    }
+
+    /**
+     * Begins a global rule competing with local rules by priority.
+     *
+     * @return single-use transition builder
+     */
+    public TransitionBuilder<C> any() {
+        editable();
+        return new TransitionBuilder<>(this, null);
+    }
+
+    /**
+     * Seals configuration and returns its reusable, compacted graph.
+     * Runtime state, lifecycle settings, pending events, and user data are not shared.
+     *
+     * @return frozen definitions for creating independent machines
+     */
+    public StateGraph<C> freeze() {
+        if (flags != 0) throw new IllegalStateException("Freeze outside callbacks and updates.");
+        return graph.freeze();
+    }
+
+    /**
+     * Starts or moves to an existing named state. No-op if already running there.
+     *
+     * @param name destination state
+     * @return this machine
+     */
+    public StateMachine<C> start(String name) {
+        return startSlot(graph.named(name));
+    }
+
+    /**
+     * Starts or moves to a state identity; custom states may be registered beforehand.
+     *
+     * @param state non-null destination
+     * @return this machine
+     */
+    public StateMachine<C> start(State<C> state) {
+        return startSlot(graph.resolve(state, true));
+    }
+
+    /**
+     * Starts a resolved state through normal transition lifecycle.
+     *
+     * @param target destination
+     * @return this machine
+     */
+    private StateMachine<C> startSlot(StateSlot<C> target) {
+        mutableLifecycle();
+        if (current == target) {
+            resume();
+            return this;
         }
-        triggerQueue.add(triggerName);
-    }
-
-    /**
-     * Clears all queued triggers.
-     *
-     * <p>Use this if you want to guarantee that triggers do not carry across frames.</p>
-     */
-    public void clearTriggers() {
-        triggerQueue.clear();
-    }
-
-    /**
-     * Adds a transition that is only considered when {@code from} is the current state.
-     *
-     * <p>Transition selection is priority-based:
-     * higher priority wins; ties are resolved by insertion order.</p>
-     *
-     * <p>Use {@code requiredTrigger} to require a queued event (consumed when taken).</p>
-     * <p>Use {@code guard} to implement boolean logic checks against {@link StateContext}.</p>
-     * <p>Use {@code minTimeInStateSec} as a debounce/cooldown (must remain in state for this many seconds).</p>
-     * <p>Use {@code reason} to store a human-readable reason on {@link Transition#reason()}.</p>
-     * <p>Use {@code action} to run custom logic during the transition.</p>
-     *
-     * @param from              source state (must be non-null)
-     * @param to                target state (must be non-null)
-     * @param priority          priority (higher wins)
-     * @param requiredTrigger   required trigger (nullable)
-     * @param guard             guard predicate (nullable)
-     * @param minTimeInStateSec debounce/cooldown in seconds (clamped to >= 0)
-     * @param reason            human-readable reason (nullable/blank becomes default)
-     * @param action            transition action (nullable)
-     * @return this for chaining
-     */
-    public StateMachine<C> addTransition(State<C> from, State<C> to, int priority, Trigger requiredTrigger, Guard<C> guard, float minTimeInStateSec, String reason, TransitionAction<C> action) {
-        Objects.requireNonNull(from, "from");
-        Objects.requireNonNull(to, "to");
-
-        Transition<C> t = new Transition<>(from, to, requiredTrigger, guard, minTimeInStateSec, priority, orderCounter.getAndIncrement(), reason, action);
-
-        perState.computeIfAbsent(from, k -> new ArrayList<>()).add(t);
-        sortTransitions(perState.get(from));
+        boolean wasStopped = current == null;
+        take(new Transition<>(getCurrentState(), target, null, -1, null, 0, Integer.MAX_VALUE, -1, wasStopped ? "initial" : "started", null), wasStopped);
         return this;
     }
 
     /**
-     * Adds a global transition (any-state rule).
+     * Forces a change to a named state without testing rules.
      *
-     * <p>Global transitions are evaluated alongside the current state's transitions and compete by priority.</p>
-     * <p>A global transition uses {@code from=null} inside {@link Transition#from()}.</p>
-     *
-     * @param to                target state (must be non-null)
-     * @param priority          priority (higher wins)
-     * @param requiredTrigger   required trigger (nullable)
-     * @param guard             guard predicate (nullable)
-     * @param minTimeInStateSec debounce/cooldown in seconds (clamped to >= 0)
-     * @param reason            human-readable reason (nullable/blank becomes default)
-     * @param action            transition action (nullable)
-     * @return this for chaining
+     * @param name destination state
+     * @return this machine
      */
-    public StateMachine<C> addGlobalTransition(State<C> to, int priority, Trigger requiredTrigger, Guard<C> guard, float minTimeInStateSec, String reason, TransitionAction<C> action) {
-        Objects.requireNonNull(to, "to");
-
-        Transition<C> t = new Transition<>(null, to, requiredTrigger, guard, minTimeInStateSec, priority, orderCounter.getAndIncrement(), reason, action);
-
-        global.add(t);
-        sortTransitions(global);
+    public StateMachine<C> goTo(String name) {
+        changeSlot(graph.named(name), "forced");
         return this;
     }
 
     /**
-     * Updates the FSM by:
-     * <ol>
-     *     <li>Accumulating time in the current state</li>
-     *     <li>Calling {@code current.onUpdate(ctx, dt)}</li>
-     *     <li>Evaluating transitions and taking the best valid one</li>
-     *     <li>Optionally repeating transition evaluation (multi-transition mode)</li>
-     * </ol>
+     * Forces a change to custom state behavior without testing rules.
      *
-     * <p>Trigger handling:</p>
-     * <ul>
-     *     <li>If a transition requires a trigger, it must exist in the trigger queue.</li>
-     *     <li>On take, that trigger name is removed from the queue.</li>
-     *     <li>If the best transition requires a trigger but consumption fails, that transition is skipped
-     *         for this update and evaluation continues.</li>
-     * </ul>
-     *
-     * <p>Safety:</p>
-     * <ul>
-     *     <li>{@code dtSec} is clamped to {@code >= 0}.</li>
-     *     <li>Transition chaining is capped by {@link #maxTransitionsPerUpdate}.</li>
-     * </ul>
-     *
-     * @param dtSec delta time in seconds
+     * @param state non-null destination
+     * @return this machine
      */
-    public void update(float dtSec) {
-        if (current == null) {
-            return;
-        }
-
-        float safeDt = Math.max(0f, dtSec);
-
-        ctx.timeInStateSec += safeDt;
-
-        current.onUpdate(ctx, safeDt);
-
-        int taken = 0;
-
-        while (true) {
-            Transition<C> next = findBestValidTransition();
-            if (next == null) {
-                break;
-            }
-
-            boolean consumed = consumeTriggerIfNeeded(next);
-            if (!consumed) {
-                temporarilyUnavailable.add(next);
-                continue;
-            }
-
-            takeTransition(next);
-            taken++;
-
-            if (!allowMultipleTransitionsPerUpdate) {
-                break;
-            }
-
-            if (taken >= maxTransitionsPerUpdate) {
-                break;
-            }
-        }
-
-        temporarilyUnavailable.clear();
+    public StateMachine<C> goTo(State<C> state) {
+        changeState(state, "forced");
+        return this;
     }
 
     /**
-     * Returns the current active state.
+     * Advances one machine on its owning thread.
      *
-     * @return current state (may be null)
+     * @param delta finite, nonnegative seconds
+     * @throws IllegalArgumentException if time is invalid or scaling overflows float
+     * @throws IllegalStateException    if recursively called
+     */
+    public void update(float delta) {
+        validTime(delta, "delta");
+        if (flags != 0) throw new IllegalStateException("StateMachine.update cannot be called recursively.");
+        if (current == null) return;
+        flags = UPDATING;
+        boolean editableGraph = !graph.isFrozen();
+        if (editableGraph) graph.activeCalls++;
+        try {
+            if (control != null && !allowsUpdate(true)) return;
+            if (paused || current == null) return;
+            float scaled = control == null ? delta : delta * control.scale;
+            if (control != null && control.scale == 0f) return;
+            if (!Float.isFinite(scaled)) throw new IllegalArgumentException("Scaled delta overflowed float.");
+            ctx.time += scaled;
+            ctx.delta = scaled;
+            long expected = revision;
+            current.state.onUpdate(ctx, scaled);
+            if (revision != expected || current == null || paused) return;
+            if (control != null && !allowsUpdate(false)) return;
+            int limit = multiple ? transitionLimit : 1;
+            for (int taken = 0; taken < limit; taken++) {
+                Transition<C> next = choose();
+                if (next == null) return;
+                if (next.event >= 0) consume(next.event);
+                take(next, false);
+                if (current == null || paused) return;
+                if (control != null && !allowsUpdate(false)) return;
+            }
+        } finally {
+            flags = 0;
+            if (editableGraph) graph.activeCalls--;
+        }
+    }
+
+    /**
+     * Finds the best valid rule without merging arrays or allocating scratch storage.
+     * Lists are searched highest-head-priority first. Once a candidate is found,
+     * the other list stops as soon as its remaining rules cannot outrank it.
+     * Guards are read-only; their invocation order is not an API guarantee.
+     *
+     * @return winning definition, or null
+     */
+    private Transition<C> choose() {
+        StateSlot<C> local = current;
+        StateSlot<C> global = graph.global;
+        if (global == null || global.count == 0) return chooseFrom(local, null);
+        if (local.count == 0) return chooseFrom(global, null);
+        if (outranks(global.rules[0], local.rules[0])) return chooseFrom(local, chooseFrom(global, null));
+        return chooseFrom(global, chooseFrom(local, null));
+    }
+
+    /**
+     * Searches one sorted adjacency array, stopping at its first valid improvement.
+     *
+     * @param slot adjacency list
+     * @param best existing winner, or null
+     * @return improved winner or the original best
+     */
+    private Transition<C> chooseFrom(StateSlot<C> slot, Transition<C> best) {
+        for (int i = 0; i < slot.count; i++) {
+            Transition<C> rule = slot.rules[i];
+            if (best != null && !outranks(rule, best)) return best;
+            if (rule.target == current || ctx.time < rule.seconds) continue;
+            if (rule.event >= 0 && !pending(rule.event)) continue;
+            if (rule.guard != null && !test(rule.guard)) continue;
+            return rule;
+        }
+        return best;
+    }
+
+    /**
+     * Compares stable rule ordering without subtraction overflow.
+     *
+     * @param first  possible higher-ranked rule
+     * @param second other rule
+     * @return true when first has higher priority or earlier tied registration
+     */
+    private static boolean outranks(Transition<?> first, Transition<?> second) {
+        return first.priority() > second.priority() || (first.priority() == second.priority() && first.order() < second.order());
+    }
+
+    /**
+     * Performs exit/action/commit/enter, preserving exception and reentry rules.
+     *
+     * @param transition already selected metadata
+     * @param starting   whether to notify the machine's start listener
+     */
+    private void take(Transition<C> transition, boolean starting) {
+        mutableLifecycle();
+        if (transition.target == current) return;
+        int previousFlags = flags;
+        flags |= CHANGING;
+        boolean editableGraph = !graph.isFrozen();
+        if (editableGraph) graph.activeCalls++;
+        try {
+            if (current != null) current.state.onExit(ctx);
+            if (transition.action != null) transition.action.run(ctx, transition);
+            current = transition.target;
+            ctx.time = 0;
+            ctx.last = transition;
+            paused = false;
+            revision++;
+            if (current != null) {
+                current.state.onEnter(ctx);
+                if (starting && control != null && control.start != null) control.start.accept(ctx);
+            } else {
+                ctx.delta = 0;
+                if (control != null && control.endListener != null) control.endListener.accept(ctx);
+            }
+        } finally {
+            flags = previousFlags;
+            if (editableGraph) graph.activeCalls--;
+        }
+    }
+
+    /**
+     * Evaluates lifecycle conditions with end before pause before continuation.
+     *
+     * @param allowContinue whether automatic continuation is allowed now
+     * @return true if state updates may proceed
+     */
+    private boolean allowsUpdate(boolean allowContinue) {
+        StateControl<C> c = control;
+        if (c == null) return current != null && !paused;
+        if (c.end != null && test(c.end)) {
+            stop();
+            return false;
+        }
+        if (c.pause != null && test(c.pause)) {
+            pause();
+            return false;
+        }
+        if (paused) {
+            if (!allowContinue || c.resume == null || !test(c.resume)) return false;
+            long before = revision;
+            resume();
+            if (current == null || paused || revision != before + 1) return false;
+            return allowsUpdate(false);
+        }
+        return current != null && (c.run == null || test(c.run));
+    }
+
+    /**
+     * Runs one read-only guard while protecting machine mutation.
+     *
+     * @param guard condition to evaluate
+     * @return predicate result
+     */
+    private boolean test(Guard<C> guard) {
+        flags |= EVALUATING;
+        try {
+            return guard.allow(ctx);
+        } finally {
+            flags &= ~EVALUATING;
+        }
+    }
+
+    /**
+     * Pauses without leaving the current state or resetting time.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> pause() {
+        mutableLifecycle();
+        if (current == null || paused) return this;
+        paused = true;
+        revision++;
+        if (control != null && control.pauseListener != null) notifyListener(control.pauseListener);
+        return this;
+    }
+
+    /**
+     * Resumes a paused machine; never starts a stopped machine.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> resume() {
+        mutableLifecycle();
+        if (current == null || !paused) return this;
+        paused = false;
+        revision++;
+        if (control != null && control.resumeListener != null) notifyListener(control.resumeListener);
+        return this;
+    }
+
+    /**
+     * Runs a lifecycle notification with the same no-recursion contract as entry/exit.
+     *
+     * @param listener non-null lifecycle listener
+     */
+    private void notifyListener(Consumer<StateContext<C>> listener) {
+        int previous = flags;
+        flags |= CHANGING;
+        boolean editableGraph = !graph.isFrozen();
+        if (editableGraph) graph.activeCalls++;
+        try {
+            listener.accept(ctx);
+        } finally {
+            flags = previous;
+            if (editableGraph) graph.activeCalls--;
+        }
+    }
+
+    /**
+     * Leaves the current state and stops updates; pending triggers are retained.
+     * Explicit stop creates one immutable metadata object; repeated stop is a no-op.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> stop() {
+        changeSlot(null, "stopped");
+        return this;
+    }
+
+    /**
+     * Alias for {@link #stop()}.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> end() {
+        return stop();
+    }
+
+    /**
+     * Silently clears runtime state and events, retaining definitions and controls.
+     * Does not invoke exit or lifecycle listeners.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> reset() {
+        mutableLifecycle();
+        current = null;
+        paused = false;
+        ctx.time = 0;
+        ctx.delta = 0;
+        ctx.last = null;
+        revision++;
+        clearTriggers();
+        return this;
+    }
+
+    /**
+     * Rewinds runtime state and enters a registered name, invoking its entry callback.
+     * Pending triggers are cleared; previous exit is not invoked.
+     *
+     * @param name initial name
+     * @return this machine
+     */
+    public StateMachine<C> restart(String name) {
+        StateSlot<C> target = graph.named(name);
+        reset();
+        return startSlot(target);
+    }
+
+    /**
+     * Returns whether a state is currently active and not paused.
+     *
+     * @return running lifecycle state; a run gate may still block execution
+     */
+    public boolean isRunning() {
+        return current != null && !paused;
+    }
+
+    /**
+     * Returns whether state/time are retained while updates are suspended.
+     *
+     * @return true while paused
+     */
+    public boolean isPaused() {
+        return current != null && paused;
+    }
+
+    /**
+     * Returns whether no state is active.
+     *
+     * @return true when stopped
+     */
+    public boolean isStopped() {
+        return current == null;
+    }
+
+    /**
+     * Returns whether lifecycle conditions are still observed.
+     *
+     * @return running or paused
+     */
+    public boolean isActive() {
+        return current != null;
+    }
+
+    /**
+     * Tests current state identity without a name lookup.
+     *
+     * @param state state identity
+     * @return true when it is current; null tests stopped
+     */
+    public boolean isIn(State<C> state) {
+        return getCurrentState() == state;
+    }
+
+    /**
+     * Tests a previously defined state name; unknown names throw.
+     *
+     * @param name name to test
+     * @return true when the resolved state is current
+     */
+    public boolean isIn(String name) {
+        return current == graph.named(name);
+    }
+
+    /**
+     * Returns the active state identity.
+     *
+     * @return state, or null when stopped
      */
     public State<C> getCurrentState() {
-        return current;
+        return current == null ? null : current.state;
     }
 
     /**
-     * Returns the live {@link StateContext} used for updates and transitions.
+     * Returns a named-state name or a custom state's simple class name.
      *
-     * <p>This context object is reused; do not store it as if it were immutable snapshot state.</p>
+     * @return display name, or null when stopped
+     */
+    public String getCurrentName() {
+        State<C> state = getCurrentState();
+        return state == null ? null : state instanceof StateNode<?> node ? node.name() : state.getClass().getSimpleName();
+    }
+
+    /**
+     * Returns the reused live context.
      *
-     * @return the state context instance
+     * @return context; not an immutable snapshot
      */
     public StateContext<C> getContext() {
         return ctx;
     }
 
     /**
-     * Forces an immediate state change (bypasses guards, triggers, and cooldown checks).
+     * Returns accumulated scaled state time.
      *
-     * <p>This still performs the normal transition lifecycle:
-     * oldState.onExit, optional action, switch current, reset timeInState, newState.onEnter.</p>
+     * @return seconds, or zero when stopped
+     */
+    public double getTimeInState() {
+        return ctx.time;
+    }
+
+    /**
+     * Registers/resolves an event and returns a graph-local ID for fast firing.
+     * Use this during setup; IDs must not be mixed between different graphs.
      *
-     * <p>The forced transition uses a very high priority and sets {@link Transition#reason()} to your provided reason
-     * (or {@code "forced"} if null).</p>
+     * @param name event name
+     * @return nonnegative event ID
+     */
+    public int trigger(String name) {
+        return graph.trigger(name, true);
+    }
+
+    /**
+     * Fires a registered event by name, deduplicating repeated fires.
      *
-     * @param next   next state (may be null)
-     * @param reason reason string (nullable)
+     * @param name previously registered event
+     * @return this machine
+     */
+    public StateMachine<C> fire(String name) {
+        return fire(graph.trigger(name, false));
+    }
+
+    /**
+     * Fires a registered event using its name.
+     *
+     * @param trigger event metadata
+     * @return this machine
+     */
+    public StateMachine<C> fire(Trigger trigger) {
+        return fire(Objects.requireNonNull(trigger, "trigger").name());
+    }
+
+    /**
+     * Fires an event ID from this graph in constant time.
+     * The first 64 IDs need no extra storage. Overflow storage is prepared by
+     * {@link #prepare()} or allocated lazily when a higher event is first fired.
+     *
+     * @param id registered graph-local event ID
+     * @return this machine
+     */
+    public StateMachine<C> fire(int id) {
+        mutableEvents();
+        checkEvent(id);
+        if (id < 64) events |= 1L << id;
+        else {
+            int word = (id >>> 6) - 1;
+            if (extraEvents == null || word >= extraEvents.length) prepare();
+            extraEvents[word] |= 1L << id;
+        }
+        return this;
+    }
+
+    /**
+     * Returns whether a registered event is waiting.
+     *
+     * @param name registered event name
+     * @return pending status
+     */
+    public boolean hasTrigger(String name) {
+        return pending(graph.trigger(name, false));
+    }
+
+    /**
+     * Returns whether an event ID is waiting.
+     *
+     * @param id graph-local ID
+     * @return pending status
+     */
+    public boolean hasTrigger(int id) {
+        checkEvent(id);
+        return pending(id);
+    }
+
+    /**
+     * Clears all pending events without releasing reusable overflow storage.
+     */
+    public void clearTriggers() {
+        mutableEvents();
+        events = 0;
+        if (extraEvents != null) Arrays.fill(extraEvents, 0);
+    }
+
+    /**
+     * Preallocates overflow event words for all currently registered triggers.
+     * Call after setup when even the first high-ID fire must not allocate.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> prepare() {
+        mutableEvents();
+        int words = (int) (((long) graph.triggerCount + 63) >>> 6) - 1;
+        if (words > 0 && (extraEvents == null || extraEvents.length < words))
+            extraEvents = extraEvents == null ? new long[words] : Arrays.copyOf(extraEvents, words);
+        return this;
+    }
+
+    /**
+     * Legacy trigger API; null/blank is ignored, unknown names register only during setup.
+     * Register all events before freezing or firing from callbacks.
+     *
+     * @param name event name
+     */
+    public void fireTrigger(String name) {
+        if (name == null || name.isBlank()) return;
+        fire(graph.trigger(name, true));
+    }
+
+    /**
+     * Tests a validated event ID without allocating.
+     *
+     * @param id event ID
+     * @return whether its bit is present
+     */
+    private boolean pending(int id) {
+        if (id < 64) return (events & (1L << id)) != 0;
+        int word = (id >>> 6) - 1;
+        return extraEvents != null && word < extraEvents.length && (extraEvents[word] & (1L << id)) != 0;
+    }
+
+    /**
+     * Consumes one known pending event.
+     *
+     * @param id event ID
+     */
+    private void consume(int id) {
+        if (id < 64) events &= ~(1L << id);
+        else extraEvents[(id >>> 6) - 1] &= ~(1L << id);
+    }
+
+    /**
+     * Checks a graph-local event ID.
+     *
+     * @param id event ID
+     */
+    private void checkEvent(int id) {
+        if (id < 0 || id >= graph.triggerCount) throw new IllegalArgumentException("Unknown trigger ID: " + id);
+    }
+
+    /**
+     * Configures an OR-combined automatic stop condition, active while paused.
+     *
+     * @param condition read-only guard
+     * @return this machine
+     */
+    public StateMachine<C> endIf(Guard<C> condition) {
+        controls().end = or(controls().end, condition);
+        return this;
+    }
+
+    /**
+     * Configures an external automatic stop condition.
+     *
+     * @param condition read-only external condition
+     * @return this machine
+     */
+    public StateMachine<C> endIf(Condition condition) {
+        Objects.requireNonNull(condition);
+        return endIf(c -> condition.test());
+    }
+
+    /**
+     * Configures an OR-combined pause condition, which blocks continuation while true.
+     *
+     * @param condition read-only guard
+     * @return this machine
+     */
+    public StateMachine<C> pauseIf(Guard<C> condition) {
+        controls().pause = or(controls().pause, condition);
+        return this;
+    }
+
+    /**
+     * Configures an external pause condition.
+     *
+     * @param condition read-only external condition
+     * @return this machine
+     */
+    public StateMachine<C> pauseIf(Condition condition) {
+        Objects.requireNonNull(condition);
+        return pauseIf(c -> condition.test());
+    }
+
+    /**
+     * Configures OR-combined continuation of an already paused machine.
+     *
+     * @param condition read-only guard
+     * @return this machine
+     */
+    public StateMachine<C> continueIf(Guard<C> condition) {
+        controls().resume = or(controls().resume, condition);
+        return this;
+    }
+
+    /**
+     * Configures external continuation of an already paused machine.
+     *
+     * @param condition read-only external condition
+     * @return this machine
+     */
+    public StateMachine<C> continueIf(Condition condition) {
+        Objects.requireNonNull(condition);
+        return continueIf(c -> condition.test());
+    }
+
+    /**
+     * Adds an AND-combined time/update gate without changing lifecycle state.
+     *
+     * @param condition read-only guard
+     * @return this machine
+     */
+    public StateMachine<C> runIf(Guard<C> condition) {
+        StateControl<C> c = controls();
+        Objects.requireNonNull(condition, "condition");
+        Guard<C> old = c.run;
+        c.run = old == null ? condition : ctx -> old.allow(ctx) && condition.allow(ctx);
+        return this;
+    }
+
+    /**
+     * Adds an external update gate.
+     *
+     * @param condition read-only external condition
+     * @return this machine
+     */
+    public StateMachine<C> runIf(Condition condition) {
+        Objects.requireNonNull(condition);
+        return runIf(c -> condition.test());
+    }
+
+    /**
+     * Removes lifecycle and run predicates, retaining speed and listeners.
+     *
+     * @return this machine
+     */
+    public StateMachine<C> clearConditions() {
+        mutableLifecycle();
+        if (control != null) control.end = control.pause = control.resume = control.run = null;
+        releaseEmptyControl();
+        revision++;
+        return this;
+    }
+
+    /**
+     * Sets state-time speed; zero freezes updates but still checks conditions.
+     *
+     * @param scale finite, nonnegative multiplier
+     * @return this machine
+     */
+    public StateMachine<C> timeScale(float scale) {
+        validTime(scale, "scale");
+        mutableLifecycle();
+        if (scale != getTimeScale()) {
+            controls().scale = scale;
+            revision++;
+            releaseEmptyControl();
+        }
+        return this;
+    }
+
+    /**
+     * Returns the state-time multiplier.
+     *
+     * @return configured speed
+     */
+    public float getTimeScale() {
+        return control == null ? 1f : control.scale;
+    }
+
+    /**
+     * Sets the maximum automatic changes per update; one disables chaining.
+     *
+     * @param maximum positive bound
+     * @return this machine
+     */
+    public StateMachine<C> maxTransitionsPerUpdate(int maximum) {
+        if (maximum < 1) throw new IllegalArgumentException("maximum must be at least one.");
+        mutableLifecycle();
+        transitionLimit = maximum;
+        multiple = maximum > 1;
+        revision++;
+        return this;
+    }
+
+    /**
+     * Legacy alias enabling/disabling chaining with the configured bound.
+     *
+     * @param allow true to enable bounded chaining
+     * @return this machine
+     */
+    public StateMachine<C> setAllowMultipleTransitionsPerUpdate(boolean allow) {
+        mutableLifecycle();
+        multiple = allow;
+        revision++;
+        return this;
+    }
+
+    /**
+     * Legacy alias; clamps to at least one and leaves chaining enablement unchanged.
+     *
+     * @param maximum desired bound
+     * @return this machine
+     */
+    public StateMachine<C> setMaxTransitionsPerUpdate(int maximum) {
+        mutableLifecycle();
+        transitionLimit = Math.max(1, maximum);
+        revision++;
+        return this;
+    }
+
+    /**
+     * Returns the effective current transition budget.
+     *
+     * @return one unless chaining is enabled
+     */
+    public int getMaxTransitionsPerUpdate() {
+        return multiple ? transitionLimit : 1;
+    }
+
+    /**
+     * Replaces the listener called after entering from stopped.
+     *
+     * @param listener action, or null
+     * @return this machine
+     */
+    public StateMachine<C> onStart(Consumer<StateContext<C>> listener) {
+        controls().start = listener;
+        releaseEmptyControl();
+        return this;
+    }
+
+    /**
+     * Replaces the pause listener.
+     *
+     * @param listener action, or null
+     * @return this machine
+     */
+    public StateMachine<C> onPause(Consumer<StateContext<C>> listener) {
+        controls().pauseListener = listener;
+        releaseEmptyControl();
+        return this;
+    }
+
+    /**
+     * Replaces the continuation listener.
+     *
+     * @param listener action, or null
+     * @return this machine
+     */
+    public StateMachine<C> onContinue(Consumer<StateContext<C>> listener) {
+        controls().resumeListener = listener;
+        releaseEmptyControl();
+        return this;
+    }
+
+    /**
+     * Replaces the listener called after the current state has exited on stop.
+     *
+     * @param listener action, or null
+     * @return this machine
+     */
+    public StateMachine<C> onEnd(Consumer<StateContext<C>> listener) {
+        controls().endListener = listener;
+        releaseEmptyControl();
+        return this;
+    }
+
+    /**
+     * Allocates optional runtime settings on first use.
+     *
+     * @return settings
+     */
+    private StateControl<C> controls() {
+        mutableLifecycle();
+        if (control == null) control = new StateControl<>();
+        return control;
+    }
+
+    /**
+     * Releases an optional settings object when all features are disabled.
+     */
+    private void releaseEmptyControl() {
+        StateControl<C> c = control;
+        if (c != null && c.scale == 1f && c.end == null && c.pause == null && c.resume == null && c.run == null && c.start == null && c.pauseListener == null && c.resumeListener == null && c.endListener == null)
+            control = null;
+    }
+
+    /**
+     * Combines guards at configuration time with short-circuit OR.
+     *
+     * @param first previous guard
+     * @param next  new guard
+     * @return combined guard
+     */
+    private static <C> Guard<C> or(Guard<C> first, Guard<C> next) {
+        Objects.requireNonNull(next, "condition");
+        return first == null ? next : ctx -> first.allow(ctx) || next.allow(ctx);
+    }
+
+    /**
+     * Original positional registration API, preserved for migration.
+     *
+     * @param from     source state
+     * @param to       target state
+     * @param priority higher values win
+     * @param trigger  optional trigger
+     * @param guard    optional guard
+     * @param minTime  minimum state seconds; finite negatives clamp to zero
+     * @param reason   optional reason
+     * @param action   optional transition action
+     * @return this machine
+     */
+    public StateMachine<C> addTransition(State<C> from, State<C> to, int priority, Trigger trigger, Guard<C> guard, float minTime, String reason, TransitionAction<C> action) {
+        editable();
+        finiteLegacy(minTime);
+        register(graph.resolve(from, true), graph.resolve(to, true), trigger, guard, Math.max(0f, minTime), priority, reason, action);
+        return this;
+    }
+
+    /**
+     * Original positional global-rule registration API.
+     *
+     * @param to       target state
+     * @param priority higher values win
+     * @param trigger  optional trigger
+     * @param guard    optional guard
+     * @param minTime  minimum state seconds; finite negatives clamp to zero
+     * @param reason   optional reason
+     * @param action   optional action
+     * @return this machine
+     */
+    public StateMachine<C> addGlobalTransition(State<C> to, int priority, Trigger trigger, Guard<C> guard, float minTime, String reason, TransitionAction<C> action) {
+        editable();
+        finiteLegacy(minTime);
+        register(null, graph.resolve(to, true), trigger, guard, Math.max(0f, minTime), priority, reason, action);
+        return this;
+    }
+
+    /**
+     * Forces a normal lifecycle change. A null destination now correctly stops.
+     *
+     * @param next   target, or null to stop
+     * @param reason reason, or null for "forced"
      */
     public void changeState(State<C> next, String reason) {
-        if (next == current) {
-            return;
-        }
-
-        Transition<C> forced = new Transition<>(current, next, null, null, 0f, Integer.MAX_VALUE, orderCounter.getAndIncrement(), (reason == null ? "forced" : reason), null);
-
-        takeTransition(forced);
+        mutableLifecycle();
+        changeSlot(next == null ? null : graph.resolve(next, true), reason == null ? "forced" : reason);
     }
 
     /**
-     * Sets the initial state and calls {@link State#onEnter(StateContext)} immediately.
+     * Changes to a resolved destination.
      *
-     * <p>This clears:</p>
-     * <ul>
-     *     <li>current state</li>
-     *     <li>time in state</li>
-     *     <li>last transition</li>
-     * </ul>
+     * @param target destination, or null
+     * @param reason metadata reason
+     */
+    private void changeSlot(StateSlot<C> target, String reason) {
+        mutableLifecycle();
+        if (target == current) return;
+        boolean starting = current == null;
+        take(new Transition<>(getCurrentState(), target, null, -1, null, 0, Integer.MAX_VALUE, -1, reason, null), starting);
+    }
+
+    /**
+     * Original silent-initialization API: no exit of a previous state.
+     * Pending triggers are retained; a null initial state clears current metadata.
      *
-     * <p>If {@code initial} is null, the machine becomes idle (no current state).</p>
-     *
-     * @param initial initial state (nullable)
-     * @param reason  reason string used on the synthetic "initial" transition (nullable)
+     * @param initial new initial state, or null
+     * @param reason  initial metadata reason
      */
     public void setInitialState(State<C> initial, String reason) {
+        mutableLifecycle();
+        StateSlot<C> target = initial == null ? null : graph.resolve(initial, true);
         current = null;
-        ctx.current = null;
-        ctx.timeInStateSec = 0f;
-        ctx.lastTransition = null;
-
-        if (initial != null) {
-            Transition<C> init = new Transition<>(null, initial, null, null, 0f, Integer.MAX_VALUE, orderCounter.getAndIncrement(), (reason == null ? "initial" : reason), null);
-
-            current = initial;
-            ctx.current = initial;
-            ctx.lastTransition = init;
-            ctx.timeInStateSec = 0f;
-
-            initial.onEnter(ctx);
-        }
+        paused = false;
+        ctx.time = 0;
+        ctx.delta = 0;
+        ctx.last = null;
+        revision++;
+        if (target != null)
+            take(new Transition<>(null, target, null, -1, null, 0, Integer.MAX_VALUE, -1, reason == null ? "initial" : reason, null), true);
     }
 
     /**
-     * Chooses the best valid transition for the current state.
+     * Resolves a name for a builder.
      *
-     * <p>This evaluates global transitions and state-specific transitions and then compares the best candidate
-     * from each by priority and insertion order.</p>
-     *
-     * @return the best transition to take, or null if none valid
+     * @param name state name
+     * @return state slot
      */
-    private Transition<C> findBestValidTransition() {
-        if (current == null) {
-            return null;
-        }
-
-        List<Transition<C>> stateList = perState.get(current);
-
-        Transition<C> best = null;
-
-        best = chooseBest(best, findBestValidFromList(global));
-        if (stateList != null && !stateList.isEmpty()) {
-            best = chooseBest(best, findBestValidFromList(stateList));
-        }
-
-        return best;
+    StateSlot<C> slot(String name) {
+        return graph.named(name);
     }
 
     /**
-     * Finds the first valid transition from a list that is already sorted by:
-     * priority descending, then insertion order ascending.
+     * Resolves a state for a builder.
      *
-     * <p>This method applies:
-     * cooldown (min time in state),
-     * guard,
-     * trigger presence,
-     * and the "temporarily unavailable" set used during one update pass.</p>
-     *
-     * @param list sorted transition list
-     * @return first valid transition, or null
+     * @param state  identity
+     * @param create whether registration is allowed
+     * @return state slot
      */
-    private Transition<C> findBestValidFromList(List<Transition<C>> list) {
-        for (Transition<C> t : list) {
-            if (temporarilyUnavailable.contains(t)) {
-                continue;
-            }
-            if (ctx.timeInStateSec < t.minTimeInStateSec()) {
-                continue;
-            }
-            if (t.guard() != null && !t.guard().allow(ctx)) {
-                continue;
-            }
-            if (t.requiredTrigger() != null && !triggerQueue.contains(t.requiredTrigger().name())) {
-                continue;
-            }
-            return t;
-        }
-        return null;
+    StateSlot<C> slot(State<C> state, boolean create) {
+        return graph.resolve(state, create);
     }
 
     /**
-     * Compares two transitions and returns the better one.
-     *
-     * <p>Comparison rules:</p>
-     * <ul>
-     *     <li>Higher priority wins.</li>
-     *     <li>If priority ties, lower insertion order wins (earlier added).</li>
-     * </ul>
-     *
-     * @param a candidate A (nullable)
-     * @param b candidate B (nullable)
-     * @return the best candidate, or null if both are null
+     * Checks graph editability for builders.
      */
-    private Transition<C> chooseBest(Transition<C> a, Transition<C> b) {
-        if (a == null) return b;
-        if (b == null) return a;
-
-        int p = Integer.compare(b.priority(), a.priority());
-        if (p != 0) {
-            return (p > 0) ? b : a;
-        }
-
-        return (b.order() < a.order()) ? b : a;
+    void editable() {
+        graph.checkEditable();
     }
 
     /**
-     * Consumes the required trigger for a transition (if any).
+     * Registers one completed builder definition.
      *
-     * <p>If the transition does not require a trigger, this returns true.</p>
-     * <p>If it requires one, this removes it from the trigger queue and returns whether removal succeeded.</p>
-     *
-     * @param t transition
-     * @return true if trigger is not needed or was successfully consumed
+     * @param from     source or null
+     * @param to       destination
+     * @param trigger  optional trigger
+     * @param guard    optional guard
+     * @param seconds  minimum time
+     * @param priority priority
+     * @param reason   reason
+     * @param action   optional action
      */
-    private boolean consumeTriggerIfNeeded(Transition<C> t) {
-        if (t.requiredTrigger() == null) {
-            return true;
-        }
-        return triggerQueue.remove(t.requiredTrigger().name());
+    void register(StateSlot<C> from, StateSlot<C> to, Trigger trigger, Guard<C> guard, double seconds, int priority, String reason, TransitionAction<C> action) {
+        graph.add(from, to, trigger, guard, seconds, priority, reason, action);
     }
 
     /**
-     * Sorts transitions in-place by priority descending then insertion order ascending.
-     *
-     * <p>This ensures that "first valid wins" also respects priority.</p>
-     *
-     * @param list transition list
+     * Rejects lifecycle/timing mutation in predicates or transition callbacks.
      */
-    private void sortTransitions(List<Transition<C>> list) {
-        list.sort((a, b) -> {
-            int p = Integer.compare(b.priority(), a.priority());
-            if (p != 0) return p;
-            return Long.compare(a.order(), b.order());
-        });
+    private void mutableLifecycle() {
+        if ((flags & (CHANGING | EVALUATING)) != 0)
+            throw new IllegalStateException("Do not change lifecycle inside guards, enter/exit/actions, or lifecycle listeners.");
     }
 
     /**
-     * Performs the actual transition lifecycle:
-     * <ol>
-     *     <li>call from.onExit(ctx) if from != null</li>
-     *     <li>run transition action if present</li>
-     *     <li>switch current state, update context, reset timeInState</li>
-     *     <li>call to.onEnter(ctx) if to != null</li>
-     * </ol>
-     *
-     * <p>If {@code to == from}, this method does nothing.</p>
-     *
-     * @param t transition to take
+     * Allows event firing in callbacks, but not in guards.
      */
-    private void takeTransition(Transition<C> t) {
-        if (t == null) {
-            return;
-        }
+    private void mutableEvents() {
+        if ((flags & EVALUATING) != 0) throw new IllegalStateException("Guards must not mutate pending events.");
+    }
 
-        State<C> from = current;
-        State<C> to = t.to();
+    /**
+     * Validates time and unit conversions.
+     *
+     * @param value time value
+     * @param name  parameter name
+     */
+    static void validTime(double value, String name) {
+        if (!Double.isFinite(value) || value < 0)
+            throw new IllegalArgumentException(name + " must be finite and nonnegative.");
+    }
 
-        if (to == from) {
-            return;
-        }
-
-        if (from != null) {
-            from.onExit(ctx);
-        }
-
-        if (t.action() != null) {
-            t.action().run(ctx, t);
-        }
-
-        current = to;
-        ctx.current = to;
-        ctx.lastTransition = t;
-        ctx.timeInStateSec = 0f;
-
-        if (to != null) {
-            to.onEnter(ctx);
-        }
+    /**
+     * Validates legacy durations while allowing their original negative clamp.
+     *
+     * @param value legacy time value
+     */
+    private static void finiteLegacy(float value) {
+        if (!Float.isFinite(value)) throw new IllegalArgumentException("Time must be finite.");
     }
 }

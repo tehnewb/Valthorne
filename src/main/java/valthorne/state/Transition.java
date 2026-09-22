@@ -1,172 +1,140 @@
 package valthorne.state;
 
-import java.util.Objects;
-
 /**
- * A transition rule.
+ * Immutable transition metadata reused whenever a registered rule is taken.
+ * Higher priority wins; equal priorities use earlier registration order.
+ * A null source marks a global rule. A null target occurs only on explicit stop.
  *
- * <h2>Example</h2>
- * <pre>{@code
- * Trigger jump = new Trigger("jump");
+ * <p>Rules are created with {@link StateMachine#from(String)} or the original
+ * addTransition methods. State time, required events, and guards must all pass.
+ * Self-targeting rules are ignored rather than consuming a transition budget.</p>
  *
- * Transition<PlayerCtx> t = new Transition<>(
- *     idle, jumpState,
- *     jump,
- *     ctx -> ctx.data().grounded(),
- *     0.05f,
- *     10,
- *     0L,
- *     "jump pressed",
- *     (ctx, tr) -> {  reset timers, play sound, etc.  }
- * );
- * }</pre>
- *
- * <p>Transitions can be:</p>
- * <ul>
- *     <li><b>State-specific</b>: {@link #from()} is non-null and must match the current state.</li>
- *     <li><b>Global</b>: {@link #from()} is null and can apply from any state.</li>
- * </ul>
- *
- * <p>Ordering:</p>
- * <ul>
- *     <li>Higher {@link #priority()} wins.</li>
- *     <li>If priorities tie, lower {@link #order()} (earlier insertion) wins.</li>
- * </ul>
- *
- * @param <C> user-defined context type
+ * @param <C> user-data type
  * @author Albert Beaupre
  * @since February 12th, 2026
  */
 public final class Transition<C> {
-
-    private final State<C> from;                     // Source state; null means global/any-state.
-    private final State<C> to;                       // Target state (required).
-    private final Trigger requiredTrigger;           // Trigger required to take this transition; null means none.
-    private final Guard<C> guard;                    // Guard predicate; null means always allowed.
-    private final float minTimeInStateSec;           // Debounce/cooldown: minimum time spent in current state.
-    private final int priority;                      // Priority: higher wins.
-    private final long order;                        // Insertion order: lower wins (tie-breaker).
-    private final String reason;                     // Human-readable reason for debugging/telemetry.
-    private final TransitionAction<C> action;        // Optional action run during transition; null means none.
+    private final State<C> from; // Source identity; null for global or initial metadata.
+    final StateSlot<C> target; // Direct destination slot, avoiding transition lookup.
+    private final Trigger trigger; // Required trigger metadata, or null.
+    final int event; // Required event bit index, or -1.
+    final Guard<C> guard; // Optional read-only guard.
+    final double seconds; // Minimum scaled state time in seconds.
+    private final int priority; // Higher priorities are considered first.
+    private final long order; // Stable registration-order tie breaker.
+    private final String reason; // Nonblank debugging reason.
+    final TransitionAction<C> action; // Optional action between exit and entry.
 
     /**
-     * Creates a transition.
+     * Stores a validated definition.
      *
-     * <p>This constructor is package-private because transitions are typically created through {@link StateMachine}.</p>
-     *
-     * @param from              source state (nullable for global)
-     * @param to                target state (non-null)
-     * @param requiredTrigger   trigger required (nullable)
-     * @param guard             guard predicate (nullable)
-     * @param minTimeInStateSec cooldown seconds required in current state (clamped >= 0)
-     * @param priority          priority (higher wins)
-     * @param order             insertion order (lower wins)
-     * @param reason            reason string (blank becomes default)
-     * @param action            transition action (nullable)
+     * @param from     source or null
+     * @param target   target slot or null for stop metadata
+     * @param trigger  optional trigger
+     * @param event    event bit index or minus one
+     * @param guard    optional guard
+     * @param seconds  minimum state time
+     * @param priority rule priority
+     * @param order    registration order
+     * @param reason   debug reason
+     * @param action   optional action
      */
-    Transition(State<C> from, State<C> to, Trigger requiredTrigger, Guard<C> guard, float minTimeInStateSec, int priority, long order, String reason, TransitionAction<C> action) {
+    Transition(State<C> from, StateSlot<C> target, Trigger trigger, int event, Guard<C> guard, double seconds, int priority, long order, String reason, TransitionAction<C> action) {
         this.from = from;
-        this.to = Objects.requireNonNull(to, "to");
-        this.requiredTrigger = requiredTrigger;
+        this.target = target;
+        this.trigger = trigger;
+        this.event = event;
         this.guard = guard;
-        this.minTimeInStateSec = Math.max(0f, minTimeInStateSec);
+        this.seconds = seconds;
         this.priority = priority;
         this.order = order;
-        this.reason = (reason == null || reason.isBlank()) ? "transition" : reason;
+        this.reason = reason == null || reason.isBlank() ? "transition" : reason;
         this.action = action;
     }
 
     /**
-     * Returns the source state.
+     * Returns source identity.
      *
-     * <p>If this is a global transition, this will be null.</p>
-     *
-     * @return source state, or null
+     * @return source or null for a global/initial transition
      */
     public State<C> from() {
         return from;
     }
 
     /**
-     * Returns the target state.
+     * Returns destination identity.
      *
-     * @return target state (never null)
+     * @return destination, or null for explicit stop metadata
      */
     public State<C> to() {
-        return to;
+        return target == null ? null : target.state;
     }
 
     /**
-     * Returns the required trigger for this transition, if any.
+     * Returns required event metadata.
      *
-     * <p>If non-null, the trigger must be present in the state machine's trigger queue to be valid,
-     * and will be consumed (removed) when the transition is taken.</p>
-     *
-     * @return required trigger, or null
+     * @return trigger or null
      */
     public Trigger requiredTrigger() {
-        return requiredTrigger;
+        return trigger;
     }
 
     /**
-     * Returns the guard predicate, if any.
+     * Returns the read-only guard.
      *
-     * <p>If non-null, it must return true for this transition to be valid.</p>
-     *
-     * @return guard, or null
+     * @return guard or null
      */
     public Guard<C> guard() {
         return guard;
     }
 
     /**
-     * Returns the minimum time required in the current state before this transition becomes eligible.
+     * Returns minimum state time through the original float API.
      *
-     * <p>This is a debounce/cooldown mechanism to prevent rapid flipping between states.</p>
-     *
-     * @return minimum seconds in state (>= 0)
+     * @return minimum scaled seconds
      */
     public float minTimeInStateSec() {
-        return minTimeInStateSec;
+        return (float) seconds;
     }
 
     /**
-     * Returns the priority for this transition.
+     * Returns minimum state time without narrowing.
      *
-     * <p>Higher values win when multiple transitions are valid.</p>
+     * @return minimum scaled seconds
+     */
+    public double afterSeconds() {
+        return seconds;
+    }
+
+    /**
+     * Returns priority.
      *
-     * @return priority
+     * @return higher values win
      */
     public int priority() {
         return priority;
     }
 
     /**
-     * Returns the insertion order for tie-breaking.
+     * Returns insertion order.
      *
-     * <p>Lower values indicate earlier insertion.</p>
-     *
-     * @return insertion order
+     * @return lower values win tied priorities
      */
     public long order() {
         return order;
     }
 
     /**
-     * Returns a human-readable reason associated with this transition.
+     * Returns the debugging reason.
      *
-     * <p>This is useful for debugging, logs, or telemetry.</p>
-     *
-     * @return reason string (never blank)
+     * @return nonblank reason
      */
     public String reason() {
         return reason;
     }
 
     /**
-     * Returns the transition action, if any.
-     *
-     * <p>Actions run after oldState.onExit and before newState.onEnter.</p>
+     * Returns the action.
      *
      * @return action or null
      */

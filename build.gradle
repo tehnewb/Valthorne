@@ -52,6 +52,7 @@ dependencies {
     implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
     implementation "org.apache.commons:commons-compress:1.28.0"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.18.2"
     implementation "io.github.erkko68.filament-ffm:filament-ffm:0.4.0"
 
     // Publish the same native runtime set regardless of the build host.

@@ -55,7 +55,7 @@ for(const name of sharedGraphics){
         source=source.replaceAll('glDisable(GL_FRAMEBUFFER_SRGB);','');
         source=replaceMethod(source,'private void uploadAtlas(',`if(atlas!=0)glDeleteTextures(atlas);int[] ids=new int[textures.size()];for(int i=0;i<ids.length;i++)ids[i]=textures.get(i).getTextureID();atlas=BrowserPathTraceGL.atlas(ids);`);
         source=source.replace('private static int program(int[] types,String[] sources){','private static int program(int[] types,String[] sources){if(types.length==1&&types[0]==GL_COMPUTE_SHADER)return BrowserPathTraceGL.program(sources[0]);');
-        const state=source.indexOf('    private static final class State implements AutoCloseable{');if(state<0)throw new Error('Review path tracing state guard');
+        const state=source.search(/^    private static final class State implements AutoCloseable\s*\{/m);if(state<0)throw new Error('Review path tracing state guard');
         source=source.slice(0,state)+`    private static final class State implements AutoCloseable{private final org.teavm.jso.JSObject saved=BrowserPathTraceGL.begin();public void close(){BrowserPathTraceGL.end(saved);}}\n}\n`;
     }
     if(name==='graphics/debug/PerformanceOverlay'){
@@ -124,6 +124,8 @@ for(const name of sharedGraphics){
     source=source.replace(/^(package [^;]+;)/m,'$1\nimport static valthorne.web.graphics.BrowserGL.*;');
     source=source.replace('import org.lwjgl.util.yoga.Yoga;','import valthorne.web.ui.BrowserYoga;').replaceAll('Yoga.','BrowserYoga.');
     source=source.replace(/^import static org\.lwjgl\.nanovg\.NanoVG(?:GL3)?\.[^;]+;\r?\n/gm,'');
+    source=source.replace(/^import org\.lwjgl\.nanovg\.NanoVG;\r?\n/gm,'');
+    source=source.replace(/^import org\.lwjgl\.glfw\.GLFW;\r?\n/gm,'');
     source=source.replaceAll('org.lwjgl.nanovg.NanoVG.', 'valthorne.web.ui.BrowserNano.');
     if(name==='ui/NanoUtility')source=source.replace('valthorne.io.file.ValthorneFiles.extractToTempPath(resource)', 'resource');
     if(name.startsWith('ui/'))source=source.replace(/^(package [^;]+;)/m,'$1\nimport static valthorne.web.ui.BrowserNano.*;');
