@@ -1,9 +1,11 @@
 package valthorne.graphics.model;
 
-import valthorne.camera.OrthographicCamera3D;
 import org.joml.Matrix4f;
+import valthorne.camera.OrthographicCamera3D;
 
 import static org.lwjgl.opengl.GL33.*;
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Owns a directional-light depth map and the batch used to render opaque and
@@ -26,6 +28,7 @@ import static org.lwjgl.opengl.GL33.*;
  *     // Supply this shadow map to the main pass's MeshRenderState3D.
  * }
  * }</pre>
+ *
  * @author Albert Beaupre
  */
 public final class ShadowMap3D implements AutoCloseable {
@@ -43,6 +46,7 @@ public final class ShadowMap3D implements AutoCloseable {
     private Scene3D cachedScene; // Scene identity used by the optional revision cache.
     private long cachedRevision; // Caster revision associated with the cached scene and camera.
     private long renderCount; // Number of depth passes that completed successfully.
+
     /**
      * Allocates a 24-bit depth texture, depth-only framebuffer, comparison sampler,
      * and private model batch. Initializes a Z-up light camera at (5, -5, 10),
@@ -51,7 +55,7 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @param resolution width and height in pixels
      * @throws IllegalArgumentException if resolution is nonpositive or exceeds the GL texture limit
-     * @throws IllegalStateException if the depth framebuffer is incomplete
+     * @throws IllegalStateException    if the depth framebuffer is incomplete
      */
     public ShadowMap3D(int resolution) {
         if (resolution <= 0 || resolution > glGetInteger(GL_MAX_TEXTURE_SIZE))
@@ -108,7 +112,9 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @return softness in shadow-map texels; initially 2
      */
-    public float getSoftness() {return softness;}
+    public float getSoftness() {
+        return softness;
+    }
 
     /**
      * Sets the PCF sampling radius without invalidating the cached depth pass.
@@ -145,7 +151,9 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @return cumulative successful render count
      */
-    public long getRenderCount() {return renderCount;}
+    public long getRenderCount() {
+        return renderCount;
+    }
 
     /**
      * Renders only when the scene identity, caller-supplied caster revision, or
@@ -154,16 +162,16 @@ public final class ShadowMap3D implements AutoCloseable {
      * the revision for every shadow-affecting change, or use {@link #render(Scene3D)}
      * for procedural geometry whose changes cannot be tracked.
      *
-     * @param scene scene whose shadow casters are drawn
+     * @param scene          scene whose shadow casters are drawn
      * @param casterRevision application-managed revision of caster content
      * @return true if a depth pass completed; false if the cached image was reused
      * @throws IllegalStateException if this map has been disposed
-     * @throws NullPointerException if the scene is null
+     * @throws NullPointerException  if the scene is null
      */
     public boolean renderIfChanged(Scene3D scene, long casterRevision) {
         if (disposed) throw new IllegalStateException("Shadow map disposed");
         camera.rebuild(resolution, resolution);
-        if (isReady() && cachedScene == scene && cachedRevision == casterRevision && java.util.Arrays.equals(cachedCamera, camera.getCombined().get(matrixUpload)))
+        if (isReady() && cachedScene == scene && cachedRevision == casterRevision && Arrays.equals(cachedCamera, camera.getCombined().get(matrixUpload)))
             return false;
         render(scene);
         cachedScene = scene;
@@ -179,7 +187,9 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @return borrowed mutable light camera
      */
-    public OrthographicCamera3D getCamera() {return camera;}
+    public OrthographicCamera3D getCamera() {
+        return camera;
+    }
 
     /**
      * Returns the owned depth texture name. Check {@link #isReady()} before using
@@ -201,7 +211,9 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @return independent world-to-light-clip matrix
      */
-    public Matrix4f getMatrix() {return new Matrix4f(matrix);}
+    public Matrix4f getMatrix() {
+        return new Matrix4f(matrix);
+    }
 
     /**
      * Reports whether a successful depth pass is available and the resources remain
@@ -209,14 +221,18 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @return true when the depth texture and captured matrix can be sampled
      */
-    public boolean isReady() {return rendered && !disposed;}
+    public boolean isReady() {
+        return rendered && !disposed;
+    }
 
     /**
      * Returns the receiver-side depth bias used during shadow comparison.
      *
      * @return nonnegative depth bias; initially 0.001
      */
-    public float getBias() {return bias;}
+    public float getBias() {
+        return bias;
+    }
 
     /**
      * Sets the receiving shader's depth-comparison bias. This sampling adjustment
@@ -239,7 +255,9 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @return shadow strength from 0 through 1; initially 0.85
      */
-    public float getStrength() {return strength;}
+    public float getStrength() {
+        return strength;
+    }
 
     /**
      * Sets receiver shadow strength without invalidating the depth image. Zero
@@ -270,11 +288,11 @@ public final class ShadowMap3D implements AutoCloseable {
      *
      * @param scene nonnull scene to render; ownership remains with the caller
      * @throws IllegalStateException if this map has been disposed
-     * @throws NullPointerException if scene is null
+     * @throws NullPointerException  if scene is null
      */
     public void render(Scene3D scene) {
         if (disposed) throw new IllegalStateException("Shadow map disposed");
-        java.util.Objects.requireNonNull(scene, "scene");
+        Objects.requireNonNull(scene, "scene");
         cachedScene = null;
         int oldDraw = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING), oldRead = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
         int[] viewport = new int[4];
@@ -330,5 +348,7 @@ public final class ShadowMap3D implements AutoCloseable {
      * Supports try-with-resources and is harmless after successful disposal.
      */
     @Override
-    public void close() {dispose();}
+    public void close() {
+        dispose();
+    }
 }

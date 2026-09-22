@@ -2,6 +2,7 @@ package valthorne.math.physics;
 
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import java.util.Objects;
 
 /**
  * Reusable configuration for creating a rigid body in {@link PhysicsWorld3D}.
@@ -55,8 +56,8 @@ public final class BodySettings3D {
      * @throws IllegalArgumentException if a static-only shape is paired with nonstatic motion
      */
     public BodySettings3D(CollisionShape3D shape, MotionType3D motion) {
-        this.shape = java.util.Objects.requireNonNull(shape, "shape");
-        this.motion = java.util.Objects.requireNonNull(motion, "motion");
+        this.shape = Objects.requireNonNull(shape, "shape");
+        this.motion = Objects.requireNonNull(motion, "motion");
         if (shape.isStaticOnly() && motion != MotionType3D.STATIC)
             throw new IllegalArgumentException("Triangle meshes require static bodies; use a convex hull for moving bodies");
     }
@@ -64,12 +65,16 @@ public final class BodySettings3D {
     /**
      * Returns the fixed motion category of bodies created with these settings.
      */
-    public MotionType3D getMotionType() {return motion;}
+    public MotionType3D getMotionType() {
+        return motion;
+    }
 
     /**
      * Returns the configured mass override in kilograms.
      */
-    public float getMass() {return mass;}
+    public float getMass() {
+        return mass;
+    }
 
     /**
      * Locks all angular degrees of freedom while preserving free translation.
@@ -85,7 +90,9 @@ public final class BodySettings3D {
      *
      * @return true when rotational motion is disabled for new bodies
      */
-    public boolean isRotationLocked() {return rotationLocked;}
+    public boolean isRotationLocked() {
+        return rotationLocked;
+    }
 
     /**
      * Assigns the initial world-space position from finite components. Values
@@ -97,7 +104,9 @@ public final class BodySettings3D {
      * @return these settings for chaining
      * @throws IllegalArgumentException if any component is non-finite
      */
-    public BodySettings3D setPosition(float x, float y, float z) {return setPosition(new Vector3f(x, y, z));}
+    public BodySettings3D setPosition(float x, float y, float z) {
+        return setPosition(new Vector3f(x, y, z));
+    }
 
     /**
      * Copies a finite world-space position. Later changes to the supplied vector
@@ -119,7 +128,7 @@ public final class BodySettings3D {
      *
      * @param rotation the nonnull orientation to copy
      * @return these settings for chaining
-     * @throws NullPointerException if rotation is null
+     * @throws NullPointerException     if rotation is null
      * @throws IllegalArgumentException if rotation is non-finite or zero-length
      */
     public BodySettings3D setRotation(Quaternionf rotation) {

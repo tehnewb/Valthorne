@@ -5,6 +5,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.teavm.jso.typedarrays.Float32Array;
 import valthorne.graphics.model.ModelInstance3D;
+import java.util.Objects;
 
 /** Browser implementation of the existing owned Jolt body handle. */
 public final class RigidBody3D implements AutoCloseable {
@@ -38,7 +39,7 @@ public final class RigidBody3D implements AutoCloseable {
     public Vector3f getLinearVelocity(Vector3f destination){return velocity(destination,1);}
     public Vector3f getAngularVelocity(){return getAngularVelocity(new Vector3f());}
     public Vector3f getAngularVelocity(Vector3f destination){return velocity(destination,2);}
-    private Vector3f velocity(Vector3f destination,int type){check();java.util.Objects.requireNonNull(destination);Float32Array v=world.bodies.read(id,type);return destination.set(v.get(0),v.get(1),v.get(2));}
+    private Vector3f velocity(Vector3f destination,int type){check();Objects.requireNonNull(destination);Float32Array v=world.bodies.read(id,type);return destination.set(v.get(0),v.get(1),v.get(2));}
     public RigidBody3D setLinearVelocity(Vector3f velocity){return setLinearVelocity(velocity.x,velocity.y,velocity.z);}
     public RigidBody3D setLinearVelocity(float x,float y,float z){moving();PhysicsMath3D.finite(x,"x");PhysicsMath3D.finite(y,"y");PhysicsMath3D.finite(z,"z");world.bodies.change(id,0,x,y,z,0,0,0);return this;}
     public RigidBody3D setAngularVelocity(Vector3f velocity){moving();world.bodies.change(id,1,PhysicsMath3D.check(velocity));return this;}
@@ -53,7 +54,7 @@ public final class RigidBody3D implements AutoCloseable {
     private RigidBody3D change(int operation,Vector3f value){dynamic();world.bodies.change(id,operation,PhysicsMath3D.check(value));return this;}
     public RigidBody3D setTransform(Vector3f position,Quaternionf rotation){check();world.bodies.pose(id,PhysicsMath3D.check(position),PhysicsMath3D.normalizeRotation(rotation,new Quaternionf()),0);capture();remember();sync(1);return this;}
     public RigidBody3D moveKinematic(Vector3f position,Quaternionf rotation){check();if(motion!=MotionType3D.KINEMATIC)throw new IllegalStateException("Body is not kinematic");world.bodies.pose(id,PhysicsMath3D.check(position),PhysicsMath3D.normalizeRotation(rotation,new Quaternionf()),world.getFixedTimeStep());return this;}
-    public RigidBody3D bind(ModelInstance3D model){check();this.model=java.util.Objects.requireNonNull(model);model.setParentTransform(new Matrix4f());sync(1);return this;}
+    public RigidBody3D bind(ModelInstance3D model){check();this.model=Objects.requireNonNull(model);model.setParentTransform(new Matrix4f());sync(1);return this;}
     public void unbind(){check();model=null;}
     void remember(){previousPosition.set(currentPosition);previousRotation.set(currentRotation);}
     void capture(){Float32Array v=world.bodies.read(id,0);currentPosition.set(v.get(0),v.get(1),v.get(2));PhysicsMath3D.normalizeRotation(currentRotation,v.get(3),v.get(4),v.get(5),v.get(6));}

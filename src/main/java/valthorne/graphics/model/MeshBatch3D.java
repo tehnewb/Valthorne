@@ -1,5 +1,8 @@
 package valthorne.graphics.model;
 
+import org.joml.Matrix4f;
+import org.joml.Vector2f;
+import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import valthorne.camera.Camera3D;
 import valthorne.graphics.Color;
@@ -8,22 +11,22 @@ import valthorne.graphics.shader.LightingShader3D;
 import valthorne.graphics.shader.Mesh3DShader;
 import valthorne.graphics.shader.Shader;
 import valthorne.math.MathUtils;
-import org.joml.Matrix4f;
-import org.joml.Vector2f;
-import org.joml.Vector3f;
 
 import java.nio.FloatBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
-import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL30.*;
+import org.joml.Matrix3f;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL33;
 
 /**
  * Accumulates world-space triangles in a growable CPU buffer and submits them
@@ -58,15 +61,10 @@ import static org.lwjgl.opengl.GL30.glGenVertexArrays;
  *     mesh.dispose();
  * }
  * }</pre>
+ *
  * @author Albert Beaupre
  */
 public final class MeshBatch3D {
-    private final float[] matrixUpload = new float[16]; // Reusable column-major matrix array for shader uploads.
-
-    private final Matrix4f modelTransform = new Matrix4f(); // Scratch model-to-world matrix for instance emission.
-    private final org.joml.Matrix3f normalTransform = new org.joml.Matrix3f(); // Scratch inverse-transpose matrix for model normals.
-
-
     /**
      * Interleaved vertex width: XYZ position, XYZ normal, RGBA color, and UV.
      */
@@ -79,6 +77,9 @@ public final class MeshBatch3D {
      * Shared fallback material when a render state supplies none.
      */
     private static final Material3D DEFAULT_MATERIAL = new Material3D();
+    private final float[] matrixUpload = new float[16]; // Reusable column-major matrix array for shader uploads.
+    private final Matrix4f modelTransform = new Matrix4f(); // Scratch model-to-world matrix for instance emission.
+    private final Matrix3f normalTransform = new Matrix3f(); // Scratch inverse-transpose matrix for model normals.
     private final Mesh3DShader compatibilityShader; // Owned compatibility shader created with the batch.
     private final int vaoId; // Owned OpenGL vertex-array name.
     private final int vboId; // Owned OpenGL vertex-buffer name.
@@ -197,9 +198,9 @@ public final class MeshBatch3D {
      * the same copied color at all vertices. Skips triangles whose cross-product
      * length is at most 0.00001. UV coordinates default to zero.
      *
-     * @param a first world-space vertex
-     * @param b second world-space vertex
-     * @param c third world-space vertex
+     * @param a     first world-space vertex
+     * @param b     second world-space vertex
+     * @param c     third world-space vertex
      * @param color nonnull vertex color copied into the buffer
      * @throws NullPointerException if a vertex or color is null
      */
@@ -239,10 +240,10 @@ public final class MeshBatch3D {
      * Each triangle independently computes a face normal and may be skipped if
      * degenerate; nonplanar quads therefore have two flat-shaded faces.
      *
-     * @param a first world-space corner
-     * @param b second world-space corner
-     * @param c third world-space corner
-     * @param d fourth world-space corner
+     * @param a     first world-space corner
+     * @param b     second world-space corner
+     * @param c     third world-space corner
+     * @param d     fourth world-space corner
      * @param color color copied to each emitted vertex
      * @throws NullPointerException if a corner or color is null
      */
@@ -256,14 +257,14 @@ public final class MeshBatch3D {
      * Dimensions are full extents; this helper does not validate their sign or
      * finiteness. Negative sizes can reverse winding.
      *
-     * @param centerX world center X
-     * @param centerY world center Y
-     * @param centerZ world center Z
-     * @param sizeX full local X extent
-     * @param sizeY full local Y extent
-     * @param sizeZ full local Z extent
+     * @param centerX   world center X
+     * @param centerY   world center Y
+     * @param centerZ   world center Z
+     * @param sizeX     full local X extent
+     * @param sizeY     full local Y extent
+     * @param sizeZ     full local Z extent
      * @param rotationY Y-axis rotation in radians
-     * @param color copied face color
+     * @param color     copied face color
      */
     public void box(float centerX, float centerY, float centerZ,
                     float sizeX, float sizeY, float sizeZ,
@@ -296,14 +297,14 @@ public final class MeshBatch3D {
      * uses flat normals. Supply positive dimensions and suitable subdivision counts;
      * this helper does not validate them.
      *
-     * @param centerX capsule axis X
-     * @param centerY capsule axis Y
-     * @param baseZ bottom of the lower hemisphere
-     * @param radius circular radius
-     * @param height requested overall height
+     * @param centerX  capsule axis X
+     * @param centerY  capsule axis Y
+     * @param baseZ    bottom of the lower hemisphere
+     * @param radius   circular radius
+     * @param height   requested overall height
      * @param segments circumferential divisions, normally at least 3
-     * @param stacks latitude divisions per hemisphere, normally at least 1
-     * @param color copied vertex color
+     * @param stacks   latitude divisions per hemisphere, normally at least 1
+     * @param color    copied vertex color
      */
     public void capsule(float centerX, float centerY, float baseZ,
                         float radius, float height,
@@ -323,13 +324,13 @@ public final class MeshBatch3D {
      * pole triangles are skipped by the triangle helper. Subdivision counts and
      * radius are not validated; nonpositive counts emit no corresponding faces.
      *
-     * @param centerX world center X
-     * @param centerY world center Y
-     * @param centerZ world center Z
-     * @param radius sphere radius
+     * @param centerX  world center X
+     * @param centerY  world center Y
+     * @param centerZ  world center Z
+     * @param radius   sphere radius
      * @param segments circumferential divisions, normally at least 3
-     * @param stacks latitude divisions per hemisphere
-     * @param color copied vertex color
+     * @param stacks   latitude divisions per hemisphere
+     * @param color    copied vertex color
      */
     public void sphere(float centerX, float centerY, float centerZ,
                        float radius, int segments, int stacks,
@@ -343,13 +344,13 @@ public final class MeshBatch3D {
      * Height extends equally above and below the center. Dimensions and subdivision
      * counts are not validated.
      *
-     * @param centerX axis X
-     * @param centerY axis Y
-     * @param centerZ vertical midpoint
-     * @param radius circular radius
-     * @param height full cylinder height
+     * @param centerX  axis X
+     * @param centerY  axis Y
+     * @param centerZ  vertical midpoint
+     * @param radius   circular radius
+     * @param height   full cylinder height
      * @param segments circumferential divisions, normally at least 3
-     * @param color copied vertex color
+     * @param color    copied vertex color
      */
     public void cylinder(float centerX, float centerY, float centerZ,
                          float radius, float height, int segments,
@@ -365,13 +366,13 @@ public final class MeshBatch3D {
      * Appends only the side walls of a centered Z-aligned cylinder. Leaves both
      * ends open and computes a separate flat normal for each wall segment.
      *
-     * @param centerX axis X
-     * @param centerY axis Y
-     * @param centerZ vertical midpoint
-     * @param radius circular radius
-     * @param height full wall height
+     * @param centerX  axis X
+     * @param centerY  axis Y
+     * @param centerZ  vertical midpoint
+     * @param radius   circular radius
+     * @param height   full wall height
      * @param segments circumferential divisions
-     * @param color copied vertex color
+     * @param color    copied vertex color
      */
     public void cylinderWalls(float centerX, float centerY, float centerZ,
                               float radius, float height, int segments,
@@ -386,13 +387,13 @@ public final class MeshBatch3D {
      * radius and ordinary subdivision counts, topFace selects a positive-Z normal;
      * false reverses the winding. Nonpositive segment counts emit nothing.
      *
-     * @param centerX disc center X
-     * @param centerY disc center Y
-     * @param z plane height
-     * @param radius disc radius
-     * @param topFace whether the face points toward positive Z
+     * @param centerX  disc center X
+     * @param centerY  disc center Y
+     * @param z        plane height
+     * @param radius   disc radius
+     * @param topFace  whether the face points toward positive Z
      * @param segments fan triangle count, normally at least 3
-     * @param color copied vertex color
+     * @param color    copied vertex color
      */
     public void disc(float centerX, float centerY, float z,
                      float radius, boolean topFace, int segments,
@@ -417,11 +418,11 @@ public final class MeshBatch3D {
      * Copies vertex data into the batch; neither the model nor its resources are
      * retained by the emitted geometry. A null model emits nothing.
      *
-     * @param model source model
-     * @param worldX world translation X
-     * @param worldY world translation Y
-     * @param worldZ world translation Z
-     * @param scale nonzero uniform scale
+     * @param model      source model
+     * @param worldX     world translation X
+     * @param worldY     world translation Y
+     * @param worldZ     world translation Z
+     * @param scale      nonzero uniform scale
      * @param yawRadians Z-axis rotation in radians
      * @throws IllegalArgumentException if scale is zero or transform evaluation rejects nonfinite components
      */
@@ -442,7 +443,7 @@ public final class MeshBatch3D {
      *
      * @param instance borrowed source instance
      * @throws IllegalArgumentException if the instance transform is invalid
-     * @throws IllegalStateException if the linear world transform is effectively singular
+     * @throws IllegalStateException    if the linear world transform is effectively singular
      */
     public void model(ModelInstance3D instance) {
         if (instance == null) {
@@ -460,13 +461,13 @@ public final class MeshBatch3D {
         transform.normal(normalTransform);
         boolean reflected = determinant < 0f;
         for (Model3D.Triangle triangle : model.triangles()) {
-            modelVertex(transform, triangle.a, triangle.normalA, triangle.uvA, triangle.color);
+            modelVertex(transform, triangle.a(), triangle.normalA(), triangle.uvA(), triangle.color());
             if (reflected) {
-                modelVertex(transform, triangle.c, triangle.normalC, triangle.uvC, triangle.color);
-                modelVertex(transform, triangle.b, triangle.normalB, triangle.uvB, triangle.color);
+                modelVertex(transform, triangle.c(), triangle.normalC(), triangle.uvC(), triangle.color());
+                modelVertex(transform, triangle.b(), triangle.normalB(), triangle.uvB(), triangle.color());
             } else {
-                modelVertex(transform, triangle.b, triangle.normalB, triangle.uvB, triangle.color);
-                modelVertex(transform, triangle.c, triangle.normalC, triangle.uvC, triangle.color);
+                modelVertex(transform, triangle.b(), triangle.normalB(), triangle.uvB(), triangle.color());
+                modelVertex(transform, triangle.c(), triangle.normalC(), triangle.uvC(), triangle.color());
             }
         }
     }
@@ -477,10 +478,10 @@ public final class MeshBatch3D {
      * Uses the normal matrix prepared for the current model.
      *
      * @param transform model-to-world position matrix
-     * @param point source position
-     * @param normal source normal
-     * @param uv source texture coordinates
-     * @param color copied vertex color
+     * @param point     source position
+     * @param normal    source normal
+     * @param uv        source texture coordinates
+     * @param color     copied vertex color
      */
     private void modelVertex(Matrix4f transform, Vector3f point, Vector3f normal, Vector2f uv, Color color) {
         transform.transformPosition(point, scratchA);
@@ -497,7 +498,7 @@ public final class MeshBatch3D {
      * matrices must already be current. A null instance or camera is rejected.
      *
      * @param instance candidate model instance
-     * @param camera camera used for visibility testing
+     * @param camera   camera used for visibility testing
      * @return true if visibility passed and model emission was invoked
      */
     public boolean modelIfVisible(ModelInstance3D instance, Camera3D camera) {
@@ -541,7 +542,7 @@ public final class MeshBatch3D {
      *
      * @param state nonnull camera, material, and lighting configuration
      * @throws IllegalStateException if disposed or a nonempty draw has no camera
-     * @throws NullPointerException if state is null
+     * @throws NullPointerException  if state is null
      */
     public void renderUploaded(MeshRenderState3D state) {
         if (disposed) throw new IllegalStateException("MeshBatch3D is disposed");
@@ -567,7 +568,7 @@ public final class MeshBatch3D {
      *
      * @param state nonnull camera, material, and lighting configuration
      * @throws IllegalStateException if disposed or a nonempty draw has no camera
-     * @throws NullPointerException if state is null
+     * @throws NullPointerException  if state is null
      */
     public void render(MeshRenderState3D state) {
         if (disposed) throw new IllegalStateException("MeshBatch3D is disposed");
@@ -585,7 +586,7 @@ public final class MeshBatch3D {
      *
      * @param state rendering configuration for the accumulated material group
      * @throws IllegalStateException if disposed or a nonempty draw has no camera
-     * @throws NullPointerException if state is null for a nonempty draw
+     * @throws NullPointerException  if state is null for a nonempty draw
      */
     void renderInBatch(MeshRenderState3D state) {
         if (disposed) throw new IllegalStateException("MeshBatch3D is disposed");
@@ -626,12 +627,12 @@ public final class MeshBatch3D {
      * Ensures CPU capacity and appends twelve floats: position, normal, color, and
      * zero UV coordinates. Increments the accumulated vertex count.
      *
-     * @param x position X
-     * @param y position Y
-     * @param z position Z
-     * @param nx normal X
-     * @param ny normal Y
-     * @param nz normal Z
+     * @param x     position X
+     * @param y     position Y
+     * @param z     position Z
+     * @param nx    normal X
+     * @param ny    normal Y
+     * @param nz    normal Z
      * @param color color components copied into the buffer
      */
     private void putVertex(float x, float y, float z, float nx, float ny, float nz, Color color) {
@@ -682,7 +683,7 @@ public final class MeshBatch3D {
      * </p>
      *
      * @param state nonnull render configuration
-     * @throws NullPointerException if state is null
+     * @throws NullPointerException  if state is null
      * @throws IllegalStateException if no camera is configured
      */
     private void bindRenderState(MeshRenderState3D state) {
@@ -725,8 +726,8 @@ public final class MeshBatch3D {
             }
         }
 
-        org.lwjgl.opengl.GL20.glBlendEquationSeparate(org.lwjgl.opengl.GL14.GL_FUNC_ADD, org.lwjgl.opengl.GL14.GL_FUNC_ADD);
-        org.lwjgl.opengl.GL11.glFrontFace(org.lwjgl.opengl.GL11.GL_CCW);
+        GL20.glBlendEquationSeparate(GL14.GL_FUNC_ADD, GL14.GL_FUNC_ADD);
+        GL11.glFrontFace(GL11.GL_CCW);
         if (state.isShadowPass()) {
             if (depthShader == null) depthShader = new DepthShader3D();
             shader = depthShader;
@@ -747,7 +748,7 @@ public final class MeshBatch3D {
             return;
         }
         if (state.getLighting() != null) {
-            glDisable(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_SRGB);
+            glDisable(GL30.GL_FRAMEBUFFER_SRGB);
             state.getLighting().bind(shader);
             shader.setUniform1f("u_roughness", material.getRoughness());
             shader.setUniform1f("u_metallic", material.getMetallic());
@@ -755,9 +756,9 @@ public final class MeshBatch3D {
         ShadowMap3D shadow = state.getShadowMap();
         boolean hasShadow = shadow != null && shadow.isReady() && material.isReceivesShadow() && !state.isShadowPass();
         shader.setUniform1i("u_hasShadow", hasShadow ? 1 : 0);
-        org.lwjgl.opengl.GL13.glActiveTexture(org.lwjgl.opengl.GL13.GL_TEXTURE2);
+        GL13.glActiveTexture(GL13.GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, hasShadow ? shadow.getTextureId() : 0);
-        org.lwjgl.opengl.GL33.glBindSampler(2, hasShadow && state.getLighting() != null ? shadow.getComparisonSampler() : 0);
+        GL33.glBindSampler(2, hasShadow && state.getLighting() != null ? shadow.getComparisonSampler() : 0);
         if (hasShadow) {
             shader.setUniformMatrix4("u_shadowMatrix", shadow.getMatrix().get(matrixUpload));
             shader.setUniform1f("u_shadowBias", shadow.getBias());
@@ -843,13 +844,13 @@ public final class MeshBatch3D {
      * Appends flat-shaded side quads around a Z-aligned circular shell, leaving both
      * ends open. Each segment uses two adjacent angular samples at both heights.
      *
-     * @param centerX axis X
-     * @param centerY axis Y
-     * @param lowerZ lower endpoint
-     * @param upperZ upper endpoint
-     * @param radius circular radius
+     * @param centerX  axis X
+     * @param centerY  axis Y
+     * @param lowerZ   lower endpoint
+     * @param upperZ   upper endpoint
+     * @param radius   circular radius
      * @param segments circumferential subdivisions
-     * @param color copied wall color
+     * @param color    copied wall color
      */
     private void cylinderShell(float centerX, float centerY, float lowerZ, float upperZ,
                                float radius, int segments, Color color) {
@@ -870,15 +871,15 @@ public final class MeshBatch3D {
      * triangle helper to discard degenerate pole faces. Nonpositive subdivision
      * counts produce no geometry.
      *
-     * @param centerX sphere center X
-     * @param centerY sphere center Y
-     * @param centerZ sphere center Z
-     * @param radius sphere radius
+     * @param centerX  sphere center X
+     * @param centerY  sphere center Y
+     * @param centerZ  sphere center Z
+     * @param radius   sphere radius
      * @param phiStart initial latitude in radians
-     * @param phiEnd final latitude in radians
+     * @param phiEnd   final latitude in radians
      * @param segments circumferential subdivisions
-     * @param stacks latitude subdivisions
-     * @param color copied vertex color
+     * @param stacks   latitude subdivisions
+     * @param color    copied vertex color
      */
     private void hemisphere(float centerX, float centerY, float centerZ, float radius,
                             float phiStart, float phiEnd, int segments, int stacks, Color color) {
@@ -903,14 +904,14 @@ public final class MeshBatch3D {
      * Rotates a local point about Y and adds a world-space center, writing into
      * caller-supplied storage.
      *
-     * @param centerX translation X
-     * @param centerY translation Y
-     * @param centerZ translation Z
-     * @param localX local X
-     * @param localY local Y
-     * @param localZ local Z
+     * @param centerX   translation X
+     * @param centerY   translation Y
+     * @param centerZ   translation Z
+     * @param localX    local X
+     * @param localY    local Y
+     * @param localZ    local Z
      * @param rotationY Y-axis angle in radians
-     * @param out destination vector
+     * @param out       destination vector
      * @return out
      */
     private Vector3f rotatedPoint(float centerX, float centerY, float centerZ,
@@ -930,10 +931,10 @@ public final class MeshBatch3D {
      * @param centerX center X
      * @param centerY center Y
      * @param centerZ center Z
-     * @param radius radial distance
-     * @param theta longitude in radians
-     * @param phi latitude in radians
-     * @param out destination vector
+     * @param radius  radial distance
+     * @param theta   longitude in radians
+     * @param phi     latitude in radians
+     * @param out     destination vector
      * @return out
      */
     private Vector3f spherePoint(float centerX, float centerY, float centerZ, float radius, float theta, float phi, Vector3f out) {

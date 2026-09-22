@@ -1,7 +1,7 @@
 package valthorne.graphics.model;
 
-import valthorne.graphics.Color;
 import org.joml.Vector3f;
+import valthorne.graphics.Color;
 
 /**
  * Mutable world-space point-light parameters consumed by the 3D lighting system.
@@ -37,7 +37,9 @@ public final class PointLight3D {
      *
      * @return requested shadow-map participation, initially false
      */
-    public boolean isCastsShadows() {return castsShadows;}
+    public boolean isCastsShadows() {
+        return castsShadows;
+    }
 
     /**
      * Sets optional Filament shadow participation without allocating resources here.
@@ -57,7 +59,9 @@ public final class PointLight3D {
      *
      * @return the live world-space position
      */
-    public Vector3f getPosition() {return position;}
+    public Vector3f getPosition() {
+        return position;
+    }
 
     /**
      * Returns the internal mutable color. Changing it updates subsequent lighting
@@ -65,7 +69,9 @@ public final class PointLight3D {
      *
      * @return the live light color
      */
-    public Color getColor() {return color;}
+    public Color getColor() {
+        return color;
+    }
 
     /**
      * Copies color components into this light without retaining the supplied
@@ -87,7 +93,9 @@ public final class PointLight3D {
      *
      * @return the positive range in world units, initially ten
      */
-    public float getRange() {return range;}
+    public float getRange() {
+        return range;
+    }
 
     /**
      * Replaces the influence range after validating that it is finite and strictly
@@ -110,7 +118,9 @@ public final class PointLight3D {
      *
      * @return the finite intensity multiplier, initially one
      */
-    public float getIntensity() {return intensity;}
+    public float getIntensity() {
+        return intensity;
+    }
 
     /**
      * Replaces the brightness multiplier after finite, nonnegative validation.

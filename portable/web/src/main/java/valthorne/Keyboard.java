@@ -3,6 +3,7 @@ import org.teavm.jso.*;
 import valthorne.event.*;
 import valthorne.event.events.*;
 import valthorne.event.listeners.KeyListener;
+import java.util.Arrays;
 
 /** Browser keyboard backend retaining Valthorne key values and event routes. */
 public final class Keyboard {
@@ -130,7 +131,7 @@ public final class Keyboard {
     public static final int RIGHT_SUPER = 347;
     public static final int MENU = 348;
     @JSFunctor private interface KeyCallback extends JSObject {void accept(int key,int mods,boolean down);}
-    static void init(){java.util.Arrays.fill(downKeys,false);install((key,mods,down)->JGL.runInputTask(()->{if(key>=0&&key<downKeys.length)downKeys[key]=down;JGL.publish(down?new KeyPressEvent(key,mods):new KeyReleaseEvent(key,mods));}));installText(text->JGL.runInputTask(()->JGL.publish(new valthorne.event.events.TextInputEvent(text))));}
+    static void init(){Arrays.fill(downKeys,false);install((key,mods,down)->JGL.runInputTask(()->{if(key>=0&&key<downKeys.length)downKeys[key]=down;JGL.publish(down?new KeyPressEvent(key,mods):new KeyReleaseEvent(key,mods));}));installText(text->JGL.runInputTask(()->JGL.publish(new TextInputEvent(text))));}
     @JSFunctor private interface Text extends JSObject{void accept(String text);}
     @JSBody(params="callback",script="valthorneHost.platform.legacyTextEvent=callback;") private static native void installText(Text callback);
     @JSBody(params="callback",script="valthorneHost.platform.legacyKeyEvent=callback;") private static native void install(KeyCallback callback);

@@ -79,14 +79,16 @@ public final class Lighting2D implements AutoCloseable {
      * Creates capacity for 512 lights with 1024 angular samples per shadow row.
      * Scene/light textures are sized lazily; map resolution initially uses half scale.
      */
-    public Lighting2D() {this(512, 1024);}
+    public Lighting2D() {
+        this(512, 1024);
+    }
 
     /**
      * Validates atlas dimensions, allocates staging buffers, and creates shaders and
      * GPU resources inside a selected-state restoration scope. Requires a current
      * OpenGL context; scene and map storage are allocated on first capture.
      *
-     * @param capacity registered-light limit, one through 4096
+     * @param capacity         registered-light limit, one through 4096
      * @param shadowResolution angular samples per light, 64 through 4096
      * @throws IllegalArgumentException if these or device texture-size limits are exceeded
      */
@@ -130,10 +132,10 @@ public final class Lighting2D implements AutoCloseable {
      * its framebuffer, and checks completeness. Enclosing capture owns state restoration.
      *
      * @param texture owned texture identifier
-     * @param fbo owned framebuffer identifier
-     * @param w positive pixel width
-     * @param h positive pixel height
-     * @param format internal texture format
+     * @param fbo     owned framebuffer identifier
+     * @param w       positive pixel width
+     * @param h       positive pixel height
+     * @param format  internal texture format
      * @throws IllegalStateException if the framebuffer is incomplete
      */
     private static void allocate(int texture, int fbo, int w, int h, int format) {
@@ -178,7 +180,7 @@ public final class Lighting2D implements AutoCloseable {
      *
      * @param light non-null light to register
      * @return this system
-     * @throws NullPointerException if light is null
+     * @throws NullPointerException  if light is null
      * @throws IllegalStateException if capacity is full or lifecycle/thread checks fail
      */
     public Lighting2D addLight(PointLight2D light) {
@@ -244,7 +246,7 @@ public final class Lighting2D implements AutoCloseable {
      *
      * @param color non-null linear-space ambient color
      * @return this system
-     * @throws NullPointerException if color is null
+     * @throws NullPointerException     if color is null
      * @throws IllegalArgumentException if RGB is negative or non-finite
      */
     public Lighting2D setAmbient(Color color) {
@@ -294,7 +296,9 @@ public final class Lighting2D implements AutoCloseable {
      *
      * @return last visible light count
      */
-    public int getVisibleLightCount() {return visibleCount;}
+    public int getVisibleLightCount() {
+        return visibleCount;
+    }
 
     /**
      * Reads light-only instanced draws: zero for cache reuse or no visible lights,
@@ -302,14 +306,18 @@ public final class Lighting2D implements AutoCloseable {
      *
      * @return last light draw count
      */
-    public int getLastLightDrawCalls() {return lastDrawCalls;}
+    public int getLastLightDrawCalls() {
+        return lastDrawCalls;
+    }
 
     /**
      * Reads cumulative atlas-row uploads, excluding unchanged and shadow-disabled rows.
      *
      * @return completed shadow upload count
      */
-    public long getShadowUploadCount() {return shadowUploads;}
+    public long getShadowUploadCount() {
+        return shadowUploads;
+    }
 
     /**
      * Reads cumulative map refreshes, including ambient-only clears. Cache reuse
@@ -317,7 +325,9 @@ public final class Lighting2D implements AutoCloseable {
      *
      * @return map refresh count
      */
-    public long getLightMapRenderCount() {return mapRenders;}
+    public long getLightMapRenderCount() {
+        return mapRenders;
+    }
 
     /**
      * Exposes the owned HDR texture as a borrowed identifier. Storage appears on first
@@ -336,13 +346,13 @@ public final class Lighting2D implements AutoCloseable {
      * scissor/sRGB, and enables all color writes. Finish existing batches first.
      * Failure cancels capture and restores covered state; success requires end/cancel.
      *
-     * @param minX finite lower world X
-     * @param minY finite lower world Y
-     * @param worldWidth positive finite world extent X
+     * @param minX        finite lower world X
+     * @param minY        finite lower world Y
+     * @param worldWidth  positive finite world extent X
      * @param worldHeight positive finite world extent Y
-     * @param pixelWidth positive capture width within device texture limits
+     * @param pixelWidth  positive capture width within device texture limits
      * @param pixelHeight positive capture height within device texture limits
-     * @throws IllegalStateException if already capturing or lifecycle/thread checks fail
+     * @throws IllegalStateException    if already capturing or lifecycle/thread checks fail
      * @throws IllegalArgumentException if world or pixel dimensions are invalid
      */
     public void beginScene(float minX, float minY, float worldWidth, float worldHeight, int pixelWidth, int pixelHeight) {
@@ -412,7 +422,9 @@ public final class Lighting2D implements AutoCloseable {
             compositeShader.setUniform1i("u_light", 1);
             compositeShader.setUniform1f("u_exposure", exposure);
             glDrawArrays(GL_TRIANGLES, 0, 3);
-        } finally {saved.close();}
+        } finally {
+            saved.close();
+        }
     }
 
     /**
@@ -561,8 +573,8 @@ public final class Lighting2D implements AutoCloseable {
          * Retains registration state with initially invalid revision markers so a visible
          * pass considers the light's shadow geometry.
          *
-         * @param light borrowed light
-         * @param slot reserved atlas row
+         * @param light  borrowed light
+         * @param slot   reserved atlas row
          * @param shadow owned CPU shadow cache
          */
         Entry(PointLight2D light, int slot, PolarShadow2D shadow) {

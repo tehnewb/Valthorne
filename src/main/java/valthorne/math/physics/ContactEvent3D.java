@@ -27,15 +27,7 @@ import org.joml.Vector3f;
  * @param penetration the reported penetration depth in world units, or zero on removal
  * @author Albert Beaupre
  */
-public record ContactEvent3D(
-        Type type,
-        RigidBody3D bodyA,
-        RigidBody3D bodyB,
-        int subShapeA,
-        int subShapeB,
-        Vector3f normal,
-        float penetration
-) {
+public record ContactEvent3D(Type type, RigidBody3D bodyA, RigidBody3D bodyB, int subShapeA, int subShapeB, Vector3f normal, float penetration) {
     /**
      * Copies the normal and retains all other components unchanged. This is a
      * data snapshot operation and does not query native body state.
@@ -49,7 +41,9 @@ public record ContactEvent3D(
      * @param penetration the reported penetration depth
      * @throws NullPointerException if normal is null
      */
-    public ContactEvent3D {normal = new Vector3f(normal);}
+    public ContactEvent3D {
+        normal = new Vector3f(normal);
+    }
 
     /**
      * Returns a defensive copy of the recorded normal, preserving its magnitude.
@@ -58,7 +52,9 @@ public record ContactEvent3D(
      * @return a newly allocated copy of the snapshot's world-space normal
      */
     @Override
-    public Vector3f normal() {return new Vector3f(normal);}
+    public Vector3f normal() {
+        return new Vector3f(normal);
+    }
 
     /**
      * Identifies the native contact callback represented by a snapshot.

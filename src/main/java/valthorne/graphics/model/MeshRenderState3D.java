@@ -1,8 +1,13 @@
 package valthorne.graphics.model;
 
+import org.joml.Vector3f;
 import valthorne.camera.Camera3D;
 import valthorne.graphics.Color;
-import org.joml.Vector3f;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import valthorne.graphics.lighting3d.Lighting3D;
 
 /**
  * Mutable draw configuration combining camera, material, compatibility lighting,
@@ -23,12 +28,12 @@ public final class MeshRenderState3D {
      * Maximum number of lights retained by the compatibility point-light list.
      */
     public static final int MAX_POINT_LIGHTS = 8;
-    private final java.util.ArrayList<PointLight3D> pointLights = new java.util.ArrayList<>(); // Borrowed compatibility lights in insertion order.
+    private final ArrayList<PointLight3D> pointLights = new ArrayList<>(); // Borrowed compatibility lights in insertion order.
     private final Color ambient = new Color(0.14f, 0.14f, 0.14f, 1f); // Owned ambient color, initially RGB 0.14.
     private final Color directional = new Color(0.46f, 0.46f, 0.46f, 1f); // Owned directional color, initially RGB 0.46.
     private final Vector3f lightDirection = new Vector3f(0f, -1f, 0f); // Owned light direction, stored without normalization.
     private final Color fogColor = Color.BLACK.copy(); // Owned fog color, initially black.
-    private valthorne.graphics.lighting3d.Lighting3D lighting; // Borrowed tiled lighting system, or null for compatibility lighting.
+    private Lighting3D lighting; // Borrowed tiled lighting system, or null for compatibility lighting.
     private float fogStart = 260f, fogEnd = 880f, fogAmount = 0.58f; // Fog start/end distances and maximum blend amount.
     private ShadowMap3D shadowMap; // Borrowed shadow map, or null.
     private boolean shadowPass; // Internal switch selecting depth-only shadow submission.
@@ -48,7 +53,9 @@ public final class MeshRenderState3D {
      *
      * @return borrowed tiled lighting system, or null
      */
-    public valthorne.graphics.lighting3d.Lighting3D getLighting() {return lighting;}
+    public Lighting3D getLighting() {
+        return lighting;
+    }
 
     /**
      * Retains the borrowed tiled lighting system without taking disposal responsibility.
@@ -57,7 +64,7 @@ public final class MeshRenderState3D {
      * @param lighting replacement reference, or null
      * @return this state
      */
-    public MeshRenderState3D setLighting(valthorne.graphics.lighting3d.Lighting3D lighting) {
+    public MeshRenderState3D setLighting(Lighting3D lighting) {
         this.lighting = lighting;
         return this;
     }
@@ -68,7 +75,9 @@ public final class MeshRenderState3D {
      *
      * @return borrowed shadow map, or null
      */
-    public ShadowMap3D getShadowMap() {return shadowMap;}
+    public ShadowMap3D getShadowMap() {
+        return shadowMap;
+    }
 
     /**
      * Retains the borrowed shadow map without taking disposal responsibility.
@@ -87,7 +96,9 @@ public final class MeshRenderState3D {
      *
      * @return shadow-pass flag
      */
-    boolean isShadowPass() {return shadowPass;}
+    boolean isShadowPass() {
+        return shadowPass;
+    }
 
     /**
      * Sets the internal shadow-pass flag without changing lighting or material objects.
@@ -107,7 +118,9 @@ public final class MeshRenderState3D {
      *
      * @return mutable ambient light color
      */
-    public Color getAmbientLight() {return ambient;}
+    public Color getAmbientLight() {
+        return ambient;
+    }
 
     /**
      * Copies the ambient light color into owned storage without retaining the input.
@@ -127,7 +140,9 @@ public final class MeshRenderState3D {
      *
      * @return mutable directional light color
      */
-    public Color getDirectionalLight() {return directional;}
+    public Color getDirectionalLight() {
+        return directional;
+    }
 
     /**
      * Copies the directional light color into owned storage without retaining the input.
@@ -147,7 +162,9 @@ public final class MeshRenderState3D {
      *
      * @return live light-list view
      */
-    public java.util.List<PointLight3D> getPointLights() {return java.util.Collections.unmodifiableList(pointLights);}
+    public List<PointLight3D> getPointLights() {
+        return Collections.unmodifiableList(pointLights);
+    }
 
     /**
      * Appends a borrowed light, allowing repeated references, up to the compatibility
@@ -155,11 +172,11 @@ public final class MeshRenderState3D {
      *
      * @param light light to append
      * @return this state
-     * @throws NullPointerException if light is null
+     * @throws NullPointerException  if light is null
      * @throws IllegalStateException if eight lights are already present
      */
     public MeshRenderState3D addLight(PointLight3D light) {
-        java.util.Objects.requireNonNull(light, "light");
+        Objects.requireNonNull(light, "light");
         if (pointLights.size() == MAX_POINT_LIGHTS)
             throw new IllegalStateException("At most eight point lights are supported");
         pointLights.add(light);
@@ -173,48 +190,57 @@ public final class MeshRenderState3D {
      * @param light light to remove
      * @return true if an entry was removed
      */
-    public boolean removeLight(PointLight3D light) {return pointLights.remove(light);}
+    public boolean removeLight(PointLight3D light) {
+        return pointLights.remove(light);
+    }
 
     /**
      * Removes all compatibility light references without disposing them or changing
      * the optional tiled lighting system.
      */
-    public void clearLights() {pointLights.clear();}
+    public void clearLights() {
+        pointLights.clear();
+    }
 
     /**
      * Returns the stored fog start distance without changing or validating draw state.
      *
      * @return fog start distance
      */
-    public float getFogStart() {return fogStart;}
+    public float getFogStart() {
+        return fogStart;
+    }
 
     /**
      * Returns the stored fog end distance without changing or validating draw state.
      *
      * @return fog end distance
      */
-    public float getFogEnd() {return fogEnd;}
+    public float getFogEnd() {
+        return fogEnd;
+    }
 
     /**
      * Returns the stored maximum fog blend fraction without changing or validating draw state.
      *
      * @return maximum fog blend fraction
      */
-    public float getFogAmount() {return fogAmount;}
+    public float getFogAmount() {
+        return fogAmount;
+    }
 
     /**
      * Stores validated fog distances and maximum blend fraction. Color is configured
      * separately; these values are consumed by subsequent draws.
      *
-     * @param start finite nonnegative start distance in world units
-     * @param end finite end distance greater than start
+     * @param start  finite nonnegative start distance in world units
+     * @param end    finite end distance greater than start
      * @param amount finite maximum blend fraction from zero through one
      * @return this state
      * @throws IllegalArgumentException if distances or amount violate their constraints
      */
     public MeshRenderState3D setFog(float start, float end, float amount) {
-        if (!Float.isFinite(start) || !Float.isFinite(end) || !Float.isFinite(amount)
-                || start < 0f || end <= start || amount < 0f || amount > 1f)
+        if (!Float.isFinite(start) || !Float.isFinite(end) || !Float.isFinite(amount) || start < 0f || end <= start || amount < 0f || amount > 1f)
             throw new IllegalArgumentException("Fog requires 0 <= start < end and amount in [0,1]");
         fogStart = start;
         fogEnd = end;
@@ -408,8 +434,8 @@ public final class MeshRenderState3D {
      * Stores the world XY rectangle used to map radiance texture coordinates. Rejects
      * nonpositive extents but does not separately validate finiteness or origin values.
      *
-     * @param minX world-space left coordinate
-     * @param minY world-space lower coordinate
+     * @param minX  world-space left coordinate
+     * @param minY  world-space lower coordinate
      * @param sizeX positive world-space X extent
      * @param sizeY positive world-space Y extent
      * @return this state

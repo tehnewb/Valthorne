@@ -61,6 +61,7 @@ public final class LightMapRenderer {
      * destination-color blending. The caller supplies the framebuffer and viewport.
      * Leaves depth testing and blending disabled, texture unit zero active and
      * unbound, and the shader and VAO unbound; previous state is not restored.
+     *
      * @param textureId borrowed two-dimensional light-map texture
      */
     public void render(int textureId) {
@@ -86,7 +87,8 @@ public final class LightMapRenderer {
      * Call while the light-map framebuffer is bound, before final composition.
      * Strength is forwarded unchecked. Leaves depth testing and blending disabled,
      * texture unit zero active and unbound, and shader and VAO unbound.
-     * @param texId borrowed two-dimensional irradiance texture
+     *
+     * @param texId    borrowed two-dimensional irradiance texture
      * @param strength multiplier applied by the bake shader
      */
     public void bake(int texId, float strength) {

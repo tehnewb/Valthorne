@@ -13,6 +13,7 @@ import valthorne.ui.nodes.nano.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import valthorne.graphics.texture.NinePatchDrawable;
 
 /**
  * Builds a density-scaled light or dark skin for texture and NanoVG UI controls.
@@ -110,7 +111,9 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
     public ThemeData create() {
         if (closed) throw new IllegalStateException("Theme has been closed");
         for (Class<?> type : List.of(NanoPanel.class, NanoButton.class, NanoTextField.class, NanoCheckbox.class,
-                NanoSlider.class, NanoProgressBar.class, NanoScrollPanel.class, NanoGrid.class, NanoComboBox.class)) {
+                NanoSlider.class, NanoProgressBar.class, NanoScrollPanel.class, NanoGrid.class, NanoComboBox.class,
+                NanoCollapsibleSection.class, NanoDataTable.class, NanoSplitPane.class, NanoTabbedPane.class,
+                NanoTooltip.class, NanoVirtualList.class)) {
             try {
                 Class.forName(type.getName(), true, type.getClassLoader());
             } catch (ClassNotFoundException impossible) {throw new AssertionError(impossible);}
@@ -237,7 +240,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         pixels.flip();
         var skin = new NinePatchTexture(new TextureData(pixels, size, size), radius, radius, radius, radius);
         skins.add(skin);
-        return new valthorne.graphics.texture.NinePatchDrawable(skin);
+        return new NinePatchDrawable(skin);
     }
 
     /**

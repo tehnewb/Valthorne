@@ -34,7 +34,9 @@ public final class PathTracer2D implements AutoCloseable {
      * Creates an empty scene with view center (0,0), world height twelve, and camera
      * elevation one hundred, using the underlying tracer's normal resource lifecycle.
      */
-    public PathTracer2D() {setView(0, 0, 12, 100);}
+    public PathTracer2D() {
+        setView(0, 0, 12, 100);
+    }
 
     /**
      * Places the camera above XY facing negative Z with positive Y up. Sets world height
@@ -42,9 +44,9 @@ public final class PathTracer2D implements AutoCloseable {
      * visible width. Camera elevation should exceed scene geometry. Does not rebuild
      * matrices itself or reset a caller-customized orthographic zoom.
      *
-     * @param centerX world-space horizontal center
-     * @param centerY world-space vertical center
-     * @param worldHeight positive unzoomed visible height in world units
+     * @param centerX      world-space horizontal center
+     * @param centerY      world-space vertical center
+     * @param worldHeight  positive unzoomed visible height in world units
      * @param cameraHeight positive elevation above XY
      * @return this facade
      * @throws IllegalArgumentException if the combined input check or clip-plane constraints fail
@@ -63,12 +65,12 @@ public final class PathTracer2D implements AutoCloseable {
      * Creates a white XY plane anchored at its lower-left corner and adds it to the
      * scene at the requested elevation. Material and any texture remain shared.
      *
-     * @param x lower-left world X
-     * @param y lower-left world Y
-     * @param width finite positive X extent
-     * @param height finite positive Y extent
+     * @param x         lower-left world X
+     * @param y         lower-left world Y
+     * @param width     finite positive X extent
+     * @param height    finite positive Y extent
      * @param elevation world Z coordinate
-     * @param material non-null shared surface material
+     * @param material  non-null shared surface material
      * @return mutable placed instance retained by the scene
      */
     public ModelInstance3D addSurface(float x, float y, float width, float height, float elevation, Material3D material) {
@@ -79,11 +81,11 @@ public final class PathTracer2D implements AutoCloseable {
      * Creates a box from Z zero to the supplied height, anchored at its lower-left XY
      * corner. Adds it to the scene for surface shading, occlusion, and light transport.
      *
-     * @param x lower-left world X
-     * @param y lower-left world Y
-     * @param width finite positive X extent
-     * @param depth finite positive Y extent
-     * @param height finite positive Z extent
+     * @param x        lower-left world X
+     * @param y        lower-left world Y
+     * @param width    finite positive X extent
+     * @param depth    finite positive Y extent
+     * @param height   finite positive Z extent
      * @param material non-null shared wall material
      * @return mutable wall instance retained by the scene
      */
@@ -96,12 +98,12 @@ public final class PathTracer2D implements AutoCloseable {
      * Its finite geometry participates in shadows and reflections; this creates an
      * emissive material rather than a compatibility point-light entry.
      *
-     * @param x world X center
-     * @param y world Y center
+     * @param x         world X center
+     * @param y         world Y center
      * @param elevation world Z center
-     * @param radius finite positive sphere radius
-     * @param color emission color copied by the material
-     * @param radiance emission-strength setting
+     * @param radius    finite positive sphere radius
+     * @param color     emission color copied by the material
+     * @param radiance  emission-strength setting
      * @return mutable emissive instance retained by the scene
      */
     public ModelInstance3D addAreaLight(float x, float y, float elevation, float radius, Color color, float radiance) {
@@ -112,10 +114,10 @@ public final class PathTracer2D implements AutoCloseable {
      * Creates a placed instance sharing model and material, then appends it to the scene.
      * No GPU upload is performed by this helper.
      *
-     * @param model geometry to reference
-     * @param x world X translation
-     * @param y world Y translation
-     * @param z world Z translation
+     * @param model    geometry to reference
+     * @param x        world X translation
+     * @param y        world Y translation
+     * @param z        world Z translation
      * @param material non-null material to share
      * @return appended instance
      */
@@ -131,7 +133,9 @@ public final class PathTracer2D implements AutoCloseable {
      *
      * @return retained scene
      */
-    public Scene3D getScene() {return scene;}
+    public Scene3D getScene() {
+        return scene;
+    }
 
     /**
      * Returns the owned tracer for quality and output configuration. Do not dispose it
@@ -139,7 +143,9 @@ public final class PathTracer2D implements AutoCloseable {
      *
      * @return underlying tracer
      */
-    public PathTracer3D getTracer() {return tracer;}
+    public PathTracer3D getTracer() {
+        return tracer;
+    }
 
     /**
      * Returns the live orthographic camera for additional pose or projection settings.
@@ -147,19 +153,25 @@ public final class PathTracer2D implements AutoCloseable {
      *
      * @return owned camera
      */
-    public OrthographicCamera3D getCamera() {return camera;}
+    public OrthographicCamera3D getCamera() {
+        return camera;
+    }
 
     /**
      * Delegates the current scene and camera to the GPU path tracer. Requires the
      * appropriate current graphics context and follows the tracer's viewport, accumulation,
      * and output behavior; this facade adds no separate compositing pass.
      */
-    public void render() {tracer.render(scene, camera);}
+    public void render() {
+        tracer.render(scene, camera);
+    }
 
     /**
      * Releases the underlying tracer's resources on the graphics thread. Scene geometry
      * and caller-owned textures are not disposed by this facade.
      */
     @Override
-    public void close() {tracer.close();}
+    public void close() {
+        tracer.close();
+    }
 }

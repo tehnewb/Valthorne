@@ -8,6 +8,7 @@ import org.teavm.jso.typedarrays.Float32Array;
 import valthorne.Window;
 import valthorne.camera.Camera3D;
 import valthorne.graphics.Color;
+import valthorne.web.graphics.BrowserGL;
 
 /** Browser Filament backend for the existing scene API. Source models remain caller-owned. */
 public final class FilamentRenderer3D implements AutoCloseable {
@@ -42,7 +43,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
     public void invalidate(){check();invalidate(handle);}
     public void render(Scene3D source,Camera3D camera){
         check();Objects.requireNonNull(source);Objects.requireNonNull(camera);
-        valthorne.web.graphics.BrowserGL.glGetIntegerv(valthorne.web.graphics.BrowserGL.GL_VIEWPORT,viewport);
+        BrowserGL.glGetIntegerv(BrowserGL.GL_VIEWPORT,viewport);
         camera.rebuild(Math.max(1,viewport[2]),Math.max(1,viewport[3]));copy(camera.getProjection(),projection);copy(inverseView.set(camera.getView()).invert(),cameraModel);
         var snapshot=collector.capture(source);
         boolean reject=occlusionEnabled;

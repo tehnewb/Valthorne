@@ -1,7 +1,7 @@
 package valthorne.ui.behavior;
 
-import valthorne.event.events.MouseScrollEvent;
 import org.joml.Vector2f;
+import valthorne.event.events.MouseScrollEvent;
 
 /**
  * Computes scroll offsets consistently for texture and NanoVG scroll panels.
@@ -23,7 +23,8 @@ public final class ScrollBehavior {
      * Prevents construction of this stateless helper. Panel offsets and axis
      * settings are supplied explicitly for each wheel calculation.
      */
-    private ScrollBehavior() {}
+    private ScrollBehavior() {
+    }
 
     /**
      * Computes the next offsets and consumes the event if either changes.
@@ -57,8 +58,7 @@ public final class ScrollBehavior {
      * @param speed      content-coordinate units per wheel-delta unit
      * @return a newly allocated vector containing clamped X and Y offsets
      */
-    public static Vector2f wheel(MouseScrollEvent event, boolean horizontal, boolean vertical,
-                                 float x, float y, float maxX, float maxY, float speed) {
+    public static Vector2f wheel(MouseScrollEvent event, boolean horizontal, boolean vertical, float x, float y, float maxX, float maxY, float speed) {
         float nextX = x, nextY = y;
         if (horizontal && event.preciseXOffset() != 0) nextX -= event.preciseXOffset() * speed;
         if (vertical && maxY > 0) nextY -= event.preciseYOffset() * speed;

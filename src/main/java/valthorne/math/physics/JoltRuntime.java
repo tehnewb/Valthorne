@@ -40,7 +40,8 @@ final class JoltRuntime {
      * Prevents construction of the runtime bootstrap utility. Physics worlds
      * access shared initialization through the static entry point.
      */
-    private JoltRuntime() {}
+    private JoltRuntime() {
+    }
 
     /**
      * Initializes native physics once for this loaded runtime class. Reads

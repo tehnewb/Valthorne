@@ -19,12 +19,7 @@ import org.joml.Vector3f;
  * @param normal   the world-space collision surface normal to snapshot
  * @author Albert Beaupre
  */
-public record PhysicsRayHit3D(
-        RigidBody3D body,
-        float distance,
-        Vector3f position,
-        Vector3f normal
-) {
+public record PhysicsRayHit3D(RigidBody3D body, float distance, Vector3f position, Vector3f normal) {
     /**
      * Copies the hit point and normal while retaining the body reference and
      * distance unchanged. Later changes to the supplied vectors cannot alter the hit.
@@ -47,7 +42,9 @@ public record PhysicsRayHit3D(
      * @return a newly allocated hit-position vector
      */
     @Override
-    public Vector3f position() {return new Vector3f(position);}
+    public Vector3f position() {
+        return new Vector3f(position);
+    }
 
     /**
      * Returns an independent copy of the recorded surface normal. No additional
@@ -56,5 +53,7 @@ public record PhysicsRayHit3D(
      * @return a newly allocated world-space normal vector
      */
     @Override
-    public Vector3f normal() {return new Vector3f(normal);}
+    public Vector3f normal() {
+        return new Vector3f(normal);
+    }
 }

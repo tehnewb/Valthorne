@@ -5,6 +5,7 @@ import com.github.stephengold.joltjni.RVec3;
 import com.github.stephengold.joltjni.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import java.util.Objects;
 
 /**
  * Internal numeric validation and value conversion for the Jolt physics boundary.
@@ -28,7 +29,8 @@ final class PhysicsMath3D {
      * Prevents construction of this stateless conversion utility. All operations
      * work on explicit arguments and return validated or newly converted values.
      */
-    private PhysicsMath3D() {}
+    private PhysicsMath3D() {
+    }
 
     /**
      * Rejects NaN and positive or negative infinity before a numeric input crosses
@@ -83,7 +85,7 @@ final class PhysicsMath3D {
      * @throws IllegalArgumentException if any component is non-finite
      */
     static Vector3f check(Vector3f value) {
-        java.util.Objects.requireNonNull(value, "vector");
+        Objects.requireNonNull(value, "vector");
         finite(value.x(), "x");
         finite(value.y(), "y");
         finite(value.z(), "z");
@@ -124,11 +126,11 @@ final class PhysicsMath3D {
      *
      * @param value nonnull source orientation
      * @return new normalized native quaternion
-     * @throws NullPointerException if value is null
+     * @throws NullPointerException     if value is null
      * @throws IllegalArgumentException if the orientation is zero or nonfinite
      */
     static Quat rotation(Quaternionf value) {
-        java.util.Objects.requireNonNull(value, "rotation");
+        Objects.requireNonNull(value, "rotation");
         double length = rotationLength(value.x(), value.y(), value.z(), value.w());
         return new Quat((float) (value.x() / length), (float) (value.y() / length),
                 (float) (value.z() / length), (float) (value.w() / length));
@@ -138,14 +140,14 @@ final class PhysicsMath3D {
      * Validates and normalizes an orientation into caller storage. Source and
      * destination may be the same object.
      *
-     * @param value nonnull source orientation
+     * @param value       nonnull source orientation
      * @param destination nonnull output quaternion
      * @return destination
-     * @throws NullPointerException if either quaternion is null
+     * @throws NullPointerException     if either quaternion is null
      * @throws IllegalArgumentException if source orientation is zero or nonfinite
      */
     static Quaternionf normalizeRotation(Quaternionf value, Quaternionf destination) {
-        java.util.Objects.requireNonNull(value, "rotation");
+        Objects.requireNonNull(value, "rotation");
         return normalizeRotation(destination, value.x(), value.y(), value.z(), value.w());
     }
 
@@ -154,12 +156,12 @@ final class PhysicsMath3D {
      * double-precision norm.
      *
      * @param destination nonnull output quaternion
-     * @param x X component
-     * @param y Y component
-     * @param z Z component
-     * @param w scalar component
+     * @param x           X component
+     * @param y           Y component
+     * @param z           Z component
+     * @param w           scalar component
      * @return destination
-     * @throws NullPointerException if destination is null
+     * @throws NullPointerException     if destination is null
      * @throws IllegalArgumentException if the components form a zero or nonfinite quaternion
      */
     static Quaternionf normalizeRotation(Quaternionf destination, float x, float y, float z, float w) {
@@ -194,7 +196,9 @@ final class PhysicsMath3D {
      * @return a newly allocated engine vector
      * @throws NullPointerException if value is null
      */
-    static Vector3f vector(Vec3 value) {return new Vector3f(value.getX(), value.getY(), value.getZ());}
+    static Vector3f vector(Vec3 value) {
+        return new Vector3f(value.getX(), value.getY(), value.getZ());
+    }
 
     /**
      * Reads a native real-valued position and narrows each component to float.
@@ -205,7 +209,9 @@ final class PhysicsMath3D {
      * @return a new engine vector in the same world coordinate system
      * @throws NullPointerException if value is null
      */
-    static Vector3f position(RVec3 value) {return new Vector3f((float) value.xx(), (float) value.yy(), (float) value.zz());}
+    static Vector3f position(RVec3 value) {
+        return new Vector3f((float) value.xx(), (float) value.yy(), (float) value.zz());
+    }
 
     /**
      * Copies and normalizes a Jolt quaternion into JOML storage.

@@ -49,7 +49,9 @@ public final class DistanceJoint3D implements AutoCloseable {
      *
      * @return whether this joint has been removed and its native constraint released
      */
-    public boolean isDestroyed() {return destroyed;}
+    public boolean isDestroyed() {
+        return destroyed;
+    }
 
     /**
      * Requests removal and release through the owning world unless destruction
@@ -60,5 +62,7 @@ public final class DistanceJoint3D implements AutoCloseable {
      *                               thread, after world closure, or during a native update
      */
     @Override
-    public void close() {if (!destroyed) world.destroyJoint(this);}
+    public void close() {
+        if (!destroyed) world.destroyJoint(this);
+    }
 }

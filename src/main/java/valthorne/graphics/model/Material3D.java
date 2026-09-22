@@ -2,6 +2,7 @@ package valthorne.graphics.model;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
+import java.util.Objects;
 
 /**
  * Mutable surface and render-state configuration shared by the built-in 3D
@@ -65,7 +66,9 @@ public final class Material3D {
      *
      * @return the transmission value in zero through one
      */
-    public float getTransmission() {return transmission;}
+    public float getTransmission() {
+        return transmission;
+    }
 
     /**
      * Sets dielectric transmission without changing render pass, tint alpha or depth policy. Invalid values leave the previous setting unchanged.
@@ -86,7 +89,9 @@ public final class Material3D {
      *
      * @return the finite index, at least one
      */
-    public float getIndexOfRefraction() {return indexOfRefraction;}
+    public float getIndexOfRefraction() {
+        return indexOfRefraction;
+    }
 
     /**
      * Assigns a dielectric index without enabling transmission automatically.
@@ -107,7 +112,9 @@ public final class Material3D {
      *
      * @return the finite nonnegative multiplier
      */
-    public float getEmissionStrength() {return emissionStrength;}
+    public float getEmissionStrength() {
+        return emissionStrength;
+    }
 
     /**
      * Sets the separate HDR emission multiplier without rewriting emissive RGB or alpha. Renderer support for this parameter is independent of packed emissive color.
@@ -126,7 +133,9 @@ public final class Material3D {
      * Reports whether Filament creates its legacy point light from this mesh's
      * emission. Defaults to true; visible emissive radiance is independent.
      */
-    public boolean isEmissionLightEnabled() {return emissionLightEnabled;}
+    public boolean isEmissionLightEnabled() {
+        return emissionLightEnabled;
+    }
 
     /**
      * Enables Filament's implicit mesh point light without changing visible glow.
@@ -147,7 +156,9 @@ public final class Material3D {
      *
      * @return the roughness in zero through one
      */
-    public float getRoughness() {return roughness;}
+    public float getRoughness() {
+        return roughness;
+    }
 
     /**
      * Assigns normalized roughness; no other material properties are inferred or changed.
@@ -168,7 +179,9 @@ public final class Material3D {
      *
      * @return the metallic fraction in zero through one
      */
-    public float getMetallic() {return metallic;}
+    public float getMetallic() {
+        return metallic;
+    }
 
     /**
      * Assigns the metallic fraction independently of tint, roughness and transmission.
@@ -189,7 +202,9 @@ public final class Material3D {
      *
      * @return the shadow-casting flag
      */
-    public boolean isCastsShadow() {return castsShadow;}
+    public boolean isCastsShadow() {
+        return castsShadow;
+    }
 
     /**
      * Changes shadow-casting permission without changing render pass or scene membership.
@@ -207,7 +222,9 @@ public final class Material3D {
      *
      * @return the shadow-receiving flag
      */
-    public boolean isReceivesShadow() {return receivesShadow;}
+    public boolean isReceivesShadow() {
+        return receivesShadow;
+    }
 
     /**
      * Changes shadow-receiving permission without enabling lighting or creating a shadow map.
@@ -225,7 +242,9 @@ public final class Material3D {
      *
      * @return the assigned texture, or null when untextured
      */
-    public Texture getTexture() {return texture;}
+    public Texture getTexture() {
+        return texture;
+    }
 
     /**
      * Retains an optional diffuse texture without copying, uploading or disposing either the new or previous resource.
@@ -243,7 +262,9 @@ public final class Material3D {
      *
      * @return the finite cutoff in zero through one
      */
-    public float getAlphaCutoff() {return alphaCutoff;}
+    public float getAlphaCutoff() {
+        return alphaCutoff;
+    }
 
     /**
      * Sets the alpha-discard threshold without changing render pass or enabling blending.
@@ -480,7 +501,7 @@ public final class Material3D {
      * @throws NullPointerException if source is null
      */
     public Material3D set(Material3D source) {
-        java.util.Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(source, "source");
         tint.set(source.tint);
         emissive.set(source.emissive);
         renderPass = source.renderPass;

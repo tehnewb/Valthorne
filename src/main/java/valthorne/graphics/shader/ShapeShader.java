@@ -15,6 +15,8 @@ import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL30;
 
 /**
  * A simple, general-purpose shader for drawing {@link Shape} polygons with explicit
@@ -156,8 +158,8 @@ public class ShapeShader extends Shader {
     @Override
     public void dispose() {
         super.dispose();
-        if (vao != 0) org.lwjgl.opengl.GL30.glDeleteVertexArrays(vao);
-        if (vbo != 0) org.lwjgl.opengl.GL15.glDeleteBuffers(vbo);
+        if (vao != 0) GL30.glDeleteVertexArrays(vao);
+        if (vbo != 0) GL15.glDeleteBuffers(vbo);
     }
 
     /**

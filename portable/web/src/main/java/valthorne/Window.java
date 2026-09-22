@@ -2,29 +2,42 @@ package valthorne;
 
 import org.teavm.jso.JSBody;
 import valthorne.graphics.Color;
+import java.util.Objects;
+import org.joml.Matrix4f;
+import org.teavm.jso.JSFunctor;
+import org.teavm.jso.JSObject;
+import org.teavm.jso.typedarrays.Uint8Array;
+import valthorne.event.EventTypes;
+import valthorne.event.events.WindowFocusEvent;
+import valthorne.event.events.WindowResizeEvent;
+import valthorne.event.listeners.WindowResizeListener;
+import valthorne.graphics.GraphicsCapabilities;
+import valthorne.graphics.texture.TextureData;
+import valthorne.ui.Dimensional;
+import valthorne.web.WindowImages;
 
 /** Browser window backend. Browser-owned window placement is not emulated. */
 public final class Window {
     private Window() {}
-    public static valthorne.graphics.GraphicsCapabilities getGraphicsCapabilities(){return valthorne.graphics.GraphicsCapabilities.current();}
-    public static void addWindowResizeListener(valthorne.event.listeners.WindowResizeListener listener){addWindowResizeListener(listener,0);}
-    public static void addWindowResizeListener(valthorne.event.listeners.WindowResizeListener listener,int priority){JGL.subscribe(valthorne.event.EventTypes.WINDOW_RESIZE,priority,java.util.Objects.requireNonNull(listener));}
-    public static void removeWindowResizeListener(valthorne.event.listeners.WindowResizeListener listener){JGL.unsubscribe(valthorne.event.EventTypes.WINDOW_RESIZE,java.util.Objects.requireNonNull(listener));}
+    public static GraphicsCapabilities getGraphicsCapabilities(){return GraphicsCapabilities.current();}
+    public static void addWindowResizeListener(WindowResizeListener listener){addWindowResizeListener(listener,0);}
+    public static void addWindowResizeListener(WindowResizeListener listener,int priority){JGL.subscribe(EventTypes.WINDOW_RESIZE,priority,Objects.requireNonNull(listener));}
+    public static void removeWindowResizeListener(WindowResizeListener listener){JGL.unsubscribe(EventTypes.WINDOW_RESIZE,Objects.requireNonNull(listener));}
     private static SwapInterval interval=SwapInterval.VSYNC;
     private static final float[] projection=new float[16];
     private static int projectionWidth,projectionHeight;
-    private static void resizeProjection(){int w=getWidth(),h=getHeight();if(w!=projectionWidth||h!=projectionHeight){new org.joml.Matrix4f().setOrtho(0,w,0,h,-1,1).get(projection);projectionWidth=w;projectionHeight=h;}}
+    private static void resizeProjection(){int w=getWidth(),h=getHeight();if(w!=projectionWidth||h!=projectionHeight){new Matrix4f().setOrtho(0,w,0,h,-1,1).get(projection);projectionWidth=w;projectionHeight=h;}}
     public static float[] getProjectionMatrix(){resizeProjection();return projection;}
     public static void setProjectionMatrix(float[] values){if(values==null)throw new NullPointerException("matrixData");if(values.length<16)throw new IllegalArgumentException("matrixData must contain at least 16 floats");resizeProjection();System.arraycopy(values,0,projection,0,16);}
     public static void copyProjectionMatrix(float[] values){if(values==null)throw new NullPointerException("destination");if(values.length<16)throw new IllegalArgumentException("destination must contain at least 16 floats");System.arraycopy(getProjectionMatrix(),0,values,0,16);}
-    static void configure(JGLConfiguration config){setTitle(config.getTitle());interval=config.getSwapInterval();installEvents((ow,oh,w,h)->JGL.postEvent(new valthorne.event.events.WindowResizeEvent(ow,oh,w,h)),focused->JGL.postEvent(new valthorne.event.events.WindowFocusEvent(focused)));}
-    @org.teavm.jso.JSFunctor private interface Resize extends org.teavm.jso.JSObject{void accept(int oldWidth,int oldHeight,int width,int height);}
-    @org.teavm.jso.JSFunctor private interface Focus extends org.teavm.jso.JSObject{void accept(boolean focused);}
+    static void configure(JGLConfiguration config){setTitle(config.getTitle());interval=config.getSwapInterval();installEvents((ow,oh,w,h)->JGL.postEvent(new WindowResizeEvent(ow,oh,w,h)),focused->JGL.postEvent(new WindowFocusEvent(focused)));}
+    @JSFunctor private interface Resize extends JSObject{void accept(int oldWidth,int oldHeight,int width,int height);}
+    @JSFunctor private interface Focus extends JSObject{void accept(boolean focused);}
     @JSBody(params={"resize","focus"},script="valthorneHost.platform.legacyResizeEvent=resize;valthorneHost.platform.legacyFocusEvent=focus;") private static native void installEvents(Resize resize,Focus focus);
     @JSBody(params="title",script="document.title=title;") public static native void setTitle(String title);
     @JSBody(script="return valthorneHost.platform.window.width;") public static native int getWidth();
     @JSBody(script="return valthorneHost.platform.window.height;") public static native int getHeight();
-    public static void init(JGLConfiguration config){configure(java.util.Objects.requireNonNull(config));}
+    public static void init(JGLConfiguration config){configure(Objects.requireNonNull(config));}
     @JSBody(params={"width","height"},script="valthorneHost.platform.window.size(width,height);") public static native void setSize(int width,int height);
     @JSBody(script="return valthorneHost.platform.window.stage.getBoundingClientRect().left;") public static native int getX();
     @JSBody(script="return valthorneHost.platform.window.stage.getBoundingClientRect().top;") public static native int getY();
@@ -43,13 +56,13 @@ public final class Window {
     @JSBody(script="valthorneHost.platform.window.focus();") public static native void focus();
     @JSBody(params="value",script="valthorneHost.platform.window.stage.style.zIndex=value?'2147483647':'';") public static native void setAlwaysOnTop(boolean value);
     @JSBody(params="value",script="valthorneHost.platform.window.opacity(value);") public static native void setOpacity(float value);
-    public static void setIcon(valthorne.graphics.texture.TextureData texture){icon(valthorne.web.WindowImages.pixels(texture),texture.width(),texture.height());}
-    @JSBody(params={"pixels","width","height"},script="valthorneHost.platform.window.icon(pixels,width,height);") private static native void icon(org.teavm.jso.typedarrays.Uint8Array pixels,int width,int height);
+    public static void setIcon(TextureData texture){icon(WindowImages.pixels(texture),texture.width(),texture.height());}
+    @JSBody(params={"pixels","width","height"},script="valthorneHost.platform.window.icon(pixels,width,height);") private static native void icon(Uint8Array pixels,int width,int height);
     @JSBody(script="valthorneHost.platform.window.center();") public static native void center();
     @JSBody(params={"minW","minH","maxW","maxH"},script="valthorneHost.platform.window.limits(minW,minH,maxW,maxH);") public static native void setSizeLimits(int minW,int minH,int maxW,int maxH);
     /** Browsers do not expose native window pointers. */
     public static long getAddress(){return 0;}
-    private static final valthorne.ui.Dimensional dimensional=new valthorne.ui.Dimensional(){
+    private static final Dimensional dimensional=new Dimensional(){
       public float getX(){return 0;}public float getY(){return 0;}
       public void setX(float x){Window.setPosition((int)x,Window.getY());}public void setY(float y){Window.setPosition(Window.getX(),(int)y);}
       public void setPosition(float x,float y){Window.setPosition((int)x,(int)y);}
@@ -57,7 +70,7 @@ public final class Window {
       public void setWidth(float w){Window.setSize((int)w,Window.getHeight());}public void setHeight(float h){Window.setSize(Window.getWidth(),(int)h);}
       public void setSize(float w,float h){Window.setSize((int)w,(int)h);}
     };
-    public static valthorne.ui.Dimensional getDimensional(){return dimensional;}
+    public static Dimensional getDimensional(){return dimensional;}
     public static void requestClose(){JGL.requestClose();}
     static boolean shouldClose(){return JGL.shouldClose();}
     public static SwapInterval getSwapInterval(){return interval;}

@@ -1,22 +1,26 @@
 package valthorne.graphics.model;
 
-import static io.github.erkko68.filament.ffm.FilamentC.*;
-
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.glfw.GLFWNativeWGL.*;
-import static org.lwjgl.opengl.GL43.*;
-
-import static java.lang.foreign.ValueLayout.*;
-
 import io.github.erkko68.filament.ffm.*;
-import io.github.erkko68.filament.ffm.FilamentLoader;
-
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.*;
+
+import static io.github.erkko68.filament.ffm.FilamentC.*;
+import static java.lang.foreign.ValueLayout.*;
+import static org.lwjgl.glfw.GLFW.glfwGetCurrentContext;
+import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
+import static org.lwjgl.glfw.GLFWNativeWGL.glfwGetWGLContext;
+import static org.lwjgl.opengl.GL43.*;
+import java.io.IOException;
+import org.joml.Vector2f;
+import org.lwjgl.opengl.GL;
+import org.lwjgl.system.Platform;
+import valthorne.camera.Camera3D;
+import valthorne.graphics.GraphicsCapabilities;
+import valthorne.graphics.texture.Texture;
 
 /**
  * Adapts Valthorne triangle scenes to Filament 1.75 through Windows x64 OpenGL
@@ -56,75 +60,10 @@ import java.util.*;
  * }
  * }</pre>
  * See the repository's docs/filament.md for material packages and integration limits.
+ *
  * @author Albert Beaupre
  */
 public final class FilamentRenderer3D implements AutoCloseable {
-    private final float[] projectionValues = new float[16], matrixValues = new float[16]; // Reusable JOML projection and transform component arrays.
-
-    /**
-     * Quality presets at full output resolution. PERFORMANCE uses half-resolution
-     * ambient occlusion without MSAA; INTERACTIVE uses full-resolution AO without MSAA, HIGH requests
-     * four samples, and ULTRA requests eight, subject to backend support.
-     * @author Albert Beaupre
-     */
-    public enum Quality {
-        /**
-         * Temporal smoothing with half-resolution, edge-aware ambient occlusion and no MSAA.
-         */
-        PERFORMANCE,
-        /**
-         * Full-resolution ambient occlusion with multisample antialiasing disabled.
-         */
-        INTERACTIVE,
-        /**
-         * Full-resolution ambient occlusion with four requested MSAA samples, subject to backend support.
-         */
-        HIGH,
-        /**
-         * Full-resolution ambient occlusion with eight requested MSAA samples, subject to backend support.
-         */
-        ULTRA
-    }
-
-    private final Thread owner = Thread.currentThread(); // Thread that owns this renderer and its confined native arena.
-    private final Matrix4f inverseView = new Matrix4f(); // Scratch inverse camera view matrix.
-    private final int[] viewport = new int[4]; // Reusable caller viewport bounds in pixels.
-    private final MemorySegment engine, renderer, view, camera, scene, sky, swap; // Owned core Filament engine, rendering, camera, scene, skybox, and swap-chain handles.
-    private MemorySegment target = MemorySegment.NULL, color = MemorySegment.NULL; // Owned output render target and imported color texture wrapper.
-    private boolean sharedOutput;
-    private Arena outputArena;
-    private MemorySegment outputPixels;
-    private int texture, framebuffer, width, height; // Owned shared GL output texture/read framebuffer and current pixel dimensions.
-    private final Arena arena = Arena.ofConfined(); // Owner-thread native memory retained for the renderer lifetime.
-    private final MemorySegment matrix = arena.allocate(16 * 8),
-            projection = arena.allocate(16 * 8); // Persistent transform and double-precision projection transfer storage.
-    private final Map<String, MemorySegment> names = new HashMap<>(); // Cached native material parameter strings allocated in the arena.
-    private final IdentityHashMap<Model3D, Mesh> meshes = new IdentityHashMap<>(); // Owned immutable native meshes keyed by borrowed source identity.
-    private final IdentityHashMap<Model3D, Float> minimumAlpha = new IdentityHashMap<>(); // Cached minimum vertex alpha per immutable borrowed model.
-    private final IdentityHashMap<valthorne.graphics.texture.Texture, MemorySegment> textures =
-            new IdentityHashMap<>(); // Owned imported texture wrappers keyed by borrowed source texture identity.
-    private final List<Entry> entries = new ArrayList<>(); // Reusable native renderable/material slots in collected scene order.
-    private final ArrayList<ExplicitLight> pointLights = new ArrayList<>(); // Reusable native slots for active explicit scene point lights.
-    private MemorySegment opaque, solid, glass, alpha, white, indirect, environment; // Owned material packages, fallback texture, and static environment-light resources.
-    private long signature = Long.MIN_VALUE; // Last synchronized model/material signature; minimum value forces refresh.
-    private final PathTracingScene.Collector sceneCollector = new PathTracingScene.Collector(); // Renderer-owned CPU collection scratch.
-    private final OcclusionCuller3D occlusion = new OcclusionCuller3D(); // Reusable current-frame CPU visibility tester.
-    private final ArrayList<EntryState> entryStates = new ArrayList<>(); // Synchronization signatures and scene-membership flags parallel to native entry slots.
-    private boolean occlusionCullingEnabled = true; // Enables conservative submission rejection when secondary effects permit it.
-    private int occludedCount, offscreenCount, updatedEntryCount; // Most recent occluded, offscreen, and native-entry update counts.
-    private long uploadedSourceVertices, uploadedUniqueVertices; // Cumulative source and compacted vertex counts for native mesh uploads.
-    /**
-     * Reads the cumulative number of source vertices processed by native mesh uploads. Shared cached meshes do not add counts every time an instance is drawn.
-     *
-     * @return cumulative vertices before exact mesh indexing, for upload diagnostics
-     */
-    public long getUploadedSourceVertices() {return uploadedSourceVertices;}
-    /**
-     * Reads cumulative vertices actually retained for native uploads after optional exact indexing. Compare with source vertices to measure upload compaction; this is not a per-frame draw count.
-     *
-     * @return cumulative unique vertices actually uploaded, for upload diagnostics
-     */
-    public long getUploadedUniqueVertices() {return uploadedUniqueVertices;}
     /**
      * Selects the no-discard material optimization unless valthorne.filament.disableSolid is true.
      */
@@ -137,53 +76,243 @@ public final class FilamentRenderer3D implements AutoCloseable {
      * Enables phase timing when valthorne.filament.profile is true at class initialization.
      */
     private static final boolean PROFILE = Boolean.getBoolean("valthorne.filament.profile");
+    private final float[] projectionValues = new float[16], matrixValues = new float[16]; // Reusable JOML projection and transform component arrays.
+    private final Thread owner = Thread.currentThread(); // Thread that owns this renderer and its confined native arena.
+    private final Matrix4f inverseView = new Matrix4f(); // Scratch inverse camera view matrix.
+    private final int[] viewport = new int[4]; // Reusable caller viewport bounds in pixels.
+    private final MemorySegment engine, renderer, view, camera, scene, sky, swap; // Owned core Filament engine, rendering, camera, scene, skybox, and swap-chain handles.
+    private final Arena arena = Arena.ofConfined(); // Owner-thread native memory retained for the renderer lifetime.
+    private final MemorySegment matrix = arena.allocate(16 * 8), projection = arena.allocate(16 * 8); // Persistent transform and double-precision projection transfer storage.
+    private final Map<String, MemorySegment> names = new HashMap<>(); // Cached native material parameter strings allocated in the arena.
+    private final IdentityHashMap<Model3D, Mesh> meshes = new IdentityHashMap<>(); // Owned immutable native meshes keyed by borrowed source identity.
+    private final IdentityHashMap<Model3D, Float> minimumAlpha = new IdentityHashMap<>(); // Cached minimum vertex alpha per immutable borrowed model.
+    private final IdentityHashMap<Texture, MemorySegment> textures = new IdentityHashMap<>(); // Owned imported texture wrappers keyed by borrowed source texture identity.
+    private final List<Entry> entries = new ArrayList<>(); // Reusable native renderable/material slots in collected scene order.
+    private final ArrayList<ExplicitLight> pointLights = new ArrayList<>(); // Reusable native slots for active explicit scene point lights.
+    private final PathTracingScene.Collector sceneCollector = new PathTracingScene.Collector(); // Renderer-owned CPU collection scratch.
+    private final OcclusionCuller3D occlusion = new OcclusionCuller3D(); // Reusable current-frame CPU visibility tester.
+    private final ArrayList<EntryState> entryStates = new ArrayList<>(); // Synchronization signatures and scene-membership flags parallel to native entry slots.
     private final long[] profileNanos = new long[4]; // Most recent four phase durations in nanoseconds; zero when profiling is disabled.
+    private MemorySegment target = MemorySegment.NULL, color = MemorySegment.NULL; // Owned output render target and imported color texture wrapper.
+    private final boolean sharedOutput;
+    private Arena outputArena;
+    private MemorySegment outputPixels;
+    private int texture, framebuffer, width, height; // Owned shared GL output texture/read framebuffer and current pixel dimensions.
+    private final MemorySegment opaque;
+    private final MemorySegment solid;
+    private final MemorySegment glass;
+    private final MemorySegment alpha;
+    private final MemorySegment white;
+    private final MemorySegment indirect;
+    private final MemorySegment environment; // Owned material packages, fallback texture, and static environment-light resources.
+    private long signature = Long.MIN_VALUE; // Last synchronized model/material signature; minimum value forces refresh.
+    private boolean occlusionCullingEnabled = true; // Enables conservative submission rejection when secondary effects permit it.
+    private int occludedCount, offscreenCount, updatedEntryCount; // Most recent occluded, offscreen, and native-entry update counts.
+    private long uploadedSourceVertices, uploadedUniqueVertices; // Cumulative source and compacted vertex counts for native mesh uploads.
+    private boolean closed, regenerateMipmaps; // Resource lifetime flag and pending imported-texture mip refresh.
+    private float exposure = 1; // Positive camera exposure multiplier.
+
+    /**
+     * Creates a shared OpenGL Filament engine, headless rendering objects, compiled
+     * surface/glass/alpha materials, a white fallback texture, and the bundled studio
+     * environment. Temporarily releases the GLFW context while creating Filament's
+     * shared driver context, then restores it. Enables temporal/FXAA smoothing and
+     * ambient occlusion, with screen-space reflections disabled.
+     *
+     * @throws UnsupportedOperationException if no packaged runtime or required GL context is available
+     * @throws IllegalStateException         if no GLFW context is current, engine creation fails, or a required material/environment cannot be loaded
+     */
+    public FilamentRenderer3D() {
+        if (glfwGetCurrentContext() == 0)
+            throw new IllegalStateException("Create FilamentRenderer3D with an OpenGL context current");
+        if (!GraphicsCapabilities.current().filament())
+            throw new UnsupportedOperationException("Filament requires a packaged Windows x64, Linux x64/ARM64 or macOS ARM64 runtime and OpenGL 4.1 presentation context");
+        sharedOutput = Platform.get() == Platform.WINDOWS && !Boolean.getBoolean("valthorne.filament.readback") && (GL.getCapabilities().OpenGL42 || GL.getCapabilities().GL_ARB_texture_storage);
+        FilamentLoader.load();
+        var builder = FilaEngineBuilder_create();
+        FilaEngineBuilder_backend(builder, FILA_ENGINE_BACKEND_OPENGL());
+        long window = glfwGetCurrentContext();
+        if (sharedOutput) FilaEngineBuilder_sharedContext(builder, MemorySegment.ofAddress(glfwGetWGLContext(window)));
+        glfwMakeContextCurrent(0);
+        try {
+            engine = FilaEngineBuilder_build(builder);
+        } finally {
+            glfwMakeContextCurrent(window);
+            FilaEngineBuilder_destroy(builder);
+        }
+        if (engine.equals(MemorySegment.NULL)) throw new IllegalStateException("Filament engine creation failed");
+        renderer = FilaEngine_createRenderer(engine);
+        view = FilaEngine_createView(engine);
+        scene = FilaEngine_createScene(engine);
+        camera = FilaEngine_createCameraAuto(engine);
+        swap = FilaEngine_createSwapChainHeadless(engine, 1, 1, 0);
+        FilaView_setScene(view, scene);
+        FilaView_setCamera(view, camera);
+        var sb = FilaSkyboxBuilder_create();
+        FilaSkyboxBuilder_color(sb, .15f, .2f, .3f, 1);
+        sky = FilaSkyboxBuilder_build(sb, engine);
+        FilaSkyboxBuilder_destroy(sb);
+        FilaScene_setSkybox(scene, sky);
+        opaque = material("surface");
+        solid = material("solid");
+        glass = material("glass");
+        alpha = material("alpha");
+        var tb = FilaTextureBuilder_create();
+        FilaTextureBuilder_width(tb, 1);
+        FilaTextureBuilder_height(tb, 1);
+        FilaTextureBuilder_format(tb, FILA_TEXTURE_INTERNAL_FORMAT_RGBA8());
+        white = FilaTextureBuilder_build(tb, engine);
+        FilaTextureBuilder_destroy(tb);
+        var pixel = arena.allocate(4);
+        pixel.set(JAVA_INT, 0, -1);
+        FilaTexture_setImage(white, engine, 0, 0, 0, 0, 1, 1, 1, pixel, 4, FILA_PIXEL_DATA_FORMAT_RGBA(), FILA_PIXEL_DATA_TYPE_UBYTE(), (byte) 1, 0, 0, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
+        try (var input = FilamentRenderer3D.class.getResourceAsStream("/valthorne/filament/studio-ibl.ktx")) {
+            byte[] data = Objects.requireNonNull(input, "Missing studio environment").readAllBytes();
+            try (var upload = Arena.ofConfined()) {
+                var bytes = upload.allocateFrom(JAVA_BYTE, data);
+                var sh = upload.allocate(27 * 4);
+                environment = FilaKTX1Loader_createTexture(engine, bytes, data.length, false);
+                if (!FilaKTX1Loader_getSphericalHarmonics(bytes, data.length, sh))
+                    throw new IllegalStateException("Missing environment irradiance");
+                indirect = FilaKTX1Loader_createIndirectLight(engine, environment, sh);
+                FilaIndirectLight_setIntensity(indirect, 1000);
+                FilaScene_setIndirectLight(scene, indirect);
+                FilaEngine_flushAndWait(engine, -1L);
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        FilaView_setAntiAliasing(view, 1);
+        FilaView_setShadowType(view, FILA_VIEW_SHADOW_TYPE_PCF());
+        var ao = FilaViewAmbientOcclusionOptions.allocate(arena);
+        FilaView_getAmbientOcclusionOptions(view, ao);
+        FilaViewAmbientOcclusionOptions.enabled(ao, true);
+        FilaViewAmbientOcclusionOptions.quality(ao, 3);
+        FilaViewAmbientOcclusionOptions.resolution(ao, 1);
+        FilaViewAmbientOcclusionOptions.radius(ao, .3f);
+        FilaView_setAmbientOcclusionOptions(view, ao);
+        var ssr = FilaViewScreenSpaceReflectionsOptions.allocate(arena);
+        FilaView_getScreenSpaceReflectionsOptions(view, ssr);
+        FilaViewScreenSpaceReflectionsOptions.enabled(ssr, false);
+        FilaView_setScreenSpaceReflectionsOptions(view, ssr);
+        var taa = FilaViewTemporalAntiAliasingOptions.allocate(arena);
+        FilaView_getTemporalAntiAliasingOptions(view, taa);
+        FilaViewTemporalAntiAliasingOptions.enabled(taa, true);
+        FilaView_setTemporalAntiAliasingOptions(view, taa);
+    }
+
+    /**
+     * Hashes one placement's model identity, transform, selected material values, texture
+     * identity, and lighting flags to avoid redundant native updates. Geometry and texture
+     * pixel contents are not scanned, and a hash match is not an exact equality proof.
+     *
+     * @param item collected placement with current material and captured transform
+     * @return rolling signature used by the corresponding native slot
+     */
+    private static long entrySignature(PathTracingScene.Instance item) {
+        long h = System.identityHashCode(item.model());
+        for (int c = 0; c < 4; c++) for (int r = 0; r < 4; r++) h = mix(h, item.transform().get(c, r));
+        var m = item.material();
+        var t = m.getTint();
+        var e = m.getEmissive();
+        h = mix(mix(mix(mix(h, t.r()), t.g()), t.b()), t.a());
+        h = mix(mix(mix(mix(h, e.r()), e.g()), e.b()), e.a());
+        h = mix(mix(mix(h, m.getRoughness()), m.getMetallic()), m.getAlphaCutoff());
+        h = mix(mix(mix(h, m.getTransmission()), m.getIndexOfRefraction()), m.getEmissionStrength());
+        h = (h ^ System.identityHashCode(m.getTexture())) * 0x100000001b3L;
+        h = (h ^ m.getRenderPass().ordinal()) * 0x100000001b3L;
+        h = (h ^ (m.isCastsShadow() ? 1 : 0) ^ (m.isReceivesShadow() ? 2 : 0) ^ (m.isEmissionLightEnabled() ? 4 : 0)) * 0x100000001b3L;
+        return h;
+    }
+
+    /**
+     * Folds a float's canonical IEEE bit representation into a rolling FNV-style hash.
+     *
+     * @param hash  accumulated signature
+     * @param value next scalar material or transform component
+     * @return updated signature
+     */
+    private static long mix(long hash, float value) {
+        return (hash ^ Float.floatToIntBits(value)) * 0x100000001b3L;
+    }
+
+    /**
+     * Converts an sRGB component to linear light using the standard piecewise
+     * transfer function. Does not clamp inputs or validate the result.
+     *
+     * @param value sRGB component
+     * @return linear-light component
+     */
+    private static float linear(float value) {
+        return value <= .04045f ? value / 12.92f : (float) Math.pow((value + .055f) / 1.055f, 2.4);
+    }
+
+    /**
+     * Reads the cumulative number of source vertices processed by native mesh uploads. Shared cached meshes do not add counts every time an instance is drawn.
+     *
+     * @return cumulative vertices before exact mesh indexing, for upload diagnostics
+     */
+    public long getUploadedSourceVertices() {
+        return uploadedSourceVertices;
+    }
+
+    /**
+     * Reads cumulative vertices actually retained for native uploads after optional exact indexing. Compare with source vertices to measure upload compaction; this is not a per-frame draw count.
+     *
+     * @return cumulative unique vertices actually uploaded, for upload diagnostics
+     */
+    public long getUploadedUniqueVertices() {
+        return uploadedUniqueVertices;
+    }
 
     /**
      * Reads optional phase timing, enabled with -Dvalthorne.filament.profile=true.
+     *
      * @param phase 0 caller wait, 1 scene synchronization, 2 native render/completion, 3 camera/blit overhead
      * @return most recent phase duration in nanoseconds, zero when profiling is disabled
      */
-    public long getProfileNanos(int phase) {return profileNanos[phase];}
-
-    /**
-     * Tracks synchronization and visibility for one reusable native renderable slot.
-     * The signature represents the last submitted instance state; initialization separates
-     * a valid first signature from a default value, and visibility tracks native scene membership.
-     * @author Albert Beaupre
-     */
-    private static final class EntryState {
-        long signature; // Last synchronized placement signature for this native slot.
-        boolean initialized, visible = true; // Whether the slot has been synchronized and currently belongs to the native scene.
+    public long getProfileNanos(int phase) {
+        return profileNanos[phase];
     }
 
     /**
      * Enables conservative current-frame occlusion and offscreen submission rejection.
      * Shadow casters and implicit light contributors remain active. Scenes containing
      * refractive glass bypass rejection to preserve secondary visibility.
+     *
      * @param enabled whether additional CPU visibility rejection is enabled
      */
-    public void setOcclusionCullingEnabled(boolean enabled) {checkOwner(); occlusionCullingEnabled = enabled;}
+    public void setOcclusionCullingEnabled(boolean enabled) {
+        checkOwner();
+        occlusionCullingEnabled = enabled;
+    }
+
     /**
      * Reads native entry rejections caused by the additional CPU occlusion test during the latest scene synchronization. Retained shadow and lighting contributors are not counted as rejected.
      *
      * @return number of native geometry entries rejected by occlusion in the last frame
      */
-    public int getOccludedCount() {return occludedCount;}
+    public int getOccludedCount() {
+        return occludedCount;
+    }
+
     /**
      * Reads entry rejections proven offscreen by the additional CPU test during the latest synchronization. This does not include all culling performed internally by Filament.
      *
      * @return number of native geometry entries rejected as offscreen in the last frame
      */
-    public int getOffscreenCount() {return offscreenCount;}
+    public int getOffscreenCount() {
+        return offscreenCount;
+    }
+
     /**
      * Reads how many entry transforms/materials were synchronized during the latest frame. Unchanged visible entries and deferred culled entries can avoid these updates.
      *
      * @return number of entries whose native transform/material state was refreshed last frame
      */
-    public int getUpdatedEntryCount() {return updatedEntryCount;}
-    private boolean closed, regenerateMipmaps; // Resource lifetime flag and pending imported-texture mip refresh.
-    private float exposure = 1; // Positive camera exposure multiplier.
+    public int getUpdatedEntryCount() {
+        return updatedEntryCount;
+    }
 
     /**
      * Counts distinct model identities currently cached as native vertex/index
@@ -210,192 +339,12 @@ public final class FilamentRenderer3D implements AutoCloseable {
     }
 
     /**
-     * Owner-thread cache for one reusable explicit native point-light slot. Stores
-     * the last uploaded source components so moving lights update only changed
-     * parameters without invalidating mesh/material bindings.
-     * @author Albert Beaupre
-     */
-    private static final class ExplicitLight {
-        final int entity; // Owned native point-light entity identifier.
-        float x = Float.NaN, y, z, r = Float.NaN, g, b; // Last uploaded source position and RGB; NaN forces initial synchronization.
-        float intensity = Float.NaN, range = Float.NaN; // Last uploaded lumen intensity and falloff range.
-        boolean shadows; // Last uploaded shadow-casting flag.
-
-        /**
-         * Associates a cache slot with a newly created native light entity. NaN sentinels
-         * force the first position, color, intensity, and range upload.
-         *
-         * @param entity owned native light entity ID
-         */
-        ExplicitLight(int entity) {this.entity = entity;}
-    }
-
-    /**
-     * Owned immutable native mesh buffers and local bounds cached by source model
-     * identity. Bounds use center/half-extent representation for Filament culling.
-     *
-     * <p>The native segments refer to cached vertex and index resources managed by the renderer.
-     * Bounds are expressed in model-local coordinates so instances can share geometry while
-     * supplying independent transforms; constructing this record does not allocate a mesh.</p>
-     *
-     * @param vertices native vertex buffer
-     * @param indices native index buffer
-     * @param cx local bounds center X
-     * @param cy local bounds center Y
-     * @param cz local bounds center Z
-     * @param hx local bounds half-width
-     * @param hy local bounds half-height
-     * @param hz local bounds half-depth
-     * @author Albert Beaupre
-     */
-    private record Mesh(
-            MemorySegment vertices,
-            MemorySegment indices,
-            float cx,
-            float cy,
-            float cz,
-            float hx,
-            float hy,
-            float hz) {}
-
-    /**
-     * Reusable native renderable/material slot associated with a borrowed source
-     * model. The reserved light entity gains a component only when emission lighting
-     * is enabled and nonzero.
-     *
-     * @param model borrowed model identity used to find cached mesh buffers
-     * @param glass whether the screen-space transmission material is selected
-     * @param alpha whether the alpha-compositing material is selected
-     * @param entity owned renderable entity ID
-     * @param light owned entity ID reserved for implicit emission lighting
-     * @param material owned native material instance
-     * @author Albert Beaupre
-     */
-    private record Entry(
-            Model3D model, boolean glass, boolean alpha, boolean solid, int entity, int light, MemorySegment material) {}
-
-    /**
-     * Creates a shared OpenGL Filament engine, headless rendering objects, compiled
-     * surface/glass/alpha materials, a white fallback texture, and the bundled studio
-     * environment. Temporarily releases the GLFW context while creating Filament's
-     * shared driver context, then restores it. Enables temporal/FXAA smoothing and
-     * ambient occlusion, with screen-space reflections disabled.
-     *
-     * @throws UnsupportedOperationException if no packaged runtime or required GL context is available
-     * @throws IllegalStateException if no GLFW context is current, engine creation fails, or a required material/environment cannot be loaded
-     */
-    public FilamentRenderer3D() {
-        if (glfwGetCurrentContext() == 0)
-            throw new IllegalStateException("Create FilamentRenderer3D with an OpenGL context current");
-        if (!valthorne.graphics.GraphicsCapabilities.current().filament())
-            throw new UnsupportedOperationException("Filament requires a packaged Windows x64, Linux x64/ARM64 or macOS ARM64 runtime and OpenGL 4.1 presentation context");
-        sharedOutput = org.lwjgl.system.Platform.get() == org.lwjgl.system.Platform.WINDOWS
-                && !Boolean.getBoolean("valthorne.filament.readback")
-                && (org.lwjgl.opengl.GL.getCapabilities().OpenGL42 || org.lwjgl.opengl.GL.getCapabilities().GL_ARB_texture_storage);
-        FilamentLoader.load();
-        var builder = FilaEngineBuilder_create();
-        FilaEngineBuilder_backend(builder, FILA_ENGINE_BACKEND_OPENGL());
-        long window = glfwGetCurrentContext();
-        if (sharedOutput) FilaEngineBuilder_sharedContext(builder, MemorySegment.ofAddress(glfwGetWGLContext(window)));
-        glfwMakeContextCurrent(0);
-        try {
-            engine = FilaEngineBuilder_build(builder);
-        } finally {
-            glfwMakeContextCurrent(window);
-            FilaEngineBuilder_destroy(builder);
-        }
-        if (engine.equals(MemorySegment.NULL))
-            throw new IllegalStateException("Filament engine creation failed");
-        renderer = FilaEngine_createRenderer(engine);
-        view = FilaEngine_createView(engine);
-        scene = FilaEngine_createScene(engine);
-        camera = FilaEngine_createCameraAuto(engine);
-        swap = FilaEngine_createSwapChainHeadless(engine, 1, 1, 0);
-        FilaView_setScene(view, scene);
-        FilaView_setCamera(view, camera);
-        var sb = FilaSkyboxBuilder_create();
-        FilaSkyboxBuilder_color(sb, .15f, .2f, .3f, 1);
-        sky = FilaSkyboxBuilder_build(sb, engine);
-        FilaSkyboxBuilder_destroy(sb);
-        FilaScene_setSkybox(scene, sky);
-        opaque = material("surface");
-        solid = material("solid");
-        glass = material("glass");
-        alpha = material("alpha");
-        var tb = FilaTextureBuilder_create();
-        FilaTextureBuilder_width(tb, 1);
-        FilaTextureBuilder_height(tb, 1);
-        FilaTextureBuilder_format(tb, FILA_TEXTURE_INTERNAL_FORMAT_RGBA8());
-        white = FilaTextureBuilder_build(tb, engine);
-        FilaTextureBuilder_destroy(tb);
-        var pixel = arena.allocate(4);
-        pixel.set(JAVA_INT, 0, -1);
-        FilaTexture_setImage(
-                white,
-                engine,
-                0,
-                0,
-                0,
-                0,
-                1,
-                1,
-                1,
-                pixel,
-                4,
-                FILA_PIXEL_DATA_FORMAT_RGBA(),
-                FILA_PIXEL_DATA_TYPE_UBYTE(),
-                (byte) 1,
-                0,
-                0,
-                0,
-                MemorySegment.NULL,
-                MemorySegment.NULL,
-                MemorySegment.NULL);
-        try (var input =
-                FilamentRenderer3D.class.getResourceAsStream(
-                        "/valthorne/filament/studio-ibl.ktx")) {
-            byte[] data =
-                    Objects.requireNonNull(input, "Missing studio environment").readAllBytes();
-            try (var upload = Arena.ofConfined()) {
-                var bytes = upload.allocateFrom(JAVA_BYTE, data);
-                var sh = upload.allocate(27 * 4);
-                environment = FilaKTX1Loader_createTexture(engine, bytes, data.length, false);
-                if (!FilaKTX1Loader_getSphericalHarmonics(bytes, data.length, sh))
-                    throw new IllegalStateException("Missing environment irradiance");
-                indirect = FilaKTX1Loader_createIndirectLight(engine, environment, sh);
-                FilaIndirectLight_setIntensity(indirect, 1000);
-                FilaScene_setIndirectLight(scene, indirect);
-                FilaEngine_flushAndWait(engine, -1L);
-            }
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException(e);
-        }
-        FilaView_setAntiAliasing(view, 1);
-        FilaView_setShadowType(view, FILA_VIEW_SHADOW_TYPE_PCF());
-        var ao = FilaViewAmbientOcclusionOptions.allocate(arena);
-        FilaView_getAmbientOcclusionOptions(view, ao);
-        FilaViewAmbientOcclusionOptions.enabled(ao, true);
-        FilaViewAmbientOcclusionOptions.quality(ao, 3);
-        FilaViewAmbientOcclusionOptions.resolution(ao, 1);
-        FilaViewAmbientOcclusionOptions.radius(ao, .3f);
-        FilaView_setAmbientOcclusionOptions(view, ao);
-        var ssr = FilaViewScreenSpaceReflectionsOptions.allocate(arena);
-        FilaView_getScreenSpaceReflectionsOptions(view, ssr);
-        FilaViewScreenSpaceReflectionsOptions.enabled(ssr, false);
-        FilaView_setScreenSpaceReflectionsOptions(view, ssr);
-        var taa = FilaViewTemporalAntiAliasingOptions.allocate(arena);
-        FilaView_getTemporalAntiAliasingOptions(view, taa);
-        FilaViewTemporalAntiAliasingOptions.enabled(taa, true);
-        FilaView_setTemporalAntiAliasingOptions(view, taa);
-    }
-
-    /**
      * Sets the positive multiplier applied through Filament camera sensitivity on
      * subsequent renders. Does not rebuild mesh or material caches.
      *
      * @param value finite positive exposure multiplier
      * @throws IllegalArgumentException if value is nonpositive or nonfinite
-     * @throws IllegalStateException if called off the owner thread or after closure
+     * @throws IllegalStateException    if called off the owner thread or after closure
      */
     public void setExposure(float value) {
         requireOpen();
@@ -410,13 +359,12 @@ public final class FilamentRenderer3D implements AutoCloseable {
      *
      * @param value finite nonnegative native indirect-light intensity
      * @throws IllegalArgumentException if value is negative or nonfinite
-     * @throws IllegalStateException if called off the owner thread or after closure
+     * @throws IllegalStateException    if called off the owner thread or after closure
      */
     public void setEnvironmentIntensity(float value) {
         requireOpen();
         if (value < 0 || !Float.isFinite(value))
-            throw new IllegalArgumentException(
-                    "Environment intensity must be finite and nonnegative");
+            throw new IllegalArgumentException("Environment intensity must be finite and nonnegative");
         FilaIndirectLight_setIntensity(indirect, value);
     }
 
@@ -445,7 +393,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
      * Does not change temporal antialiasing or output resolution.
      *
      * @param quality nonnull preset
-     * @throws NullPointerException if quality is null
+     * @throws NullPointerException  if quality is null
      * @throws IllegalStateException if called off the owner thread or after closure
      */
     public void setQuality(Quality quality) {
@@ -461,8 +409,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
             var msaa = FilaViewMultiSampleAntiAliasingOptions.allocate(temporary);
             FilaView_getMultiSampleAntiAliasingOptions(view, msaa);
             FilaViewMultiSampleAntiAliasingOptions.enabled(msaa, quality == Quality.HIGH || quality == Quality.ULTRA);
-            FilaViewMultiSampleAntiAliasingOptions.sampleCount(
-                    msaa, (byte) (quality == Quality.ULTRA ? 8 : 4));
+            FilaViewMultiSampleAntiAliasingOptions.sampleCount(msaa, (byte) (quality == Quality.ULTRA ? 8 : 4));
             FilaView_setMultiSampleAntiAliasingOptions(view, msaa);
         }
     }
@@ -501,11 +448,8 @@ public final class FilamentRenderer3D implements AutoCloseable {
      * @throws IllegalStateException if the package is missing or cannot be read
      */
     private MemorySegment material(String file) {
-        try (var input =
-                FilamentRenderer3D.class.getResourceAsStream(
-                        "/valthorne/filament/" + file + ".filamat")) {
-            if (input == null)
-                throw new IllegalStateException("Missing Filament material: " + file);
+        try (var input = FilamentRenderer3D.class.getResourceAsStream("/valthorne/filament/" + file + ".filamat")) {
+            if (input == null) throw new IllegalStateException("Missing Filament material: " + file);
             byte[] data = input.readAllBytes();
             var bytes = arena.allocateFrom(JAVA_BYTE, data);
             var b = FilaMaterial_Builder_create();
@@ -515,7 +459,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
             } finally {
                 FilaMaterial_Builder_destroy(b);
             }
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -532,12 +476,12 @@ public final class FilamentRenderer3D implements AutoCloseable {
      * a general try/finally GL-state guard around all native operations.
      * </p>
      *
-     * @param source supported triangle-model scene
+     * @param source       supported triangle-model scene
      * @param sourceCamera camera whose projection and view are copied to Filament
-     * @throws IllegalStateException if called off the owner thread or after closure
+     * @throws IllegalStateException    if called off the owner thread or after closure
      * @throws IllegalArgumentException if scene renderables or explicit light values are unsupported
      */
-    public void render(Scene3D source, valthorne.camera.Camera3D sourceCamera) {
+    public void render(Scene3D source, Camera3D sourceCamera) {
         checkOwner();
         long profileStart = PROFILE ? System.nanoTime() : 0;
         // Complete the caller's previous reads before the shared driver writes
@@ -550,14 +494,12 @@ public final class FilamentRenderer3D implements AutoCloseable {
         if (vp[2] <= 0 || vp[3] <= 0) return;
         if (vp[2] != width || vp[3] != height) resize(vp[2], vp[3]);
         sourceCamera.rebuild(width, height);
-        float[] p = sourceCamera.getProjection().get(projectionValues),
-                m = inverseView.set(sourceCamera.getView()).invert().get(matrixValues);
+        float[] p = sourceCamera.getProjection().get(projectionValues), m = inverseView.set(sourceCamera.getView()).invert().get(matrixValues);
         for (int i = 0; i < 16; i++) {
             projection.setAtIndex(JAVA_DOUBLE, i, p[i]);
             matrix.setAtIndex(JAVA_FLOAT, i, m[i]);
         }
-        FilaCamera_setCustomProjection(
-                camera, projection, projection, sourceCamera.getNear(), sourceCamera.getFar());
+        FilaCamera_setCustomProjection(camera, projection, projection, sourceCamera.getNear(), sourceCamera.getFar());
         FilaCamera_setModelMatrix(camera, matrix);
         FilaCamera_setExposure(camera, 4, 1f / 60, 100 * exposure);
         long syncStart = PROFILE ? System.nanoTime() : 0;
@@ -566,9 +508,8 @@ public final class FilamentRenderer3D implements AutoCloseable {
         if (PROFILE) profileNanos[1] = renderStart - syncStart;
         FilaView_setViewport(view, 0, 0, width, height);
         FilaRenderer_renderStandaloneView(renderer, view);
-        if (!sharedOutput) FilaRenderer_readPixelsRenderTarget(renderer, target, 0, 0, width, height,
-                outputPixels, outputPixels.byteSize(), FILA_PIXEL_DATA_FORMAT_RGBA(), FILA_PIXEL_DATA_TYPE_UBYTE(),
-                (byte) 1, 0, 0, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
+        if (!sharedOutput)
+            FilaRenderer_readPixelsRenderTarget(renderer, target, 0, 0, width, height, outputPixels, outputPixels.byteSize(), FILA_PIXEL_DATA_FORMAT_RGBA(), FILA_PIXEL_DATA_TYPE_UBYTE(), (byte) 1, 0, 0, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
         FilaEngine_flushAndWait(engine, -1L);
         if (PROFILE) profileNanos[2] = System.nanoTime() - renderStart;
         if (!sharedOutput) {
@@ -581,20 +522,11 @@ public final class FilamentRenderer3D implements AutoCloseable {
         boolean srgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
         glDisable(GL_FRAMEBUFFER_SRGB);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-        glBlitFramebuffer(
-                0,
-                sharedOutput ? 0 : height,
-                width,
-                sharedOutput ? height : 0,
-                vp[0],
-                vp[1],
-                vp[0] + width,
-                vp[1] + height,
-                GL_COLOR_BUFFER_BIT,
-                GL_NEAREST);
+        glBlitFramebuffer(0, sharedOutput ? 0 : height, width, sharedOutput ? height : 0, vp[0], vp[1], vp[0] + width, vp[1] + height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, old);
         if (srgb) glEnable(GL_FRAMEBUFFER_SRGB);
-        if (PROFILE) profileNanos[3] = System.nanoTime() - profileStart - profileNanos[0] - profileNanos[1] - profileNanos[2];
+        if (PROFILE)
+            profileNanos[3] = System.nanoTime() - profileStart - profileNanos[0] - profileNanos[1] - profileNanos[2];
     }
 
     /**
@@ -604,10 +536,10 @@ public final class FilamentRenderer3D implements AutoCloseable {
      * and evicts mesh/texture wrappers no longer referenced. Regenerates imported
      * mips when invalidation requested it.
      *
-     * @param source current source scene
+     * @param source       current source scene
      * @param sourceCamera current camera for conservative geometry rejection
      */
-    private void sync(Scene3D source, valthorne.camera.Camera3D sourceCamera) {
+    private void sync(Scene3D source, Camera3D sourceCamera) {
         syncPointLights(source.getLights());
         var snapshot = sceneCollector.capture(source);
         boolean changed = signature != snapshot.signature();
@@ -616,7 +548,10 @@ public final class FilamentRenderer3D implements AutoCloseable {
         snapshot.instances.removeIf(instance -> instance.model().triangles().length == 0);
         boolean reject = occlusionCullingEnabled;
         for (int i = 0; i < snapshot.instances.size(); i++)
-            if (snapshot.instances.get(i).material().getTransmission() > .01f) {reject = false; break;}
+            if (snapshot.instances.get(i).material().getTransmission() > .01f) {
+                reject = false;
+                break;
+            }
         if (reject) {
             occlusion.begin(sourceCamera.getCombined(), width, height);
             for (int i = 0; i < snapshot.instances.size(); i++) {
@@ -660,8 +595,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
             boolean visible = true;
             // Keep contributors to other passes in the native scene; camera hiding is
             // not equivalent to deleting geometry from shadows or implicit lighting.
-            if (reject && !material.isCastsShadow()
-                    && (!material.isEmissionLightEnabled() || material.getEmissionStrength() * emissive.a() <= 0)) {
+            if (reject && !material.isCastsShadow() && (!material.isEmissionLightEnabled() || material.getEmissionStrength() * emissive.a() <= 0)) {
                 var visibility = occlusion.test(instance.model(), instance.transform());
                 visible = visibility == OcclusionCuller3D.Visibility.VISIBLE;
                 if (visibility == OcclusionCuller3D.Visibility.OCCLUDED) occludedCount++;
@@ -689,50 +623,20 @@ public final class FilamentRenderer3D implements AutoCloseable {
             for (int j = 0; j < 16; j++)
                 matrix.setAtIndex(JAVA_FLOAT, j, instance.transform().get(j / 4, j % 4));
             var tm = FilaEngine_getTransformManager(engine);
-            FilaTransformManager_setTransform(
-                    tm, FilaTransformManager_getInstance(tm, e.entity()), matrix);
+            FilaTransformManager_setTransform(tm, FilaTransformManager_getInstance(tm, e.entity()), matrix);
             float power = material.getEmissionStrength() * emissive.a();
-            FilaMaterialInstance_setParameterFloat4(
-                    e.material(),
-                    name("tint"),
-                    linear(tint.r()),
-                    linear(tint.g()),
-                    linear(tint.b()),
-                    tint.a());
-            FilaMaterialInstance_setParameterFloat(
-                    e.material(), name("roughness"), material.getRoughness());
-            FilaMaterialInstance_setParameterFloat(
-                    e.material(), name("metallic"), material.getMetallic());
-            FilaMaterialInstance_setParameterFloat(
-                    e.material(), name("cutoff"), material.getAlphaCutoff());
-            FilaMaterialInstance_setParameterFloat3(
-                    e.material(),
-                    name("emission"),
-                    linear(emissive.r()) * power * 200,
-                    linear(emissive.g()) * power * 200,
-                    linear(emissive.b()) * power * 200);
-            FilaMaterialInstance_setParameterTexture(
-                    e.material(),
-                    name("albedo"),
-                    material.getTexture() == null
-                            ? white
-                            : textures.computeIfAbsent(material.getTexture(), this::importTexture),
-                    FilaTextureSampler_create(
-                            FILA_TEXTURE_SAMPLER_MIN_FILTER_LINEAR_MIPMAP_LINEAR(),
-                            FILA_TEXTURE_SAMPLER_MAG_FILTER_LINEAR(),
-                            FILA_TEXTURE_SAMPLER_WRAP_MODE_REPEAT(),
-                            FILA_TEXTURE_SAMPLER_WRAP_MODE_REPEAT(),
-                            FILA_TEXTURE_SAMPLER_WRAP_MODE_REPEAT()));
+            FilaMaterialInstance_setParameterFloat4(e.material(), name("tint"), linear(tint.r()), linear(tint.g()), linear(tint.b()), tint.a());
+            FilaMaterialInstance_setParameterFloat(e.material(), name("roughness"), material.getRoughness());
+            FilaMaterialInstance_setParameterFloat(e.material(), name("metallic"), material.getMetallic());
+            FilaMaterialInstance_setParameterFloat(e.material(), name("cutoff"), material.getAlphaCutoff());
+            FilaMaterialInstance_setParameterFloat3(e.material(), name("emission"), linear(emissive.r()) * power * 200, linear(emissive.g()) * power * 200, linear(emissive.b()) * power * 200);
+            FilaMaterialInstance_setParameterTexture(e.material(), name("albedo"), material.getTexture() == null ? white : textures.computeIfAbsent(material.getTexture(), this::importTexture), FilaTextureSampler_create(FILA_TEXTURE_SAMPLER_MIN_FILTER_LINEAR_MIPMAP_LINEAR(), FILA_TEXTURE_SAMPLER_MAG_FILTER_LINEAR(), FILA_TEXTURE_SAMPLER_WRAP_MODE_REPEAT(), FILA_TEXTURE_SAMPLER_WRAP_MODE_REPEAT(), FILA_TEXTURE_SAMPLER_WRAP_MODE_REPEAT()));
             if (e.glass()) {
-                FilaMaterialInstance_setParameterFloat(
-                        e.material(), name("ior"), material.getIndexOfRefraction());
-                FilaMaterialInstance_setParameterFloat(
-                        e.material(), name("transmission"), material.getTransmission());
-                FilaMaterialInstance_setParameterFloat(
-                        e.material(), name("thickness"), meshes.get(e.model()).hz() * 2);
+                FilaMaterialInstance_setParameterFloat(e.material(), name("ior"), material.getIndexOfRefraction());
+                FilaMaterialInstance_setParameterFloat(e.material(), name("transmission"), material.getTransmission());
+                FilaMaterialInstance_setParameterFloat(e.material(), name("thickness"), meshes.get(e.model()).hz() * 2);
             }
-            boolean emitting =
-                    power > 0 && (emissive.r() > 0 || emissive.g() > 0 || emissive.b() > 0);
+            boolean emitting = power > 0 && (emissive.r() > 0 || emissive.g() > 0 || emissive.b() > 0);
             var lm = FilaEngine_getLightManager(engine);
             boolean hasLight = FilaLightManager_hasComponent(lm, e.light());
             if (emitting && material.isEmissionLightEnabled()) {
@@ -751,56 +655,36 @@ public final class FilamentRenderer3D implements AutoCloseable {
                 }
                 int light = FilaLightManager_getInstance(lm, e.light());
                 float[] transform = instance.transform().get(matrixValues);
-                FilaLightManager_setPosition(
-                        lm, light, transform[12], transform[13], transform[14]);
-                FilaLightManager_setColor(
-                        lm,
-                        light,
-                        linear(emissive.r()),
-                        linear(emissive.g()),
-                        linear(emissive.b()));
+                FilaLightManager_setPosition(lm, light, transform[12], transform[13], transform[14]);
+                FilaLightManager_setColor(lm, light, linear(emissive.r()), linear(emissive.g()), linear(emissive.b()));
                 FilaLightManager_setIntensity(lm, light, power * 1000);
             } else if (hasLight) {
                 FilaScene_remove(scene, e.light());
                 FilaLightManager_destroy(lm, e.light());
             }
-            FilaRenderableManager_setCastShadows(
-                    FilaEngine_getRenderableManager(engine),
-                    FilaRenderableManager_getInstance(
-                            FilaEngine_getRenderableManager(engine), e.entity()),
-                    material.isCastsShadow() && !emitting && !e.glass() && !e.alpha());
-            FilaRenderableManager_setReceiveShadows(
-                    FilaEngine_getRenderableManager(engine),
-                    FilaRenderableManager_getInstance(FilaEngine_getRenderableManager(engine), e.entity()),
-                    material.isReceivesShadow());
+            FilaRenderableManager_setCastShadows(FilaEngine_getRenderableManager(engine), FilaRenderableManager_getInstance(FilaEngine_getRenderableManager(engine), e.entity()), material.isCastsShadow() && !emitting && !e.glass() && !e.alpha());
+            FilaRenderableManager_setReceiveShadows(FilaEngine_getRenderableManager(engine), FilaRenderableManager_getInstance(FilaEngine_getRenderableManager(engine), e.entity()), material.isReceivesShadow());
         }
         signature = snapshot.signature();
         if (!changed && !regenerateMipmaps) return;
         var usedModels = Collections.newSetFromMap(new IdentityHashMap<Model3D, Boolean>());
-        var usedTextures =
-                Collections.newSetFromMap(
-                        new IdentityHashMap<valthorne.graphics.texture.Texture, Boolean>());
+        var usedTextures = Collections.newSetFromMap(new IdentityHashMap<Texture, Boolean>());
         for (var instance : snapshot.instances) {
             usedModels.add(instance.model());
-            if (instance.material().getTexture() != null)
-                usedTextures.add(instance.material().getTexture());
+            if (instance.material().getTexture() != null) usedTextures.add(instance.material().getTexture());
         }
-        meshes.entrySet()
-                .removeIf(
-                        e -> {
-                            if (usedModels.contains(e.getKey())) return false;
-                            minimumAlpha.remove(e.getKey());
-                            FilaEngine_destroyVertexBuffer(engine, e.getValue().vertices());
-                            FilaEngine_destroyIndexBuffer(engine, e.getValue().indices());
-                            return true;
-                        });
-        textures.entrySet()
-                .removeIf(
-                        e -> {
-                            if (usedTextures.contains(e.getKey())) return false;
-                            FilaEngine_destroyTexture(engine, e.getValue());
-                            return true;
-                        });
+        meshes.entrySet().removeIf(e -> {
+            if (usedModels.contains(e.getKey())) return false;
+            minimumAlpha.remove(e.getKey());
+            FilaEngine_destroyVertexBuffer(engine, e.getValue().vertices());
+            FilaEngine_destroyIndexBuffer(engine, e.getValue().indices());
+            return true;
+        });
+        textures.entrySet().removeIf(e -> {
+            if (usedTextures.contains(e.getKey())) return false;
+            FilaEngine_destroyTexture(engine, e.getValue());
+            return true;
+        });
         if (regenerateMipmaps) {
             for (var entry : textures.entrySet()) {
                 if (!sharedOutput) uploadTexture(entry.getKey(), entry.getValue());
@@ -812,40 +696,10 @@ public final class FilamentRenderer3D implements AutoCloseable {
     }
 
     /**
-     * Hashes one placement's model identity, transform, selected material values, texture
-     * identity, and lighting flags to avoid redundant native updates. Geometry and texture
-     * pixel contents are not scanned, and a hash match is not an exact equality proof.
-     * @param item collected placement with current material and captured transform
-     * @return rolling signature used by the corresponding native slot
-     */
-    private static long entrySignature(PathTracingScene.Instance item) {
-        long h = System.identityHashCode(item.model());
-        for (int c = 0; c < 4; c++) for (int r = 0; r < 4; r++) h = mix(h, item.transform().get(c, r));
-        var m = item.material();
-        var t = m.getTint(); var e = m.getEmissive();
-        h = mix(mix(mix(mix(h, t.r()), t.g()), t.b()), t.a());
-        h = mix(mix(mix(mix(h, e.r()), e.g()), e.b()), e.a());
-        h = mix(mix(mix(h, m.getRoughness()), m.getMetallic()), m.getAlphaCutoff());
-        h = mix(mix(mix(h, m.getTransmission()), m.getIndexOfRefraction()), m.getEmissionStrength());
-        h = (h ^ System.identityHashCode(m.getTexture())) * 0x100000001b3L;
-        h = (h ^ m.getRenderPass().ordinal()) * 0x100000001b3L;
-        h = (h ^ (m.isCastsShadow() ? 1 : 0) ^ (m.isReceivesShadow() ? 2 : 0)
-                ^ (m.isEmissionLightEnabled() ? 4 : 0)) * 0x100000001b3L;
-        return h;
-    }
-
-    /**
-     * Folds a float's canonical IEEE bit representation into a rolling FNV-style hash.
-     * @param hash accumulated signature
-     * @param value next scalar material or transform component
-     * @return updated signature
-     */
-    private static long mix(long hash, float value) {return (hash ^ Float.floatToIntBits(value)) * 0x100000001b3L;}
-
-    /**
      * Determines whether alpha testing can be skipped for this placement. Zero cutoff
      * accepts nonnegative vertex and tint alpha even with a texture; otherwise an untextured
      * alpha product must strictly clear the cutoff. Model minimum alpha is cached by identity.
+     *
      * @param item placement being considered for the solid material path
      * @return whether known alpha values prove that the discard test is unnecessary
      */
@@ -856,16 +710,15 @@ public final class FilamentRenderer3D implements AutoCloseable {
         float vertexAlpha = minimumAlpha.computeIfAbsent(item.model(), model -> {
             float minimum = 1;
             for (var triangle : model.triangles()) {
-                if (!Float.isFinite(triangle.color.a())) return Float.NaN;
-                minimum = Math.min(minimum, triangle.color.a());
+                if (!Float.isFinite(triangle.color().a())) return Float.NaN;
+                minimum = Math.min(minimum, triangle.color().a());
             }
             return minimum;
         });
         if (!(vertexAlpha >= 0)) return false;
         // Zero cutoff cannot discard nonnegative alpha, including transparent texture pixels.
         // For untextured geometry the complete alpha product is known without a readback.
-        return material.getAlphaCutoff() == 0 || (material.getTexture() == null
-                && vertexAlpha * tintAlpha > material.getAlphaCutoff() + 1e-6f);
+        return material.getAlphaCutoff() == 0 || (material.getTexture() == null && vertexAlpha * tintAlpha > material.getAlphaCutoff() + 1e-6f);
     }
 
     /**
@@ -886,10 +739,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
             var position = light.getPosition();
             var color = light.getColor();
             float lumens = light.getIntensity() * 1000f;
-            if (!position.isFinite() || !Float.isFinite(lumens)
-                    || !Float.isFinite(color.r()) || color.r() < 0
-                    || !Float.isFinite(color.g()) || color.g() < 0
-                    || !Float.isFinite(color.b()) || color.b() < 0)
+            if (!position.isFinite() || !Float.isFinite(lumens) || !Float.isFinite(color.r()) || color.r() < 0 || !Float.isFinite(color.g()) || color.g() < 0 || !Float.isFinite(color.b()) || color.b() < 0)
                 throw new IllegalArgumentException("Point light position, RGB and lumen intensity must be finite; RGB must be nonnegative");
             if (lumens == 0 || (color.r() == 0 && color.g() == 0 && color.b() == 0)) continue;
             ExplicitLight entry;
@@ -970,46 +820,17 @@ public final class FilamentRenderer3D implements AutoCloseable {
         FilaEntityManager_destroy(FilaEntityManager_get(), entry.entity);
     }
 
-    /**
-     * Imports a borrowed OpenGL albedo texture into Filament after synchronizing
-     * caller writes. Requests a complete mip chain and generates it immediately
-     * unless a pending invalidation will regenerate all imported textures together.
-     * The wrapper is owned, while the underlying source texture remains caller-owned.
-     *
-     * @param source live borrowed albedo texture
-     * @return owned native texture wrapper
-     */
-    private static final class PixelTransfer implements AutoCloseable {
-        private final int[] names;
-        private final int[] values = new int[4];
-        private final int binding, buffer, texture = glGetInteger(GL_TEXTURE_BINDING_2D);
-        PixelTransfer(boolean pack) {
-            names = pack ? new int[]{GL_PACK_ALIGNMENT, GL_PACK_ROW_LENGTH, GL_PACK_SKIP_PIXELS, GL_PACK_SKIP_ROWS}
-                    : new int[]{GL_UNPACK_ALIGNMENT, GL_UNPACK_ROW_LENGTH, GL_UNPACK_SKIP_PIXELS, GL_UNPACK_SKIP_ROWS};
-            binding = pack ? GL_PIXEL_PACK_BUFFER : GL_PIXEL_UNPACK_BUFFER;
-            buffer = glGetInteger(pack ? GL_PIXEL_PACK_BUFFER_BINDING : GL_PIXEL_UNPACK_BUFFER_BINDING);
-            for (int i=0;i<4;i++) { values[i]=glGetInteger(names[i]); glPixelStorei(names[i], i==0?1:0); }
-            glBindBuffer(binding, 0);
-        }
-        public void close() {
-            glBindTexture(GL_TEXTURE_2D, texture); glBindBuffer(binding, buffer);
-            for (int i=0;i<4;i++) glPixelStorei(names[i], values[i]);
-        }
-    }
-
-    private void uploadTexture(valthorne.graphics.texture.Texture source, MemorySegment destination) {
+    private void uploadTexture(Texture source, MemorySegment destination) {
         try (var pixels = Arena.ofConfined(); var state = new PixelTransfer(true)) {
             var bytes = pixels.allocate(Math.multiplyExact(Math.multiplyExact((long) source.getWidth(), source.getHeight()), 4), 4);
             glBindTexture(GL_TEXTURE_2D, source.getTextureID());
             glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, bytes.asByteBuffer());
-            FilaTexture_setImage(destination, engine, 0, 0, 0, 0, source.getWidth(), source.getHeight(), 1,
-                    bytes, bytes.byteSize(), FILA_PIXEL_DATA_FORMAT_RGBA(), FILA_PIXEL_DATA_TYPE_UBYTE(),
-                    (byte) 1, 0, 0, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
+            FilaTexture_setImage(destination, engine, 0, 0, 0, 0, source.getWidth(), source.getHeight(), 1, bytes, bytes.byteSize(), FILA_PIXEL_DATA_FORMAT_RGBA(), FILA_PIXEL_DATA_TYPE_UBYTE(), (byte) 1, 0, 0, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
             FilaEngine_flushAndWait(engine, -1L);
         }
     }
 
-    private MemorySegment importTexture(valthorne.graphics.texture.Texture source) {
+    private MemorySegment importTexture(Texture source) {
         glFinish();
         var b = FilaTextureBuilder_create();
         FilaTextureBuilder_width(b, source.getWidth());
@@ -1017,9 +838,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
         int levels = 32 - Integer.numberOfLeadingZeros(Math.max(source.getWidth(), source.getHeight()));
         FilaTextureBuilder_levels(b, (byte) levels);
         FilaTextureBuilder_format(b, FILA_TEXTURE_INTERNAL_FORMAT_RGBA8());
-        FilaTextureBuilder_usage(b, FILA_TEXTURE_USAGE_SAMPLEABLE()
-                | FILA_TEXTURE_USAGE_BLIT_SRC() | FILA_TEXTURE_USAGE_BLIT_DST()
-                | FILA_TEXTURE_USAGE_GEN_MIPMAPPABLE() | (sharedOutput ? 0 : FILA_TEXTURE_USAGE_UPLOADABLE()));
+        FilaTextureBuilder_usage(b, FILA_TEXTURE_USAGE_SAMPLEABLE() | FILA_TEXTURE_USAGE_BLIT_SRC() | FILA_TEXTURE_USAGE_BLIT_DST() | FILA_TEXTURE_USAGE_GEN_MIPMAPPABLE() | (sharedOutput ? 0 : FILA_TEXTURE_USAGE_UPLOADABLE()));
         if (sharedOutput) FilaTextureBuilder_importTexture(b, source.getTextureID());
         try {
             MemorySegment imported = FilaTextureBuilder_build(b, engine);
@@ -1029,17 +848,6 @@ public final class FilamentRenderer3D implements AutoCloseable {
         } finally {
             FilaTextureBuilder_destroy(b);
         }
-    }
-
-    /**
-     * Converts an sRGB component to linear light using the standard piecewise
-     * transfer function. Does not clamp inputs or validate the result.
-     *
-     * @param value sRGB component
-     * @return linear-light component
-     */
-    private static float linear(float value) {
-        return value <= .04045f ? value / 12.92f : (float) Math.pow((value + .055f) / 1.055f, 2.4);
     }
 
     /**
@@ -1058,16 +866,11 @@ public final class FilamentRenderer3D implements AutoCloseable {
         float[] data = new float[count * 13];
         int[] indices = new int[count];
         int vertex = 0;
-        float minX = Float.POSITIVE_INFINITY,
-                minY = minX,
-                minZ = minX,
-                maxX = -minX,
-                maxY = -minX,
-                maxZ = -minX;
+        float minX = Float.POSITIVE_INFINITY, minY = minX, minZ = minX, maxX = -minX, maxY = -minX, maxZ = -minX;
         for (var t : triangles) {
-            var positions = new Vector3f[] {t.a, t.b, t.c};
-            var normals = new Vector3f[] {t.normalA, t.normalB, t.normalC};
-            var uvs = new org.joml.Vector2f[] {t.uvA, t.uvB, t.uvC};
+            var positions = new Vector3f[]{t.a(), t.b(), t.c()};
+            var normals = new Vector3f[]{t.normalA(), t.normalB(), t.normalC()};
+            var uvs = new Vector2f[]{t.uvA(), t.uvB(), t.uvC()};
             for (int j = 0; j < 3; j++) {
                 var p = positions[j];
                 var n = normals[j];
@@ -1083,10 +886,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
                 maxZ = Math.max(maxZ, p.z());
                 // Unit quaternion rotating +Z to the smooth normal; no tangent-space normal map is
                 // used.
-                float nx = n.x(),
-                        ny = n.y(),
-                        nz = n.z(),
-                        length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+                float nx = n.x(), ny = n.y(), nz = n.z(), length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
                 nx /= length;
                 ny /= length;
                 nz /= length;
@@ -1101,10 +901,10 @@ public final class FilamentRenderer3D implements AutoCloseable {
                 }
                 data[k + 7] = uvs[j].x();
                 data[k + 8] = uvs[j].y();
-                data[k + 9] = linear(t.color.r());
-                data[k + 10] = linear(t.color.g());
-                data[k + 11] = linear(t.color.b());
-                data[k + 12] = t.color.a();
+                data[k + 9] = linear(t.color().r());
+                data[k + 10] = linear(t.color().g());
+                data[k + 11] = linear(t.color().b());
+                data[k + 12] = t.color().a();
                 indices[vertex] = vertex;
                 vertex++;
             }
@@ -1130,36 +930,11 @@ public final class FilamentRenderer3D implements AutoCloseable {
             long vertexBytes = (long) uniqueVertices * 13 * Float.BYTES;
             var vertexData = upload.allocate(vertexBytes, Float.BYTES);
             MemorySegment.copy(MemorySegment.ofArray(data), 0, vertexData, 0, vertexBytes);
-            FilaVertexBuffer_setBufferAt(
-                    vertices,
-                    engine,
-                    (byte) 0,
-                    vertexData,
-                    vertexBytes,
-                    0,
-                    MemorySegment.NULL,
-                    MemorySegment.NULL,
-                    MemorySegment.NULL);
-            FilaIndexBuffer_setBuffer(
-                    indexBuffer,
-                    engine,
-                    upload.allocateFrom(JAVA_INT, indices),
-                    (long) indices.length * 4,
-                    0,
-                    MemorySegment.NULL,
-                    MemorySegment.NULL,
-                    MemorySegment.NULL);
+            FilaVertexBuffer_setBufferAt(vertices, engine, (byte) 0, vertexData, vertexBytes, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
+            FilaIndexBuffer_setBuffer(indexBuffer, engine, upload.allocateFrom(JAVA_INT, indices), (long) indices.length * 4, 0, MemorySegment.NULL, MemorySegment.NULL, MemorySegment.NULL);
             FilaEngine_flushAndWait(engine, -1L);
         }
-        return new Mesh(
-                vertices,
-                indexBuffer,
-                (minX + maxX) / 2,
-                (minY + maxY) / 2,
-                (minZ + maxZ) / 2,
-                Math.max(.001f, (maxX - minX) / 2),
-                Math.max(.001f, (maxY - minY) / 2),
-                Math.max(.001f, (maxZ - minZ) / 2));
+        return new Mesh(vertices, indexBuffer, (minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2, Math.max(.001f, (maxX - minX) / 2), Math.max(.001f, (maxY - minY) / 2), Math.max(.001f, (maxZ - minZ) / 2));
     }
 
     /**
@@ -1168,24 +943,20 @@ public final class FilamentRenderer3D implements AutoCloseable {
      * a second entity ID for optional emission lighting. Releases the slot if native
      * renderable construction fails.
      *
-     * @param model borrowed model identity
+     * @param model       borrowed model identity
      * @param transparent whether glass transmission is selected
-     * @param blended whether alpha compositing is selected
+     * @param blended     whether alpha compositing is selected
      * @return owned scene entry
      * @throws IllegalStateException if native renderable construction fails
      */
     private Entry createEntry(Model3D model, boolean transparent, boolean blended, boolean solidSurface) {
         Mesh mesh = meshes.computeIfAbsent(model, this::mesh);
-        var entry = new Entry(model, transparent, blended, solidSurface,
-                FilaEntityManager_create(FilaEntityManager_get()),
-                FilaEntityManager_create(FilaEntityManager_get()),
-                FilaMaterial_createInstance(blended ? alpha : transparent ? glass : solidSurface ? solid : opaque));
+        var entry = new Entry(model, transparent, blended, solidSurface, FilaEntityManager_create(FilaEntityManager_get()), FilaEntityManager_create(FilaEntityManager_get()), FilaMaterial_createInstance(blended ? alpha : transparent ? glass : solidSurface ? solid : opaque));
         var builder = FilaRenderableManagerBuilder_create(1);
         try {
             FilaRenderableManagerBuilder_geometry(builder, 0, 4, mesh.vertices(), mesh.indices());
             FilaRenderableManagerBuilder_material(builder, 0, entry.material());
-            FilaRenderableManagerBuilder_boundingBox(
-                    builder, mesh.cx(), mesh.cy(), mesh.cz(), mesh.hx(), mesh.hy(), mesh.hz());
+            FilaRenderableManagerBuilder_boundingBox(builder, mesh.cx(), mesh.cy(), mesh.cz(), mesh.hx(), mesh.hy(), mesh.hz());
             FilaRenderableManagerBuilder_castShadows(builder, !transparent && !blended);
             FilaRenderableManagerBuilder_receiveShadows(builder, true);
             if (!FilaRenderableManagerBuilder_build(builder, engine, entry.entity()))
@@ -1246,8 +1017,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
         }
         width = w;
         height = h;
-        int old = glGetInteger(GL_TEXTURE_BINDING_2D),
-                fb = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
+        int old = glGetInteger(GL_TEXTURE_BINDING_2D), fb = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
         texture = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, texture);
         if (sharedOutput) glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, w, h);
@@ -1265,8 +1035,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
         FilaTextureBuilder_width(tb, w);
         FilaTextureBuilder_height(tb, h);
         FilaTextureBuilder_format(tb, FILA_TEXTURE_INTERNAL_FORMAT_RGBA8());
-        FilaTextureBuilder_usage(
-                tb, FILA_TEXTURE_USAGE_COLOR_ATTACHMENT() | FILA_TEXTURE_USAGE_SAMPLEABLE() | FILA_TEXTURE_USAGE_BLIT_SRC());
+        FilaTextureBuilder_usage(tb, FILA_TEXTURE_USAGE_COLOR_ATTACHMENT() | FILA_TEXTURE_USAGE_SAMPLEABLE() | FILA_TEXTURE_USAGE_BLIT_SRC());
         if (sharedOutput) FilaTextureBuilder_importTexture(tb, texture);
         color = FilaTextureBuilder_build(tb, engine);
         FilaTextureBuilder_destroy(tb);
@@ -1277,8 +1046,7 @@ public final class FilamentRenderer3D implements AutoCloseable {
         FilaView_setRenderTarget(view, target);
         framebuffer = glGenFramebuffers();
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(
-                GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+        glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fb);
     }
 
@@ -1350,5 +1118,136 @@ public final class FilamentRenderer3D implements AutoCloseable {
     private void requireOpen() {
         checkOwner();
         if (closed) throw new IllegalStateException("Renderer is closed");
+    }
+
+    /**
+     * Quality presets at full output resolution. PERFORMANCE uses half-resolution
+     * ambient occlusion without MSAA; INTERACTIVE uses full-resolution AO without MSAA, HIGH requests
+     * four samples, and ULTRA requests eight, subject to backend support.
+     *
+     * @author Albert Beaupre
+     */
+    public enum Quality {
+        /**
+         * Temporal smoothing with half-resolution, edge-aware ambient occlusion and no MSAA.
+         */
+        PERFORMANCE,
+        /**
+         * Full-resolution ambient occlusion with multisample antialiasing disabled.
+         */
+        INTERACTIVE,
+        /**
+         * Full-resolution ambient occlusion with four requested MSAA samples, subject to backend support.
+         */
+        HIGH,
+        /**
+         * Full-resolution ambient occlusion with eight requested MSAA samples, subject to backend support.
+         */
+        ULTRA
+    }
+
+    /**
+     * Tracks synchronization and visibility for one reusable native renderable slot.
+     * The signature represents the last submitted instance state; initialization separates
+     * a valid first signature from a default value, and visibility tracks native scene membership.
+     *
+     * @author Albert Beaupre
+     */
+    private static final class EntryState {
+        long signature; // Last synchronized placement signature for this native slot.
+        boolean initialized, visible = true; // Whether the slot has been synchronized and currently belongs to the native scene.
+    }
+
+    /**
+     * Owner-thread cache for one reusable explicit native point-light slot. Stores
+     * the last uploaded source components so moving lights update only changed
+     * parameters without invalidating mesh/material bindings.
+     *
+     * @author Albert Beaupre
+     */
+    private static final class ExplicitLight {
+        final int entity; // Owned native point-light entity identifier.
+        float x = Float.NaN, y, z, r = Float.NaN, g, b; // Last uploaded source position and RGB; NaN forces initial synchronization.
+        float intensity = Float.NaN, range = Float.NaN; // Last uploaded lumen intensity and falloff range.
+        boolean shadows; // Last uploaded shadow-casting flag.
+
+        /**
+         * Associates a cache slot with a newly created native light entity. NaN sentinels
+         * force the first position, color, intensity, and range upload.
+         *
+         * @param entity owned native light entity ID
+         */
+        ExplicitLight(int entity) {
+            this.entity = entity;
+        }
+    }
+
+    /**
+     * Owned immutable native mesh buffers and local bounds cached by source model
+     * identity. Bounds use center/half-extent representation for Filament culling.
+     *
+     * <p>The native segments refer to cached vertex and index resources managed by the renderer.
+     * Bounds are expressed in model-local coordinates so instances can share geometry while
+     * supplying independent transforms; constructing this record does not allocate a mesh.</p>
+     *
+     * @param vertices native vertex buffer
+     * @param indices  native index buffer
+     * @param cx       local bounds center X
+     * @param cy       local bounds center Y
+     * @param cz       local bounds center Z
+     * @param hx       local bounds half-width
+     * @param hy       local bounds half-height
+     * @param hz       local bounds half-depth
+     * @author Albert Beaupre
+     */
+    private record Mesh(MemorySegment vertices, MemorySegment indices, float cx, float cy, float cz, float hx, float hy, float hz) {
+    }
+
+    /**
+     * Reusable native renderable/material slot associated with a borrowed source
+     * model. The reserved light entity gains a component only when emission lighting
+     * is enabled and nonzero.
+     *
+     * @param model    borrowed model identity used to find cached mesh buffers
+     * @param glass    whether the screen-space transmission material is selected
+     * @param alpha    whether the alpha-compositing material is selected
+     * @param entity   owned renderable entity ID
+     * @param light    owned entity ID reserved for implicit emission lighting
+     * @param material owned native material instance
+     * @author Albert Beaupre
+     */
+    private record Entry(Model3D model, boolean glass, boolean alpha, boolean solid, int entity, int light, MemorySegment material) {
+    }
+
+    /**
+     * Imports a borrowed OpenGL albedo texture into Filament after synchronizing
+     * caller writes. Requests a complete mip chain and generates it immediately
+     * unless a pending invalidation will regenerate all imported textures together.
+     * The wrapper is owned, while the underlying source texture remains caller-owned.
+     *
+     * @param source live borrowed albedo texture
+     * @return owned native texture wrapper
+     */
+    private static final class PixelTransfer implements AutoCloseable {
+        private final int[] names;
+        private final int[] values = new int[4];
+        private final int binding, buffer, texture = glGetInteger(GL_TEXTURE_BINDING_2D);
+
+        PixelTransfer(boolean pack) {
+            names = pack ? new int[]{GL_PACK_ALIGNMENT, GL_PACK_ROW_LENGTH, GL_PACK_SKIP_PIXELS, GL_PACK_SKIP_ROWS} : new int[]{GL_UNPACK_ALIGNMENT, GL_UNPACK_ROW_LENGTH, GL_UNPACK_SKIP_PIXELS, GL_UNPACK_SKIP_ROWS};
+            binding = pack ? GL_PIXEL_PACK_BUFFER : GL_PIXEL_UNPACK_BUFFER;
+            buffer = glGetInteger(pack ? GL_PIXEL_PACK_BUFFER_BINDING : GL_PIXEL_UNPACK_BUFFER_BINDING);
+            for (int i = 0; i < 4; i++) {
+                values[i] = glGetInteger(names[i]);
+                glPixelStorei(names[i], i == 0 ? 1 : 0);
+            }
+            glBindBuffer(binding, 0);
+        }
+
+        public void close() {
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glBindBuffer(binding, buffer);
+            for (int i = 0; i < 4; i++) glPixelStorei(names[i], values[i]);
+        }
     }
 }

@@ -2,6 +2,7 @@ package valthorne.graphics.texture;
 
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.shader.ShaderSources;
+import java.util.regex.Matcher;
 
 /**
  * <p>
@@ -362,5 +363,5 @@ public final class TextureBatchContract {
      * @param value generated shader text
      * @return substituted source, without modifying other shader whitespace
      */
-    private static String replaceToken(String source,String name,String value){return source.replaceAll("\\$\\{\\s*"+name+"\\s*\\}",java.util.regex.Matcher.quoteReplacement(value));}
+    private static String replaceToken(String source,String name,String value){return source.replaceAll("\\$\\{\\s*"+name+"\\s*\\}",Matcher.quoteReplacement(value));}
 }

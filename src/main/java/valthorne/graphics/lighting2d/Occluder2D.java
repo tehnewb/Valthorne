@@ -71,10 +71,21 @@ public class Occluder2D {
         maxY = by;
     }
 
-    Occluder2D() { segments = true; vertices = new float[0]; }
-    void synchronize() { }
-    int edgeStep() { return segments ? 4 : 2; }
-    int edgeEnd(int i) { return segments ? i + 2 : (i + 2) % coordinateCount; }
+    Occluder2D() {
+        segments = true;
+        vertices = new float[0];
+    }
+
+    void synchronize() {
+    }
+
+    int edgeStep() {
+        return segments ? 4 : 2;
+    }
+
+    int edgeEnd(int i) {
+        return segments ? i + 2 : (i + 2) % coordinateCount;
+    }
 
     /**
      * Creates an axis-aligned rectangle with local corners from (0,0) through
@@ -139,7 +150,9 @@ public class Occluder2D {
      *
      * @return the world X translation
      */
-    public float getX() {return x;}
+    public float getX() {
+        return x;
+    }
 
     /**
      * Returns the Y translation applied to every local vertex, independently of
@@ -147,7 +160,9 @@ public class Occluder2D {
      *
      * @return the world Y translation
      */
-    public float getY() {return y;}
+    public float getY() {
+        return y;
+    }
 
     /**
      * Performs a broad-phase bounds test against the square enclosing a light's
@@ -158,7 +173,9 @@ public class Occluder2D {
      * @return whether the translated polygon bounds overlap the query square
      * @throws NullPointerException if light is null
      */
-    boolean overlaps(PointLight2D light) {return x + maxX >= light.x - light.radius && x + minX <= light.x + light.radius && y + maxY >= light.y - light.radius && y + minY <= light.y + light.radius;}
+    boolean overlaps(PointLight2D light) {
+        return x + maxX >= light.x - light.radius && x + minX <= light.x + light.radius && y + maxY >= light.y - light.radius && y + minY <= light.y + light.radius;
+    }
 
     /**
      * Tests a world point using an even-odd horizontal-ray crossing calculation

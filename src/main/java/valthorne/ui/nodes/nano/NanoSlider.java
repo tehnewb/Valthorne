@@ -16,6 +16,9 @@ import valthorne.ui.theme.StyleKey;
 import valthorne.viewport.Viewport;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import valthorne.Mouse;
+import valthorne.event.events.MouseReleaseEvent;
+import valthorne.ui.behavior.RangeModel;
 
 /**
  * Focusable NanoVG range control with mouse, wheel, and keyboard input. Values
@@ -96,7 +99,7 @@ public class NanoSlider extends UINode implements NanoNode {
      * Theme input-change callback used when the local action is null.
      */
     public static final StyleKey<NodeAction<NanoSlider>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<NanoSlider>>) (Class<?>) NodeAction.class);
-    private final valthorne.ui.behavior.RangeModel model = new valthorne.ui.behavior.RangeModel(0, 1, 0); // Owned finite range, value, and step calculations.
+    private final RangeModel model = new RangeModel(0, 1, 0); // Owned finite range, value, and step calculations.
     private NodeAction<NanoSlider> action; // Optional local input-change callback overriding theme fallback.
     private float trackHeight = 8f; // Track cross-axis thickness in UI units.
     private float thumbSize = 18f; // Circular thumb diameter and reserved travel size in UI units.
@@ -505,7 +508,7 @@ public class NanoSlider extends UINode implements NanoNode {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        if (event.getButton() != valthorne.Mouse.LEFT || isDisabled()) return;
+        if (event.getButton() != Mouse.LEFT || isDisabled()) return;
         setDragging(true);
         updateFromPointer(event.getX(), event.getY());
     }
@@ -518,7 +521,7 @@ public class NanoSlider extends UINode implements NanoNode {
      */
     @Override
     public void onMouseDrag(MouseDragEvent event) {
-        if (event.getButton() == valthorne.Mouse.LEFT && isDragging())
+        if (event.getButton() == Mouse.LEFT && isDragging())
             updateFromPointer(event.getToX(), event.getToY());
     }
 
@@ -729,7 +732,7 @@ public class NanoSlider extends UINode implements NanoNode {
      * @param event routed pointer release
      */
     @Override
-    public void onMouseRelease(valthorne.event.events.MouseReleaseEvent event) {setDragging(false);}
+    public void onMouseRelease(MouseReleaseEvent event) {setDragging(false);}
 
     /**
      * Invokes the local callback or resolved theme fallback synchronously. Missing

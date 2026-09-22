@@ -1,15 +1,17 @@
 package valthorne.audio.sound;
 
 import org.lwjgl.BufferUtils;
-import valthorne.audio.AudioFormat;
 
 import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Map;
+
+import static valthorne.audio.AudioFormat.MP3;
 
 /**
  * <p>
@@ -34,7 +36,7 @@ public class Mp3SoundDecoder implements SoundDecoder {
         AudioFileFormat fileFormat = AudioSystem.getAudioFileFormat(new ByteArrayInputStream(data));
 
         try (AudioInputStream input = AudioSystem.getAudioInputStream(new ByteArrayInputStream(data))) {
-            javax.sound.sampled.AudioFormat format = input.getFormat();
+            AudioFormat format = input.getFormat();
             float duration = extractDurationSeconds(fileFormat.properties(), fileFormat.getFrameLength(), format.getFrameRate());
             return new SoundMetadata(duration, format.getChannels(), (int) format.getSampleRate(), 16, 0L, data.length);
         }
@@ -52,7 +54,7 @@ public class Mp3SoundDecoder implements SoundDecoder {
         AudioFileFormat fileFormat = AudioSystem.getAudioFileFormat(file);
 
         try (AudioInputStream input = AudioSystem.getAudioInputStream(file)) {
-            javax.sound.sampled.AudioFormat format = input.getFormat();
+            AudioFormat format = input.getFormat();
             float duration = extractDurationSeconds(fileFormat.properties(), fileFormat.getFrameLength(), format.getFrameRate());
             return new SoundMetadata(duration, format.getChannels(), (int) format.getSampleRate(), 16, 0L, file.length());
         }
@@ -89,15 +91,15 @@ public class Mp3SoundDecoder implements SoundDecoder {
     @Override
     public SoundData decode(byte[] data) throws Exception {
         try (AudioInputStream input = AudioSystem.getAudioInputStream(new ByteArrayInputStream(data))) {
-            javax.sound.sampled.AudioFormat sourceFormat = input.getFormat();
-            javax.sound.sampled.AudioFormat pcmFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
+            AudioFormat sourceFormat = input.getFormat();
+            AudioFormat pcmFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
 
             try (AudioInputStream pcmInput = AudioSystem.getAudioInputStream(pcmFormat, input)) {
                 byte[] pcmBytes = pcmInput.readAllBytes();
                 ByteBuffer pcm = BufferUtils.createByteBuffer(pcmBytes.length);
                 pcm.put(pcmBytes).flip();
                 float duration = pcmBytes.length / (pcmFormat.getChannels() * pcmFormat.getSampleRate() * 2);
-                return new SoundData(null, pcm, 0L, pcmBytes.length, duration, pcmFormat.getChannels(), (int) pcmFormat.getSampleRate(), 16, false, true, AudioFormat.MP3);
+                return new SoundData(null, pcm, 0L, pcmBytes.length, duration, pcmFormat.getChannels(), (int) pcmFormat.getSampleRate(), 16, false, true, MP3);
             }
         }
     }

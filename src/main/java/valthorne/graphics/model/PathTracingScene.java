@@ -1,13 +1,14 @@
 package valthorne.graphics.model;
 
-import valthorne.graphics.Color;
-import valthorne.graphics.texture.Texture;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import valthorne.graphics.Color;
+import valthorne.graphics.texture.Texture;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import org.joml.Matrix3f;
 
 /**
  * Collects visible triangle-model instances and builds packed geometry, emitter
@@ -30,43 +31,10 @@ import java.util.List;
  * releasing prior build data. Models, materials, and textures remain borrowed;
  * this package-private object owns CPU lists, matrices, and packed arrays only.
  * </p>
+ *
  * @author Albert Beaupre
  */
 final class PathTracingScene {
-    /**
-     * Retains reusable instance, transform, and combined-material storage for one renderer.
-     * Each capture refreshes the same snapshot; callers must finish consuming it before
-     * the next capture or clear. Failed collection abandons the retained snapshot so a
-     * later attempt starts cleanly. Source scene resources remain borrowed.
-     * @author Albert Beaupre
-     */
-    static final class Collector {
-        private PathTracingScene snapshot; // Reusable snapshot borrowed by callers until the next capture or clear.
-
-        /**
-         * Collects current visible placements into reusable CPU storage, clearing previous
-         * build data and refreshing the signature. OBJ preparation may require the GL context.
-         * The returned object and its mutable contents are borrowed until the next capture.
-         * @param scene scene whose current visibility and material values are collected
-         * @return reusable snapshot owned by this collector
-         */
-        PathTracingScene capture(Scene3D scene) {
-            if (snapshot == null) snapshot = new PathTracingScene();
-            try {
-                snapshot.collect(scene);
-                return snapshot;
-            } catch (RuntimeException | Error failure) {
-                clear();
-                throw failure;
-            }
-        }
-
-        /**
-         * Drops borrowed references and retained scratch capacity without disposing sources.
-         */
-        void clear() {snapshot = null;}
-    }
-
     final ArrayList<Instance> instances = new ArrayList<>(); // Collected model/material references and captured transforms.
     final ArrayList<Texture> textures = new ArrayList<>(); // Borrowed distinct textures in atlas-layer order.
     final ArrayList<float[]> triangles = new ArrayList<>(); // Packed 48-float triangles, reordered in place during BVH construction.
@@ -76,36 +44,8 @@ final class PathTracingScene {
     private final ArrayList<Material3D> objMaterials = new ArrayList<>(); // Owned combined materials; never aliases a source material.
     private final Capacity instancesCapacity = new Capacity(), transformsCapacity = new Capacity(), materialsCapacity = new Capacity(); // Independent retention policies for instances, transforms, and combined OBJ materials.
     private int instanceCount, transformCount, objMaterialCount; // Active prefixes during recollection.
-
-    /**
-     * Tracks peak active list size and consecutive small captures for reusable scene
-     * scratch. Retired references are removed immediately, while backing arrays shrink
-     * after 32 captures below one quarter of the peak, or immediately when empty.
-     * @author Albert Beaupre
-     */
-    private static final class Capacity {
-        private int peak, smallCaptures; // Peak active size and consecutive captures below its quarter-size threshold.
-
-        /**
-         * Removes elements outside the active prefix and applies delayed capacity trimming.
-         * Call after a successful collection with a count no greater than the list size.
-         * @param list owned scratch list to prune
-         * @param count number of elements used by the completed capture
-         */
-        void finish(ArrayList<?> list, int count) {
-            // Remove retired references immediately, without allocating a sub-list view.
-            for (int i = list.size() - 1; i >= count; i--) list.remove(i);
-            peak = Math.max(peak, count);
-            if (count == 0 || count < peak / 4) {
-                if (count == 0 || ++smallCaptures >= 32) {
-                    list.trimToSize();
-                    peak = count;
-                    smallCaptures = 0;
-                }
-            } else smallCaptures = 0;
-        }
-    }
     private long signature = 0xcbf29ce484222325L; // Rolling construction-time signature initialized to the FNV offset basis.
+
     /**
      * Collects explicitly visible renderables and scene-node hierarchies, capturing
      * each world transform. Direct visible renderables must be model instances;
@@ -122,7 +62,109 @@ final class PathTracingScene {
     /**
      * Creates empty renderer-owned scratch; collection must populate it before building.
      */
-    private PathTracingScene() {}
+    private PathTracingScene() {
+    }
+
+    /**
+     * Drops all entries and trims a nonempty build-data list after upload or recollection.
+     * Referenced textures and model resources are borrowed and are never disposed here.
+     *
+     * @param data owned list whose temporary build entries can be released
+     */
+    private static void release(ArrayList<?> data) {
+        if (!data.isEmpty()) {
+            data.clear();
+            data.trimToSize();
+        }
+    }
+
+    /**
+     * Copies three vector components into a packed float array without a fourth
+     * padding component.
+     *
+     * @param target destination array
+     * @param offset first destination index
+     * @param v      vector to copy
+     */
+    private static void put(float[] target, int offset, Vector3f v) {
+        target[offset] = v.x();
+        target[offset + 1] = v.y();
+        target[offset + 2] = v.z();
+    }
+
+    /**
+     * Computes a triangle centroid coordinate from its packed base point and two
+     * edge vectors: base plus one third of the edge sum.
+     *
+     * @param t    packed triangle
+     * @param axis coordinate index from 0 through 2
+     * @return centroid coordinate on the selected axis
+     */
+    private static float centroid(float[] t, int axis) {
+        return t[axis] + (t[4 + axis] + t[8 + axis]) / 3;
+    }
+
+    /**
+     * Converts an sRGB component to linear light for emitter luminance weighting.
+     * Does not clamp input values.
+     *
+     * @param x sRGB component
+     * @return linear-light component
+     */
+    private static double linear(float x) {
+        return x <= .04045 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4);
+    }
+
+    /**
+     * Copies equal-stride records into a new contiguous array. An empty source still
+     * produces one zero-filled stride so a nonempty GPU allocation can be created.
+     *
+     * @param source packed records
+     * @param stride floats per record
+     * @return independent contiguous data
+     */
+    private static float[] flatten(List<float[]> source, int stride) {
+        float[] result = new float[Math.max(stride, source.size() * stride)];
+        for (int i = 0; i < source.size(); i++) System.arraycopy(source.get(i), 0, result, i * stride, stride);
+        return result;
+    }
+
+    /**
+     * Creates a six-float min/max accumulator with positive-infinite minima and
+     * negative-infinite maxima, ready for its first triangle.
+     *
+     * @return new empty bounds storage
+     */
+    private static float[] emptyBounds() {
+        return new float[]{Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY,
+                Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
+    }
+
+    /**
+     * Expands a six-float bounds accumulator to include the three vertices reconstructed
+     * from a packed triangle's base and edges.
+     *
+     * @param bounds   mutable minimum XYZ followed by maximum XYZ
+     * @param triangle packed triangle record
+     */
+    private static void extend(float[] bounds, float[] triangle) {
+        for (int a = 0; a < 3; a++) {
+            float p = triangle[a], q = p + triangle[4 + a], r = p + triangle[8 + a];
+            bounds[a] = Math.min(bounds[a], Math.min(p, Math.min(q, r)));
+            bounds[3 + a] = Math.max(bounds[3 + a], Math.max(p, Math.max(q, r)));
+        }
+    }
+
+    /**
+     * Computes box surface area for BVH split cost without validating the bounds.
+     *
+     * @param bounds valid minimum/maximum box
+     * @return twice the sum of pairwise extent products
+     */
+    private static float area(float[] bounds) {
+        float x = bounds[3] - bounds[0], y = bounds[4] - bounds[1], z = bounds[5] - bounds[2];
+        return 2 * (x * y + y * z + z * x);
+    }
 
     /**
      * Refreshes mutable inputs in the original order without a second signature traversal.
@@ -147,6 +189,7 @@ final class PathTracingScene {
     /**
      * Reserves the next reusable captured transform, growing storage only when needed.
      * The caller must overwrite the matrix before reading it; later captures may reuse it.
+     *
      * @return owned mutable matrix for the current placement
      */
     private Matrix4f nextTransform() {
@@ -162,65 +205,6 @@ final class PathTracingScene {
         release(triangles);
         release(nodes);
         release(emitters);
-    }
-
-    /**
-     * Drops all entries and trims a nonempty build-data list after upload or recollection.
-     * Referenced textures and model resources are borrowed and are never disposed here.
-     * @param data owned list whose temporary build entries can be released
-     */
-    private static void release(ArrayList<?> data) {
-        if (!data.isEmpty()) {
-            data.clear();
-            data.trimToSize();
-        }
-    }
-
-    /**
-     * Copies three vector components into a packed float array without a fourth
-     * padding component.
-     *
-     * @param target destination array
-     * @param offset first destination index
-     * @param v vector to copy
-     */
-    private static void put(float[] target, int offset, Vector3f v) {
-        target[offset] = v.x();
-        target[offset + 1] = v.y();
-        target[offset + 2] = v.z();
-    }
-
-    /**
-     * Computes a triangle centroid coordinate from its packed base point and two
-     * edge vectors: base plus one third of the edge sum.
-     *
-     * @param t packed triangle
-     * @param axis coordinate index from 0 through 2
-     * @return centroid coordinate on the selected axis
-     */
-    private static float centroid(float[] t, int axis) {return t[axis] + (t[4 + axis] + t[8 + axis]) / 3;}
-
-    /**
-     * Converts an sRGB component to linear light for emitter luminance weighting.
-     * Does not clamp input values.
-     *
-     * @param x sRGB component
-     * @return linear-light component
-     */
-    private static double linear(float x) {return x <= .04045 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4);}
-
-    /**
-     * Copies equal-stride records into a new contiguous array. An empty source still
-     * produces one zero-filled stride so a nonempty GPU allocation can be created.
-     *
-     * @param source packed records
-     * @param stride floats per record
-     * @return independent contiguous data
-     */
-    private static float[] flatten(List<float[]> source, int stride) {
-        float[] result = new float[Math.max(stride, source.size() * stride)];
-        for (int i = 0; i < source.size(); i++) System.arraycopy(source.get(i), 0, result, i * stride, stride);
-        return result;
     }
 
     /**
@@ -244,14 +228,18 @@ final class PathTracingScene {
      *
      * @param v value to mix
      */
-    private void hash(int v) {signature = (signature ^ v) * 0x100000001b3L;}
+    private void hash(int v) {
+        signature = (signature ^ v) * 0x100000001b3L;
+    }
 
     /**
      * Mixes the float's canonical bit representation into the scene signature.
      *
      * @param v scalar material or transform component
      */
-    private void hash(float v) {hash(Float.floatToIntBits(v));}
+    private void hash(float v) {
+        hash(Float.floatToIntBits(v));
+    }
 
     /**
      * Mixes all four color components into the rolling signature in RGBA order.
@@ -271,8 +259,8 @@ final class PathTracingScene {
      * models upload pending textures and recursively expand parts, combining tint,
      * translucency, and texture selection with the instance material.
      *
-     * @param model source model, possibly null
-     * @param material effective instance material
+     * @param model     source model, possibly null
+     * @param material  effective instance material
      * @param transform captured model-to-world matrix
      */
     private void add(Model3D model, Material3D material, Matrix4f transform) {
@@ -326,7 +314,9 @@ final class PathTracingScene {
      *
      * @return rolling scene signature
      */
-    long signature() {return signature;}
+    long signature() {
+        return signature;
+    }
 
     /**
      * Appends world-space triangles for collected instances, skipping areas at most
@@ -360,9 +350,9 @@ final class PathTracingScene {
             }
             if (Math.abs(i.transform.determinant3x3()) < 1e-20f)
                 throw new IllegalStateException("Singular normal transform");
-            org.joml.Matrix3f normalTransform = i.transform.normal(new org.joml.Matrix3f());
+            Matrix3f normalTransform = i.transform.normal(new Matrix3f());
             for (Model3D.Triangle t : i.model.triangles()) {
-                Vector3f a = i.transform.transformPosition(t.a, new Vector3f()), b = i.transform.transformPosition(t.b, new Vector3f()), c = i.transform.transformPosition(t.c, new Vector3f());
+                Vector3f a = i.transform.transformPosition(t.a(), new Vector3f()), b = i.transform.transformPosition(t.b(), new Vector3f()), c = i.transform.transformPosition(t.c(), new Vector3f());
                 Vector3f e1 = new Vector3f(b).sub(a), e2 = new Vector3f(c).sub(a);
                 float area = new Vector3f(e1).cross(e2).length() * .5f;
                 if (!(area > 1e-10f)) continue;
@@ -372,16 +362,16 @@ final class PathTracingScene {
                 put(v, 4, e1);
                 put(v, 8, e2);
                 v[3] = area;
-                Vector3f normal = normalTransform.transform(t.normalA, new Vector3f());
+                Vector3f normal = normalTransform.transform(t.normalA(), new Vector3f());
                 if (normal.lengthSquared() != 0f) normal.normalize();
                 put(v, 12, normal);
-                normalTransform.transform(t.normalB, normal);
+                normalTransform.transform(t.normalB(), normal);
                 if (normal.lengthSquared() != 0f) normal.normalize();
                 put(v, 16, normal);
-                normalTransform.transform(t.normalC, normal);
+                normalTransform.transform(t.normalC(), normal);
                 if (normal.lengthSquared() != 0f) normal.normalize();
                 put(v, 20, normal);
-                Color tint = m.getTint(), tc = t.color, em = m.getEmissive();
+                Color tint = m.getTint(), tc = t.color(), em = m.getEmissive();
                 v[24] = tint.r() * tc.r();
                 v[25] = tint.g() * tc.g();
                 v[26] = tint.b() * tc.b();
@@ -394,12 +384,12 @@ final class PathTracingScene {
                 v[33] = m.getMetallic();
                 v[34] = m.getTransmission();
                 v[35] = m.getIndexOfRefraction();
-                v[36] = t.uvA.x();
-                v[37] = t.uvA.y();
-                v[38] = t.uvB.x();
-                v[39] = t.uvB.y();
-                v[40] = t.uvC.x();
-                v[41] = t.uvC.y();
+                v[36] = t.uvA().x();
+                v[37] = t.uvA().y();
+                v[38] = t.uvB().x();
+                v[39] = t.uvB().y();
+                v[40] = t.uvC().x();
+                v[41] = t.uvC().y();
                 v[42] = layer;
                 v[43] = m.getAlphaCutoff();
                 v[45] = surfaceId;
@@ -436,7 +426,7 @@ final class PathTracingScene {
      * </p>
      *
      * @param start inclusive triangle index
-     * @param end exclusive triangle index
+     * @param end   exclusive triangle index
      * @param depth current recursion depth
      * @return newly appended node index
      */
@@ -478,7 +468,11 @@ final class PathTracingScene {
             for (int j = 1; j < count; j++) {
                 extend(bounds, triangles.get(start + j - 1));
                 double cost = area(bounds) * j + suffix[j];
-                if (cost < bestCost) {bestCost = cost; axis = candidate; bestLeft = j;}
+                if (cost < bestCost) {
+                    bestCost = cost;
+                    axis = candidate;
+                    bestLeft = j;
+                }
             }
         }
         n[7] = -(axis + 1); // Internal nodes encode the split axis for direction-ordered traversal.
@@ -491,49 +485,14 @@ final class PathTracingScene {
     }
 
     /**
-     * Creates a six-float min/max accumulator with positive-infinite minima and
-     * negative-infinite maxima, ready for its first triangle.
-     *
-     * @return new empty bounds storage
-     */
-    private static float[] emptyBounds() {
-        return new float[]{Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY,
-                Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
-    }
-
-    /**
-     * Expands a six-float bounds accumulator to include the three vertices reconstructed
-     * from a packed triangle's base and edges.
-     *
-     * @param bounds mutable minimum XYZ followed by maximum XYZ
-     * @param triangle packed triangle record
-     */
-    private static void extend(float[] bounds, float[] triangle) {
-        for (int a = 0; a < 3; a++) {
-            float p = triangle[a], q = p + triangle[4 + a], r = p + triangle[8 + a];
-            bounds[a] = Math.min(bounds[a], Math.min(p, Math.min(q, r)));
-            bounds[3 + a] = Math.max(bounds[3 + a], Math.max(p, Math.max(q, r)));
-        }
-    }
-
-    /**
-     * Computes box surface area for BVH split cost without validating the bounds.
-     *
-     * @param bounds valid minimum/maximum box
-     * @return twice the sum of pairwise extent products
-     */
-    private static float area(float[] bounds) {
-        float x = bounds[3] - bounds[0], y = bounds[4] - bounds[1], z = bounds[5] - bounds[2];
-        return 2 * (x * y + y * z + z * x);
-    }
-
-    /**
      * Flattens the current BVH-ordered triangle records into independent upload data.
      * Must follow build for a complete snapshot.
      *
      * @return packed 48-float records, or one zero record when empty
      */
-    float[] triangleData() {return flatten(triangles, 48);}
+    float[] triangleData() {
+        return flatten(triangles, 48);
+    }
 
     /**
      * Builds pairs of triangle index and cumulative emitter probability from the
@@ -560,7 +519,78 @@ final class PathTracingScene {
      *
      * @return packed eight-float nodes, or one zero node when empty
      */
-    float[] nodeData() {return flatten(nodes, 8);}
+    float[] nodeData() {
+        return flatten(nodes, 8);
+    }
+
+    /**
+     * Retains reusable instance, transform, and combined-material storage for one renderer.
+     * Each capture refreshes the same snapshot; callers must finish consuming it before
+     * the next capture or clear. Failed collection abandons the retained snapshot so a
+     * later attempt starts cleanly. Source scene resources remain borrowed.
+     *
+     * @author Albert Beaupre
+     */
+    static final class Collector {
+        private PathTracingScene snapshot; // Reusable snapshot borrowed by callers until the next capture or clear.
+
+        /**
+         * Collects current visible placements into reusable CPU storage, clearing previous
+         * build data and refreshing the signature. OBJ preparation may require the GL context.
+         * The returned object and its mutable contents are borrowed until the next capture.
+         *
+         * @param scene scene whose current visibility and material values are collected
+         * @return reusable snapshot owned by this collector
+         */
+        PathTracingScene capture(Scene3D scene) {
+            if (snapshot == null) snapshot = new PathTracingScene();
+            try {
+                snapshot.collect(scene);
+                return snapshot;
+            } catch (RuntimeException | Error failure) {
+                clear();
+                throw failure;
+            }
+        }
+
+        /**
+         * Drops borrowed references and retained scratch capacity without disposing sources.
+         */
+        void clear() {
+            snapshot = null;
+        }
+    }
+
+    /**
+     * Tracks peak active list size and consecutive small captures for reusable scene
+     * scratch. Retired references are removed immediately, while backing arrays shrink
+     * after 32 captures below one quarter of the peak, or immediately when empty.
+     *
+     * @author Albert Beaupre
+     */
+    private static final class Capacity {
+        private int peak, smallCaptures; // Peak active size and consecutive captures below its quarter-size threshold.
+
+        /**
+         * Removes elements outside the active prefix and applies delayed capacity trimming.
+         * Call after a successful collection with a count no greater than the list size.
+         *
+         * @param list  owned scratch list to prune
+         * @param count number of elements used by the completed capture
+         */
+        void finish(ArrayList<?> list, int count) {
+            // Remove retired references immediately, without allocating a sub-list view.
+            for (int i = list.size() - 1; i >= count; i--) list.remove(i);
+            peak = Math.max(peak, count);
+            if (count == 0 || count < peak / 4) {
+                if (count == 0 || ++smallCaptures >= 32) {
+                    list.trimToSize();
+                    peak = count;
+                    smallCaptures = 0;
+                }
+            } else smallCaptures = 0;
+        }
+    }
 
     /**
      * Collected geometry source and effective material with a captured world matrix.
@@ -570,8 +600,8 @@ final class PathTracingScene {
      * Models and materials remain borrowed, so their required lifetime extends through
      * scene construction even though instance transforms have already been captured.</p>
      *
-     * @param model borrowed source triangle model
-     * @param material borrowed effective material
+     * @param model     borrowed source triangle model
+     * @param material  borrowed effective material
      * @param transform captured world transform retained by reference
      * @author Albert Beaupre
      */

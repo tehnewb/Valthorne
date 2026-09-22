@@ -1,5 +1,7 @@
 package valthorne.web.ui;
-import org.teavm.jso.*; import org.teavm.jso.typedarrays.Uint8Array; import org.teavm.interop.*; import org.lwjgl.nanovg.*; import java.nio.ByteBuffer;
+import org.teavm.jso.*; import Uint8Array; import org.teavm.interop.*; import org.lwjgl.nanovg.*; import ByteBuffer;
+import java.nio.ByteBuffer;
+import org.teavm.jso.typedarrays.Uint8Array;
 public final class BrowserNano {
 private BrowserNano() {}
 public static final int NVG_ANTIALIAS=1,NVG_STENCIL_STROKES=2,NVG_ALIGN_LEFT=1,NVG_ALIGN_CENTER=2,NVG_ALIGN_RIGHT=4,NVG_ALIGN_TOP=8,NVG_ALIGN_MIDDLE=16,NVG_ALIGN_BOTTOM=32,NVG_ALIGN_BASELINE=64,NVG_ROUND=1,NVG_IMAGE_FLIPY=8,NVG_CW=1,NVG_CCW=2;

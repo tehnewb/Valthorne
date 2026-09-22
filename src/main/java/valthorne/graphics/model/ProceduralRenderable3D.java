@@ -1,11 +1,12 @@
 package valthorne.graphics.model;
 
-import valthorne.camera.Camera3D;
 import org.joml.FrustumIntersection;
-import org.joml.primitives.AABBf;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.primitives.AABBf;
+import valthorne.camera.Camera3D;
+import org.joml.Matrix3f;
 
 /**
  * A procedurally emitted mesh with a material, affine transform, and conservative
@@ -28,6 +29,7 @@ import org.joml.Vector3f;
  *         .setScale(2);
  * Vector3f worldPoint = surface.transform(new Vector3f(0, 0, 1), new Vector3f());
  * }</pre>
+ *
  * @author Albert Beaupre
  */
 public final class ProceduralRenderable3D implements MeshRenderable3D {
@@ -39,7 +41,7 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
     private final Vector3f boundsScratch = new Vector3f(); // Scratch vector for transforming one local bounds corner.
     private final Matrix4f rotationMatrix = new Matrix4f(); // Scratch matrix for applying a copied quaternion rotation.
     private final Matrix4f parentTransform = new Matrix4f(); // Copied parent affine transform applied before local placement.
-    private final org.joml.Matrix3f normalTransform = new org.joml.Matrix3f(); // Scratch inverse-transpose matrix for normal transformation.
+    private final Matrix3f normalTransform = new Matrix3f(); // Scratch inverse-transpose matrix for normal transformation.
     private final Matrix4f worldTransform = new Matrix4f(); // Cached parent times translation times rotation times scale matrix.
     private final float[] lastTransform = new float[9]; // Last evaluated position, scale, and Euler components.
     private Material3D material = new Material3D(); // Borrowed material used for geometry submission.
@@ -72,7 +74,7 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
      *
      * @param rotation finite, nonzero quaternion
      * @return this renderable
-     * @throws NullPointerException if rotation is null
+     * @throws NullPointerException     if rotation is null
      * @throws IllegalArgumentException if the quaternion is zero or nonfinite
      */
     public ProceduralRenderable3D setRotation(Quaternionf rotation) {
@@ -123,7 +125,7 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
      *
      * @param out nonnull destination matrix
      * @return out
-     * @throws NullPointerException if out is null
+     * @throws NullPointerException     if out is null
      * @throws IllegalArgumentException if local transform components are nonfinite or scale contains zero
      */
     public Matrix4f getWorldTransform(Matrix4f out) {
@@ -137,11 +139,11 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
      * under nonuniform scaling; a zero input normal remains zero.
      *
      * @param normal local-space normal, which may also be out
-     * @param out destination for the world-space normal
+     * @param out    destination for the world-space normal
      * @return out
-     * @throws NullPointerException if either vector is null
+     * @throws NullPointerException     if either vector is null
      * @throws IllegalArgumentException if the local transform is invalid
-     * @throws IllegalStateException if the world linear transform is effectively singular
+     * @throws IllegalStateException    if the world linear transform is effectively singular
      */
     public Vector3f transformNormal(Vector3f normal, Vector3f out) {
         updateTransform();
@@ -379,7 +381,7 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
      * @return this renderable
      */
     public ProceduralRenderable3D setLocalBounds(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
-        localBounds.setMin(minX, minY, minZ).setMax( maxX, maxY, maxZ).correctBounds();
+        localBounds.setMin(minX, minY, minZ).setMax(maxX, maxY, maxZ).correctBounds();
         worldBoundsDirty = true;
         return this;
     }
@@ -457,9 +459,9 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
      * matrix. The input and destination may be the same vector.
      *
      * @param localPoint nonnull local-space point
-     * @param out nonnull destination
+     * @param out        nonnull destination
      * @return out
-     * @throws NullPointerException if either vector is null
+     * @throws NullPointerException     if either vector is null
      * @throws IllegalArgumentException if the local transform is invalid
      */
     public Vector3f transform(Vector3f localPoint, Vector3f out) {
@@ -474,9 +476,9 @@ public final class ProceduralRenderable3D implements MeshRenderable3D {
      * @param localX local X coordinate
      * @param localY local Y coordinate
      * @param localZ local Z coordinate
-     * @param out nonnull destination vector
+     * @param out    nonnull destination vector
      * @return out
-     * @throws NullPointerException if out is null
+     * @throws NullPointerException     if out is null
      * @throws IllegalArgumentException if the local transform is invalid
      */
     public Vector3f transform(float localX, float localY, float localZ, Vector3f out) {

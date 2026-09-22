@@ -49,12 +49,12 @@ public abstract class Light {
      * dirty with soft shadows enabled. Position and distance are stored unchecked.
      *
      * @param rayHandler associated handler
-     * @param rays base ray count, at least three
-     * @param color color to copy
-     * @param distance radial extent
-     * @param x world center X
-     * @param y world center Y
-     * @throws NullPointerException if handler or color is null
+     * @param rays       base ray count, at least three
+     * @param color      color to copy
+     * @param distance   radial extent
+     * @param x          world center X
+     * @param y          world center Y
+     * @throws NullPointerException     if handler or color is null
      * @throws IllegalArgumentException if rays is below three
      */
     protected Light(RayHandler rayHandler, int rays, Color color, float distance, float x, float y) {
@@ -81,7 +81,7 @@ public abstract class Light {
     /**
      * Writes one unoccluded endpoint into reusable XY output for the base rebuild.
      *
-     * @param index base ray index
+     * @param index  base ray index
      * @param output destination with at least two elements
      */
     protected abstract void computeRayEnd(int index, float[] output);
@@ -154,9 +154,9 @@ public abstract class Light {
      * the smaller partition and iterates over the larger to limit stack growth.
      *
      * @param indices permutation to reorder
-     * @param angles angle lookup array
-     * @param low inclusive first position
-     * @param high inclusive last position
+     * @param angles  angle lookup array
+     * @param low     inclusive first position
+     * @param high    inclusive last position
      */
     private void quickSort(int[] indices, float[] angles, int low, int high) {
         while (low < high) {
@@ -177,9 +177,9 @@ public abstract class Light {
      * Angle values remain unchanged.
      *
      * @param indices permutation to mutate
-     * @param angles angle lookup array
-     * @param low inclusive range start
-     * @param high inclusive range end and pivot source
+     * @param angles  angle lookup array
+     * @param low     inclusive range start
+     * @param high    inclusive range end and pivot source
      * @return pivot's final index
      */
     private int partition(int[] indices, float[] angles, int low, int high) {
@@ -206,7 +206,7 @@ public abstract class Light {
      * Stores a hit endpoint and fraction or the unobstructed endpoint with fraction one.
      * Reuses the light's scratch hit object.
      *
-     * @param index destination ray slot
+     * @param index   destination ray slot
      * @param targetX unoccluded X
      * @param targetY unoccluded Y
      */
@@ -229,7 +229,7 @@ public abstract class Light {
      *
      * @param targetX endpoint X
      * @param targetY endpoint Y
-     * @param outHit optional reusable result
+     * @param outHit  optional reusable result
      * @return whether a hit occurred
      */
     protected final boolean rayCast(float targetX, float targetY, RayCastHit outHit) {

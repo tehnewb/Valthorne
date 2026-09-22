@@ -3,6 +3,10 @@ import org.teavm.jso.*;
 import valthorne.event.*;
 import valthorne.event.events.*;
 import valthorne.event.listeners.*;
+import java.util.Arrays;
+import org.teavm.jso.typedarrays.Uint8Array;
+import valthorne.graphics.texture.TextureData;
+import valthorne.web.WindowImages;
 
 /** Browser mouse backend, preserving desktop button IDs and bottom-left coordinates. */
 public final class Mouse {
@@ -15,7 +19,7 @@ public final class Mouse {
     private static Object cursorOwner;private static int cursorShape=CURSOR_ARROW;
     @JSFunctor private interface Callback extends JSObject {void accept(int kind,int button,int mods,int fromX,int fromY,int x,int y);}
     @JSFunctor private interface Scroll extends JSObject {void accept(float x,float y);}
-    static void init(){java.util.Arrays.fill(buttons,false);mouseX=0;mouseY=Window.getHeight();scrollX=scrollY=0;install((kind,button,mods,fromX,fromY,x,y)->JGL.runInputTask(()->{
+    static void init(){Arrays.fill(buttons,false);mouseX=0;mouseY=Window.getHeight();scrollX=scrollY=0;install((kind,button,mods,fromX,fromY,x,y)->JGL.runInputTask(()->{
         mouseX=x;mouseY=y;if(button>=0&&button<buttons.length&&(kind==0||kind==1))buttons[button]=kind==0;
         Event event=switch(kind){
             case 0 -> new MousePressEvent(button,mods,x,y);
@@ -52,10 +56,10 @@ public final class Mouse {
         cursorOwner=null;cursorShape=CURSOR_ARROW;setCursor(CURSOR_ARROW);
     }
     public static int getCursorShape(){return cursorShape;}
-    public static void setCursor(valthorne.graphics.texture.TextureData texture,int hotX,int hotY){
-        cursor(valthorne.web.WindowImages.pixels(texture),texture.width(),texture.height(),Math.max(0,Math.min(texture.width()-1,hotX)),Math.max(0,Math.min(texture.height()-1,texture.height()-hotY-1)));
+    public static void setCursor(TextureData texture,int hotX,int hotY){
+        cursor(WindowImages.pixels(texture),texture.width(),texture.height(),Math.max(0,Math.min(texture.width()-1,hotX)),Math.max(0,Math.min(texture.height()-1,texture.height()-hotY-1)));
     }
-    @JSBody(params={"pixels","w","h","x","y"},script="var p=valthorneHost.platform;p.canvas.style.cursor=p.cursorValue='url('+p.window.image(pixels,w,h)+') '+x+' '+y+', default';") private static native void cursor(org.teavm.jso.typedarrays.Uint8Array pixels,int w,int h,int x,int y);
+    @JSBody(params={"pixels","w","h","x","y"},script="var p=valthorneHost.platform;p.canvas.style.cursor=p.cursorValue='url('+p.window.image(pixels,w,h)+') '+x+' '+y+', default';") private static native void cursor(Uint8Array pixels,int w,int h,int x,int y);
     /** Changes engine coordinates; browser security prevents warping the OS pointer. */
     public static void setCursorPosition(double x,double y){if(!Double.isFinite(x+y))throw new IllegalArgumentException("Invalid cursor position");mouseX=(int)x;mouseY=(int)y;position(x,y);}
     @JSBody(params={"x","y"},script="var p=valthorneHost.platform;p.mouseX=x;p.mouseY=p.window.height-y;") private static native void position(double x,double y);

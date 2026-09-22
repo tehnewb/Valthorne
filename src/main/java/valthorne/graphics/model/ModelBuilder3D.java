@@ -1,10 +1,11 @@
 package valthorne.graphics.model;
 
-import valthorne.graphics.Color;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
+import valthorne.graphics.Color;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
 /**
  * Builds CPU triangle models from explicit faces or centered Z-up primitives.
@@ -50,8 +51,8 @@ public final class ModelBuilder3D {
      * Creates a centered box with twelve white triangles and flat outward face normals.
      * Each face receives unit-square UVs independently.
      *
-     * @param width finite positive X extent
-     * @param depth finite positive Y extent
+     * @param width  finite positive X extent
+     * @param depth  finite positive Y extent
      * @param height finite positive Z extent
      * @return new closed box model
      * @throws IllegalArgumentException if a dimension is invalid
@@ -73,9 +74,9 @@ public final class ModelBuilder3D {
      * that span longitude and latitude. Omits degenerate pole triangles, yielding
      * 2 * segments * (stacks - 1) triangles for ordinary counts.
      *
-     * @param radius finite positive radius
+     * @param radius   finite positive radius
      * @param segments longitude divisions, at least three
-     * @param stacks latitude divisions, at least two
+     * @param stacks   latitude divisions, at least two
      * @return new sphere model
      * @throws IllegalArgumentException if radius or subdivision counts are invalid
      */
@@ -99,8 +100,8 @@ public final class ModelBuilder3D {
      * flat end caps. Side UVs wrap around the circumference; cap UVs map the circular
      * cross-section into a unit square. Each segment contributes four triangles.
      *
-     * @param radius finite positive radius
-     * @param height finite positive full Z extent
+     * @param radius   finite positive radius
+     * @param height   finite positive full Z extent
      * @param segments circumference divisions, at least three
      * @return new cylinder model
      * @throws IllegalArgumentException if dimensions or segment count are invalid
@@ -144,7 +145,7 @@ public final class ModelBuilder3D {
      * Maps a cap point's XY coordinates from a radius-centered disk into the unit square.
      * Z is ignored and the caller supplies a positive radius.
      *
-     * @param p cylinder cap position
+     * @param p      cylinder cap position
      * @param radius cylinder radius
      * @return newly allocated cap texture coordinate
      */
@@ -156,16 +157,16 @@ public final class ModelBuilder3D {
      * Scales unit-sphere positions by radius while preserving their radial directions
      * as vertex normals. Assigns white color and the supplied seam-aware UVs.
      *
-     * @param a first unit-sphere position
-     * @param b second unit-sphere position
-     * @param c third unit-sphere position
+     * @param a  first unit-sphere position
+     * @param b  second unit-sphere position
+     * @param c  third unit-sphere position
      * @param ua first U coordinate
      * @param va first V coordinate
      * @param ub second U coordinate
      * @param vb second V coordinate
      * @param uc third U coordinate
      * @param vc third V coordinate
-     * @param r sphere radius
+     * @param r  sphere radius
      * @return new attributed triangle
      */
     private static Model3D.Triangle sphereTriangle(Vector3f a, Vector3f b, Vector3f c,
@@ -190,9 +191,9 @@ public final class ModelBuilder3D {
      * Appends a copied colored triangle with zero UVs and generated flat normals.
      * No degeneracy or winding correction is performed.
      *
-     * @param a first position
-     * @param b second position
-     * @param c third position
+     * @param a     first position
+     * @param b     second position
+     * @param c     third position
      * @param color face color
      * @return this builder
      * @throws NullPointerException if a position or color is null
@@ -211,7 +212,7 @@ public final class ModelBuilder3D {
      * @throws NullPointerException if triangle is null
      */
     public ModelBuilder3D triangle(Model3D.Triangle triangle) {
-        triangles.add(java.util.Objects.requireNonNull(triangle));
+        triangles.add(Objects.requireNonNull(triangle));
         return this;
     }
 
@@ -220,10 +221,10 @@ public final class ModelBuilder3D {
      * Supply ordered coplanar corners for a conventional quad; convexity, planarity,
      * and winding are not validated or corrected.
      *
-     * @param a first corner at UV (0,0)
-     * @param b second corner at UV (1,0)
-     * @param c third corner at UV (1,1)
-     * @param d fourth corner at UV (0,1)
+     * @param a     first corner at UV (0,0)
+     * @param b     second corner at UV (1,0)
+     * @param c     third corner at UV (1,1)
+     * @param d     fourth corner at UV (0,1)
      * @param color color copied into both triangles
      * @return this builder
      * @throws NullPointerException if a corner or color is null
@@ -242,11 +243,15 @@ public final class ModelBuilder3D {
      *
      * @return independent model snapshot, possibly empty
      */
-    public Model3D build() {return new Model3D(triangles.toArray(Model3D.Triangle[]::new));}
+    public Model3D build() {
+        return new Model3D(triangles.toArray(Model3D.Triangle[]::new));
+    }
 
     /**
      * Removes accumulated faces without affecting models already built. No graphics
      * resources are owned or released by this operation.
      */
-    public void clear() {triangles.clear();}
+    public void clear() {
+        triangles.clear();
+    }
 }

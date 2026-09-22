@@ -1,10 +1,10 @@
 package valthorne.graphics.model;
 
+import org.joml.Vector2f;
+import org.joml.Vector3f;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureData;
-import org.joml.Vector2f;
-import org.joml.Vector3f;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import org.lwjgl.opengl.GL13;
 
 /**
  * Loads Wavefront OBJ triangle geometry with UVs, explicit normals, optional
@@ -41,6 +42,7 @@ import java.util.*;
  *     model.dispose();
  * }
  * }</pre>
+ *
  * @author Albert Beaupre
  */
 public final class ObjModel3D extends Model3D {
@@ -49,13 +51,14 @@ public final class ObjModel3D extends Model3D {
     private final Map<Material3D, String> textureNames; // Identity-based part material bindings to decoded image paths.
     private final Map<String, Texture> textures = new HashMap<>(); // Owned lazily uploaded textures keyed by resource path.
     private boolean disposed; // Whether image and texture resource disposal completed.
+
     /**
      * Stores loaded geometry and takes ownership of image resources and texture
      * binding maps. Copies the part list but retains its mutable models/materials.
      *
-     * @param triangles combined geometry for the base model
-     * @param parts material-group geometry and material references
-     * @param images decoded images owned by this model
+     * @param triangles    combined geometry for the base model
+     * @param parts        material-group geometry and material references
+     * @param images       decoded images owned by this model
      * @param textureNames identity-based material-to-image mapping
      */
     private ObjModel3D(Triangle[] triangles, List<Part> parts, Map<String, TextureData> images,
@@ -72,19 +75,21 @@ public final class ObjModel3D extends Model3D {
      *
      * @param path OBJ filesystem path
      * @return newly owned model
-     * @throws UncheckedIOException if an OBJ, material, or image file cannot be read
+     * @throws UncheckedIOException     if an OBJ, material, or image file cannot be read
      * @throws IllegalArgumentException if input geometry or supported material data is malformed
      */
-    public static ObjModel3D load(String path) {return load(path, true);}
+    public static ObjModel3D load(String path) {
+        return load(path, true);
+    }
 
     /**
      * Loads an OBJ from a normalized absolute filesystem path and resolves its
      * dependencies relative to their declaring files.
      *
-     * @param path OBJ filesystem path
+     * @param path             OBJ filesystem path
      * @param convertAndGround whether to swap Y/Z, center horizontally, and ground the model
      * @return newly owned model
-     * @throws UncheckedIOException if a required file cannot be read
+     * @throws UncheckedIOException     if a required file cannot be read
      * @throws IllegalArgumentException if supported input data is malformed
      */
     public static ObjModel3D load(String path, boolean convertAndGround) {
@@ -103,11 +108,11 @@ public final class ObjModel3D extends Model3D {
      * include the source path and line number.
      * </p>
      *
-     * @param source logical path used for loading and relative dependency resolution
-     * @param resolver nonnull provider of source and dependency bytes
+     * @param source           logical path used for loading and relative dependency resolution
+     * @param resolver         nonnull provider of source and dependency bytes
      * @param convertAndGround whether to convert axes and reposition the model
      * @return newly owned geometry and image resources
-     * @throws UncheckedIOException if the resolver reports a read failure
+     * @throws UncheckedIOException     if the resolver reports a read failure
      * @throws IllegalArgumentException if references, numbers, faces, or supported materials are invalid
      */
     public static ObjModel3D load(String source, Resolver resolver, boolean convertAndGround) {
@@ -208,25 +213,27 @@ public final class ObjModel3D extends Model3D {
      * reverses handedness, so it also reverses vertex order while preserving matching
      * UV and normal assignments.
      *
-     * @param t source triangle
+     * @param t      source triangle
      * @param offset source-space centering and grounding offset
      * @return converted triangle
      */
     private static Triangle convert(Triangle t, Vector3f offset) {
         // Swapping Y/Z reverses handedness, so reverse the face order as well.
-        return new Triangle(convertPosition(t.getA(), offset), convertPosition(t.getC(), offset), convertPosition(t.getB(), offset), t.getColor(),
-                t.getUvA(), t.getUvC(), t.getUvB(), swap(t.getNormalA()), swap(t.getNormalC()), swap(t.getNormalB()));
+        return new Triangle(convertPosition(t.a(), offset), convertPosition(t.c(), offset), convertPosition(t.b(), offset), t.color(),
+                t.uvA(), t.uvC(), t.uvB(), swap(t.normalA()), swap(t.normalC()), swap(t.normalB()));
     }
 
     /**
      * Subtracts the source-space offset from the supplied working vector, then
      * returns a new vector with Y and Z exchanged.
      *
-     * @param p mutable position working copy
+     * @param p      mutable position working copy
      * @param offset source-space translation to subtract
      * @return converted position
      */
-    private static Vector3f convertPosition(Vector3f p, Vector3f offset) {return swap(p.sub(offset));}
+    private static Vector3f convertPosition(Vector3f p, Vector3f offset) {
+        return swap(p.sub(offset));
+    }
 
     /**
      * Copies a vector with Y and Z exchanged; used for both positions and normals.
@@ -234,26 +241,32 @@ public final class ObjModel3D extends Model3D {
      * @param p source vector
      * @return new vector containing X, Z, Y
      */
-    private static Vector3f swap(Vector3f p) {return new Vector3f(p.x(), p.z(), p.y());}
+    private static Vector3f swap(Vector3f p) {
+        return new Vector3f(p.x(), p.z(), p.y());
+    }
 
     /**
      * Resolves an optional texture-coordinate index, allocating zero UVs when absent.
      *
      * @param values parsed UV list
-     * @param i resolved index, or a negative value for no UV
+     * @param i      resolved index, or a negative value for no UV
      * @return referenced UV or new zero vector
      */
-    private static Vector2f uv(List<Vector2f> values, int i) {return i < 0 ? new Vector2f() : values.get(i);}
+    private static Vector2f uv(List<Vector2f> values, int i) {
+        return i < 0 ? new Vector2f() : values.get(i);
+    }
 
     /**
      * Resolves an optional normal reference. A missing normal returns null so
      * triangle construction can derive its face normal.
      *
      * @param values parsed normal list
-     * @param i resolved index, or a negative value for no explicit normal
+     * @param i      resolved index, or a negative value for no explicit normal
      * @return referenced normal or null
      */
-    private static Vector3f normal(List<Vector3f> values, int i) {return i < 0 ? null : values.get(i);}
+    private static Vector3f normal(List<Vector3f> values, int i) {
+        return i < 0 ? null : values.get(i);
+    }
 
     /**
      * Parses three finite coordinates following an OBJ directive token.
@@ -262,7 +275,9 @@ public final class ObjModel3D extends Model3D {
      * @return new coordinate vector
      * @throws IllegalArgumentException if a coordinate is malformed or nonfinite
      */
-    private static Vector3f vector(String[] p) {return new Vector3f(number(p[1]), number(p[2]), number(p[3]));}
+    private static Vector3f vector(String[] p) {
+        return new Vector3f(number(p[1]), number(p[2]), number(p[3]));
+    }
 
     /**
      * Parses a finite floating-point token, rejecting NaN and infinities.
@@ -281,7 +296,7 @@ public final class ObjModel3D extends Model3D {
      * Parses a position/UV/normal face reference, preserving omitted UV and normal
      * components as -1. Validates each present index against its current source list.
      *
-     * @param s slash-separated face token
+     * @param s  slash-separated face token
      * @param pc number of parsed positions
      * @param tc number of parsed UVs
      * @param nc number of parsed normals
@@ -298,7 +313,7 @@ public final class ObjModel3D extends Model3D {
      * Resolves an OBJ one-based positive index or a negative index relative to the
      * current list end. Zero and out-of-range references are invalid.
      *
-     * @param s integer index token
+     * @param s     integer index token
      * @param count current source-list size
      * @return zero-based list index
      * @throws IllegalArgumentException if the token is invalid, zero, or out of range
@@ -325,7 +340,7 @@ public final class ObjModel3D extends Model3D {
      * Resolves a dependency as a sibling of its declaring source, normalizes dot
      * segments, and converts separators to forward slashes for the resolver.
      *
-     * @param source declaring OBJ or MTL path
+     * @param source   declaring OBJ or MTL path
      * @param relative dependency path
      * @return normalized dependency path
      */
@@ -339,10 +354,10 @@ public final class ObjModel3D extends Model3D {
      * and diffuse texture paths; ignores unsupported directives other than map options,
      * which are rejected.
      *
-     * @param source material-library path
-     * @param resolver byte provider for the library
+     * @param source    material-library path
+     * @param resolver  byte provider for the library
      * @param materials mutable material-name map to populate
-     * @throws IOException if the library cannot be read
+     * @throws IOException              if the library cannot be read
      * @throws IllegalArgumentException if a supported value is malformed or texture-map options are used
      */
     private static void readMtl(String source, Resolver resolver, Map<String, Info> materials) throws IOException {
@@ -366,7 +381,8 @@ public final class ObjModel3D extends Model3D {
                         throw new IllegalArgumentException("MTL map options are not supported: " + line);
                     current.texture = resolve(source, name);
                 }
-                default -> {}
+                default -> {
+                }
             }
         }
     }
@@ -377,7 +393,9 @@ public final class ObjModel3D extends Model3D {
      *
      * @return material parts in first face-group encounter order
      */
-    public List<Part> getParts() {return parts;}
+    public List<Part> getParts() {
+        return parts;
+    }
 
     /**
      * Uploads missing decoded images and binds the resulting owned textures to
@@ -398,7 +416,7 @@ public final class ObjModel3D extends Model3D {
             return;
         }
         try (RenderStateSnapshot3D ignored = new RenderStateSnapshot3D()) {
-            org.lwjgl.opengl.GL13.glActiveTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0);
+            GL13.glActiveTexture(GL13.GL_TEXTURE0);
             for (var entry : textureNames.entrySet()) {
                 Texture texture = textures.computeIfAbsent(entry.getValue(), key -> new Texture(images.get(key)));
                 entry.getKey().setTexture(texture);
@@ -425,6 +443,7 @@ public final class ObjModel3D extends Model3D {
      * Supplies owned byte arrays for logical OBJ, MTL, and image paths. The loader
      * passes normalized relative dependencies through the same resolver, allowing
      * filesystem, archive, or application-managed asset storage.
+     *
      * @author Albert Beaupre
      */
     @FunctionalInterface
@@ -448,7 +467,7 @@ public final class ObjModel3D extends Model3D {
      * Changing the material affects consumers of that same part; retaining a part does not
      * extend the lifetime of textures owned by the parent model.</p>
      *
-     * @param model geometry for faces using this material group
+     * @param model    geometry for faces using this material group
      * @param material mutable diffuse material for the group
      * @author Albert Beaupre
      */
@@ -474,6 +493,7 @@ public final class ObjModel3D extends Model3D {
      * Mutable CPU material information collected from an MTL library before part
      * materials and decoded images are created. Unspecified diffuse color starts
      * opaque white and an unspecified texture remains absent.
+     *
      * @author Albert Beaupre
      */
     private static final class Info {

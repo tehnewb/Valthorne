@@ -81,7 +81,9 @@ public record ModelParameters(
      * @throws java.nio.file.InvalidPathException if path cannot be parsed
      * @throws IllegalArgumentException           if path is blank and therefore an invalid key
      */
-    public static ModelParameters fromPath(String path) {return fromPath(path, path);}
+    public static ModelParameters fromPath(String path) {
+        return fromPath(path, path);
+    }
 
     /**
      * Creates filesystem parameters with an explicit asset key. Relative paths

@@ -30,7 +30,7 @@ public final class LightOccluder {
      * Retains geometry and optional collider identity with all category bits enabled.
      * A null collider falls back to the area itself.
      *
-     * @param area non-null borrowed geometry
+     * @param area     non-null borrowed geometry
      * @param collider application collision identity, or null
      */
     public LightOccluder(Area area, Object collider) {
@@ -41,8 +41,8 @@ public final class LightOccluder {
      * Retains the area and category bits without copying geometry. Null collider identity
      * is replaced by the area; zero category bits blocks no non-null light masks.
      *
-     * @param area borrowed occlusion geometry
-     * @param collider application identity, or null to use area
+     * @param area         borrowed occlusion geometry
+     * @param collider     application identity, or null to use area
      * @param categoryBits occluder membership mask
      * @throws NullPointerException if area is null
      */
