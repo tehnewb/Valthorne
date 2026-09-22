@@ -1,298 +1,174 @@
 package valthorne.ui.nodes.nano;
 
-import valthorne.Keyboard;
-import valthorne.event.events.KeyPressEvent;
-import valthorne.event.events.MousePressEvent;
-import valthorne.ui.nodes.VirtualList;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Keyboard-accessible selection control with a clipped, virtualized modal overlay.
- * Item membership is copied on assignment, while item objects remain shared. The
- * popup creates rows on demand, shows at most eight row slots, and moves keyboard
- * focus to the highlighted option. Use on the owning UI thread.
- *
+ * Themed single-selection dropdown with a virtualized modal option menu. Programmatic
+ * item/selection changes are silent; user selection notifies once after the popup closes.
+ * Empty selection uses index -1 and displays a placeholder. Items are copied, while
+ * individual values and the formatter are borrowed on the UI thread.
  * <pre>{@code
- * NanoComboBox<String> choice = new NanoComboBox<String>()
- *         .items(List.of("Low", "Medium", "High"))
- *         .selectedIndex(1)
- *         .onChange(value -> System.out.println(value));
+ * NanoComboBox<String> quality = new NanoComboBox<String>().items(List.of("Low", "High"));
+ * quality.onChange(value -> applyQuality(value));
+ * root.add(quality);
  * }</pre>
- *
- * <p>Programmatic selection updates the label without invoking the change listener.
- * User selection closes the popup and notifies only when the selected index changes.
- * An attached, enabled control with nonempty items is required to open the popup.</p>
- *
- * @param <T> item value type
+ * @param <T> option value type
  * @author Albert Beaupre
  */
 public class NanoComboBox<T> extends NanoContainer {
-    private final NanoButton trigger = new NanoButton("Select..."); // Owned full-size trigger button.
-    private List<T> items = List.of(); // Immutable membership snapshot retaining item references.
-    private Function<? super T, String> formatter = String::valueOf; // Shared item-to-label formatter.
-    private Consumer<? super T> change = value -> {}; // Synchronous user-selection callback.
-    private int selectedIndex = -1, highlighted; // Selected index and current popup highlight.
-    private Popup popup; // Active modal overlay, or null when closed.
-    private VirtualList options; // Active virtualized option rows, or null when closed.
+    /** Borrows the Nano caption for custom layout. @return owned trigger caption */
+    public NanoLabel getLabel() { return trigger.getLabel(); }
+
+    /** Returns the formatted selection or placeholder. @return displayed caption */
+    public String getText() { return trigger.getText(); }
+
+    /** Borrows the button used to paint and activate this control. @return owned trigger */
+    public NanoButton getTrigger() { return trigger; }
+
+    /** Keeps named widget chrome on the actual NanoVG button. */
+    @Override protected void applyLayout() {
+        trigger.setStyleName(getStyleName());
+        super.applyLayout();
+    }
+
+    /** Mirrors focus for painting while the root retains this control as its focus target. */
+    @Override public void setFocused(boolean focused) {
+        super.setFocused(focused);
+        trigger.setFocused(focused);
+    }
+
+    private final NanoButton trigger = new NanoButton("Select...");
+    private List<T> items = List.of(); // Immutable option sequence; elements remain borrowed.
+    private Function<? super T, String> formatter = String::valueOf; // Option-to-label conversion callback.
+    private Consumer<? super T> change = value -> {}; // User-selection listener, invoked after dismissal.
+    private final NanoPopupMenu popup = new NanoPopupMenu(); // Owned root-hosted option list.
+    private int selected = -1; // Selected option index or -1 for no selection.
 
     /**
-     * Creates a focusable 200-by-38 control with a non-focusable trigger that fills its
-     * bounds. Trigger activation opens the popup; the initial item list is empty.
+     * Creates an empty dropdown whose standard button action toggles the popup.
      */
     public NanoComboBox() {
-        setClickable(true);
-        setFocusable(true);
-        getLayout().width(200).height(38).noShrink();
-        trigger.getLayout().widthPercent(100).heightPercent(100);
-        trigger.setFocusable(false);
-        trigger.action(button -> open());
-        add(trigger);
+        setClickable(true); setFocusable(true);
+        trigger.setFocusable(false); trigger.getLayout().widthPercent(100).heightPercent(100); add(trigger);
+        trigger.action(button -> { if (popup.isOpen()) popup.close(); else open(); });
+        getLayout().minWidth(160).height(36);
     }
 
     /**
-     * Closes any popup, copies list membership, clears selection, and refreshes the label.
-     * Does not notify the change listener. Null validation happens after popup closure.
-     *
-     * @param items replacement values; list and elements must be non-null
-     * @return this control
-     * @throws NullPointerException if the list or any item is null
+     * Replaces options with a nonnull snapshot and clears selection silently.
+     * @param items list without null elements
+     * @return this dropdown
      */
     public NanoComboBox<T> items(List<T> items) {
-        close();
-        this.items = List.copyOf(items);
-        selectedIndex = -1;
-        updateText();
-        return this;
+        List<T> copy = List.copyOf(items);
+        popup.close(); this.items = copy; selected = -1; trigger.text("Select..."); return this;
     }
 
     /**
-     * Returns the unmodifiable membership snapshot. Item objects themselves are not
-     * copied and may remain mutable.
-     *
-     * @return current item list
+     * Returns the immutable option list; individual values are not deep copied.
+     * @return options in menu order
      */
-    public List<T> getItems() {return items;}
+    public List<T> getItems() { return items; }
 
     /**
-     * Returns the current selected index independently of the popup highlight.
-     *
-     * @return selected index, or -1 when no item is selected
+     * Reads the selected index without notifying listeners.
+     * @return index or -1 when empty
      */
-    public int getSelectedIndex() {return selectedIndex;}
+    public int getSelectedIndex() { return selected; }
 
     /**
-     * Returns the shared selected item without applying the formatter.
-     *
-     * @return selected item, or null when selection is empty
+     * Borrows the selected value; no selection returns null.
+     * @return selected option or null
      */
-    public T getSelected() {return selectedIndex < 0 ? null : items.get(selectedIndex);}
+    public T getSelected() { return selected < 0 ? null : items.get(selected); }
 
     /**
-     * Sets selection and refreshes the trigger label without closing an open popup or
-     * calling the change listener. The existing popup highlight is not synchronized here.
-     *
-     * @param index item index, or -1 to clear selection
-     * @return this control
-     * @throws IndexOutOfBoundsException if index is outside -1 through the last item
+     * Sets selection silently, dismissing stale options. Formatting is validated before
+     * mutation so formatter failures preserve the old selection and label.
+     * @param index -1 or a valid option index
+     * @return this dropdown
+     * @throws IndexOutOfBoundsException if index is outside the supported range
      */
     public NanoComboBox<T> selectedIndex(int index) {
         if (index < -1 || index >= items.size()) throw new IndexOutOfBoundsException(index);
-        selectedIndex = index;
-        updateText();
-        return this;
+        String label = index < 0 ? "Select..." : Objects.requireNonNull(formatter.apply(items.get(index)));
+        popup.close(); selected = index; trigger.text(label); return this;
     }
 
     /**
-     * Replaces the item formatter, closes the popup, and refreshes the selected label.
-     * The formatter runs synchronously for selected text and newly created option rows.
-     *
-     * @param formatter item-to-label function
-     * @return this control
-     * @throws NullPointerException if formatter is null
+     * Applies user selection and notifies only when its index changes. Disabled controls
+     * ignore requests; listeners see committed state and their exceptions propagate.
+     * @param index valid option index, or -1 to clear
+     */
+    public void select(int index) {
+        if (isDisabled()) return;
+        int before = selected; selectedIndex(index);
+        if (before != selected) change.accept(getSelected());
+    }
+
+    /**
+     * Replaces formatting and updates the current label without notifying selection.
+     * @param formatter nonnull callback returning nonnull labels
+     * @return this dropdown
      */
     public NanoComboBox<T> formatter(Function<? super T, String> formatter) {
-        this.formatter = Objects.requireNonNull(formatter);
-        close();
-        updateText();
-        return this;
+        Objects.requireNonNull(formatter);
+        String label = selected < 0 ? "Select..." : Objects.requireNonNull(formatter.apply(getSelected()));
+        popup.close(); this.formatter = formatter; trigger.text(label); return this;
     }
 
     /**
-     * Replaces the callback for user selection changes. Programmatic item or index
-     * changes do not invoke it, and callback exceptions propagate after popup closure.
-     *
-     * @param listener callback receiving the selected item
-     * @return this control
-     * @throws NullPointerException if listener is null
+     * Replaces the synchronous user-change callback; programmatic setters remain silent.
+     * @param listener nonnull callback
+     * @return this dropdown
      */
-    public NanoComboBox<T> onChange(Consumer<? super T> listener) {
-        change = Objects.requireNonNull(listener);
-        return this;
-    }
+    public NanoComboBox<T> onChange(Consumer<? super T> listener) { change = Objects.requireNonNull(listener); return this; }
 
     /**
-     * Tests whether an overlay reference is retained. This reflects local popup state
-     * rather than independently querying the root's modal stack.
-     *
-     * @return true while this control retains a popup
-     */
-    public boolean isOpen() {return popup != null;}
-
-    /**
-     * Displays the placeholder when selection is empty or formats the selected item.
-     * Does not notify listeners or rebuild popup rows.
-     */
-    private void updateText() {trigger.text(selectedIndex < 0 ? "Select..." : formatter.apply(items.get(selectedIndex)));}
-
-    /**
-     * Applies a user-selected index, closes the popup, and invokes the listener only
-     * when the index changed. Index validation and label updates precede closure.
-     *
-     * @param index selected option index
-     */
-    private void select(int index) {
-        boolean changed = selectedIndex != index;
-        selectedIndex(index);
-        close();
-        if (changed) change.accept(getSelected());
-    }
-
-    /**
-     * Creates a root-sized modal overlay and virtualized option list if attached, enabled,
-     * nonempty, and currently closed. Positions the list below the control or above when
-     * space is insufficient, bounds its height to the root, and focuses the selected or
-     * first option. Formatting and layout occur synchronously.
+     * Builds labels for a new opening and presents options below this control.
+     * Detached, empty, or disabled controls do not open. Formatter errors propagate.
      */
     public void open() {
-        if (popup != null || items.isEmpty() || getRoot() == null || isDisabled()) return;
-        var root = getRoot();
-        root.setFocusTo(this);
-        popup = new Popup();
-        popup.getLayout().absolute().left(0).top(0).widthPercent(100).heightPercent(100);
-        options = new VirtualList(items.size(), index ->
-                new NanoButton(formatter.apply(items.get(index))).action(button -> select(index)));
-        options.rowHeight(36).gap(2);
-        var content = screenToContent(0, 0);
-        var world = screenToWorld(0, 0);
-        float x = getAbsoluteX() - (content.x() - world.x());
-        float y = getAbsoluteY() + (content.y() - world.y()) + getHeight();
-        float height = Math.min(8 * 38, items.size() * 38);
-        height = Math.min(height, root.getHeight());
-        if (y + height > root.getHeight()) y = Math.max(0, y - getHeight() - height);
-        options.getLayout().absolute().left(Math.clamp(x, 0, Math.max(0, root.getWidth() - getWidth())))
-                .top(y).width(Math.min(root.getWidth(), Math.max(160, getWidth()))).height(height);
-        popup.add(options);
-        root.showModal(popup);
-        highlighted = Math.max(0, selectedIndex);
-        focusOption();
+        if (isDisabled() || getRoot() == null || items.isEmpty()) return;
+        var commands = new java.util.ArrayList<NanoPopupMenu.Item>();
+        for (int i = 0; i < items.size(); i++) {
+            int index = i;
+            commands.add(new NanoPopupMenu.Item(Objects.requireNonNull(formatter.apply(items.get(i))), () -> select(index), true));
+        }
+        popup.items(commands).showBelow(this);
+        if (selected >= 0) popup.highlight(selected);
     }
 
     /**
-     * Scrolls the highlighted item into view, performs root layout to materialize its row,
-     * and requests focus for that row. Requires an active popup attached to a root.
-     */
-    private void focusOption() {
-        options.scrollToIndex(highlighted);
-        getRoot().layout();
-        getRoot().setFocusTo(options.getItemNode(highlighted));
-    }
-
-    /**
-     * Clears local popup references and asks the owning root to hide the prior modal
-     * when still attached. Repeated calls are harmless and do not change selection.
-     */
-    public void close() {
-        Popup previous = popup;
-        popup = null;
-        options = null;
-        if (previous != null && previous.getRoot() != null) previous.getRoot().hideModal(previous);
-    }
-
-    /**
-     * Closes the modal overlay during node destruction so it does not remain attached
-     * to the root after the control is removed.
-     */
-    @Override
-    public void onDestroy() {close();}
-
-    /**
-     * Attempts to open on Space, Enter, or Down and consumes those keys even if opening
-     * is prevented by attachment, disabled state, or an empty list.
-     *
+     * Opens on Up or Down, initially focusing the selected option when available.
+     * Enter and Space use the normal button toggle action; disabled controls ignore keys.
      * @param event routed control key press
      */
-    @Override
-    public void onKeyPress(KeyPressEvent event) {
-        int key = event.getKey();
-        if (key == Keyboard.SPACE || key == Keyboard.ENTER || key == Keyboard.DOWN) {
-            open();
-            event.consume();
+    @Override public void onKeyPress(valthorne.event.events.KeyPressEvent event) {
+        if (isDisabled()) return;
+        if (event.getKey() == valthorne.Keyboard.DOWN || event.getKey() == valthorne.Keyboard.UP) {
+            open(); event.consume();
+        } else if (event.getKey() == valthorne.Keyboard.ENTER || event.getKey() == valthorne.Keyboard.SPACE) {
+            if (isOpen()) close(); else open(); event.consume();
         }
     }
 
     /**
-     * Root-sized modal receiver around the virtual option list. Handles dismissal and
-     * navigation keys while option buttons perform selection. Its lifetime is controlled
-     * by the enclosing combo box.
-     *
-     * @author Albert Beaupre
+     * Reports whether the dropdown currently owns an attached option overlay.
+     * @return true while open
      */
-    private final class Popup extends NanoContainer {
-        /**
-         * Creates a clickable, scrollable overlay so modal routing can intercept input
-         * outside the option rows.
-         */
-        Popup() {
-            setClickable(true);
-            setScrollable(true);
-        }
+    public boolean isOpen() { return popup.isOpen(); }
 
-        /**
-         * Closes the popup and consumes a mouse press routed to the overlay. There is no
-         * button filter in this callback; option rows have their own input routing.
-         *
-         * @param event overlay mouse press
-         */
-        @Override
-        public void onMousePress(MousePressEvent event) {
-            close();
-            event.consume();
-        }
+    /**
+     * Dismisses options without modifying selection or notifying listeners.
+     */
+    public void close() { popup.close(); }
 
-        /**
-         * Handles Escape dismissal and bounded Up, Down, Home, and End highlighting.
-         * Navigation materializes and focuses the option row; recognized keys are consumed.
-         * Other keys are left for option button activation or normal routing.
-         *
-         * @param event routed popup key press
-         */
-        @Override
-        public void onKeyPress(KeyPressEvent event) {
-            switch (event.getKey()) {
-                case Keyboard.ESCAPE -> close();
-                case Keyboard.UP -> {
-                    highlighted = Math.max(0, highlighted - 1);
-                    focusOption();
-                }
-                case Keyboard.DOWN -> {
-                    highlighted = Math.min(items.size() - 1, highlighted + 1);
-                    focusOption();
-                }
-                case Keyboard.HOME -> {
-                    highlighted = 0;
-                    focusOption();
-                }
-                case Keyboard.END -> {
-                    highlighted = items.size() - 1;
-                    focusOption();
-                }
-                default -> {return;}
-            }
-            event.consume();
-        }
-    }
+    /**
+     * Removes the option overlay when its anchor leaves the UI tree.
+     */
+    @Override public void onDestroy() { close(); }
 }

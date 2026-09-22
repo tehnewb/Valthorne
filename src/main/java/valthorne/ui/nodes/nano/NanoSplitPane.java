@@ -107,6 +107,11 @@ public class NanoSplitPane extends NanoPanel {
 
     private final class Divider extends NanoButton {
         Divider() { super(""); }
+        /** Requests the cursor for the axis this divider can resize. */
+        @Override public int getCursorShape() {
+            if (NanoSplitPane.this.isDisabled() || isDisabled()) return 0;
+            return vertical ? Mouse.CURSOR_VRESIZE : Mouse.CURSOR_HRESIZE;
+        }
         @Override public void onMousePress(MousePressEvent event) {
             if (isDisabled() || event.getButton() != Mouse.LEFT) return;
             setDragging(true); dragOffset = pointer(event.getX(), event.getY()) - firstSize; event.consume();

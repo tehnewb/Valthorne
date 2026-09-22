@@ -2,7 +2,7 @@
 
 Author: Albert Beaupre
 
-These eight controls live in `valthorne.ui.nodes` and participate in the existing
+These controls live in `valthorne.ui.nodes` and participate in the existing
 `UIRoot` layout, focus, pointer, theme, and mixed-renderer lifecycle. Configure them
 on the UI thread and attach them to an existing root or container. The snippets
 below assume an initialized application; they are integration fragments.
@@ -20,6 +20,35 @@ below assume an initialized application; they are integration fragments.
 | `ColorPicker` | Editing packed RGBA colors | HSV wheel, brightness, RGBA sliders, hex entry, alpha preview |
 | `NumberSpinner` | Editing bounded numeric values | Decimal entry, stepping buttons, Up/Down, Home/End |
 | `RadioGroup` | Showing a small set of mutually exclusive choices | Buttons and wrapping arrow navigation |
+
+## NanoVG versions
+
+Every widget above has a counterpart in `valthorne.ui.nodes.nano`: `NanoWindow`,
+`NanoFileExplorer`, `NanoFileChooser`, `NanoDirectoryTree`, `NanoBreadcrumbBar`,
+`NanoMenuBar`, `NanoPopupMenu`, `NanoComboBox<T>`, `NanoColorPicker`,
+`NanoNumberSpinner`, and `NanoRadioGroup`.
+
+The Nano versions use NanoVG throughout their owned hierarchy, including popup rows,
+scrollbars, editors, labels, and modal shells. They expose the same selection,
+navigation, callback, and window policies; child accessors return the corresponding
+Nano types. Use their nested types, such as `NanoFileChooser.Filter`,
+`NanoPopupMenu.Item`, and `NanoColorPicker.Mode`, with the Nano controls.
+`ProfessionalTheme` supplies both light and dark chrome for either family.
+
+```java
+import valthorne.ui.nodes.nano.*;
+
+NanoWindow inspector = new NanoWindow("Inspector").bounds(40, 60, 360, 320);
+inspector.getContentPane().add(
+        new NanoColorPicker().color(Color.RED),
+        new NanoNumberSpinner(0, 100, 1, 25));
+root.add(inspector);
+```
+
+Use the same `UIRoot` and lifecycle as the standard widgets; no separate NanoVG
+frame or context is required. Application-supplied children may still mix backends.
+The existing `NanoComboBox` now shares the new Nano popup behavior, including
+disabled-row navigation, focus restoration, and closing on owner detachment.
 
 ## Shared setup and ownership
 

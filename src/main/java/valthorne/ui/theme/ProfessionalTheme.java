@@ -159,6 +159,11 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         Drawable flat = squareSkin(surface, surface), rowHover = squareSkin(hover, hover);
         Drawable rowSelected = squareSkin(hover, accent), editor = squareSkin(raised, border);
         Drawable editorFocus = squareSkin(raised, accent), command = squareSkin(hover, border);
+        data.rule(ScrollPanel.class, "menu-surface").set(Panel.BACKGROUND_KEY, chrome);
+        data.rule(Button.class, "menu-item").set(Button.BACKGROUND_KEY, pane);
+        data.rule(Button.class, "menu-item", StyleState.HOVERED).set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Button.class, "menu-item", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Button.class, "menu-item", StyleState.PRESSED).set(Button.BACKGROUND_KEY, rowHover);
         data.rule(Panel.class, "chooser-pane").set(Panel.BACKGROUND_KEY, pane);
         data.rule(Panel.class, "chooser-chrome").set(Panel.BACKGROUND_KEY, chrome);
         data.rule(Button.class, "chooser-row").set(Button.BACKGROUND_KEY, pane);
@@ -216,7 +221,79 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 .set(NanoPanel.PRESSED_BACKGROUND_COLOR_KEY, new Color(0xAA070C15))
                 .set(NanoPanel.BORDER_WIDTH_KEY, 0f)
                 .set(NanoModal.DIALOG_BACKGROUND_COLOR_KEY, raised).set(NanoModal.DIALOG_BORDER_COLOR_KEY, border);
+        nanoWidgets(data);
         return data;
+    }
+
+    /** Applies matching chrome to the composite NanoVG widgets in either palette. */
+    private void nanoWidgets(ThemeData data) {
+        Color clear = new Color(0x00000000);
+        nanoPanel(data.rule(NanoPanel.class, "widget-layout"), clear, clear, 0);
+        data.rule(NanoScrollPanel.class, "widget-layout")
+                .set(NanoScrollPanel.BACKGROUND_COLOR_KEY, clear)
+                .set(NanoScrollPanel.BORDER_WIDTH_KEY, 0f);
+        nanoPanel(data.rule(NanoPanel.class, "surface"), raised, border, 1);
+        nanoPanel(data.rule(NanoPanel.class, "window-frame"), raised, border, 1);
+        nanoPanel(data.rule(NanoPanel.class, "chooser-pane"), raised, raised, 0);
+        nanoPanel(data.rule(NanoPanel.class, "chooser-chrome"), surface, border, 1);
+        for (String name : List.of("chooser-pane", "chooser-chrome"))
+            data.rule(NanoPanel.class, name).set(NanoPanel.CORNER_RADIUS_KEY, 0f);
+
+        nanoButton(data.rule(NanoButton.class, "window-title"), hover, border);
+        nanoButton(data.rule(NanoButton.class, "window-close"), hover, border);
+        data.rule(NanoButton.class, "window-close").set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, error)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, error);
+        nanoButton(data.rule(NanoButton.class, "window-grip"), clear, clear);
+        data.rule(NanoButton.class, "window-grip").set(NanoButton.BORDER_WIDTH_KEY, 0f)
+                .set(NanoButton.CORNER_RADIUS_KEY, 0f)
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, accent)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, accent)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, accent);
+        for (String name : List.of("chooser-row", "chooser-tool", "chooser-heading", "chooser-divider", "chooser-action", "chooser-primary")) {
+            nanoButton(data.rule(NanoButton.class, name), name.equals("chooser-row") || name.equals("chooser-heading") ? raised : surface, border);
+            data.rule(NanoButton.class, name).set(NanoButton.CORNER_RADIUS_KEY, 0f)
+                    .set(NanoButton.BORDER_WIDTH_KEY, name.equals("chooser-action") || name.equals("chooser-primary") ? 1f : 0f)
+                    .set(NanoButton.FONT_SIZE_KEY, 14 * density);
+        }
+        data.rule(NanoButton.class, "chooser-row", StyleState.SELECTED)
+                .set(NanoButton.BACKGROUND_COLOR_KEY, hover)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, hover);
+        data.rule(NanoButton.class, "chooser-primary").set(NanoButton.BORDER_COLOR_KEY, accent);
+        data.rule(NanoTextField.class, "chooser-editor").set(NanoTextField.CORNER_RADIUS_KEY, 0f)
+                .set(NanoTextField.FONT_SIZE_KEY, 14 * density).set(NanoTextField.PADDING_KEY, 6f * density);
+
+        data.rule(NanoScrollPanel.class, "menu-surface")
+                .set(NanoScrollPanel.BACKGROUND_COLOR_KEY, raised)
+                .set(NanoScrollPanel.BORDER_COLOR_KEY, border)
+                .set(NanoScrollPanel.CORNER_RADIUS_KEY, 4f * density);
+        data.rule(NanoButton.class, "menu-item")
+                .set(NanoButton.BACKGROUND_COLOR_KEY, raised)
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, hover)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, hover)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, hover)
+                .set(NanoButton.DISABLED_BACKGROUND_COLOR_KEY, raised)
+                .set(NanoButton.BORDER_WIDTH_KEY, 0f)
+                .set(NanoButton.CORNER_RADIUS_KEY, 0f)
+                .set(NanoButton.PADDING_X_KEY, 12f * density)
+                .set(NanoButton.PADDING_Y_KEY, 0f)
+                .set(NanoButton.FONT_SIZE_KEY, 15f * density);
+    }
+
+    /** Sets every panel state so layout-only surfaces stay transparent during input. */
+    private void nanoPanel(ThemeRule rule, Color fill, Color edge, float width) {
+        for (String key : List.of("backgroundColor", "hoverBackgroundColor", "focusedBackgroundColor", "pressedBackgroundColor", "disabledBackgroundColor"))
+            color(rule, "panel", key, fill);
+        for (String key : List.of("borderColor", "hoverBorderColor", "focusedBorderColor", "pressedBorderColor", "disabledBorderColor"))
+            color(rule, "panel", key, edge);
+        rule.set(NanoPanel.BORDER_WIDTH_KEY, width * density);
+    }
+
+    /** Supplies the baseline chrome while retaining normal focus and hover feedback. */
+    private void nanoButton(ThemeRule rule, Color fill, Color edge) {
+        rule.set(NanoButton.BACKGROUND_COLOR_KEY, fill).set(NanoButton.BORDER_COLOR_KEY, edge)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, fill)
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, hover)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, hover);
     }
 
     /**

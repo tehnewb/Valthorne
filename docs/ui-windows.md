@@ -6,6 +6,11 @@ Author: Albert Beaupre
 palettes, inspectors, movable panels, or document views. It uses the same layout,
 theme, pointer capture, and focus routing as other Valthorne controls.
 
+`valthorne.ui.nodes.nano.NanoWindow` provides the same API with NanoVG title,
+close button, resize grips, clipping viewports, and content panel. Use `NanoButton`,
+`NanoTextField`, and other Nano controls for a fully NanoVG inspector. Its geometry
+callback receives `NanoWindow.Frame`; both window types support mixed-backend content.
+
 The engine's native desktop window remains `valthorne.Window`. Import the intended
 type explicitly, or use a fully qualified name when a file uses both. Wildcard imports
 of both `valthorne.*` and `valthorne.ui.nodes.*` make `Window` ambiguous.

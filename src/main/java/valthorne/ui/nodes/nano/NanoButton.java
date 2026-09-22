@@ -27,7 +27,24 @@ import valthorne.ui.behavior.ActivationBehavior;
  *
  * @author Albert Beaupre
  */
-public class NanoButton extends UINode implements NanoNode {
+public class NanoButton extends NanoContainer {
+    private NanoLabel label; // Optional independently laid-out caption for composite controls.
+
+    /**
+     * Materializes the caption as a NanoVG child so composite buttons can position,
+     * clip, or hide it independently. Text setters continue to update this label.
+     * @return owned caption, which may be reparented into an owned clipping viewport
+     */
+    public NanoLabel getLabel() {
+        if (label == null) {
+            label = new NanoLabel(text);
+            label.setClickable(false);
+            label.fontName(fontName).fontSize(fontSize);
+            getLayout().itemsCenter().justifyCenter();
+            add(label);
+        }
+        return label;
+    }
 
     /**
      * Theme background color used during layout; colors are retained by reference.
@@ -122,6 +139,7 @@ public class NanoButton extends UINode implements NanoNode {
     public static final StyleKey<NodeAction<NanoButton>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<NanoButton>>) (Class<?>) NodeAction.class);
 
     private String text = ""; // Raw non-null text used for measurement and painting.
+    private boolean leftAligned; // Menu command captions can use leading-edge alignment.
 
     private Color backgroundColor = new Color(0xFF2A2A2A); // Borrowed background color used by state-aware painting.
     private Color hoverBackgroundColor = new Color(0xFF323232); // Borrowed hover background color used by state-aware painting.
@@ -191,7 +209,14 @@ public class NanoButton extends UINode implements NanoNode {
      */
     public NanoButton text(String text) {
         this.text = text == null ? "" : text;
+        if (label != null) label.text(this.text);
         markLayoutDirty();
+        return this;
+    }
+
+    /** Aligns painted text to the leading edge for menu rows. Center is the default. */
+    public NanoButton leftAligned(boolean enabled) {
+        leftAligned = enabled;
         return this;
     }
 
@@ -504,12 +529,13 @@ public class NanoButton extends UINode implements NanoNode {
     }
 
     /**
-     * Performs no timed work or child traversal. Input callbacks drive activation.
+     * Updates any composed children. Input callbacks drive activation.
      *
      * @param delta elapsed update seconds, unused
      */
     @Override
     public void update(float delta) {
+        super.update(delta);
     }
 
     /**
@@ -712,13 +738,15 @@ public class NanoButton extends UINode implements NanoNode {
             nvgStroke(vg);
         }
 
-        if (text != null && !text.isEmpty()) {
+        if (label == null && text != null && !text.isEmpty()) {
             nvgFontSize(vg, fontSize);
             nvgFontFace(vg, fontName);
-            nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+            nvgTextAlign(vg, (leftAligned ? NVG_ALIGN_LEFT : NVG_ALIGN_CENTER) | NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, NanoUtility.color1(drawText));
-            nvgText(vg, x + width * 0.5f, y + height * 0.5f, text);
+            nvgText(vg, leftAligned ? x + paddingX : x + width * 0.5f, y + height * 0.5f, text);
         }
+        if (label != null) label.color(drawText);
+        super.draw(vg);
     }
 
     /**

@@ -12,7 +12,7 @@ import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
-import valthorne.ui.nodes.*;
+import valthorne.ui.nodes.nano.*;
 import valthorne.ui.nodes.nano.NanoPanel;
 import valthorne.ui.theme.ProfessionalTheme;
 import java.io.IOException;
@@ -31,7 +31,7 @@ import static org.lwjgl.opengl.GL11.*;
  * @author Albert Beaupre
  */
 @Tag("graphics")
-class WidgetGraphicsTest {
+class NanoWidgetGraphicsTest {
     @TempDir Path temporary; // Isolated local directory for browser integration tests.
 
     /**
@@ -42,9 +42,9 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            var window = new valthorne.ui.nodes.Window("Long window title that must leave room for the X")
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Long window title that must leave room for the X")
                     .bounds(100, 100, 260, 200);
-            TextField editor = new TextField("Name").text("Saved value");
+            NanoTextField editor = new NanoTextField("Name").text("Saved value");
             editor.getLayout().height(36); window.content(editor);
             int[] calls = {0};
             window.onClose(() -> {
@@ -81,8 +81,8 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create()); Mouse.setCursor(Mouse.CURSOR_ARROW);
-            var window = new valthorne.ui.nodes.Window("Close during capture").bounds(100, 100, 260, 200);
-            Button outside = place(new Button("Outside"), 400, 40, 150, 36);
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Close during capture").bounds(100, 100, 260, 200);
+            NanoButton outside = place(new NanoButton("Outside"), 400, 40, 150, 36);
             root.add(window, outside); draw(root);
             for (int[] point : new int[][]{{150, 120}, {358, 200}}) {
                 window.open(); draw(root); var frame = window.getFrame();
@@ -109,6 +109,25 @@ class WidgetGraphicsTest {
         JGL.publish(new MouseMoveEvent(-1, 0, x, 480 - y, x, 480 - y));
     }
 
+    /** Verifies hover, capture, orientation, and release cursor behavior on Nano dividers. */
+    @Test void splitDividerShowsAxisResizeCursor() {
+        UIRoot root = new UIRoot();
+        try (ProfessionalTheme theme = new ProfessionalTheme()) {
+            root.setTheme(theme.create()); Mouse.setCursor(Mouse.CURSOR_HAND);
+            NanoSplitPane split = place(new NanoSplitPane(new NanoPanel(), new NanoPanel()), 100, 100, 300, 200);
+            root.add(split); draw(root);
+            hover(246, 150); assertEquals(Mouse.CURSOR_HRESIZE, Mouse.getCursorShape());
+            JGL.publish(new MousePressEvent(0, 0, 246, 330));
+            hover(450, 350); assertEquals(Mouse.CURSOR_HRESIZE, Mouse.getCursorShape());
+            JGL.publish(new MouseReleaseEvent(0, 0, 450, 130));
+            hover(450, 350); assertEquals(Mouse.CURSOR_HAND, Mouse.getCursorShape());
+            split.vertical(true); draw(root);
+            hover(200, 200); assertEquals(Mouse.CURSOR_VRESIZE, Mouse.getCursorShape());
+            split.getDivider().setEnabled(false); hover(450, 350); hover(200, 200);
+            assertEquals(Mouse.CURSOR_HAND, Mouse.getCursorShape());
+        } finally { root.dispose(); Mouse.setCursor(Mouse.CURSOR_ARROW); }
+    }
+
     /**
      * Exercises the installed native mouse producer's reused drag events, including
      * reversal during one held gesture at every corner. Native movement reports the
@@ -124,7 +143,7 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            var window = new valthorne.ui.nodes.Window("Native corner test").bounds(100, 100, 260, 200);
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Native corner test").bounds(100, 100, 260, 200);
             root.add(window); draw(root);
             for (int horizontal : new int[]{-1, 1}) for (int vertical : new int[]{-1, 1}) {
                 window.bounds(100, 100, 260, 200); draw(root);
@@ -153,7 +172,7 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create()); Mouse.setCursor(Mouse.CURSOR_HAND);
-            var window = new valthorne.ui.nodes.Window("Cursor test").bounds(100, 100, 260, 200);
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Cursor test").bounds(100, 100, 260, 200);
             root.add(window); draw(root);
             int[][] cases = {{102,200,Mouse.CURSOR_HRESIZE},{358,200,Mouse.CURSOR_HRESIZE},
                     {230,102,Mouse.CURSOR_VRESIZE},{230,298,Mouse.CURSOR_VRESIZE},
@@ -209,7 +228,7 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            var window = new valthorne.ui.nodes.Window("Resize").bounds(100, 100, 260, 200).minimumSize(160, 100);
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Resize").bounds(100, 100, 260, 200).minimumSize(160, 100);
             root.add(window); draw(root);
             for (int horizontal : new int[]{-1, 1}) for (int vertical : new int[]{-1, 1}) {
                 for (int growX : new int[]{-1, 1}) for (int growY : new int[]{-1, 1}) {
@@ -247,14 +266,14 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            var window = new valthorne.ui.nodes.Window("Inspector").bounds(100, 100, 240, 180).minimumSize(180, 120).maximumSize(400, 300);
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Inspector").bounds(100, 100, 240, 180).minimumSize(180, 120).maximumSize(400, 300);
             root.add(window); draw(root);
-            var events = new ArrayList<valthorne.ui.nodes.Window.Frame>(); window.onChange(events::add);
+            var events = new ArrayList<valthorne.ui.nodes.nano.NanoWindow.Frame>(); window.onChange(events::add);
             JGL.publish(new MousePressEvent(0, 0, 150, 360));
             JGL.publish(new MouseDragEvent(0, 0, 150, 360, 200, 330)); draw(root);
             JGL.publish(new MouseDragEvent(0, 0, 150, 360, 230, 300)); draw(root);
             JGL.publish(new MouseReleaseEvent(0, 0, 230, 300));
-            assertEquals(new valthorne.ui.nodes.Window.Frame(180, 160, 240, 180), window.getFrame());
+            assertEquals(new valthorne.ui.nodes.nano.NanoWindow.Frame(180, 160, 240, 180), window.getFrame());
             assertEquals(2, events.size()); assertNull(root.getCaptured());
             int[][] directions = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
             for (int[] direction : directions) {
@@ -282,8 +301,8 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            Panel parent = place(new Panel(), 30, 40, 400, 300);
-            var window = new valthorne.ui.nodes.Window("Nested").bounds(20, 30, 220, 160); parent.add(window); root.add(parent); draw(root);
+            NanoPanel parent = place(new NanoPanel(), 30, 40, 400, 300);
+            var window = new valthorne.ui.nodes.nano.NanoWindow("Nested").bounds(20, 30, 220, 160); parent.add(window); root.add(parent); draw(root);
             window.draggable(false); drag(root, 100, 90, 150, 130); assertEquals(20, window.getFrame().x());
             drag(root, 268, 150, 288, 150); assertEquals(240, window.getWidth());
             window.draggable(true).resizable(false); draw(root); drag(root, 288, 150, 310, 150); assertEquals(240, window.getWidth());
@@ -310,13 +329,13 @@ class WidgetGraphicsTest {
             UIRoot root = new UIRoot();
             try (ProfessionalTheme theme = new ProfessionalTheme(light, 1)) {
                 root.setTheme(theme.create());
-                Panel background = place(new Panel(), 0, 0, 640, 480); background.setStyleName("surface"); root.add(background);
-                var first = new valthorne.ui.nodes.Window("Scene inspector").bounds(30, 40, 330, 280);
-                var second = new valthorne.ui.nodes.Window("Properties (fixed size)").bounds(265, 165, 310, 220).resizable(false);
-                TextField editor = new TextField("Object name").text("Player"); editor.getLayout().height(36);
-                Button action = new Button("Apply"); action.getLayout().height(36); int[] clicks = {0}; action.action(button -> clicks[0]++);
-                first.getContentPane().getLayout().gap(8); first.getContentPane().add(editor, action, new Label("Drag the title. Resize any border."));
-                second.getContentPane().add(new Label("Content stays inside the window."), new NumberSpinner(0, 100, 1, 25));
+                NanoPanel background = place(new NanoPanel(), 0, 0, 640, 480); background.setStyleName("surface"); root.add(background);
+                var first = new valthorne.ui.nodes.nano.NanoWindow("Scene inspector").bounds(30, 40, 330, 280);
+                var second = new valthorne.ui.nodes.nano.NanoWindow("Properties (fixed size)").bounds(265, 165, 310, 220).resizable(false);
+                NanoTextField editor = new NanoTextField("Object name").text("Player"); editor.getLayout().height(36);
+                NanoButton action = new NanoButton("Apply"); action.getLayout().height(36); int[] clicks = {0}; action.action(button -> clicks[0]++);
+                first.getContentPane().getLayout().gap(8); first.getContentPane().add(editor, action, new NanoLabel("Drag the title. Resize any border."));
+                second.getContentPane().add(new NanoLabel("Content stays inside the window."), new NanoNumberSpinner(0, 100, 1, 25));
                 root.add(first, second); draw(root);
                 long node = editor.getYogaMemoryAddress();
                 click(100, 100); assertSame(first, root.get(root.size() - 1)); assertSame(editor, root.getFocused());
@@ -336,9 +355,9 @@ class WidgetGraphicsTest {
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
             root.setViewport(new valthorne.viewport.StretchViewport(320, 240));
-            var window = new valthorne.ui.nodes.Window("A very long title that must stay inside its own frame")
+            var window = new valthorne.ui.nodes.nano.NanoWindow("A very long title that must stay inside its own frame")
                     .minimumSize(100, 80).bounds(30, 30, 180, 140);
-            Button overflow = new Button("Wide content"); overflow.getLayout().width(500).height(500);
+            NanoButton overflow = new NanoButton("Wide content"); overflow.getLayout().width(500).height(500);
             int[] calls = {0}; overflow.action(button -> calls[0]++); window.content(overflow); root.add(window); draw(root);
             drag(root, 100, 100, 140, 120);
             assertEquals(50, window.getFrame().x(), .01); assertEquals(40, window.getFrame().y(), .01);
@@ -360,8 +379,8 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme(true, 1)) {
             root.setTheme(theme.create());
-            FileChooser chooser = place(new FileChooser(temporary), 8, 8, 624, 464); root.add(chooser); draw(root);
-            DirectoryTree tree = chooser.getDirectoryTree(); FileExplorer explorer = chooser.getExplorer();
+            NanoFileChooser chooser = place(new NanoFileChooser(temporary), 8, 8, 624, 464); root.add(chooser); draw(root);
+            NanoDirectoryTree tree = chooser.getDirectoryTree(); NanoFileExplorer explorer = chooser.getExplorer();
             assertTrue(tree.getAbsoluteX() + tree.getWidth() <= explorer.getAbsoluteX());
             assertEquals(tree.getAbsoluteY(), explorer.getAbsoluteY(), 1);
             assertTrue(chooser.getFilenameField().getAbsoluteY() >= explorer.getAbsoluteY() + explorer.getHeight());
@@ -391,8 +410,8 @@ class WidgetGraphicsTest {
             UIRoot root = new UIRoot();
             try (ProfessionalTheme theme = new ProfessionalTheme(light, 1)) {
                 root.setTheme(theme.create());
-                Panel background = place(new Panel(), 0, 0, 640, 480); background.setStyleName("surface"); root.add(background);
-                ColorPicker picker = place(new ColorPicker().mode(ColorPicker.Mode.WHEEL), 20, 20, 300, 380);
+                NanoPanel background = place(new NanoPanel(), 0, 0, 640, 480); background.setStyleName("surface"); root.add(background);
+                NanoColorPicker picker = place(new NanoColorPicker().mode(NanoColorPicker.Mode.WHEEL), 20, 20, 300, 380);
                 root.add(picker); draw(root);
                 UINode wheel = picker.getWheel();
                 int cx = Math.round(wheel.getAbsoluteX() + wheel.getWidth() / 2);
@@ -431,12 +450,12 @@ class WidgetGraphicsTest {
             UIRoot root = new UIRoot();
             try (ProfessionalTheme theme = new ProfessionalTheme(light, 1)) {
                 root.setTheme(theme.create());
-                Button owner = place(new Button("Choose file"), 10, 10, 160, 36); root.add(owner); draw(root); root.setFocusTo(owner);
-                FileChooser chooser = new FileChooser(temporary);
-                chooser.filters(List.of(new FileChooser.Filter("Scenes (*.json)", List.of("json")), new FileChooser.Filter("All files", List.of())));
+                NanoButton owner = place(new NanoButton("Choose file"), 10, 10, 160, 36); root.add(owner); draw(root); root.setFocusTo(owner);
+                NanoFileChooser chooser = new NanoFileChooser(temporary);
+                chooser.filters(List.of(new NanoFileChooser.Filter("Scenes (*.json)", List.of("json")), new NanoFileChooser.Filter("All files", List.of())));
                 var results = new ArrayList<List<Path>>(); int[] cancellations = {0};
                 chooser.onApprove(results::add).onCancel(() -> cancellations[0]++).showDialog(owner); draw(root);
-                VirtualList rows = chooser.getExplorer().getList();
+                NanoVirtualList rows = chooser.getExplorer().getList();
                 UINode first = rows.getItemNode(0);
                 int x = Math.round(first.getAbsoluteX() + 40), y = Math.round(first.getAbsoluteY() + 16);
                 capture("chooser-before-navigation.png");
@@ -464,12 +483,12 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            Button owner = place(new Button("Save"), 10, 10, 100, 36); root.add(owner); draw(root); root.setFocusTo(owner);
-            FileChooser chooser = new FileChooser(temporary).mode(FileChooser.Mode.SAVE);
-            chooser.filters(List.of(new FileChooser.Filter("Scenes", List.of("json")), new FileChooser.Filter("All files", List.of())));
+            NanoButton owner = place(new NanoButton("Save"), 10, 10, 100, 36); root.add(owner); draw(root); root.setFocusTo(owner);
+            NanoFileChooser chooser = new NanoFileChooser(temporary).mode(NanoFileChooser.Mode.SAVE);
+            chooser.filters(List.of(new NanoFileChooser.Filter("Scenes", List.of("json")), new NanoFileChooser.Filter("All files", List.of())));
             var results = new ArrayList<List<Path>>(); int[] cancelled = {0};
             chooser.onApprove(results::add).onCancel(() -> cancelled[0]++).showDialog(owner); draw(root);
-            ComboBox<?> filters = chooser.getFilterBox();
+            NanoComboBox<?> filters = chooser.getFilterBox();
             root.setFocusTo(filters); key(Keyboard.ENTER); draw(root); assertTrue(filters.isOpen());
             key(Keyboard.ESCAPE); assertFalse(filters.isOpen()); assertEquals(0, cancelled[0]);
             key(Keyboard.ENTER); key(Keyboard.END); key(Keyboard.ENTER); draw(root);
@@ -477,7 +496,7 @@ class WidgetGraphicsTest {
             chooser.getFilenameField().text("scene.json"); root.setFocusTo(chooser.getFilenameField()); key(Keyboard.ENTER); draw(root);
             assertEquals(file, chooser.getPendingOverwrite()); assertTrue(results.isEmpty());
             capture("chooser-overwrite.png");
-            Panel prompt = chooser.getConfirmationPanel(); UINode replace = prompt.get(0);
+            NanoPanel prompt = chooser.getConfirmationPanel(); UINode replace = prompt.get(0);
             click(Math.round(replace.getAbsoluteX() + 40), Math.round(replace.getAbsoluteY() + 18));
             assertEquals(List.of(List.of(file)), results); assertSame(owner, root.getFocused());
             assertEquals("unchanged", Files.readString(file)); draw(root);
@@ -497,16 +516,16 @@ class WidgetGraphicsTest {
             UIRoot root = new UIRoot();
             try (ProfessionalTheme theme = new ProfessionalTheme(light, 1)) {
                 root.setTheme(theme.create());
-                Panel background = place(new Panel(), 0, 0, 640, 480);
+                NanoPanel background = place(new NanoPanel(), 0, 0, 640, 480);
                 background.setStyleName("surface"); root.add(background);
-                MenuBar bar = place(new MenuBar().addMenu("File", List.of(
-                        new PopupMenu.Item("Save scene", () -> {}, true),
-                        new PopupMenu.Item("Export (unavailable)", () -> {}, false))), 12, 8, 610, 36);
-                ColorPicker picker = place(new ColorPicker().color(new Color(0x80336699)), 12, 60, 250, 220);
-                FileExplorer explorer = place(new FileExplorer(temporary), 280, 60, 348, 360);
-                ComboBox<String> combo = place(new ComboBox<String>().items(List.of("Low", "Medium", "High")).selectedIndex(1), 12, 300, 250, 36);
-                NumberSpinner spinner = place(new NumberSpinner(0, 100, .5, 12.5), 12, 344, 250, 36);
-                RadioGroup radio = place(new RadioGroup(List.of("Windowed", "Fullscreen")), 12, 394, 250, 64);
+                NanoMenuBar bar = place(new NanoMenuBar().addMenu("File", List.of(
+                        new NanoPopupMenu.Item("Save scene", () -> {}, true),
+                        new NanoPopupMenu.Item("Export (unavailable)", () -> {}, false))), 12, 8, 610, 36);
+                NanoColorPicker picker = place(new NanoColorPicker().color(new Color(0x80336699)), 12, 60, 250, 220);
+                NanoFileExplorer explorer = place(new NanoFileExplorer(temporary), 280, 60, 348, 360);
+                NanoComboBox<String> combo = place(new NanoComboBox<String>().items(List.of("Low", "Medium", "High")).selectedIndex(1), 12, 300, 250, 36);
+                NanoNumberSpinner spinner = place(new NanoNumberSpinner(0, 100, .5, 12.5), 12, 344, 250, 36);
+                NanoRadioGroup radio = place(new NanoRadioGroup(List.of("Windowed", "Fullscreen")), 12, 394, 250, 64);
                 root.add(bar, picker, explorer, combo, spinner, radio); draw(root);
                 for (int i = 0; i < 4; i++) {
                     assertTrue(picker.getChannel(i).getAbsoluteX() >= picker.getAbsoluteX() + 56,
@@ -544,7 +563,7 @@ class WidgetGraphicsTest {
             int at = ((479 - y) * 640 + x) * 4;
             image.setRGB(x, y, (pixels.get(at) & 255) << 16 | (pixels.get(at + 1) & 255) << 8 | pixels.get(at + 2) & 255);
         }
-        Path output = Path.of("build/reports/widget-visuals", name);
+        Path output = Path.of("build/reports/nano-widget-visuals", name);
         Files.createDirectories(output.getParent());
         javax.imageio.ImageIO.write(image, "png", output.toFile());
     }
@@ -586,8 +605,21 @@ class WidgetGraphicsTest {
      * @param root attached scene root
      */
     private static void draw(UIRoot root) {
+        assertNanoChildren(root);
         root.layout(); root.update(0); root.layout(); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         root.draw(); glFinish(); assertEquals(GL_NO_ERROR, glGetError());
+    }
+
+    /** Rejects accidental texture controls inside Nano widgets, including open overlays. */
+    private static void assertNanoChildren(valthorne.ui.UIContainer parent) {
+        for (int i = 0; i < parent.size(); i++) {
+            UINode child = parent.get(i);
+            // UIRoot owns one backend-neutral overlay host implemented as a plain Panel.
+            boolean rootOverlay = parent instanceof UIRoot && child.getClass() == valthorne.ui.nodes.Panel.class
+                    && !child.isClickable() && !child.isFocusable() && !child.isScrollable();
+            if (!rootOverlay) assertInstanceOf(valthorne.ui.nodes.nano.NanoNode.class, child, child.getClass().getName());
+            if (child instanceof valthorne.ui.UIContainer container) assertNanoChildren(container);
+        }
     }
 
     /**
@@ -615,11 +647,19 @@ class WidgetGraphicsTest {
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
             int[] calls = {0};
-            MenuBar bar = place(new MenuBar(), 10, 10, 300, 36);
-            bar.addMenu("File", List.of(new PopupMenu.Item("Disabled", () -> fail("disabled"), false),
-                    new PopupMenu.Item("One", () -> calls[0]++, true), new PopupMenu.Item("Two", () -> calls[0] += 10, true)));
-            bar.addMenu("Edit", List.of(new PopupMenu.Item("Edit action", () -> calls[0] += 100, true)));
-            root.add(bar); draw(root); root.setFocusTo(bar.getHeading(0));
+            NanoMenuBar bar = place(new NanoMenuBar(), 10, 10, 300, 36);
+            bar.addMenu("File", List.of(new NanoPopupMenu.Item("Disabled", () -> fail("disabled"), false),
+                    new NanoPopupMenu.Item("One", () -> calls[0]++, true), new NanoPopupMenu.Item("Two", () -> calls[0] += 10, true)));
+            bar.addMenu("Edit", List.of(new NanoPopupMenu.Item("Edit action", () -> calls[0] += 100, true)));
+            root.add(bar); draw(root);
+            click(40, 28); draw(root); assertTrue(bar.getMenu(0).isOpen());
+            NanoVirtualList menuRows = (NanoVirtualList) bar.getMenu(0).get(0);
+            assertEquals("menu-item", menuRows.getItemNode(0).getStyleName());
+            click(100, 28); draw(root);
+            assertFalse(bar.getMenu(0).isOpen()); assertTrue(bar.getMenu(1).isOpen(),
+                    "a single click on another heading switches the open menu");
+            click(100, 28); draw(root); assertFalse(bar.getMenu(1).isOpen());
+            root.setFocusTo(bar.getHeading(0));
             key(Keyboard.ENTER); draw(root); assertTrue(bar.getMenu(0).isOpen());
             key(Keyboard.DOWN); key(Keyboard.ENTER);
             assertEquals(10, calls[0]); assertFalse(bar.getMenu(0).isOpen()); assertSame(bar.getHeading(0), root.getFocused());
@@ -639,7 +679,7 @@ class WidgetGraphicsTest {
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
             NanoPanel parent = place(new NanoPanel(), 0, 0, 640, 480);
-            ComboBox<String> combo = place(new ComboBox<String>().items(List.of("Alpha", "Beta", "Gamma")), 20, 20, 180, 36);
+            NanoComboBox<String> combo = place(new NanoComboBox<String>().items(List.of("Alpha", "Beta", "Gamma")), 20, 20, 180, 36);
             var selected = new ArrayList<String>(); combo.onChange(selected::add); parent.add(combo); root.add(parent); draw(root);
             click(60, 38); draw(root); assertTrue(combo.isOpen());
             click(60, 104); draw(root); assertEquals("Beta", combo.getSelected()); assertEquals(List.of("Beta"), selected);
@@ -660,9 +700,9 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            Panel parent = place(new Panel(), 0, 0, 500, 400);
-            parent.add(new Label("Earlier sibling"));
-            ComboBox<String> combo = place(new ComboBox<String>().items(List.of("A", "B", "C")), 20, 40, 180, 36);
+            NanoPanel parent = place(new NanoPanel(), 0, 0, 500, 400);
+            parent.add(new NanoLabel("Earlier sibling"));
+            NanoComboBox<String> combo = place(new NanoComboBox<String>().items(List.of("A", "B", "C")), 20, 40, 180, 36);
             parent.add(combo); root.add(parent); draw(root); combo.open();
             key(Keyboard.TAB); key(Keyboard.ENTER); assertEquals("B", combo.getSelected());
             combo.open(); root.remove(parent); assertFalse(combo.isOpen()); draw(root);
@@ -676,9 +716,9 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            ColorPicker picker = place(new ColorPicker().color(Color.RED), 20, 20, 260, 220);
-            NumberSpinner spinner = place(new NumberSpinner(0, 10, 1, 3), 310, 20, 220, 36);
-            RadioGroup radio = place(new RadioGroup(List.of("A", "B")), 310, 80, 180, 64);
+            NanoColorPicker picker = place(new NanoColorPicker().color(Color.RED), 20, 20, 260, 220);
+            NanoNumberSpinner spinner = place(new NanoNumberSpinner(0, 10, 1, 3), 310, 20, 220, 36);
+            NanoRadioGroup radio = place(new NanoRadioGroup(List.of("A", "B")), 310, 80, 180, 64);
             root.add(picker, spinner, radio); draw(root);
             var pixel = BufferUtils.createByteBuffer(4); glReadPixels(30, 449, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
             assertTrue((pixel.get(0) & 255) > 245); assertTrue((pixel.get(1) & 255) < 5);
@@ -702,15 +742,15 @@ class WidgetGraphicsTest {
         UIRoot root = new UIRoot();
         try (ProfessionalTheme theme = new ProfessionalTheme()) {
             root.setTheme(theme.create());
-            FileExplorer explorer = place(new FileExplorer(temporary), 20, 20, 500, 380);
+            NanoFileExplorer explorer = place(new NanoFileExplorer(temporary), 20, 20, 500, 380);
             root.add(explorer); draw(root);
-            VirtualList rows = explorer.getList();
+            NanoVirtualList rows = explorer.getList();
             assertTrue(rows.getLiveItemCount() < 25, "directory rows must remain virtualized");
             root.setFocusTo(rows.getItemNode(0)); key(Keyboard.HOME); key(Keyboard.ENTER); draw(root);
             assertEquals(sub.toRealPath(), explorer.getDirectory());
-            ScrollPanel trail = (ScrollPanel) explorer.get(1);
-            BreadcrumbBar crumbs = (BreadcrumbBar) trail.getContent();
-            Button first = (Button) crumbs.get(0); root.setFocusTo(first); key(Keyboard.ENTER); draw(root);
+            NanoScrollPanel trail = (NanoScrollPanel) explorer.get(1);
+            NanoBreadcrumbBar crumbs = (NanoBreadcrumbBar) trail.getContent();
+            NanoButton first = (NanoButton) crumbs.get(0); root.setFocusTo(first); key(Keyboard.ENTER); draw(root);
             assertEquals(temporary.toRealPath(), explorer.getDirectory());
             root.setFocusTo(rows.getItemNode(0)); key(Keyboard.END); draw(root);
             assertEquals("file149.txt", explorer.getSelected().getFileName().toString());

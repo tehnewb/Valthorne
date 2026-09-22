@@ -8,6 +8,13 @@ Author: Albert Beaupre
 
 NanoVG controls use vector-style painting while retaining the same UI tree, layout, focus, and behavior foundations. NanoNode defines the painting contract; NanoContainer and concrete controls provide panels, labels, buttons, images, fields, sliders, combo boxes, links, and scrollable content.
 
+The [composite widget guide](../ui-widgets.md#nanovg-versions) also covers
+`NanoBreadcrumbBar`, `NanoColorPicker`, `NanoComboBox`, `NanoDirectoryTree`,
+`NanoFileChooser`, `NanoFileExplorer`, `NanoMenuBar`, `NanoNumberSpinner`,
+`NanoPopupMenu`, and `NanoRadioGroup`. Their owned editors, rows, scrollbars, and
+modal shells all use NanoVG. [NanoWindow](../ui-windows.md) adds movable, resizable
+tool windows with matching light/dark chrome and clipped Nano content.
+
 ## Features and when to use them
 
 | Feature | Purpose |
