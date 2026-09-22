@@ -5,20 +5,28 @@ import org.teavm.runtime.fs.*;
 import org.teavm.interop.*;
 import org.teavm.jso.*;
 import org.teavm.jso.typedarrays.Uint8Array;
+import java.nio.file.CopyOption;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.ProviderMismatchException;
+import java.nio.file.StandardCopyOption;
+import java.util.Objects;
 
 /** The Java filesystem API backed by an origin-private IndexedDB store. */
 public final class BrowserFileSystem implements VirtualFileSystem {
  private static VirtualFileSystem instance;
  public static VirtualFileSystem getInstance(){if(instance==null)instance=new BrowserFileSystem();return instance;}
  public static void setInstance(VirtualFileSystem value){instance=value;}
- public static java.nio.file.Path move(java.nio.file.Path source,java.nio.file.Path target,java.nio.file.CopyOption... options)throws IOException{
-  boolean replace=false;for(var option:options){java.util.Objects.requireNonNull(option);if(option==java.nio.file.StandardCopyOption.REPLACE_EXISTING)replace=true;else if(option!=java.nio.file.StandardCopyOption.ATOMIC_MOVE)throw new UnsupportedOperationException("Unsupported move option");}
-  if(source.getFileSystem()!=target.getFileSystem())throw new java.nio.file.ProviderMismatchException();
+ public static Path move(Path source,Path target,CopyOption... options)throws IOException{
+  boolean replace=false;for(var option:options){Objects.requireNonNull(option);if(option==StandardCopyOption.REPLACE_EXISTING)replace=true;else if(option!=StandardCopyOption.ATOMIC_MOVE)throw new UnsupportedOperationException("Unsupported move option");}
+  if(source.getFileSystem()!=target.getFileSystem())throw new ProviderMismatchException();
   String from=normalize(source.toAbsolutePath().toString()),to=normalize(target.toAbsolutePath().toString());
-  if(!exists(from))throw new java.nio.file.NoSuchFileException(from);if(from.equals(to))return target;
-  if(exists(to)&&!replace)throw new java.nio.file.FileAlreadyExistsException(to);
+  if(!exists(from))throw new NoSuchFileException(from);if(from.equals(to))return target;
+  if(exists(to)&&!replace)throw new FileAlreadyExistsException(to);
   String parent=to.substring(0,to.lastIndexOf('/'));if(parent.isEmpty())parent="/";
-  try{if(!mutate("move",parent,from,to.substring(to.lastIndexOf('/')+1),replace?1:0))throw new java.nio.file.FileSystemException(from,to,"Move rejected");}catch(UncheckedIOException error){throw error.getCause();}
+  try{if(!mutate("move",parent,from,to.substring(to.lastIndexOf('/')+1),replace?1:0))throw new FileSystemException(from,to,"Move rejected");}catch(UncheckedIOException error){throw error.getCause();}
   return target;
  }
  public String getUserDir(){return "/";}public boolean isWindows(){return false;}
@@ -56,8 +64,8 @@ public final class BrowserFileSystem implements VirtualFileSystem {
   private final JSObject handle;private final boolean readable,writable;private boolean closed;
   Accessor(JSObject handle,boolean readable,boolean writable){this.handle=handle;this.readable=readable;this.writable=writable;}
   private void check()throws IOException{if(closed)throw new IOException("File is closed");}
-  public int read(byte[] data,int offset,int length)throws IOException{check();if(!readable)throw new IOException("File is not readable");java.util.Objects.checkFromIndexSize(offset,length,data.length);Uint8Array bytes=readNative(handle,length);for(int i=0;i<bytes.getLength();i++)data[offset+i]=(byte)bytes.get(i);return bytes.getLength();}
-  public void write(byte[] data,int offset,int length)throws IOException{check();if(!writable)throw new IOException("File is not writable");java.util.Objects.checkFromIndexSize(offset,length,data.length);Uint8Array bytes=Uint8Array.create(length);for(int i=0;i<length;i++)bytes.set(i,(short)(data[offset+i]&255));error(writeNative(handle,bytes));}
+  public int read(byte[] data,int offset,int length)throws IOException{check();if(!readable)throw new IOException("File is not readable");Objects.checkFromIndexSize(offset,length,data.length);Uint8Array bytes=readNative(handle,length);for(int i=0;i<bytes.getLength();i++)data[offset+i]=(byte)bytes.get(i);return bytes.getLength();}
+  public void write(byte[] data,int offset,int length)throws IOException{check();if(!writable)throw new IOException("File is not writable");Objects.checkFromIndexSize(offset,length,data.length);Uint8Array bytes=Uint8Array.create(length);for(int i=0;i<length;i++)bytes.set(i,(short)(data[offset+i]&255));error(writeNative(handle,bytes));}
   public int tell()throws IOException{check();return position(handle);}public int size()throws IOException{check();return sizeNative(handle);}
   public void seek(int value)throws IOException{check();error(seekNative(handle,value));}public void skip(int value)throws IOException{seek(Math.addExact(tell(),value));}
   public void resize(int size)throws IOException{check();error(resizeNative(handle,size));}

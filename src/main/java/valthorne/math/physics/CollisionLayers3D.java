@@ -1,5 +1,7 @@
 package valthorne.math.physics;
 
+import java.util.Arrays;
+
 /**
  * Configures symmetric collision permissions between sixteen user-defined layers.
  * Every pair, including a layer with itself, starts enabled. Changing one pair
@@ -34,7 +36,9 @@ public final class CollisionLayers3D {
      * entries. Configure exceptions with {@link #setCollision(int, int, boolean)}
      * before passing the matrix to a world constructor.
      */
-    public CollisionLayers3D() {for (boolean[] row : enabled) java.util.Arrays.fill(row, true);}
+    public CollisionLayers3D() {
+        for (boolean[] row : enabled) Arrays.fill(row, true);
+    }
 
     /**
      * Validates a user-layer index for configuration and body settings.

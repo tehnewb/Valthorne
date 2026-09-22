@@ -55,6 +55,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Registers a borrowed shape with every light-occluder category enabled.
      * Null is ignored; repeated registration is allowed and creates another entry.
+     *
      * @param shape world-space shape to register
      */
     public void addShape(Shape shape) {
@@ -64,7 +65,8 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Appends a borrowed shape and matching occluder, growing query storage and
      * invalidating the spatial index. Geometry is read from the live shape.
-     * @param shape shape to register; null is ignored
+     *
+     * @param shape        shape to register; null is ignored
      * @param categoryBits category mask tested against each light's occlusion mask
      */
     public void addShape(Shape shape, int categoryBits) {
@@ -83,6 +85,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
      * Removes every registration whose shape is the supplied object by identity.
      * Also clears the moving marker when it refers to that object and invalidates
      * the index. The shape itself is neither modified nor disposed.
+     *
      * @param shape registered object to remove; null is ignored
      */
     public void removeShape(Shape shape) {
@@ -108,7 +111,8 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Changes category masks for every identity-matching registration. Index
      * geometry is unchanged, and cached light endpoints are not invalidated.
-     * @param shape registered object to match by identity
+     *
+     * @param shape        registered object to match by identity
      * @param categoryBits replacement occluder category mask
      * @return true if at least one registration matched
      */
@@ -127,6 +131,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
 
     /**
      * Reads the category mask from the first identity-matching registration.
+     *
      * @param shape registered shape object
      * @return first matching mask, or zero when the shape is absent
      */
@@ -157,6 +162,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Returns an unmodifiable live view in registration order. Membership cannot
      * be changed through this view, but the shape objects remain mutable.
+     *
      * @return live borrowed shapes, including duplicate registrations
      */
     public List<Shape> getShapes() {
@@ -166,6 +172,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Returns the marker that keeps the spatial index rebuilding while non-null.
      * The marker need not identify a registered shape.
+     *
      * @return movement marker, or null
      */
     public Shape getMoving() {
@@ -176,6 +183,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
      * Stores the movement marker. While non-null, each prepare call rebuilds the
      * entire index; this is not a single-shape incremental update. Assigning null
      * does not itself dirty an otherwise clean index.
+     *
      * @param moving any non-null shape to force repeated rebuilds, or null to stop
      */
     public void setMoving(Shape moving) {
@@ -184,6 +192,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
 
     /**
      * Reads the spatial grid's cell width and height in world units.
+     *
      * @return configured cell size
      */
     public float getCellSize() {
@@ -194,6 +203,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
      * Sets the grid scale and invalidates the index unless the value is unchanged.
      * Use a finite positive size; the check rejects zero and negatives but does
      * not explicitly reject NaN or positive infinity.
+     *
      * @param cellSize desired square-cell size in world units
      * @throws IllegalArgumentException if cellSize is zero or negative
      */
@@ -226,10 +236,11 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Allocates a hit record and queries without light-category filtering.
      * Uses the same bounds and intersection behavior as the reusable-output overload.
+     *
      * @param startX world-space ray origin X
      * @param startY world-space ray origin Y
-     * @param endX world-space target X
-     * @param endY world-space target Y
+     * @param endX   world-space target X
+     * @param endY   world-space target Y
      * @return nearest accepted boundary hit, or null
      */
     @Override
@@ -241,11 +252,12 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Allocates a hit record and queries category-compatible occluders.
      * The temporary record is discarded on a miss.
-     * @param light filtering light, or null to accept all categories
+     *
+     * @param light  filtering light, or null to accept all categories
      * @param startX world-space ray origin X
      * @param startY world-space ray origin Y
-     * @param endX world-space target X
-     * @param endY world-space target Y
+     * @param endX   world-space target X
+     * @param endY   world-space target Y
      * @return nearest accepted boundary hit, or null
      */
     @Override
@@ -264,11 +276,11 @@ public class ShapeRaycastWorld implements RayCastWorld {
      * Float.MAX_VALUE, rather than explicitly by one. Thus an accepted hit can
      * lie beyond the target even though candidates use the segment bounds.</p>
      *
-     * @param light filtering light, or null to accept all categories
+     * @param light  filtering light, or null to accept all categories
      * @param startX world-space origin X
      * @param startY world-space origin Y
-     * @param endX world-space target X
-     * @param endY world-space target Y
+     * @param endX   world-space target X
+     * @param endY   world-space target Y
      * @param outHit reusable destination, or null for an existence-only query
      * @return true if an eligible edge intersection was found
      */
@@ -348,6 +360,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Exposes an unmodifiable live list of occluder wrappers in registration order.
      * The wrappers themselves remain mutable and refer to borrowed shapes.
+     *
      * @return live occluder view
      */
     @Override
@@ -390,6 +403,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
      * Recomputes a bounds object from non-null points. Null or empty input, or
      * an array containing only nulls, marks it invalid and leaves old extents
      * unusable. Coordinates are expected to be finite.
+     *
      * @param bounds mutable destination
      * @param points world-space vertices, possibly null
      */
@@ -430,6 +444,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Returns a new deduplication stamp. Before integer exhaustion, clears all
      * per-occluder stamps and restarts at one so old queries cannot alias.
+     *
      * @return nonzero stamp for one query
      */
     private int nextQueryStamp() {
@@ -443,6 +458,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Doubles deduplication storage until it can address the requested number
      * of registered occluders, preserving existing entries.
+     *
      * @param count required registration capacity
      */
     private void ensureQueryStampCapacity(int count) {
@@ -460,6 +476,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Maps a finite world coordinate to a grid cell using floor division, so
      * negative fractional coordinates belong to the cell below zero.
+     *
      * @param coordinate world-space coordinate
      * @return integer cell coordinate
      */
@@ -470,6 +487,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Packs signed X and Y cell coordinates into distinct halves of a long.
      * No hashing or truncation is performed beyond the map's own key handling.
+     *
      * @param cellX grid X
      * @param cellY grid Y
      * @return unique key for the integer coordinate pair
@@ -481,11 +499,12 @@ public class ShapeRaycastWorld implements RayCastWorld {
     /**
      * Finds a nearer intersection along the closed vertex boundary, including
      * the last-to-first edge. Edges adjoining null vertices are skipped.
-     * @param x1 ray origin X
-     * @param y1 ray origin Y
-     * @param x2 target X defining ray direction and fraction scale
-     * @param y2 target Y defining ray direction and fraction scale
-     * @param points cyclic boundary vertices
+     *
+     * @param x1          ray origin X
+     * @param y1          ray origin Y
+     * @param x2          target X defining ray direction and fraction scale
+     * @param y2          target Y defining ray direction and fraction scale
+     * @param points      cyclic boundary vertices
      * @param maxFraction incumbent nearest-hit parameter
      * @return nearer parameter or maxFraction; Float.MAX_VALUE for insufficient points
      */
@@ -524,14 +543,15 @@ public class ShapeRaycastWorld implements RayCastWorld {
      * negative ray parameters, parameters beyond the incumbent, and edge
      * parameters outside the epsilon-expanded [0, 1] interval. The ray parameter
      * is not independently clamped to one, and collinear overlap is ignored.
-     * @param x1 ray origin X
-     * @param y1 ray origin Y
-     * @param x2 target X defining ray direction
-     * @param y2 target Y defining ray direction
-     * @param x3 edge start X
-     * @param y3 edge start Y
-     * @param x4 edge end X
-     * @param y4 edge end Y
+     *
+     * @param x1          ray origin X
+     * @param y1          ray origin Y
+     * @param x2          target X defining ray direction
+     * @param y2          target Y defining ray direction
+     * @param x3          edge start X
+     * @param y3          edge start Y
+     * @param x4          edge end X
+     * @param y4          edge end Y
      * @param maxFraction largest accepted ray parameter
      * @return intersection parameter, or Float.MAX_VALUE when rejected
      */
@@ -585,6 +605,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
         /**
          * Tests inclusive rectangle overlap only when this cached extent is valid.
          * Touching edges count as overlap; input bounds are assumed ordered.
+         *
          * @param otherMinX candidate minimum X
          * @param otherMinY candidate minimum Y
          * @param otherMaxX candidate maximum X
@@ -616,6 +637,7 @@ public class ShapeRaycastWorld implements RayCastWorld {
         /**
          * Appends an occluder index, doubling the backing array when full. Existing
          * indices are preserved and duplicate values are allowed.
+         *
          * @param value registered occluder index
          */
         void add(int value) {

@@ -1,11 +1,14 @@
 package valthorne.graphics.model;
 
-import valthorne.camera.Camera3D;
 import org.joml.FrustumIntersection;
-import org.joml.primitives.AABBf;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.primitives.AABBf;
+import valthorne.camera.Camera3D;
+import org.joml.Intersectionf;
+import org.joml.Matrix3f;
+import org.joml.primitives.Rayf;
 
 /**
  * Places borrowed model geometry using local translation, rotation, scale, and a
@@ -37,7 +40,7 @@ public final class ModelInstance3D implements MeshRenderable3D {
     private final Vector3f boundsScratch = new Vector3f(); // Reusable transformed corner for bounds calculation.
     private final Matrix4f rotationMatrix = new Matrix4f(); // Reusable matrix for quaternion conversion.
     private final Matrix4f parentTransform = new Matrix4f(); // Copied affine parent transform, initially identity.
-    private final org.joml.Matrix3f normalTransform = new org.joml.Matrix3f(); // Reusable inverse-transpose matrix for transforming normals.
+    private final Matrix3f normalTransform = new Matrix3f(); // Reusable inverse-transpose matrix for transforming normals.
     private final Matrix4f worldTransform = new Matrix4f(); // Cached parent-times-local transform.
     private final float[] lastTransform = new float[9]; // Last validated position, scale, and Euler components.
     private Model3D model; // Borrowed model geometry, or null.
@@ -62,6 +65,19 @@ public final class ModelInstance3D implements MeshRenderable3D {
     }
 
     /**
+     * Validates incoming JOML values before replacing an engine orientation.
+     */
+    static Quaternionf copyRotation(Quaternionf source, Quaternionf destination) {
+        double length = Math.sqrt((double) source.x() * source.x() + (double) source.y() * source.y()
+                + (double) source.z() * source.z() + (double) source.w() * source.w());
+        if (!Double.isFinite(length) || length == 0)
+            throw new IllegalArgumentException("Quaternion must be finite and nonzero");
+        if (destination == null) destination = new Quaternionf();
+        return destination.set((float) (source.x() / length), (float) (source.y() / length),
+                (float) (source.z() / length), (float) (source.w() / length));
+    }
+
+    /**
      * Returns the closest world-transformed triangle intersection after a bounds test.
      * Invisible or missing models return positive infinity. The result is a ray parameter,
      * equal to world distance for a normalized direction. Allocates three scratch vectors
@@ -70,10 +86,11 @@ public final class ModelInstance3D implements MeshRenderable3D {
      * @param ray world-space query ray
      * @return nearest intersection parameter, or positive infinity when none
      */
-    public float intersect(org.joml.primitives.Rayf ray) {
+    public float intersect(Rayf ray) {
         if (!visible || model == null) return Float.POSITIVE_INFINITY;
         AABBf bounds = getWorldBounds();
-        if (!(bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY && bounds.minZ <= bounds.maxZ)) return Float.POSITIVE_INFINITY;
+        if (!(bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY && bounds.minZ <= bounds.maxZ))
+            return Float.POSITIVE_INFINITY;
         // Keep exact edge and planar hits in this conservative broad phase. JOML's
         // ray/AABB test uses an open interval. Scale padding to the ray origin too,
         // so subtraction cannot round a planar interval back to zero thickness.
@@ -84,17 +101,17 @@ public final class ModelInstance3D implements MeshRenderable3D {
         magnitude = Math.max(magnitude, Math.max(Math.abs(bounds.minZ), Math.abs(bounds.maxZ)));
         float padding = magnitude * 1e-6f;
         if (!bounds.containsPoint(ray.oX, ray.oY, ray.oZ)
-                && !org.joml.Intersectionf.testRayAab(ray.oX, ray.oY, ray.oZ, ray.dX, ray.dY, ray.dZ,
+                && !Intersectionf.testRayAab(ray.oX, ray.oY, ray.oZ, ray.dX, ray.dY, ray.dZ,
                 bounds.minX - padding, bounds.minY - padding, bounds.minZ - padding,
                 bounds.maxX + padding, bounds.maxY + padding, bounds.maxZ + padding))
             return Float.POSITIVE_INFINITY;
         float closest = Float.POSITIVE_INFINITY;
         Vector3f a = new Vector3f(), b = new Vector3f(), c = new Vector3f();
         for (Model3D.Triangle triangle : model.triangles()) {
-            transform(triangle.a, a);
-            transform(triangle.b, b);
-            transform(triangle.c, c);
-            float hit = org.joml.Intersectionf.intersectRayTriangle(ray.oX, ray.oY, ray.oZ,
+            transform(triangle.a(), a);
+            transform(triangle.b(), b);
+            transform(triangle.c(), c);
+            float hit = Intersectionf.intersectRayTriangle(ray.oX, ray.oY, ray.oZ,
                     ray.dX, ray.dY, ray.dZ, a.x(), a.y(), a.z(), b.x(), b.y(), b.z(),
                     c.x(), c.y(), c.z(), 1e-8f);
             if (hit >= 0f) closest = Math.min(closest, hit);
@@ -114,19 +131,6 @@ public final class ModelInstance3D implements MeshRenderable3D {
         quaternion = copyRotation(rotation, quaternion);
         transformValid = false;
         return this;
-    }
-
-    /**
-     * Validates incoming JOML values before replacing an engine orientation.
-     */
-    static Quaternionf copyRotation(Quaternionf source, Quaternionf destination) {
-        double length = Math.sqrt((double) source.x() * source.x() + (double) source.y() * source.y()
-                + (double) source.z() * source.z() + (double) source.w() * source.w());
-        if (!Double.isFinite(length) || length == 0)
-            throw new IllegalArgumentException("Quaternion must be finite and nonzero");
-        if (destination == null) destination = new Quaternionf();
-        return destination.set((float) (source.x() / length), (float) (source.y() / length),
-                (float) (source.z() / length), (float) (source.w() / length));
     }
 
     /**
@@ -182,7 +186,7 @@ public final class ModelInstance3D implements MeshRenderable3D {
      * than transforming a normal as a position.
      *
      * @param normal local-space normal
-     * @param out destination world-space normal
+     * @param out    destination world-space normal
      * @return out
      */
     public Vector3f transformNormal(Vector3f normal, Vector3f out) {
@@ -497,7 +501,7 @@ public final class ModelInstance3D implements MeshRenderable3D {
      * may alias because components are captured before writing.
      *
      * @param localPoint source local-space point
-     * @param out destination world-space point
+     * @param out        destination world-space point
      * @return out
      * @throws NullPointerException if either vector is null
      */
@@ -513,7 +517,7 @@ public final class ModelInstance3D implements MeshRenderable3D {
      * @param localX local X coordinate
      * @param localY local Y coordinate
      * @param localZ local Z coordinate
-     * @param out destination world-space point
+     * @param out    destination world-space point
      * @return out
      * @throws NullPointerException if out is null
      */

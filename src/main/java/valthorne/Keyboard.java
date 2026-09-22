@@ -10,6 +10,10 @@ import valthorne.event.listeners.KeyListener;
 import java.util.BitSet;
 
 import static org.lwjgl.glfw.GLFW.*;
+import static java.awt.event.KeyEvent.VK_CAPS_LOCK;
+import java.awt.Toolkit;
+import org.lwjgl.glfw.GLFWCharCallback;
+import valthorne.event.events.TextInputEvent;
 
 /**
  * <p>
@@ -730,7 +734,7 @@ public final class Keyboard {
     /**
      * Retained GLFW character callback delivering Unicode text input.
      */
-    private static org.lwjgl.glfw.GLFWCharCallback textCallback;
+    private static GLFWCharCallback textCallback;
     /**
      * Retained GLFW key callback installed on the active window.
      */
@@ -793,12 +797,12 @@ public final class Keyboard {
         resetState();
 
         try {
-            capsLockOn = java.awt.Toolkit.getDefaultToolkit().getLockingKeyState(java.awt.event.KeyEvent.VK_CAPS_LOCK);
+            capsLockOn = Toolkit.getDefaultToolkit().getLockingKeyState(VK_CAPS_LOCK);
         } catch (Throwable ignored) {
             capsLockOn = false;
         }
 
-        textCallback = org.lwjgl.glfw.GLFWCharCallback.create((win, codePoint) -> JGL.publish(new valthorne.event.events.TextInputEvent(new String(Character.toChars(codePoint)))));
+        textCallback = GLFWCharCallback.create((win, codePoint) -> JGL.publish(new TextInputEvent(new String(Character.toChars(codePoint)))));
         glfwSetCharCallback(Window.getAddress(), textCallback);
         keyCallback = GLFWKeyCallback.create((win, key, scancode, action, mods) -> {
             if (key < 0 || key > GLFW_KEY_LAST) return;

@@ -12,6 +12,8 @@ import valthorne.ui.UIContainer;
 import valthorne.ui.UINode;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.Mouse;
+import valthorne.ui.behavior.ScrollBehavior;
 
 /**
  * <p>
@@ -599,7 +601,7 @@ public class ScrollPanel extends UIContainer {
      */
     @Override
     public void onMouseScroll(MouseScrollEvent event) {
-        Vector2f next = valthorne.ui.behavior.ScrollBehavior.wheel(event, horizontal, vertical,
+        Vector2f next = ScrollBehavior.wheel(event, horizontal, vertical,
                 getScrollX(), getScrollY(), getMaxScrollX(), getMaxScrollY(), scrollSpeed);
         scroll(next.x(), next.y());
     }
@@ -619,7 +621,7 @@ public class ScrollPanel extends UIContainer {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        if (event.getButton() != valthorne.Mouse.LEFT) return;
+        if (event.getButton() != Mouse.LEFT) return;
         Vector2f position = screenToContent(event.getX(), event.getY());
         float mouseX = position.x();
         float mouseY = position.y();

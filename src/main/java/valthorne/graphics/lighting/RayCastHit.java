@@ -133,9 +133,9 @@ public final class RayCastHit {
      * Replaces the entire result without validation or copying the collider object.
      * Use a consistent coordinate space and segment fraction when populating a result.
      *
-     * @param hit whether the segment hit
-     * @param x hit X coordinate
-     * @param y hit Y coordinate
+     * @param hit      whether the segment hit
+     * @param x        hit X coordinate
+     * @param y        hit Y coordinate
      * @param fraction segment parameter, conventionally zero through one
      * @param collider borrowed collision identity, or null
      */

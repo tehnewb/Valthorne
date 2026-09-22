@@ -12,6 +12,9 @@ import org.joml.Vector3f;
 import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
 import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11.glViewport;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GL20;
 
 /**
  * Viewport that binds a 3D camera's combined projection-view matrix into the engine.
@@ -253,12 +256,12 @@ public final class PerspectiveViewport {
         if (overlayActive) throw new IllegalStateException("2D overlay is already active");
         Window.copyProjectionMatrix(worldProjectionMatrix);
         overlayState = new RenderStateSnapshot3D();
-        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
-        org.lwjgl.opengl.GL11.glDepthMask(false);
-        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_CULL_FACE);
-        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_BLEND);
-        org.lwjgl.opengl.GL11.glBlendFunc(org.lwjgl.opengl.GL11.GL_SRC_ALPHA, org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA);
-        org.lwjgl.opengl.GL20.glBlendEquationSeparate(org.lwjgl.opengl.GL14.GL_FUNC_ADD, org.lwjgl.opengl.GL14.GL_FUNC_ADD);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthMask(false);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL20.glBlendEquationSeparate(GL14.GL_FUNC_ADD, GL14.GL_FUNC_ADD);
         overlayProjection.setOrtho(0f, overlayWidth, 0f, overlayHeight, -1f, 1f);
         Window.setProjectionMatrix(overlayProjection.get(matrixUpload));
         overlayActive = true;

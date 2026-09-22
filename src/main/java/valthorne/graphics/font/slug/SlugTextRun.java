@@ -60,7 +60,8 @@ public final class SlugTextRun {
      * @param size world units per em
      */
     public void rebuild(String text, float size) {
-        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Size must be finite and nonnegative");
+        if (!Float.isFinite(size) || size < 0)
+            throw new IllegalArgumentException("Size must be finite and nonnegative");
         String normalized = text == null ? "" : text;
         if (glyphs != null && this.size == size && normalized.equals(this.text)) return;
         this.text = text == null ? "" : text;
@@ -179,8 +180,10 @@ public final class SlugTextRun {
         batch.requireDrawing();
         if (font.curveTexture() == 0) throw new IllegalStateException("Slug font is disposed");
         if (count == 0 || !batch.intersects(x + minX, y + minY, x + maxX, y + maxY)) return;
+        int r = SlugBatch.toByte(color.r()), g = SlugBatch.toByte(color.g());
+        int b = SlugBatch.toByte(color.b()), a = SlugBatch.toByte(color.a());
         for (int i = 0; i < count; i++) {
-            batch.drawGlyph(font, glyphs[i], x + xOffsets[i], y + yOffsets[i], size, color);
+            batch.drawGlyph(font, glyphs[i], x + xOffsets[i], y + yOffsets[i], size, r, g, b, a);
         }
     }
 

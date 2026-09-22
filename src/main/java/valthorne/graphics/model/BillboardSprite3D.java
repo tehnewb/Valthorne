@@ -1,11 +1,11 @@
 package valthorne.graphics.model;
 
-import valthorne.camera.Camera3D;
 import org.joml.FrustumIntersection;
+import org.joml.Vector3f;
+import org.joml.primitives.AABBf;
+import valthorne.camera.Camera3D;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureRegion;
-import org.joml.primitives.AABBf;
-import org.joml.Vector3f;
 
 /**
  * Camera-facing textured quad positioned by an anchor in 3D world space.
@@ -303,17 +303,16 @@ public final class BillboardSprite3D implements BillboardRenderable3D {
         }
         AABBf bounds = getWorldBounds();
         float padding = cullPadding(bounds);
-        return (bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY && bounds.minZ <= bounds.maxZ) && frustum.testAab(bounds.minX - padding, bounds.minY - padding, bounds.minZ - padding,
-                bounds.maxX + padding, bounds.maxY + padding, bounds.maxZ + padding);
+        return (bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY && bounds.minZ <= bounds.maxZ) && frustum.testAab(bounds.minX - padding, bounds.minY - padding, bounds.minZ - padding, bounds.maxX + padding, bounds.maxY + padding, bounds.maxZ + padding);
     }
 
     /**
      * Delegates geometry emission to the batch without checking this sprite's visible flag. The batch skips a null camera or missing region; otherwise it requires an active batch with the region's texture.
      *
      * @param billboardBatch the nonnull destination batch
-     * @param camera the facing camera, or null to skip
-     * @throws NullPointerException if billboardBatch is null
-     * @throws IllegalStateException if drawing requires a batch that has not begun
+     * @param camera         the facing camera, or null to skip
+     * @throws NullPointerException     if billboardBatch is null
+     * @throws IllegalStateException    if drawing requires a batch that has not begun
      * @throws IllegalArgumentException if the region texture differs from the active batch texture
      */
     @Override
@@ -338,24 +337,11 @@ public final class BillboardSprite3D implements BillboardRenderable3D {
 
         if (mode == BillboardMode3D.CYLINDRICAL) {
             float horizontalRadius = Math.max(Math.abs(left), Math.abs(right));
-            worldBounds.setMin(position.x() - horizontalRadius,
-                    position.y() - horizontalRadius,
-                    position.z() + bottom).setMax(
-                    position.x() + horizontalRadius,
-                    position.y() + horizontalRadius,
-                    position.z() + top).correctBounds();
+            worldBounds.setMin(position.x() - horizontalRadius, position.y() - horizontalRadius, position.z() + bottom).setMax(position.x() + horizontalRadius, position.y() + horizontalRadius, position.z() + top).correctBounds();
             return;
         }
 
-        float radius = (float) Math.sqrt(
-                Math.max(Math.abs(left), Math.abs(right)) * Math.max(Math.abs(left), Math.abs(right))
-                        + Math.max(Math.abs(bottom), Math.abs(top)) * Math.max(Math.abs(bottom), Math.abs(top))
-        );
-        worldBounds.setMin(position.x() - radius,
-                position.y() - radius,
-                position.z() - radius).setMax(
-                position.x() + radius,
-                position.y() + radius,
-                position.z() + radius).correctBounds();
+        float radius = (float) Math.sqrt(Math.max(Math.abs(left), Math.abs(right)) * Math.max(Math.abs(left), Math.abs(right)) + Math.max(Math.abs(bottom), Math.abs(top)) * Math.max(Math.abs(bottom), Math.abs(top)));
+        worldBounds.setMin(position.x() - radius, position.y() - radius, position.z() - radius).setMax(position.x() + radius, position.y() + radius, position.z() + radius).correctBounds();
     }
 }

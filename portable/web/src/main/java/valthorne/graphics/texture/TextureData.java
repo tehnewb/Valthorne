@@ -5,11 +5,12 @@ import org.teavm.interop.Async;
 import org.teavm.interop.AsyncCallback;
 import org.teavm.jso.*;
 import org.teavm.jso.typedarrays.Uint8Array;
+import valthorne.web.BrowserIO;
 
 /** Browser-decoded RGBA pixels, retaining the existing synchronous Java API. */
 public record TextureData(ByteBuffer buffer,int width,int height) {
     public static TextureData load(String path){return load(path,true);}
-    public static TextureData load(String path,boolean flipVertically){byte[] local=valthorne.web.BrowserIO.readLocal(path);return local!=null?load(local,flipVertically):Decoder.decode(Objects.requireNonNull(path),null,flipVertically);}
+    public static TextureData load(String path,boolean flipVertically){byte[] local=BrowserIO.readLocal(path);return local!=null?load(local,flipVertically):Decoder.decode(Objects.requireNonNull(path),null,flipVertically);}
     public static TextureData load(byte[] data){return load(data,true);}
     public static TextureData load(byte[] data,boolean flipVertically){
         Objects.requireNonNull(data);Uint8Array encoded=Uint8Array.create(data.length);

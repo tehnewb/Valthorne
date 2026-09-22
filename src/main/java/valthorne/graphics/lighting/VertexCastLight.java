@@ -33,12 +33,12 @@ abstract class VertexCastLight extends Light {
      * by update when active and dirty.
      *
      * @param rayHandler handler providing the occlusion world
-     * @param rays base ray count, at least three
-     * @param color color copied into the light
-     * @param distance radial extent in world units
-     * @param x world-space center X
-     * @param y world-space center Y
-     * @throws NullPointerException if handler or color is null
+     * @param rays       base ray count, at least three
+     * @param color      color copied into the light
+     * @param distance   radial extent in world units
+     * @param x          world-space center X
+     * @param y          world-space center Y
+     * @throws NullPointerException     if handler or color is null
      * @throws IllegalArgumentException if rays is below three
      */
     protected VertexCastLight(RayHandler rayHandler, int rays, Color color, float distance, float x, float y) {
@@ -130,7 +130,7 @@ abstract class VertexCastLight extends Light {
      * Checks whether any non-null vertex lies within the squared radius around this
      * light. This is a vertex test, not a polygon-edge intersection test.
      *
-     * @param points candidate vertices, possibly null
+     * @param points             candidate vertices, possibly null
      * @param maxDistanceSquared squared radial limit
      * @return true if at least one vertex is within the limit
      */

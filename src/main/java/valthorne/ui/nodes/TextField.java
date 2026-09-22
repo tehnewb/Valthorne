@@ -16,6 +16,9 @@ import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import java.nio.ByteBuffer;
+import valthorne.Mouse;
+import valthorne.ui.behavior.TextEditModel;
+import valthorne.ui.behavior.TextEditing;
 
 /**
  * <p>
@@ -193,7 +196,7 @@ public class TextField extends Panel {
      * Shared 1x1 white texture used for drawing caret and selection rectangles.
      */
     private static Texture CARET_PIXEL;
-    private final valthorne.ui.behavior.TextEditModel editor = new valthorne.ui.behavior.TextEditModel(); // Editing model holding text, selection, and caret state.
+    private final TextEditModel editor = new TextEditModel(); // Editing model holding text, selection, and caret state.
     private Color defaultSelectionColor = new Color(1f, 1f, 1f, 0.35f); // Fallback selection color when style does not provide one
     // Renderer snapshot; all mutations are owned by the shared editor.
     private String text = ""; // Raw logical text stored by the field
@@ -534,7 +537,7 @@ public class TextField extends Panel {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        if (event.getButton() != valthorne.Mouse.LEFT) return;
+        if (event.getButton() != Mouse.LEFT) return;
         float mouseX = getEventX(event);
 
         if (pendingClick && doubleClickTimer <= doubleClickWindow) {
@@ -620,7 +623,7 @@ public class TextField extends Panel {
     @Override
     public void onKeyPress(KeyPressEvent event) {
         if (!isFocused() || isDisabled()) return;
-        if (valthorne.ui.behavior.TextEditing.key(editor, event, masking)) {
+        if (TextEditing.key(editor, event, masking)) {
             event.consume();
         } else if (event.getKey() == Keyboard.ENTER) {
             if (editor.isValid()) {
@@ -910,7 +913,7 @@ public class TextField extends Panel {
     /**
      * Editing, validation and undo/redo API shared by both field families.
      */
-    public valthorne.ui.behavior.TextEditModel getEditor() {return editor;}
+    public TextEditModel getEditor() {return editor;}
 
     /**
      * Copies text, caret, and selection from the shared editing model into rendering
@@ -939,7 +942,7 @@ public class TextField extends Panel {
      * @param event text-input event to insert and consume
      */
     @Override
-    public void onTextInput(valthorne.event.events.TextInputEvent event) {
+    public void onTextInput(TextInputEvent event) {
         if (isFocused() && isEnabled()) {
             editor.insert(event.getText());
             event.consume();
@@ -1044,7 +1047,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void copySelection() {
-        valthorne.ui.behavior.TextEditing.copy(editor, masking);
+        TextEditing.copy(editor, masking);
     }
 
     /**
@@ -1057,7 +1060,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void cutSelection() {
-        if (valthorne.ui.behavior.TextEditing.copy(editor, masking)) editor.deleteSelection();
+        if (TextEditing.copy(editor, masking)) editor.deleteSelection();
     }
 
     /**
@@ -1072,7 +1075,7 @@ public class TextField extends Panel {
      * </p>
      */
     private void pasteClipboard() {
-        valthorne.ui.behavior.TextEditing.paste(editor);
+        TextEditing.paste(editor);
     }
 
     /**

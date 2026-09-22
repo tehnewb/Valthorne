@@ -2,6 +2,7 @@ package valthorne.math.physics;
 
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import java.util.Objects;
 
 final class PhysicsMath3D {
 
@@ -23,7 +24,7 @@ final class PhysicsMath3D {
     }
 
     static Vector3f check(Vector3f value) {
-        java.util.Objects.requireNonNull(value, "vector");
+        Objects.requireNonNull(value, "vector");
         finite(value.x(), "x");
         finite(value.y(), "y");
         finite(value.z(), "z");
@@ -31,7 +32,7 @@ final class PhysicsMath3D {
     }
 
     static Quaternionf normalizeRotation(Quaternionf value, Quaternionf destination) {
-        java.util.Objects.requireNonNull(value, "rotation");
+        Objects.requireNonNull(value, "rotation");
         return normalizeRotation(destination, value.x(), value.y(), value.z(), value.w());
     }
 

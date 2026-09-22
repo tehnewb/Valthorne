@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Collections;
 
 /**
  * Represents a runtime-ready Tiled tileset backed by a GPU {@link Texture}.
@@ -452,7 +453,7 @@ public final class TileSet {
     public List<TiledObject> getObjectsForLocalId(int localId) {
         TileDefinition def = tileDefs.get(localId);
         if (def == null || def.objects() == null) {
-            return java.util.Collections.emptyList();
+            return Collections.emptyList();
         }
         return def.objects();
     }

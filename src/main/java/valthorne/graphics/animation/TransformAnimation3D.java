@@ -66,7 +66,9 @@ public final class TransformAnimation3D {
      *
      * @return the duration in seconds
      */
-    public float getDuration() {return frames[frames.length - 1].time;}
+    public float getDuration() {
+        return frames[frames.length - 1].time;
+    }
 
     /**
      * Samples the requested time and replaces a model instance's local position,
@@ -97,8 +99,7 @@ public final class TransformAnimation3D {
      */
     public void apply(SceneNode3D target, float time, boolean loop) {
         Keyframe frame = sample(time, loop);
-        target.setPosition(frame.position.x(), frame.position.y(), frame.position.z())
-                .setScale(frame.scale.x(), frame.scale.y(), frame.scale.z()).setRotation(frame.rotation);
+        target.setPosition(frame.position.x(), frame.position.y(), frame.position.z()).setScale(frame.scale.x(), frame.scale.y(), frame.scale.z()).setRotation(frame.rotation);
     }
 
     /**
@@ -145,12 +146,7 @@ public final class TransformAnimation3D {
      * @param scale    the finite nonzero per-axis scale to snapshot
      * @author Albert Beaupre
      */
-    public record Keyframe(
-            float time,
-            Vector3f position,
-            Quaternionf rotation,
-            Vector3f scale
-    ) {
+    public record Keyframe(float time, Vector3f position, Quaternionf rotation, Vector3f scale) {
         /**
          * Validates time, copies transform components, and rejects non-finite
          * position/scale or zero scale components. No caller-owned value is modified.
@@ -167,14 +163,10 @@ public final class TransformAnimation3D {
             if (!Float.isFinite(time) || time < 0)
                 throw new IllegalArgumentException("Time must be finite and nonnegative");
             position = new Vector3f(position);
-            double rotationLength = Math.sqrt((double) rotation.x() * rotation.x()
-                    + (double) rotation.y() * rotation.y() + (double) rotation.z() * rotation.z()
-                    + (double) rotation.w() * rotation.w());
+            double rotationLength = Math.sqrt((double) rotation.x() * rotation.x() + (double) rotation.y() * rotation.y() + (double) rotation.z() * rotation.z() + (double) rotation.w() * rotation.w());
             if (!Double.isFinite(rotationLength) || rotationLength == 0)
                 throw new IllegalArgumentException("Quaternion must be finite and nonzero");
-            rotation = new Quaternionf((float) (rotation.x() / rotationLength),
-                    (float) (rotation.y() / rotationLength), (float) (rotation.z() / rotationLength),
-                    (float) (rotation.w() / rotationLength));
+            rotation = new Quaternionf((float) (rotation.x() / rotationLength), (float) (rotation.y() / rotationLength), (float) (rotation.z() / rotationLength), (float) (rotation.w() / rotationLength));
             scale = new Vector3f(scale);
             for (float v : new float[]{position.x(), position.y(), position.z(), scale.x(), scale.y(), scale.z()})
                 if (!Float.isFinite(v)) throw new IllegalArgumentException("Transform must be finite");
@@ -189,7 +181,9 @@ public final class TransformAnimation3D {
          * @return a newly allocated copy of local position
          */
         @Override
-        public Vector3f position() {return new Vector3f(position);}
+        public Vector3f position() {
+            return new Vector3f(position);
+        }
 
         /**
          * Returns an independent orientation copy without renormalizing it.
@@ -198,7 +192,9 @@ public final class TransformAnimation3D {
          * @return a newly allocated orientation copy
          */
         @Override
-        public Quaternionf rotation() {return new Quaternionf(rotation);}
+        public Quaternionf rotation() {
+            return new Quaternionf(rotation);
+        }
 
         /**
          * Returns an independent scale vector, preserving signed components.
@@ -207,6 +203,8 @@ public final class TransformAnimation3D {
          * @return a newly allocated copy of local scale
          */
         @Override
-        public Vector3f scale() {return new Vector3f(scale);}
+        public Vector3f scale() {
+            return new Vector3f(scale);
+        }
     }
 }

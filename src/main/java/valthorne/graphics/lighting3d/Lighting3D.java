@@ -69,7 +69,7 @@ public final class Lighting3D implements AutoCloseable {
      * Alpha is not validated because environment shading consumes only RGB.
      *
      * @param c non-null candidate linear-space color
-     * @throws NullPointerException if c is null
+     * @throws NullPointerException     if c is null
      * @throws IllegalArgumentException if RGB validation fails
      */
     private static void validate(Color c) {
@@ -96,7 +96,7 @@ public final class Lighting3D implements AutoCloseable {
      *
      * @param light light to retain
      * @return this lighting system
-     * @throws NullPointerException if light is null
+     * @throws NullPointerException  if light is null
      * @throws IllegalStateException if full, disposed, or used from the wrong thread
      */
     public Lighting3D addLight(PointLight3D light) {
@@ -138,7 +138,9 @@ public final class Lighting3D implements AutoCloseable {
      *
      * @return live borrowed lights in registration order
      */
-    public List<PointLight3D> getLights() {return Collections.unmodifiableList(lights);}
+    public List<PointLight3D> getLights() {
+        return Collections.unmodifiableList(lights);
+    }
 
     /**
      * Exposes the live CPU grid for diagnostics and culling configuration. Coordinate
@@ -146,21 +148,27 @@ public final class Lighting3D implements AutoCloseable {
      *
      * @return owned mutable grid
      */
-    public LightGrid3D getGrid() {return grid;}
+    public LightGrid3D getGrid() {
+        return grid;
+    }
 
     /**
      * Reads the count of completed light/grid upload pairs, excluding cached prepares.
      *
      * @return cumulative upload count
      */
-    public long getUploadCount() {return uploads;}
+    public long getUploadCount() {
+        return uploads;
+    }
 
     /**
      * Reads the positive exposure multiplier supplied at the next bind.
      *
      * @return configured exposure, initially one
      */
-    public float getExposure() {return exposure;}
+    public float getExposure() {
+        return exposure;
+    }
 
     /**
      * Validates and stores exposure without rebuilding light buffers. Bind forwards
@@ -169,7 +177,7 @@ public final class Lighting3D implements AutoCloseable {
      * @param exposure positive finite multiplier
      * @return this lighting system
      * @throws IllegalArgumentException if exposure is nonpositive or non-finite
-     * @throws IllegalStateException if disposed or used from the wrong thread
+     * @throws IllegalStateException    if disposed or used from the wrong thread
      */
     public Lighting3D setExposure(float exposure) {
         check();
@@ -184,10 +192,10 @@ public final class Lighting3D implements AutoCloseable {
      * Z-up normals select their blend during shading; alpha does not affect shading.
      * The input color objects are not retained.
      *
-     * @param sky non-null upper-hemisphere diffuse color
+     * @param sky    non-null upper-hemisphere diffuse color
      * @param ground non-null lower-hemisphere diffuse color
      * @return this lighting system
-     * @throws NullPointerException if either color is null
+     * @throws NullPointerException     if either color is null
      * @throws IllegalArgumentException if RGB components are negative or their sum is non-finite
      */
     public Lighting3D setEnvironment(Color sky, Color ground) {
@@ -220,7 +228,7 @@ public final class Lighting3D implements AutoCloseable {
      * unit-three/four texture bindings, and active texture selector around uploads.
      *
      * @param camera current scene camera
-     * @throws IllegalStateException if disposed or used from the wrong thread
+     * @throws IllegalStateException    if disposed or used from the wrong thread
      * @throws IllegalArgumentException if the grid rejects light or viewport data
      */
     public void prepare(Camera3D camera) {

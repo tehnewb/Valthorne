@@ -8,6 +8,7 @@ import java.nio.ByteOrder;
 import java.util.Base64;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
+import java.io.IOException;
 
 /**
  * Decodes TMX tile-layer payloads into raw global-ID bit patterns, including Tiled's
@@ -38,7 +39,7 @@ public class TiledDecoding {
      * @throws IllegalStateException if nonempty data uses an unsupported encoding or compression
      * @throws IllegalArgumentException if numeric CSV or Base64 data is malformed
      */
-    public static int[] decodeLayerData(String text, String encoding, String compression, int expectedCount) throws java.io.IOException {
+    public static int[] decodeLayerData(String text, String encoding, String compression, int expectedCount) throws IOException {
         if (text == null) return new int[Math.max(0, expectedCount)];
         String trimmed = text.trim();
         if (trimmed.isEmpty()) return new int[Math.max(0, expectedCount)];
@@ -133,7 +134,7 @@ public class TiledDecoding {
      * @return newly allocated array containing all remaining bytes
      * @throws java.io.IOException if a stream read fails
      */
-    private static byte[] readAllBytes(InputStream in) throws java.io.IOException {
+    private static byte[] readAllBytes(InputStream in) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream(4096);
         byte[] buf = new byte[8192];
         int read;

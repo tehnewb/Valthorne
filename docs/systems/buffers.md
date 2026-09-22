@@ -811,6 +811,5 @@ Computes a hash code for this buffer based on its state and contents.
 ## Related guides
 
 - [Bit fields and flags](bits.md)
-- [Cache stores and checksums](cache.md)
 - [Compression strategies](compression.md)
 - [Classpath and filesystem utilities](files.md)

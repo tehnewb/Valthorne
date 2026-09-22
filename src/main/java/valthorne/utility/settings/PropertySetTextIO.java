@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 /**
  * Reads and writes the human-readable UTF-8 representation of a {@link PropertySet}.
@@ -271,7 +273,7 @@ public final class PropertySetTextIO {
         if (value instanceof UUID v) return new EncodedValue("uuid", v.toString());
         if (value instanceof Path v) return new EncodedValue("path", v.toString());
         if (value instanceof URI v) return new EncodedValue("uri", v.toString());
-        if (value instanceof java.net.URL v) return new EncodedValue("url", v.toString());
+        if (value instanceof URL v) return new EncodedValue("url", v.toString());
         if (value instanceof Duration v) return new EncodedValue("duration", v.toString());
         if (value instanceof Period v) return new EncodedValue("period", v.toString());
         if (value instanceof Instant v) return new EncodedValue("instant", v.toString());
@@ -329,10 +331,10 @@ public final class PropertySetTextIO {
         return value.charAt(0);
     }
 
-    private static java.net.URL toUrl(String value) {
+    private static URL toUrl(String value) {
         try {
             return URI.create(value).toURL();
-        } catch (java.net.MalformedURLException error) {
+        } catch (MalformedURLException error) {
             throw new IllegalArgumentException("Invalid URL: " + value, error);
         }
     }

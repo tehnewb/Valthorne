@@ -7,6 +7,7 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.joml.primitives.AABBf;
 
 /**
  * Hierarchical placement node with optional borrowed model geometry and material.
@@ -38,7 +39,7 @@ public final class SceneNode3D {
     private final Matrix4f rotationMatrix = new Matrix4f(); // Scratch quaternion conversion matrix.
     private final Matrix4f localTransform = new Matrix4f(); // Scratch composed local transform.
     private final Matrix4f preparedWorld = new Matrix4f(); // World transform retained for the current traversal.
-    private final org.joml.primitives.AABBf subtreeBounds = new org.joml.primitives.AABBf(); // Aggregate world bounds of visible descendant models.
+    private final AABBf subtreeBounds = new AABBf(); // Aggregate world bounds of visible descendant models.
     private Model3D model; // Borrowed model, or null for a grouping node.
     private Material3D material = new Material3D(); // Shared material used for this node's model.
     private boolean visible = true; // Logical visibility of this node and its descendants.
@@ -83,7 +84,9 @@ public final class SceneNode3D {
      *
      * @return parent node, or null
      */
-    public SceneNode3D getParent() {return parent;}
+    public SceneNode3D getParent() {
+        return parent;
+    }
 
     /**
      * Recursively composes parent and local translation/rotation/scale into caller
@@ -267,7 +270,7 @@ public final class SceneNode3D {
      *
      * @param child node to attach
      * @return this parent
-     * @throws NullPointerException if child is null
+     * @throws NullPointerException     if child is null
      * @throws IllegalArgumentException if attachment would create a cycle
      */
     public SceneNode3D addChild(SceneNode3D child) {
@@ -315,19 +318,27 @@ public final class SceneNode3D {
     }
 
     // Allocation-free package traversal without exposing mutable membership.
+
     /**
      * Reads direct child count for package-local traversal without allocating a snapshot.
+     *
      * @return current number of direct children
      */
-    int childCount() {return children.size();}
+    int childCount() {
+        return children.size();
+    }
+
     /**
      * Borrows a direct child in current list order. Hierarchy mutation during indexed
      * traversal is unsupported because indices may shift.
+     *
      * @param index zero-based child index
      * @return borrowed child node
      * @throws IndexOutOfBoundsException if index is outside the current child list
      */
-    SceneNode3D childAt(int index) {return children.get(index);}
+    SceneNode3D childAt(int index) {
+        return children.get(index);
+    }
 
     /**
      * Checks this node and its ancestors for visibility, then prepares world transforms

@@ -1,6 +1,7 @@
 package valthorne.math.physics;
 import org.joml.Vector3f;
 import valthorne.graphics.model.Model3D;
+import java.util.Objects;
 /** Browser collision definition. Full extents and Z-up axes match the desktop API. */
 public final class CollisionShape3D {
     final int type;
@@ -31,7 +32,7 @@ public final class CollisionShape3D {
         for(int i=0;i<vertices.length;i++){Vector3f v=PhysicsMath3D.check(vertices[i]);data[i*3]=v.x;data[i*3+1]=v.y;data[i*3+2]=v.z;}return data;
     }
     private static Vector3f[] vertices(Model3D model) {
-        java.util.Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(model, "model");
         if (model.getTriangleCount() == 0) throw new IllegalArgumentException("Model must contain triangles");
         Vector3f[] vertices = new Vector3f[model.getTriangleCount() * 3];
         int i = 0;

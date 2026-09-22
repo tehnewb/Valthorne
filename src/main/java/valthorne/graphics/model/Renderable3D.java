@@ -1,8 +1,8 @@
 package valthorne.graphics.model;
 
-import valthorne.camera.Camera3D;
-import org.joml.primitives.AABBf;
 import org.joml.Vector3f;
+import org.joml.primitives.AABBf;
+import valthorne.camera.Camera3D;
 
 /**
  * Supplies material, visibility and sorting information to {@link ModelBatch3D}.
@@ -52,7 +52,9 @@ public interface Renderable3D {
      *
      * @return whether this object is eligible for submission before culling
      */
-    default boolean isRenderableVisible() {return true;}
+    default boolean isRenderableVisible() {
+        return true;
+    }
 
     /**
      * Provides optional current axis-aligned world bounds. The default has no
@@ -62,7 +64,9 @@ public interface Renderable3D {
      *
      * @return world-space bounds, or null when unavailable
      */
-    default AABBf getWorldBounds() {return null;}
+    default AABBf getWorldBounds() {
+        return null;
+    }
 
     /**
      * Computes signed depth as the dot product of the camera's forward direction
@@ -81,7 +85,8 @@ public interface Renderable3D {
      */
     default float getSortDepth(Camera3D camera) {
         AABBf bounds = getWorldBounds();
-        if (bounds == null || !(bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY && bounds.minZ <= bounds.maxZ)) return 0f;
+        if (bounds == null || !(bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY && bounds.minZ <= bounds.maxZ))
+            return 0f;
         Vector3f center = bounds.center(new Vector3f()).sub(camera.getPosition());
         Vector3f direction = camera.getDirection();
         return center.x() * direction.x() + center.y() * direction.y() + center.z() * direction.z();

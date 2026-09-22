@@ -1,5 +1,7 @@
 package valthorne.collections.array;
 
+import static java.lang.reflect.Array.newInstance;
+
 /**
  * Resizable indexed storage for object references with no separate logical element count.
  * Every allocated slot is readable, including untouched null entries. Set may
@@ -41,7 +43,7 @@ public class Array<T> {
      * @throws ClassCastException if a primitive component class is supplied
      */
     public Array(Class<T> type, int size) {
-        this.array = (T[]) java.lang.reflect.Array.newInstance(type, size);
+        this.array = (T[]) newInstance(type, size);
     }
 
     /**

@@ -5,6 +5,10 @@ import valthorne.graphics.texture.TextureBatch;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.AbstractList;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.RandomAccess;
 
 /**
  * <h1>UIContainer</h1>
@@ -359,7 +363,7 @@ public abstract class UIContainer extends UINode {
      * @throws IndexOutOfBoundsException if index is outside the current child range
      */
     public final UINode get(int index) {
-        java.util.Objects.checkIndex(index, size);
+        Objects.checkIndex(index, size);
         return children[index];
     }
 
@@ -370,7 +374,7 @@ public abstract class UIContainer extends UINode {
      * @return the children list
      */
     public final List<UINode> getChildren() {
-        if (childrenView == null) childrenView = java.util.Collections.unmodifiableList(new ChildView());
+        if (childrenView == null) childrenView = Collections.unmodifiableList(new ChildView());
         return childrenView;
     }
 
@@ -479,7 +483,7 @@ public abstract class UIContainer extends UINode {
      * are unsupported.
      * @author Albert Beaupre
      */
-    private final class ChildView extends java.util.AbstractList<UINode> implements java.util.RandomAccess {
+    private final class ChildView extends AbstractList<UINode> implements RandomAccess {
         /**
          * Returns the enclosing container's current child at the requested index.
          *

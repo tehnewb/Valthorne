@@ -6,6 +6,7 @@ import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Drawable;
 import valthorne.ui.NodeAction;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.behavior.ActivationBehavior;
 
 /**
  * A themed panel with a centered label and primary-button/keyboard activation.
@@ -108,7 +109,7 @@ public class Button extends Panel {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.release(this, event, () -> { if (action != null) action.perform(this); });
+        ActivationBehavior.release(this, event, () -> { if (action != null) action.perform(this); });
     }
 
     /**
@@ -119,6 +120,6 @@ public class Button extends Panel {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.key(this, event, () -> { if (action != null) action.perform(this); });
+        ActivationBehavior.key(this, event, () -> { if (action != null) action.perform(this); });
     }
 }

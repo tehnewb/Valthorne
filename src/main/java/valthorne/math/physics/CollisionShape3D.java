@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.function.Supplier;
+import java.util.Objects;
 
 /**
  * Reusable collision geometry definition for bodies created by {@link PhysicsWorld3D}.
@@ -67,8 +68,7 @@ public final class CollisionShape3D {
         PhysicsMath3D.positive(width, "width");
         PhysicsMath3D.positive(depth, "depth");
         PhysicsMath3D.positive(height, "height");
-        return new CollisionShape3D(() -> new BoxShape(new Vec3(width / 2, depth / 2, height / 2),
-                Math.min(.05f, Math.min(width, Math.min(depth, height)) / 4)), false);
+        return new CollisionShape3D(() -> new BoxShape(new Vec3(width / 2, depth / 2, height / 2), Math.min(.05f, Math.min(width, Math.min(depth, height)) / 4)), false);
     }
 
     /**
@@ -116,8 +116,7 @@ public final class CollisionShape3D {
     public static CollisionShape3D cylinder(float radius, float height) {
         PhysicsMath3D.positive(radius, "radius");
         PhysicsMath3D.positive(height, "height");
-        return new CollisionShape3D(() -> zUp(new CylinderShape(height / 2, radius,
-                Math.min(.05f, Math.min(radius, height / 2) / 2))), false);
+        return new CollisionShape3D(() -> zUp(new CylinderShape(height / 2, radius, Math.min(.05f, Math.min(radius, height / 2) / 2))), false);
     }
 
     /**
@@ -213,14 +212,14 @@ public final class CollisionShape3D {
      * @throws IllegalArgumentException if model contains no triangles
      */
     private static Vector3f[] vertices(Model3D model) {
-        java.util.Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(model, "model");
         if (model.getTriangleCount() == 0) throw new IllegalArgumentException("Model must contain triangles");
         Vector3f[] vertices = new Vector3f[model.getTriangleCount() * 3];
         int i = 0;
         for (Model3D.Triangle triangle : model.getTriangles()) {
-            vertices[i++] = triangle.getA();
-            vertices[i++] = triangle.getB();
-            vertices[i++] = triangle.getC();
+            vertices[i++] = triangle.a();
+            vertices[i++] = triangle.b();
+            vertices[i++] = triangle.c();
         }
         return vertices;
     }
@@ -253,7 +252,9 @@ public final class CollisionShape3D {
      * @return a newly created owning native shape wrapper
      * @throws IllegalArgumentException if hull or mesh settings report invalid geometry
      */
-    Shape createNative() {return factory.get();}
+    Shape createNative() {
+        return factory.get();
+    }
 
     /**
      * Reports whether body settings must use {@link MotionType3D#STATIC}.
@@ -261,5 +262,7 @@ public final class CollisionShape3D {
      *
      * @return true for triangle meshes; false for primitive and convex-hull shapes
      */
-    public boolean isStaticOnly() {return staticOnly;}
+    public boolean isStaticOnly() {
+        return staticOnly;
+    }
 }

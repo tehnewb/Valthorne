@@ -56,7 +56,9 @@ public final class PerformanceOverlay implements AutoCloseable {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             ImageIO.write(image, "png", bytes);
             atlas = new Texture(bytes.toByteArray());
-        } catch (IOException e) {throw new UncheckedIOException(e);}
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         for (int i = 0; i < glyphs.length; i++)
             glyphs[i] = new TextureRegion(atlas, i % 16 * 18, image.getHeight() - (i / 16 + 1) * 28, 18, 28);
     }
@@ -88,10 +90,12 @@ public final class PerformanceOverlay implements AutoCloseable {
      * Uses the most recently sampled text, so calling draw does not advance timing.
      *
      * @param batch active batch with the desired projection
-     * @param x left coordinate in batch space
-     * @param y glyph-quad origin Y in batch space
+     * @param x     left coordinate in batch space
+     * @param y     glyph-quad origin Y in batch space
      */
-    public void draw(TextureBatch batch, float x, float y) {drawText(batch, text, x, y);}
+    public void draw(TextureBatch batch, float x, float y) {
+        drawText(batch, text, x, y);
+    }
 
     /**
      * Draws printable ASCII using 18-by-28 quads with a 14-unit advance. Unsupported
@@ -100,8 +104,8 @@ public final class PerformanceOverlay implements AutoCloseable {
      *
      * @param batch active texture batch
      * @param value text to draw
-     * @param x left origin in batch coordinates
-     * @param y quad origin Y in batch coordinates
+     * @param x     left origin in batch coordinates
+     * @param y     quad origin Y in batch coordinates
      * @throws NullPointerException if value is null
      */
     public void drawText(TextureBatch batch, String value, float x, float y) {
@@ -116,5 +120,7 @@ public final class PerformanceOverlay implements AutoCloseable {
      * become unusable afterward; close on the owning graphics thread after drawing ends.
      */
     @Override
-    public void close() {atlas.dispose();}
+    public void close() {
+        atlas.dispose();
+    }
 }

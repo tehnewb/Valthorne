@@ -18,6 +18,9 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import static org.lwjgl.system.MemoryUtil.NULL;
+import org.lwjgl.system.MemoryUtil;
+import valthorne.event.events.WindowFocusEvent;
+import valthorne.graphics.GraphicsCapabilities;
 
 /**
  * GLFW window wrapper for Valthorne.
@@ -100,10 +103,10 @@ public final class Window {
      * Owned GLFW window handle, or zero when no window is registered.
      */
     private static long address;
-    private static valthorne.graphics.GraphicsCapabilities graphicsCapabilities;
+    private static GraphicsCapabilities graphicsCapabilities;
 
     /** @return actual capabilities of the initialized window, not the requested version */
-    public static valthorne.graphics.GraphicsCapabilities getGraphicsCapabilities() {
+    public static GraphicsCapabilities getGraphicsCapabilities() {
         if (graphicsCapabilities == null) throw new IllegalStateException("Window is not initialized");
         return graphicsCapabilities;
     }
@@ -291,7 +294,7 @@ public final class Window {
                 var description = stack.mallocPointer(1);
                 int error = glfwGetError(description);
                 String detail = description.get(0) == NULL ? "No native description"
-                        : org.lwjgl.system.MemoryUtil.memUTF8(description.get(0));
+                        : MemoryUtil.memUTF8(description.get(0));
                 failures.append("GL ").append(version[0]).append('.').append(version[1])
                         .append(" (error ").append(error).append("): ").append(detail).append('\n');
             }
@@ -303,7 +306,7 @@ public final class Window {
             if (glfwGetWindowAttrib(address, GLFW_CLIENT_API) != GLFW_OPENGL_API)
                 throw new UnsupportedOperationException("Extra window hints selected an unsupported client API; desktop OpenGL is required.");
             GL.createCapabilities();
-            graphicsCapabilities = valthorne.graphics.GraphicsCapabilities.current();
+            graphicsCapabilities = GraphicsCapabilities.current();
             graphicsCapabilities.requireRaster();
         } catch (RuntimeException | Error failure) {
             graphicsCapabilities = null;
@@ -350,7 +353,7 @@ public final class Window {
                 Mouse.cancelButtons();
                 Keyboard.resetState();
             }
-            JGL.publish(new valthorne.event.events.WindowFocusEvent(focused));
+            JGL.publish(new WindowFocusEvent(focused));
         });
 
         iconifyCallback = glfwSetWindowIconifyCallback(address, (win, iconified) -> {

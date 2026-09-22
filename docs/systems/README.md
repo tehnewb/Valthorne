@@ -7,7 +7,7 @@ This manual explains how to use every system represented in the current Java sou
 ## Start here
 
 First complete the [Gradle/Maven setup](../getting-started.md) and check
-[platform requirements](../platforms.md). This manual targets `2.1.0`;
+[platform requirements](../platforms.md). This manual targets `2.2.0`;
 see [runnable examples](../examples.md) for launch commands.
 
 1. [Application lifecycle](runtime.md): launch the engine and place initialization, updates, drawing, and cleanup correctly.
@@ -61,7 +61,6 @@ The checkout targets Java 25. Run repository examples using the Gradle wrapper; 
 | [Primitive and generic stacks](stacks.md) | 8 | `ByteFastStack`, `CharFastStack`, `DoubleFastStack`, `FastStack`, `FloatFastStack`, … |
 | [Bit fields and flags](bits.md) | 5 | `Bits`, `ByteBits`, `IntBits`, `LongBits`, `ShortBits` |
 | [ID reuse queues, string maps, and trees](data-structures.md) | 5 | `StringObjectMap`, `IntUUIDQueue`, `LongUUIDQueue`, `ShortUUIDQueue`, `IntBinaryTree` |
-| [Cache stores and checksums](cache.md) | 6 | `CacheArchive`, `CacheFile`, `CacheStore`, `ArchiveRow`, `ChecksumTable`, … |
 | [Compression strategies](compression.md) | 7 | `BZIP2Strategy`, `CompressionStrategy`, `Deflate`, `GZIP`, `LZMAStrategy`, … |
 | [Encryption and hashing adapters](encryption.md) | 11 | `AES`, `AESGCM`, `Blowfish`, `ChaCha20Poly1305`, `ECC`, … |
 | [Binary buffers and byte order](buffers.md) | 2 | `ByteOrder`, `DynamicByteBuffer` |
@@ -79,7 +78,7 @@ Examples in component descriptions may be partial integration fragments rather t
 
 ## Source coverage
 
-Every one of the 410 Java files is assigned to exactly one of the 48 guides. Related guides link across shared concepts without duplicating ownership of source coverage.
+The manual contains 47 focused guides for the 440 Java source files in this release. Related guides link across shared concepts without duplicating ownership of source coverage.
 
 <details>
 <summary>Source-to-guide index</summary>
@@ -107,12 +106,6 @@ Every one of the 410 Java files is assigned to exactly one of the 48 guides. Rel
 | [audio/sound/SoundStream.java](../../src/main/java/valthorne/audio/sound/SoundStream.java) | [audio](audio.md) |
 | [audio/sound/WaveSoundDecoder.java](../../src/main/java/valthorne/audio/sound/WaveSoundDecoder.java) | [audio](audio.md) |
 | [audio/sound/WaveSoundStream.java](../../src/main/java/valthorne/audio/sound/WaveSoundStream.java) | [audio](audio.md) |
-| [cache/CacheArchive.java](../../src/main/java/valthorne/cache/CacheArchive.java) | [cache](cache.md) |
-| [cache/CacheFile.java](../../src/main/java/valthorne/cache/CacheFile.java) | [cache](cache.md) |
-| [cache/CacheStore.java](../../src/main/java/valthorne/cache/CacheStore.java) | [cache](cache.md) |
-| [cache/checksum/ArchiveRow.java](../../src/main/java/valthorne/cache/checksum/ArchiveRow.java) | [cache](cache.md) |
-| [cache/checksum/ChecksumTable.java](../../src/main/java/valthorne/cache/checksum/ChecksumTable.java) | [cache](cache.md) |
-| [cache/checksum/FileRow.java](../../src/main/java/valthorne/cache/checksum/FileRow.java) | [cache](cache.md) |
 | [camera/Camera.java](../../src/main/java/valthorne/camera/Camera.java) | [cameras](cameras.md) |
 | [camera/Camera3D.java](../../src/main/java/valthorne/camera/Camera3D.java) | [cameras](cameras.md) |
 | [camera/OrbitCameraController.java](../../src/main/java/valthorne/camera/OrbitCameraController.java) | [cameras](cameras.md) |

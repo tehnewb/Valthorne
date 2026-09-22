@@ -52,8 +52,8 @@ public class VirtualList extends ScrollPanel {
      * Item widgets remain deferred until synchronization with an attached root.
      *
      * @param itemCount nonnegative model item count
-     * @param factory supplier of a fresh unattached node for an item index
-     * @throws NullPointerException if factory is null
+     * @param factory   supplier of a fresh unattached node for an item index
+     * @throws NullPointerException     if factory is null
      * @throws IllegalArgumentException if itemCount is negative
      */
     public VirtualList(int itemCount, IntFunction<? extends UINode> factory) {
@@ -72,7 +72,7 @@ public class VirtualList extends ScrollPanel {
      * focus or capture even after they leave the visible range.
      *
      * @param ancestor candidate row root
-     * @param node candidate descendant
+     * @param node     candidate descendant
      * @return whether node lies within ancestor's subtree
      */
     private static boolean contains(UINode ancestor, UINode node) {
@@ -85,7 +85,9 @@ public class VirtualList extends ScrollPanel {
      *
      * @return total item count
      */
-    public int getItemCount() {return itemCount;}
+    public int getItemCount() {
+        return itemCount;
+    }
 
     /**
      * Counts attached widgets, including overscan and offscreen rows retained for
@@ -93,7 +95,9 @@ public class VirtualList extends ScrollPanel {
      *
      * @return current materialized item count
      */
-    public int getLiveItemCount() {return live.size();}
+    public int getLiveItemCount() {
+        return live.size();
+    }
 
     /**
      * Enables model selection and makes the list focusable on first use. Synchronizes
@@ -120,7 +124,9 @@ public class VirtualList extends ScrollPanel {
      *
      * @return selection model, or null before selectable is called
      */
-    public SelectionModel getSelection() {return selection;}
+    public SelectionModel getSelection() {
+        return selection;
+    }
 
     /**
      * After normal scroll-panel preview, selects the live row containing a left-press
@@ -182,14 +188,18 @@ public class VirtualList extends ScrollPanel {
      * @param index model item index
      * @return attached node, or null if not materialized
      */
-    public UINode getItemNode(int index) {return live.get(index);}
+    public UINode getItemNode(int index) {
+        return live.get(index);
+    }
 
     /**
      * Returns the configured grid column count; measured-height mode requires one.
      *
      * @return positive number of columns
      */
-    public int getColumns() {return columns;}
+    public int getColumns() {
+        return columns;
+    }
 
     /**
      * Changes fixed-grid column count and invalidates item geometry. Equal values do
@@ -198,7 +208,7 @@ public class VirtualList extends ScrollPanel {
      * @param columns positive grid width in items
      * @return this list
      * @throws IllegalArgumentException if columns is below one
-     * @throws IllegalStateException if measured heights are active and columns is not one
+     * @throws IllegalStateException    if measured heights are active and columns is not one
      */
     public VirtualList columns(int columns) {
         if (columns < 1) throw new IllegalArgumentException("Columns must be positive");
@@ -339,19 +349,21 @@ public class VirtualList extends ScrollPanel {
      *
      * @return true for measured single-column mode
      */
-    public boolean hasVariableHeights() {return heights != null;}
+    public boolean hasVariableHeights() {
+        return heights != null;
+    }
 
     /**
      * Enables measured mode if needed and replaces one row's gap-inclusive stride.
      * Preserves the top visible row and its relative scroll offset through a deferred
      * scroll adjustment applied after layout. Equal measured values are a no-op.
      *
-     * @param index item whose height changed
+     * @param index  item whose height changed
      * @param height finite positive content height excluding gap
      * @return this list
      * @throws IndexOutOfBoundsException if index is invalid
-     * @throws IllegalArgumentException if height or stride is invalid
-     * @throws IllegalStateException if multiple columns prevent measured mode
+     * @throws IllegalArgumentException  if height or stride is invalid
+     * @throws IllegalStateException     if multiple columns prevent measured mode
      */
     public VirtualList itemHeight(int index, float height) {
         Objects.checkIndex(index, itemCount);
@@ -388,8 +400,7 @@ public class VirtualList extends ScrollPanel {
      */
     private void updateExtent() {
         long count = ((long) itemCount + columns - 1) / columns;
-        rows.getLayout().height((float) Math.min(Float.MAX_VALUE, Math.max(0,
-                (heights == null ? count * (double) (rowHeight + gap) : heights.totalHeight()) - gap)));
+        rows.getLayout().height((float) Math.min(Float.MAX_VALUE, Math.max(0, (heights == null ? count * (double) (rowHeight + gap) : heights.totalHeight()) - gap)));
     }
 
     /**
@@ -439,14 +450,13 @@ public class VirtualList extends ScrollPanel {
      * and creates missing rows. Uses list width minus 16 layout units for cells and
      * positions widgets absolutely. Detached or zero-height lists do nothing.
      *
-     * @throws NullPointerException if the factory returns null
+     * @throws NullPointerException     if the factory returns null
      * @throws IllegalArgumentException if the factory reuses an attached or live node
      */
     private void synchronizeRows() {
         if (getRoot() == null || getHeight() <= 0) return;
         long startRow = heights == null ? (long) (getScrollY() / (rowHeight + gap)) : heights.indexAt(getScrollY());
-        long endRow = heights == null ? (long) Math.ceil(((double) getScrollY() + getHeight()) / (rowHeight + gap))
-                : (long) heights.indexAt((double) getScrollY() + getHeight()) + 1;
+        long endRow = heights == null ? (long) Math.ceil(((double) getScrollY() + getHeight()) / (rowHeight + gap)) : (long) heights.indexAt((double) getScrollY() + getHeight()) + 1;
         int nextFirst = (int) Math.min(itemCount, Math.max(0, startRow - overscan) * columns);
         int nextLast = (int) Math.min(itemCount, (Math.min(itemCount, endRow) + overscan) * columns);
         float width = Math.max(0, getWidth() - 16);
@@ -476,9 +486,7 @@ public class VirtualList extends ScrollPanel {
                 rows.add(node);
                 if (selection != null) node.setSelected(selection.isSelected(index));
             }
-            node.getLayout().absolute().left((index % columns) * (cellWidth + gap))
-                    .top((float) (heights == null ? (index / columns) * (double) (rowHeight + gap) : heights.offset(index)))
-                    .width(cellWidth).height(getItemHeight(index)).noGrow().noShrink();
+            node.getLayout().absolute().left((index % columns) * (cellWidth + gap)).top((float) (heights == null ? (index / columns) * (double) (rowHeight + gap) : heights.offset(index))).width(cellWidth).height(getItemHeight(index)).noGrow().noShrink();
         }
     }
 }

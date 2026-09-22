@@ -30,14 +30,14 @@ public final class LightMesh extends DynamicMesh2D {
      *
      * @param centerX world-space center X
      * @param centerY world-space center Y
-     * @param radius divisor for local radial coordinates
-     * @param endX ordered endpoint X coordinates
-     * @param endY ordered endpoint Y coordinates
-     * @param r red light component
-     * @param g green light component
-     * @param b blue light component
-     * @param a alpha light component
-     * @throws NullPointerException if either endpoint array is null
+     * @param radius  divisor for local radial coordinates
+     * @param endX    ordered endpoint X coordinates
+     * @param endY    ordered endpoint Y coordinates
+     * @param r       red light component
+     * @param g       green light component
+     * @param b       blue light component
+     * @param a       alpha light component
+     * @throws NullPointerException             if either endpoint array is null
      * @throws java.nio.BufferOverflowException if fan exceeds fixed capacity
      */
     public void setFan(float centerX, float centerY, float radius, float[] endX, float[] endY, float r, float g, float b, float a) {

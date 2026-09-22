@@ -8,6 +8,8 @@ import java.util.function.Supplier;
 
 import static org.lwjgl.openal.AL10.*;
 import static org.lwjgl.openal.AL11.AL_SEC_OFFSET;
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * <p>
@@ -217,10 +219,10 @@ public class SoundPlayer {
      * @param data the sound data that this player will control
      */
     public SoundPlayer(SoundData data) {
-        this.data = java.util.Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data, "data");
         pcmFormat(data.channels(), data.bitsPerSample());
         if (data.sampleRate() <= 0) throw new IllegalArgumentException("Sample rate must be positive");
-        if (!data.streaming()) java.util.Objects.requireNonNull(data.data(), "PCM data");
+        if (!data.streaming()) Objects.requireNonNull(data.data(), "PCM data");
         this.source = alGenSources();
         this.streaming = data.streaming();
 
@@ -1792,7 +1794,7 @@ public class SoundPlayer {
         // All callers stop playback first (or have an initial/exhausted source).
         // Detaching also handles AL_INITIAL queues, whose buffers are not processed.
         alSourcei(source, AL_BUFFER, 0);
-        java.util.Arrays.fill(streamBufferDurations, 0f);
+        Arrays.fill(streamBufferDurations, 0f);
     }
 
     /**

@@ -29,6 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.List;
 
 class PropertySetTest {
 
@@ -146,7 +149,7 @@ class PropertySetTest {
         unsupported.set("object", new Object());
 
         assertThrows(IllegalArgumentException.class, unsupported::toBytes);
-        assertThrows(java.io.IOException.class, () -> PropertySet.fromBytes(new byte[]{1, 2, 3}));
+        assertThrows(IOException.class, () -> PropertySet.fromBytes(new byte[]{1, 2, 3}));
     }
 
     @Test
@@ -162,19 +165,19 @@ class PropertySetTest {
         assertTrue(text.contains("window\\:width:integer=1920"));
         assertEquals(original.asMap(), PropertySet.fromText(text).asMap());
 
-        Path file = java.nio.file.Files.createTempFile("valthorne-properties-", ".txt");
+        Path file = Files.createTempFile("valthorne-properties-", ".txt");
         try {
             original.writeText(file);
             assertEquals(original.asMap(), PropertySet.readText(file).asMap());
         } finally {
-            java.nio.file.Files.deleteIfExists(file);
+            Files.deleteIfExists(file);
         }
 
         String edited = "# user settings\nfullscreen:boolean=true\nquality:string=high\n";
         PropertySet parsed = PropertySet.fromText(edited);
         assertTrue(parsed.getRequired("fullscreen", Boolean.class).value());
         assertEquals("high", parsed.getRequired("quality", String.class).value());
-        assertThrows(java.io.IOException.class,
+        assertThrows(IOException.class,
                 () -> PropertySet.fromText("broken:unknown=value\n"));
     }
 
@@ -186,7 +189,7 @@ class PropertySetTest {
                 "fullscreen", true
         ));
         PropertyTextOptions options = new PropertyTextOptions(
-                java.util.List.of("Display settings", "Change these before launching"),
+                List.of("Display settings", "Change these before launching"),
                 Map.of("width", "Horizontal resolution", "fullscreen", "Use the whole display")
         );
 

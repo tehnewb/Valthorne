@@ -499,6 +499,5 @@ Assumes the ZIP archive contains a single entry named "data".
 
 ## Related guides
 
-- [Cache stores and checksums](cache.md)
 - [Binary buffers and byte order](buffers.md)
 - [Classpath and filesystem utilities](files.md)

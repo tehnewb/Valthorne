@@ -9,6 +9,8 @@ import valthorne.ui.UIRoot;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 import valthorne.viewport.Viewport;
+import valthorne.Mouse;
+import valthorne.ui.behavior.RangeModel;
 
 /**
  * <p>
@@ -145,7 +147,7 @@ public class Slider extends Panel {
      */
     public static final StyleKey<NodeAction<Slider>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<Slider>>) (Class<?>) NodeAction.class);
 
-    private final valthorne.ui.behavior.RangeModel model = new valthorne.ui.behavior.RangeModel(0, 1, 0); // Shared range model storing bounds and current slider value.
+    private final RangeModel model = new RangeModel(0, 1, 0); // Shared range model storing bounds and current slider value.
     private NodeAction<Slider> action; // Explicit action performed when the slider value changes
 
 
@@ -799,7 +801,7 @@ public class Slider extends Panel {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        if (event.getButton() != valthorne.Mouse.LEFT || isDisabled()) return;
+        if (event.getButton() != Mouse.LEFT || isDisabled()) return;
         setDragging(true);
         updateFromPointer(event.getX(), event.getY());
     }
@@ -820,7 +822,7 @@ public class Slider extends Panel {
      */
     @Override
     public void onMouseDrag(MouseDragEvent event) {
-        if (event.getButton() == valthorne.Mouse.LEFT && isDragging())
+        if (event.getButton() == Mouse.LEFT && isDragging())
             updateFromPointer(event.getToX(), event.getToY());
     }
 

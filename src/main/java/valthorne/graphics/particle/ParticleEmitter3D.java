@@ -27,7 +27,7 @@ import java.util.function.Function;
  * The emitter emits at fixed tick boundaries, applies mass times acceleration
  * before each tick, then synchronizes native poses and ages particles afterward.
  * World gravity is additional, multiplied by the factory's gravity factor. Physics
-     * births are quantized to the beginning of a tick and never analytically backdated
+ * births are quantized to the beginning of a tick and never analytically backdated
  * through colliders. Calling {@link #update(float)} does not advance this clock a
  * second time. Dropped world time is also dropped from the particle clock. Issue
  * bursts before advancing the world (or from an earlier before-step listener) for
@@ -76,10 +76,10 @@ public final class ParticleEmitter3D implements AutoCloseable {
      * The initializer runs synchronously for each newly allocated or reset particle
      * and must not reenter or mutate the emitter.
      *
-     * @param capacity positive maximum number of simultaneously live particles
+     * @param capacity    positive maximum number of simultaneously live particles
      * @param initializer callback configuring each particle before scene/body creation
      * @throws IllegalArgumentException if capacity is nonpositive
-     * @throws NullPointerException if initializer is null
+     * @throws NullPointerException     if initializer is null
      */
     public ParticleEmitter3D(int capacity, Consumer<Particle3D> initializer) {
         if (capacity <= 0) throw new IllegalArgumentException("Capacity must be positive");
@@ -106,7 +106,7 @@ public final class ParticleEmitter3D implements AutoCloseable {
      * @param perSecond finite nonnegative birth rate
      * @return this emitter
      * @throws IllegalArgumentException if the rate is negative or non-finite
-     * @throws IllegalStateException if closed or busy
+     * @throws IllegalStateException    if closed or busy
      */
     public ParticleEmitter3D setEmissionRate(float perSecond) {
         checkMutable();
@@ -136,33 +136,47 @@ public final class ParticleEmitter3D implements AutoCloseable {
      *
      * @return requested particles per simulation second
      */
-    public float getEmissionRate() {return rate;}
+    public float getEmissionRate() {
+        return rate;
+    }
+
     /**
      * Reads the automatic-emission flag. A true value alone does not imply births:
      * the rate may be zero, capacity full, or emitter closed.
      *
      * @return configured automatic-emission state
      */
-    public boolean isEmitting() {return emitting;}
+    public boolean isEmitting() {
+        return emitting;
+    }
+
     /**
      * Reports whether final cleanup completed and the emitter rejected further use.
      *
      * @return true after successful close
      */
-    public boolean isClosed() {return closed;}
+    public boolean isClosed() {
+        return closed;
+    }
+
     /**
      * Reads current active membership, including particles awaiting the next
      * retirement check after an external body destruction.
      *
      * @return current number of registered particles
      */
-    public int getParticleCount() {return particles.size();}
+    public int getParticleCount() {
+        return particles.size();
+    }
+
     /**
      * Reads the fixed upper bound on simultaneous active membership.
      *
      * @return constructor-supplied positive capacity
      */
-    public int getCapacity() {return capacity;}
+    public int getCapacity() {
+        return capacity;
+    }
 
     /**
      * Returns a cached unmodifiable live membership view. Particle objects are
@@ -171,7 +185,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
      *
      * @return active particles in retained spawn order
      */
-    public List<Particle3D> getParticles() {return readOnlyParticles;}
+    public List<Particle3D> getParticles() {
+        return readOnlyParticles;
+    }
 
     /**
      * Exposes the borrowed world whose fixed-step callbacks drive physical particles.
@@ -179,7 +195,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
      *
      * @return configured world, or null for cosmetic mode
      */
-    public PhysicsWorld3D getPhysicsWorld() {return physicsWorld;}
+    public PhysicsWorld3D getPhysicsWorld() {
+        return physicsWorld;
+    }
 
     /**
      * Enables physics for subsequent births; active membership must be empty.
@@ -192,11 +210,10 @@ public final class ParticleEmitter3D implements AutoCloseable {
      * must not be accessed concurrently. Render scale does not resize collision
      * geometry. The factory must not reenter the emitter.</p>
      *
-     * @param world live physics world owned by the calling thread
-     *
+     * @param world   live physics world owned by the calling thread
      * @param factory callback creating body settings for each initialized particle
      * @return this emitter
-     * @throws NullPointerException if world or factory is null
+     * @throws NullPointerException  if world or factory is null
      * @throws IllegalStateException if closed, busy, nonempty, or the world cannot be accessed
      */
     public ParticleEmitter3D setPhysics(PhysicsWorld3D world, Function<Particle3D, BodySettings3D> factory) {
@@ -212,7 +229,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
                 force = new Vector3f();
             }
             world.addBeforeStepListener(beforeStepListener);
-            try {world.addAfterStepListener(afterStepListener);} catch (RuntimeException | Error e) {
+            try {
+                world.addAfterStepListener(afterStepListener);
+            } catch (RuntimeException | Error e) {
                 world.removeBeforeStepListener(beforeStepListener);
                 throw e;
             }
@@ -270,7 +289,7 @@ public final class ParticleEmitter3D implements AutoCloseable {
      *
      * @param destination non-null scene receiving particle meshes and lights
      * @return this emitter
-     * @throws NullPointerException if destination is null
+     * @throws NullPointerException  if destination is null
      * @throws IllegalStateException if closed or busy
      */
     public ParticleEmitter3D attach(Scene3D destination) {
@@ -302,7 +321,7 @@ public final class ParticleEmitter3D implements AutoCloseable {
      * @param count nonnegative requested births
      * @return number accepted if all requested initializations succeed
      * @throws IllegalArgumentException if count is negative
-     * @throws IllegalStateException if closed, busy, or the physics world is inaccessible
+     * @throws IllegalStateException    if closed, busy, or the physics world is inaccessible
      */
     public int burst(int count) {
         checkMutable();
@@ -312,7 +331,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
         busy = true;
         try {
             for (int i = 0; i < accepted; i++) spawn();
-        } finally {busy = false;}
+        } finally {
+            busy = false;
+        }
         return accepted;
     }
 
@@ -324,7 +345,7 @@ public final class ParticleEmitter3D implements AutoCloseable {
      * exception with cleanup failure suppressed when applicable.
      *
      * @return successfully initialized active particle
-     * @throws NullPointerException if the physics factory returns null
+     * @throws NullPointerException     if the physics factory returns null
      * @throws IllegalArgumentException if the physics factory selects a nondynamic body
      */
     private Particle3D spawn() {
@@ -344,7 +365,11 @@ public final class ParticleEmitter3D implements AutoCloseable {
             particle.attach(scene);
             particles.add(particle);
         } catch (RuntimeException | Error e) {
-            try {particle.release();} catch (RuntimeException | Error cleanup) {e.addSuppressed(cleanup);}
+            try {
+                particle.release();
+            } catch (RuntimeException | Error cleanup) {
+                e.addSuppressed(cleanup);
+            }
             pool.addLast(particle);
             throw e;
         }
@@ -359,7 +384,7 @@ public final class ParticleEmitter3D implements AutoCloseable {
      *
      * @param delta finite nonnegative elapsed seconds
      * @throws IllegalArgumentException if delta is negative or non-finite
-     * @throws IllegalStateException if closed or busy
+     * @throws IllegalStateException    if closed or busy
      */
     public void update(float delta) {
         checkMutable();
@@ -373,7 +398,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
             }
             updateCosmetic(delta);
             emit(delta, false);
-        } finally {busy = false;}
+        } finally {
+            busy = false;
+        }
     }
 
     /**
@@ -382,7 +409,7 @@ public final class ParticleEmitter3D implements AutoCloseable {
      * the most recent subframe times and are analytically advanced to frame end;
      * physical births start at the tick boundary with no backdated movement.
      *
-     * @param delta elapsed simulation seconds
+     * @param delta    elapsed simulation seconds
      * @param physical true to leave new particles for native fixed-step simulation
      */
     private void emit(float delta, boolean physical) {
@@ -476,7 +503,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
                     particle.getBody().addForce(force);
                 }
             }
-        } finally {busy = false;}
+        } finally {
+            busy = false;
+        }
     }
 
     /**
@@ -498,7 +527,9 @@ public final class ParticleEmitter3D implements AutoCloseable {
                 if (particle.physicsStep == step) particle.advanceAge(delta);
             }
             compactPhysics(true);
-        } finally {busy = false;}
+        } finally {
+            busy = false;
+        }
     }
 
     /**

@@ -1,9 +1,12 @@
 package valthorne.portable;
 
 import valthorne.Application;
+
 import java.util.Objects;
 
-/** Platform-neutral application lifecycle and bounded fixed-step updates. No native dependencies. */
+/**
+ * Platform-neutral application lifecycle and bounded fixed-step updates. No native dependencies.
+ */
 public final class FrameLoop implements AutoCloseable {
     private final Application app;
     private final float step;
@@ -21,16 +24,23 @@ public final class FrameLoop implements AutoCloseable {
 
     public void start() {
         if (started || closed) throw new IllegalStateException("Loop already started or closed");
-        try {app.init();}
-        catch (RuntimeException | Error failure) {
+        try {
+            app.init();
+        } catch (RuntimeException | Error failure) {
             closed = true;
-            try {app.dispose();} catch (RuntimeException | Error cleanup) {failure.addSuppressed(cleanup);}
+            try {
+                app.dispose();
+            } catch (RuntimeException | Error cleanup) {
+                failure.addSuppressed(cleanup);
+            }
             throw failure;
         }
         started = true;
     }
 
-    /** Seconds since the previous frame; excess time is dropped instead of causing an update spiral. */
+    /**
+     * Seconds since the previous frame; excess time is dropped instead of causing an update spiral.
+     */
     public void frame(double elapsed) {
         if (!started || closed) throw new IllegalStateException("Loop is not running");
         if (!Double.isFinite(elapsed) || elapsed < 0) throw new IllegalArgumentException("Invalid frame delta");
@@ -45,13 +55,22 @@ public final class FrameLoop implements AutoCloseable {
         app.render();
     }
 
-    /** Clears partial accumulated time when pausing or resuming. Rendering continues while paused. */
+    /**
+     * Clears partial accumulated time when pausing or resuming. Rendering continues while paused.
+     */
     public void setPaused(boolean paused) {
-        if (this.paused != paused) {this.paused = paused; accumulator = 0;}
+        if (this.paused != paused) {
+            this.paused = paused;
+            accumulator = 0;
+        }
     }
-    public boolean isPaused() {return paused;}
 
-    @Override public void close() {
+    public boolean isPaused() {
+        return paused;
+    }
+
+    @Override
+    public void close() {
         if (closed) return;
         closed = true;
         if (started) app.dispose();

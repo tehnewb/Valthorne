@@ -3,6 +3,11 @@ package valthorne.graphics.model;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.joml.primitives.Rayf;
+import valthorne.camera.Camera3D;
 
 /**
  * Groups loose renderables and root-node hierarchies for submission and model
@@ -32,33 +37,39 @@ import java.util.List;
  * @author Albert Beaupre
  */
 public final class Scene3D {
-    /**
-     * Renders this scene through Filament into the current OpenGL viewport.
-     */
-    public void render(FilamentRenderer3D renderer,valthorne.camera.Camera3D camera){renderer.render(this,camera);}
-
     private final ArrayList<Renderable3D> renderables = new ArrayList<>(); // Borrowed loose renderables in insertion order; duplicates are permitted.
     private final ArrayList<SceneNode3D> nodes = new ArrayList<>(); // Borrowed hierarchy roots, checked for duplicates when added.
     private final ArrayList<PointLight3D> lights = new ArrayList<>(); // Borrowed point lights associated with this scene.
     private final List<PointLight3D> readOnlyLights = Collections.unmodifiableList(lights); // Unmodifiable live view of the scene's point-light list.
 
     /**
+     * Renders this scene through Filament into the current OpenGL viewport.
+     */
+    public void render(FilamentRenderer3D renderer, Camera3D camera) {
+        renderer.render(this, camera);
+    }
+
+    /**
      * Adds a borrowed explicit Filament point light once, independently of mesh membership.
      */
     public void addLight(PointLight3D light) {
-        java.util.Objects.requireNonNull(light, "light");
+        Objects.requireNonNull(light, "light");
         if (!lights.contains(light)) lights.add(light);
     }
 
     /**
      * Removes an explicit light without disposing it or changing its parameters.
      */
-    public boolean removeLight(PointLight3D light) {return lights.remove(light);}
+    public boolean removeLight(PointLight3D light) {
+        return lights.remove(light);
+    }
 
     /**
      * Cached, read-only live view of explicit point lights, excluding emissive mesh lights.
      */
-    public List<PointLight3D> getLights() {return readOnlyLights;}
+    public List<PointLight3D> getLights() {
+        return readOnlyLights;
+    }
 
     /**
      * Finds the closest finite forward model-triangle hit. Loose model instances
@@ -74,8 +85,8 @@ public final class Scene3D {
      * @return the nearest model hit, or null when no eligible triangle is hit
      * @throws NullPointerException if ray is null
      */
-    public PickResult3D pick(org.joml.primitives.Rayf ray) {
-        java.util.Objects.requireNonNull(ray, "ray");
+    public PickResult3D pick(Rayf ray) {
+        Objects.requireNonNull(ray, "ray");
         PickResult3D best = null;
         for (Renderable3D renderable : renderables) {
             if (renderable instanceof ModelInstance3D instance) best = pickInstance(ray, instance, null, best);
@@ -95,11 +106,11 @@ public final class Scene3D {
      * @param best the nearest hit found so far, or null
      * @return the closest result after visiting this subtree
      */
-    private PickResult3D pickNode(org.joml.primitives.Rayf ray, SceneNode3D node, PickResult3D best) {
+    private PickResult3D pickNode(Rayf ray, SceneNode3D node, PickResult3D best) {
         if (!node.isVisible()) return best;
         if (node.getModel() != null) {
             ModelInstance3D instance = new ModelInstance3D().setModel(node.getModel()).setMaterial(node.getMaterial())
-                    .setParentTransform(node.getWorldTransform(new org.joml.Matrix4f()));
+                    .setParentTransform(node.getWorldTransform(new Matrix4f()));
             best = pickInstance(ray, instance, node, best);
         }
         for (SceneNode3D child : node.getChildren()) best = pickNode(ray, child, best);
@@ -117,10 +128,10 @@ public final class Scene3D {
      * @param best     the previously nearest hit, or null
      * @return the original best result or a newly allocated closer hit
      */
-    private PickResult3D pickInstance(org.joml.primitives.Rayf ray, ModelInstance3D instance, SceneNode3D node, PickResult3D best) {
+    private PickResult3D pickInstance(Rayf ray, ModelInstance3D instance, SceneNode3D node, PickResult3D best) {
         float distance = instance.intersect(ray);
         if (!Float.isFinite(distance) || (best != null && distance >= best.distance())) return best;
-        return new PickResult3D(instance, node, distance, new org.joml.Vector3f(
+        return new PickResult3D(instance, node, distance, new Vector3f(
                 ray.oX + ray.dX * distance, ray.oY + ray.dY * distance, ray.oZ + ray.dZ * distance));
     }
 
@@ -206,31 +217,47 @@ public final class Scene3D {
     }
 
     // Allocation-free package traversal; membership must remain stable during collection.
+
     /**
      * Reads the current direct-renderable count without allocating a list snapshot.
+     *
      * @return number of direct entries, including hidden entries
      */
-    int renderableCount() {return renderables.size();}
+    int renderableCount() {
+        return renderables.size();
+    }
+
     /**
      * Borrows a direct renderable in insertion order for package-local collection.
      * Do not structurally modify the scene while traversing by index.
+     *
      * @param index zero-based entry index
      * @return borrowed renderable
      * @throws IndexOutOfBoundsException if index is outside the current list
      */
-    Renderable3D renderableAt(int index) {return renderables.get(index);}
+    Renderable3D renderableAt(int index) {
+        return renderables.get(index);
+    }
+
     /**
      * Reads the number of registered root nodes without creating a list view.
+     *
      * @return current root-node count
      */
-    int nodeCount() {return nodes.size();}
+    int nodeCount() {
+        return nodes.size();
+    }
+
     /**
      * Borrows a registered root node for allocation-free indexed traversal.
+     *
      * @param index zero-based root index
      * @return borrowed scene root
      * @throws IndexOutOfBoundsException if index is outside the current list
      */
-    SceneNode3D nodeAt(int index) {return nodes.get(index);}
+    SceneNode3D nodeAt(int index) {
+        return nodes.get(index);
+    }
 
     /**
      * Returns an unmodifiable live view of registered roots in insertion order.

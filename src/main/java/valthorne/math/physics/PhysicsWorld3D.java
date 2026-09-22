@@ -38,6 +38,7 @@ import java.util.function.Consumer;
  *     world.syncModels(true);
  * }
  * }</pre>
+ *
  * @author Albert Beaupre
  */
 public final class PhysicsWorld3D implements AutoCloseable {
@@ -59,12 +60,15 @@ public final class PhysicsWorld3D implements AutoCloseable {
     private boolean closed, advancing, inNative; // Lifecycle, stepping-recursion, and native-update access guards.
     private double accumulator, droppedTime; // Unconsumed elapsed seconds and cumulative discarded whole-step seconds.
     private long stepCount; // Number of native updates that returned, including reported capacity errors.
+
     /**
      * Creates a world with default capacities, a 60 Hz fixed step, up to eight
      * catch-up steps per update, and single-threaded native execution. Uses the
      * default collision-layer policy and binds access to the creating thread.
      */
-    public PhysicsWorld3D() {this(Settings.defaults(), new CollisionLayers3D());}
+    public PhysicsWorld3D() {
+        this(Settings.defaults(), new CollisionLayers3D());
+    }
 
     /**
      * Creates a world with supplied immutable simulation settings and the default
@@ -73,7 +77,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * @param settings nonnull timestep, capacity, and worker configuration
      * @throws NullPointerException if settings is null
      */
-    public PhysicsWorld3D(Settings settings) {this(settings, new CollisionLayers3D());}
+    public PhysicsWorld3D(Settings settings) {
+        this(settings, new CollisionLayers3D());
+    }
 
     /**
      * Initializes Jolt, builds native filters from the supplied collision policy,
@@ -83,7 +89,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * Resources registered before a construction failure are released.
      *
      * @param settings nonnull immutable simulation configuration
-     * @param layers nonnull application collision-layer policy
+     * @param layers   nonnull application collision-layer policy
      * @throws NullPointerException if either argument is null
      */
     public PhysicsWorld3D(Settings settings, CollisionLayers3D layers) {
@@ -106,10 +112,11 @@ public final class PhysicsWorld3D implements AutoCloseable {
             // https://github.com/stephengold/jolt-jni/blob/6.0.0/src/main/native/glue/o/ObjectVsBroadPhaseLayerFilterTable.cpp
             ObjectVsBroadPhaseLayerFilterTable broadphase = own(new ObjectVsBroadPhaseLayerFilterTable(mapping, layerCount, pairs, 2));
             allocator = own(new TempAllocatorMalloc());
-            jobs = settings.workerThreads == 0 ? own(new JobSystemSingleThreaded(Jolt.cMaxPhysicsJobs)) :
-                    own(new JobSystemThreadPool(Jolt.cMaxPhysicsJobs, Jolt.cMaxPhysicsBarriers, settings.workerThreads));
+            jobs = settings.workerThreads == 0 ? own(new JobSystemSingleThreaded(Jolt.cMaxPhysicsJobs)) : own(new JobSystemThreadPool(Jolt.cMaxPhysicsJobs, Jolt.cMaxPhysicsBarriers, settings.workerThreads));
             // Jolt JNI maintains a process-wide registry of systems.
-            synchronized (JoltRuntime.class) {system = own(new PhysicsSystem());}
+            synchronized (JoltRuntime.class) {
+                system = own(new PhysicsSystem());
+            }
             system.init(settings.maxBodies, 0, settings.maxBodyPairs, settings.maxContacts, mapping, broadphase, pairs);
             system.setGravity(0, 0, -9.81f);
             bodies = system.getBodyInterface();
@@ -125,7 +132,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
                  * @param contactSettings native contact settings address, unused here
                  */
                 @Override
-                public void onContactAdded(long a, long b, long manifold, long contactSettings) {contact(ContactEvent3D.Type.ADDED, a, b, manifold);}
+                public void onContactAdded(long a, long b, long manifold, long contactSettings) {
+                    contact(ContactEvent3D.Type.ADDED, a, b, manifold);
+                }
 
                 /**
                  * Copies a continuing native contact for later owner-thread notification.
@@ -137,7 +146,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
                  * @param contactSettings native contact settings address, unused here
                  */
                 @Override
-                public void onContactPersisted(long a, long b, long manifold, long contactSettings) {contact(ContactEvent3D.Type.PERSISTED, a, b, manifold);}
+                public void onContactPersisted(long a, long b, long manifold, long contactSettings) {
+                    contact(ContactEvent3D.Type.PERSISTED, a, b, manifold);
+                }
 
                 /**
                  * Queues body and subshape identifiers for a removed contact. Removal events
@@ -148,8 +159,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
                 @Override
                 public void onContactRemoved(long pairAddress) {
                     SubShapeIdPair pair = new SubShapeIdPair(pairAddress);
-                    pendingContacts.add(new RawContact(ContactEvent3D.Type.REMOVED, pair.getBody1Id(), pair.getBody2Id(),
-                            pair.getSubShapeId1(), pair.getSubShapeId2(), new Vector3f(), 0));
+                    pendingContacts.add(new RawContact(ContactEvent3D.Type.REMOVED, pair.getBody1Id(), pair.getBody2Id(), pair.getSubShapeId1(), pair.getSubShapeId2(), new Vector3f(), 0));
                 }
             });
             system.setContactListener(listener);
@@ -164,7 +174,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * construction code. The resource must remain valid until world cleanup.
      *
      * @param resource newly owned native resource
-     * @param <T> native resource type
+     * @param <T>      native resource type
      * @return resource
      */
     private <T extends JoltPhysicsObject> T own(T resource) {
@@ -177,17 +187,16 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * objects into the concurrent queue. Safe for native worker callbacks because
      * it avoids owner-thread collections and application listeners.
      *
-     * @param type added or persisted contact category
-     * @param a first borrowed body address
-     * @param b second borrowed body address
+     * @param type    added or persisted contact category
+     * @param a       first borrowed body address
+     * @param b       second borrowed body address
      * @param address borrowed manifold address
      */
     private void contact(ContactEvent3D.Type type, long a, long b, long address) {
         // Copy borrowed native data immediately; never invoke game code while Jolt holds body locks.
         Body first = new Body(a), second = new Body(b);
         ContactManifold manifold = new ContactManifold(address);
-        pendingContacts.add(new RawContact(type, first.getId(), second.getId(), manifold.getSubShapeId1(), manifold.getSubShapeId2(),
-                PhysicsMath3D.vector(manifold.getWorldSpaceNormal()), manifold.getPenetrationDepth()));
+        pendingContacts.add(new RawContact(type, first.getId(), second.getId(), manifold.getSubShapeId1(), manifold.getSubShapeId2(), PhysicsMath3D.vector(manifold.getWorldSpaceNormal()), manifold.getPenetrationDepth()));
     }
 
     /**
@@ -210,7 +219,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @return fixed timestep in seconds
      */
-    public float getFixedTimeStep() {return settings.fixedTimeStep;}
+    public float getFixedTimeStep() {
+        return settings.fixedTimeStep;
+    }
 
     /**
      * Reports whether successful cleanup has marked this world closed. Available
@@ -218,7 +229,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @return whether the world is closed
      */
-    public boolean isClosed() {return closed;}
+    public boolean isClosed() {
+        return closed;
+    }
 
     /**
      * Returns the number of native update calls that returned. A returned capacity
@@ -226,7 +239,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @return cumulative executed step count
      */
-    public long getStepCount() {return stepCount;}
+    public long getStepCount() {
+        return stepCount;
+    }
 
     /**
      * Returns accumulated whole-step time discarded when update reaches its substep
@@ -234,7 +249,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @return discarded elapsed time in seconds
      */
-    public double getDroppedTime() {return droppedTime;}
+    public double getDroppedTime() {
+        return droppedTime;
+    }
 
     /**
      * Returns accumulated time divided by the fixed timestep. After a successful
@@ -243,7 +260,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @return fraction used for optional visual interpolation
      */
-    public float getInterpolationAlpha() {return (float) (accumulator / settings.fixedTimeStep);}
+    public float getInterpolationAlpha() {
+        return (float) (accumulator / settings.fixedTimeStep);
+    }
 
     /**
      * Copies current handles into an unmodifiable list in body insertion order.
@@ -286,9 +305,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @param gravity nonnull finite world-space gravity vector
      * @return this world
-     * @throws NullPointerException if gravity is null
+     * @throws NullPointerException     if gravity is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited
+     * @throws IllegalStateException    if world access is prohibited
      */
     public PhysicsWorld3D setGravity(Vector3f gravity) {
         check();
@@ -302,7 +321,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * uses a listener snapshot, so membership changes affect a later dispatch.
      *
      * @param listener nonnull contact consumer
-     * @throws NullPointerException if listener is null
+     * @throws NullPointerException  if listener is null
      * @throws IllegalStateException if world access is prohibited
      */
     public void addContactListener(Consumer<ContactEvent3D> listener) {
@@ -329,7 +348,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * A callback failure prevents that invocation's native step from starting.
      *
      * @param listener nonnull owner-thread callback
-     * @throws NullPointerException if listener is null
+     * @throws NullPointerException  if listener is null
      * @throws IllegalStateException if world access is prohibited
      */
     public void addBeforeStepListener(Consumer<PhysicsWorld3D> listener) {
@@ -358,7 +377,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * Membership changes affect subsequent dispatch snapshots.
      *
      * @param listener nonnull callback
-     * @throws NullPointerException if listener is null
+     * @throws NullPointerException  if listener is null
      * @throws IllegalStateException if world access is prohibited
      */
     public void addAfterStepListener(Consumer<PhysicsWorld3D> listener) {
@@ -389,7 +408,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @param settings nonnull body configuration
      * @return newly registered body handle
-     * @throws NullPointerException if settings is null
+     * @throws NullPointerException  if settings is null
      * @throws IllegalStateException if world access is invalid, capacity is reached, or native allocation fails
      */
     public RigidBody3D createBody(BodySettings3D settings) {
@@ -398,20 +417,11 @@ public final class PhysicsWorld3D implements AutoCloseable {
         if (bodyMap.size() >= this.settings.maxBodies) throw new IllegalStateException("Physics body capacity reached");
         int id = Jolt.cInvalidBodyId;
         try (Shape shape = settings.shape.createNative(); BodyCreationSettings nativeSettings = new BodyCreationSettings()) {
-            nativeSettings.setShape(shape).setPosition(PhysicsMath3D.position(settings.position)).setRotation(PhysicsMath3D.rotation(settings.rotation))
-                    .setMotionType(switch (settings.motion) {
-                        case STATIC -> EMotionType.Static;
-                        case KINEMATIC -> EMotionType.Kinematic;
-                        case DYNAMIC -> EMotionType.Dynamic;
-                    })
-                    .setObjectLayer(settings.layer * 2 + (settings.motion == MotionType3D.STATIC ? 0 : 1))
-                    .setFriction(settings.friction).setRestitution(settings.restitution)
-                    .setLinearDamping(settings.linearDamping).setAngularDamping(settings.angularDamping)
-                    .setGravityFactor(settings.gravityFactor).setIsSensor(settings.sensor).setAllowSleeping(settings.sleeping)
-                    .setAllowedDofs(settings.rotationLocked
-                            ? EAllowedDofs.TranslationX | EAllowedDofs.TranslationY | EAllowedDofs.TranslationZ : EAllowedDofs.All)
-                    .setLinearVelocity(PhysicsMath3D.vector(settings.velocity))
-                    .setMotionQuality(settings.continuous ? EMotionQuality.LinearCast : EMotionQuality.Discrete);
+            nativeSettings.setShape(shape).setPosition(PhysicsMath3D.position(settings.position)).setRotation(PhysicsMath3D.rotation(settings.rotation)).setMotionType(switch (settings.motion) {
+                case STATIC -> EMotionType.Static;
+                case KINEMATIC -> EMotionType.Kinematic;
+                case DYNAMIC -> EMotionType.Dynamic;
+            }).setObjectLayer(settings.layer * 2 + (settings.motion == MotionType3D.STATIC ? 0 : 1)).setFriction(settings.friction).setRestitution(settings.restitution).setLinearDamping(settings.linearDamping).setAngularDamping(settings.angularDamping).setGravityFactor(settings.gravityFactor).setIsSensor(settings.sensor).setAllowSleeping(settings.sleeping).setAllowedDofs(settings.rotationLocked ? EAllowedDofs.TranslationX | EAllowedDofs.TranslationY | EAllowedDofs.TranslationZ : EAllowedDofs.All).setLinearVelocity(PhysicsMath3D.vector(settings.velocity)).setMotionQuality(settings.continuous ? EMotionQuality.LinearCast : EMotionQuality.Discrete);
             if (settings.motion != MotionType3D.STATIC) {
                 nativeSettings.setOverrideMassProperties(EOverrideMassProperties.CalculateInertia);
                 nativeSettings.getMassPropertiesOverride().setMass(settings.mass);
@@ -439,7 +449,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @param body handle owned by this world
      * @throws IllegalArgumentException if body is null or belongs to another world
-     * @throws IllegalStateException if world access is prohibited
+     * @throws IllegalStateException    if world access is prohibited
      */
     public void destroyBody(RigidBody3D body) {
         check();
@@ -478,7 +488,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * @param elapsedSeconds frame duration in seconds
      * @return number of fixed steps performed by this call
      * @throws IllegalArgumentException if elapsedSeconds is negative or nonfinite
-     * @throws IllegalStateException if access is invalid, stepping is recursive, or Jolt reports a capacity error
+     * @throws IllegalStateException    if access is invalid, stepping is recursive, or Jolt reports a capacity error
      */
     public int update(float elapsedSeconds) {
         check();
@@ -500,7 +510,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
             }
             syncModels(false);
             return steps;
-        } finally {advancing = false;}
+        } finally {
+            advancing = false;
+        }
     }
 
     /**
@@ -514,7 +526,11 @@ public final class PhysicsWorld3D implements AutoCloseable {
         check();
         if (advancing) throw new IllegalStateException("Recursive physics stepping is not allowed");
         advancing = true;
-        try {integrate(false);} finally {advancing = false;}
+        try {
+            integrate(false);
+        } finally {
+            advancing = false;
+        }
     }
 
     /**
@@ -534,7 +550,11 @@ public final class PhysicsWorld3D implements AutoCloseable {
         for (RigidBody3D body : bodyMap.values()) body.remember();
         int errors;
         inNative = true;
-        try {errors = system.update(settings.fixedTimeStep, 1, allocator, jobs);} finally {inNative = false;}
+        try {
+            errors = system.update(settings.fixedTimeStep, 1, allocator, jobs);
+        } finally {
+            inNative = false;
+        }
         // Consume only simulated time, before invoking game contact callbacks.
         if (consumeTime) accumulator = Math.max(0, accumulator - settings.fixedTimeStep);
         stepCount++;
@@ -602,10 +622,10 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * query layers and bodies. Direction magnitude is normalized internally, so
      * maxDistance determines the segment length.
      *
-     * @param ray nonnull ray with finite origin and finite nonzero direction
+     * @param ray         nonnull ray with finite origin and finite nonzero direction
      * @param maxDistance finite positive segment length in world units
      * @return closest hit, or null if no hit can be returned
-     * @throws NullPointerException if ray is null
+     * @throws NullPointerException     if ray is null
      * @throws IllegalArgumentException if ray values or distance are invalid
      */
     public PhysicsRayHit3D raycast(Rayf ray, float maxDistance) {
@@ -617,13 +637,13 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * this world. Uses default broadphase and object filters, normalizes the ray
      * direction, and obtains the surface normal under a native read lock.
      *
-     * @param ray nonnull ray with finite origin and finite nonzero direction
+     * @param ray         nonnull ray with finite origin and finite nonzero direction
      * @param maxDistance finite positive world-space ray length
      * @param ignoredBody live body to exclude, or null for no exclusion
      * @return closest hit with world point, normal, and distance; null for no hit or a failed read lock
-     * @throws NullPointerException if ray is null
+     * @throws NullPointerException     if ray is null
      * @throws IllegalArgumentException if inputs are invalid or the excluded body belongs elsewhere
-     * @throws IllegalStateException if world access is invalid or the excluded body is destroyed
+     * @throws IllegalStateException    if world access is invalid or the excluded body is destroyed
      */
     public PhysicsRayHit3D raycast(Rayf ray, float maxDistance, RigidBody3D ignoredBody) {
         check();
@@ -637,9 +657,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
         double length = Math.sqrt((double) ray.dX * ray.dX + (double) ray.dY * ray.dY + (double) ray.dZ * ray.dZ);
         if (length == 0) throw new IllegalArgumentException("Ray direction must be nonzero");
         direction.set((float) (ray.dX / length), (float) (ray.dY / length), (float) (ray.dZ / length)).mul(maxDistance);
-        try (RRayCast cast = new RRayCast(PhysicsMath3D.position(new Vector3f(ray.oX, ray.oY, ray.oZ)), PhysicsMath3D.vector(direction));
-             RayCastResult result = new RayCastResult(); BroadPhaseLayerFilter broadFilter = new BroadPhaseLayerFilter();
-             ObjectLayerFilter objectFilter = new ObjectLayerFilter(); BodyFilter bodyFilter = rayBodyFilter(ignoredBody)) {
+        try (RRayCast cast = new RRayCast(PhysicsMath3D.position(new Vector3f(ray.oX, ray.oY, ray.oZ)), PhysicsMath3D.vector(direction)); RayCastResult result = new RayCastResult(); BroadPhaseLayerFilter broadFilter = new BroadPhaseLayerFilter(); ObjectLayerFilter objectFilter = new ObjectLayerFilter(); BodyFilter bodyFilter = rayBodyFilter(ignoredBody)) {
             if (!system.getNarrowPhaseQuery().castRay(cast, result, broadFilter, objectFilter, bodyFilter)) return null;
             RigidBody3D body = bodyMap.get(result.getBodyId());
             RVec3 point = cast.getPointOnRay(result.getFraction());
@@ -677,16 +695,16 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * fixed-length constraint; a range allows separation within those limits.
      * The world owns the joint and destroys it when either body is destroyed.
      *
-     * @param a first body owned by this world
-     * @param b second body owned by this world
-     * @param anchorA finite world-space anchor on the first body
-     * @param anchorB finite world-space anchor on the second body
+     * @param a           first body owned by this world
+     * @param b           second body owned by this world
+     * @param anchorA     finite world-space anchor on the first body
+     * @param anchorB     finite world-space anchor on the second body
      * @param minDistance finite nonnegative minimum separation
      * @param maxDistance finite maximum separation at least minDistance
      * @return newly registered joint
-     * @throws NullPointerException if an anchor is null
+     * @throws NullPointerException     if an anchor is null
      * @throws IllegalArgumentException if ownership, motion, anchors, or distance limits are invalid
-     * @throws IllegalStateException if world access is invalid or either body is destroyed
+     * @throws IllegalStateException    if world access is invalid or either body is destroyed
      */
     public DistanceJoint3D createDistanceJoint(RigidBody3D a, RigidBody3D b, Vector3f anchorA, Vector3f anchorB, float minDistance, float maxDistance) {
         check();
@@ -725,7 +743,7 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @param joint joint owned by this world
      * @throws IllegalArgumentException if the joint belongs to another world
-     * @throws IllegalStateException if world access is prohibited
+     * @throws IllegalStateException    if world access is prohibited
      */
     void destroyJoint(DistanceJoint3D joint) {
         check();
@@ -743,7 +761,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
      *
      * @throws IllegalStateException if a live world is disposed from an invalid access context or callback
      */
-    public void dispose() {close();}
+    public void dispose() {
+        close();
+    }
 
     /**
      * Detaches native contact capture, destroys joints and bodies, clears callbacks
@@ -778,7 +798,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
     private void releaseResources() {
         if (system != null) {
             system.setContactListener(null);
-            synchronized (JoltRuntime.class) {system.forgetMe();}
+            synchronized (JoltRuntime.class) {
+                system.forgetMe();
+            }
         }
         for (int i = resources.size() - 1; i >= 0; i--) resources.get(i).close();
         resources.clear();
@@ -791,15 +813,14 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * system while preserving the same owner-thread public API.
      *
      * @param fixedTimeStep finite positive step duration in seconds
-     * @param maxSubSteps maximum fixed steps performed by one update
-     * @param maxBodies maximum concurrently registered bodies
-     * @param maxBodyPairs native body-pair capacity
-     * @param maxContacts native contact-constraint capacity
+     * @param maxSubSteps   maximum fixed steps performed by one update
+     * @param maxBodies     maximum concurrently registered bodies
+     * @param maxBodyPairs  native body-pair capacity
+     * @param maxContacts   native contact-constraint capacity
      * @param workerThreads native worker count, with zero selecting single-threaded execution
      * @author Albert Beaupre
      */
-    public record Settings(float fixedTimeStep, int maxSubSteps, int maxBodies,
-            int maxBodyPairs, int maxContacts, int workerThreads) {
+    public record Settings(float fixedTimeStep, int maxSubSteps, int maxBodies, int maxBodyPairs, int maxContacts, int workerThreads) {
         /**
          * Validates immutable simulation settings at construction.
          *
@@ -817,7 +838,9 @@ public final class PhysicsWorld3D implements AutoCloseable {
          *
          * @return a new default settings value
          */
-        public static Settings defaults() {return new Settings(1f / 60f, 8, 4096, 65536, 20480, 0);}
+        public static Settings defaults() {
+            return new Settings(1f / 60f, 8, 4096, 65536, 20480, 0);
+        }
     }
 
     /**
@@ -825,12 +848,12 @@ public final class PhysicsWorld3D implements AutoCloseable {
      * engine values rather than borrowed native addresses. Removed contacts carry a
      * zero normal and zero penetration because no manifold is available.
      *
-     * @param type contact transition
-     * @param a first body ID
-     * @param b second body ID
-     * @param subA first subshape ID
-     * @param subB second subshape ID
-     * @param normal copied world-space normal
+     * @param type        contact transition
+     * @param a           first body ID
+     * @param b           second body ID
+     * @param subA        first subshape ID
+     * @param subB        second subshape ID
+     * @param normal      copied world-space normal
      * @param penetration copied penetration depth in world units
      * @author Albert Beaupre
      */

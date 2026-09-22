@@ -7,6 +7,9 @@ import valthorne.graphics.texture.Texture;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
+import java.util.Objects;
+import org.joml.Matrix4f;
+import org.joml.primitives.AABBf;
 
 /**
  * Frame submission batch with frustum/opaque-triangle occlusion culling, material batching
@@ -44,35 +47,23 @@ public final class ModelBatch3D implements AutoCloseable {
     private final IdentityHashMap<Material3D, Material3D> materials = new IdentityHashMap<>(); // Per-frame source-identity material snapshots.
     private final IdentityHashMap<Material3D, Integer> materialOrder = new IdentityHashMap<>(); // Stable encounter order of material snapshots.
     private final Material3D defaultMaterial = new Material3D(); // Fallback for renderables without a material.
+    private final OcclusionCuller3D occlusion = new OcclusionCuller3D(); // Reusable conservative visibility tester for the current camera pass.
+    private final Matrix4f occlusionTransform = new Matrix4f(); // Scratch model-to-world transform for visibility tests.
     private MeshRenderState3D activeState; // Borrowed live render state for the active frame.
     private Camera3D activeCamera; // Borrowed camera rebuilt when begin is called.
     private boolean begun, disposed, cullingEnabled = true; // Frame lifecycle, disposal state, and frustum-culling enablement.
     private int submittedCount, visibleCount, culledCount; // Current or most recent frame's submission outcome counters.
     private int culledSubtreeCount; // Number of hierarchy branches rejected before per-item traversal.
-    private final OcclusionCuller3D occlusion = new OcclusionCuller3D(); // Reusable conservative visibility tester for the current camera pass.
-    private final org.joml.Matrix4f occlusionTransform = new org.joml.Matrix4f(); // Scratch model-to-world transform for visibility tests.
     private boolean occlusionCullingEnabled = true; // Enables optional conservative current-pass occlusion rejection.
     private int occludedCount; // Number of candidates rejected as occluded during the latest pass.
-
-    /**
-     * Enables rejection behind previously submitted opaque triangles. Submit large
-     * opaque walls first for best coverage. Shadow passes always bypass occlusion.
-     * @param enabled whether camera-pass occlusion is enabled
-     * @return this batch
-     */
-    public ModelBatch3D setOcclusionCullingEnabled(boolean enabled) {occlusionCullingEnabled = enabled; return this;}
-    /**
-     * Reads the current or most recently completed pass's model submissions rejected by opaque-triangle coverage. The counter resets at begin and excludes ordinary frustum rejections.
-     *
-     * @return camera-pass submissions rejected by occlusion in the last frame
-     */
-    public int getOccludedCount() {return occludedCount;}
 
     /**
      * Allocates default owned mesh and billboard backends. Construct on the graphics
      * thread and dispose this batch when all frame submissions are finished.
      */
-    public ModelBatch3D() {this(new MeshBatch3D());}
+    public ModelBatch3D() {
+        this(new MeshBatch3D());
+    }
 
     /**
      * Allocates an owned mesh backend with the requested float capacity and a default
@@ -80,7 +71,9 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @param initialCapacityFloats initial mesh float-buffer capacity
      */
-    public ModelBatch3D(int initialCapacityFloats) {this(new MeshBatch3D(initialCapacityFloats));}
+    public ModelBatch3D(int initialCapacityFloats) {
+        this(new MeshBatch3D(initialCapacityFloats));
+    }
 
     /**
      * Takes ownership of a mesh backend and allocates a default billboard backend.
@@ -88,19 +81,21 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @param meshBatch non-null mesh backend
      */
-    public ModelBatch3D(MeshBatch3D meshBatch) {this(meshBatch, new BillboardBatch3D());}
+    public ModelBatch3D(MeshBatch3D meshBatch) {
+        this(meshBatch, new BillboardBatch3D());
+    }
 
     /**
      * Retains and takes disposal responsibility for both supplied rendering backends.
      * They must not be used independently while this batch is emitting a frame.
      *
-     * @param meshBatch owned mesh backend
+     * @param meshBatch      owned mesh backend
      * @param billboardBatch owned billboard backend
      * @throws NullPointerException if either backend is null
      */
     public ModelBatch3D(MeshBatch3D meshBatch, BillboardBatch3D billboardBatch) {
-        this.meshBatch = java.util.Objects.requireNonNull(meshBatch);
-        this.billboardBatch = java.util.Objects.requireNonNull(billboardBatch);
+        this.meshBatch = Objects.requireNonNull(meshBatch);
+        this.billboardBatch = Objects.requireNonNull(billboardBatch);
     }
 
     /**
@@ -109,7 +104,7 @@ public final class ModelBatch3D implements AutoCloseable {
      * an opaque instance pass using the material setter's normal depth-write behavior.
      *
      * @param instance instance-level overrides
-     * @param part OBJ part material
+     * @param part     OBJ part material
      * @return newly combined material sharing texture resources
      */
     private static Material3D combine(Material3D instance, Material3D part) {
@@ -123,12 +118,33 @@ public final class ModelBatch3D implements AutoCloseable {
     }
 
     /**
+     * Enables rejection behind previously submitted opaque triangles. Submit large
+     * opaque walls first for best coverage. Shadow passes always bypass occlusion.
+     *
+     * @param enabled whether camera-pass occlusion is enabled
+     * @return this batch
+     */
+    public ModelBatch3D setOcclusionCullingEnabled(boolean enabled) {
+        occlusionCullingEnabled = enabled;
+        return this;
+    }
+
+    /**
+     * Reads the current or most recently completed pass's model submissions rejected by opaque-triangle coverage. The counter resets at begin and excludes ordinary frustum rejections.
+     *
+     * @return camera-pass submissions rejected by occlusion in the last frame
+     */
+    public int getOccludedCount() {
+        return occludedCount;
+    }
+
+    /**
      * Starts a frame, rebuilds the state's camera with its retained viewport dimensions,
      * prepares non-shadow lighting, clears submissions and material snapshots, and resets
      * statistics. Does not snapshot the state or camera themselves.
      *
      * @param state live render state containing a camera
-     * @throws IllegalStateException if disposed or already active
+     * @throws IllegalStateException    if disposed or already active
      * @throws IllegalArgumentException if state or its camera is null
      */
     public void begin(MeshRenderState3D state) {
@@ -157,7 +173,9 @@ public final class ModelBatch3D implements AutoCloseable {
      * @param instance instance to submit, or null to count as culled
      * @return whether the submission was accepted
      */
-    public boolean submit(ModelInstance3D instance) {return submit((Renderable3D) instance);}
+    public boolean submit(ModelInstance3D instance) {
+        return submit((Renderable3D) instance);
+    }
 
     /**
      * Counts and tests a renderable for visibility and optional frustum culling. Rejects
@@ -168,7 +186,7 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @param renderable supported mesh or billboard, or null
      * @return true when accepted by submission checks, false when culled
-     * @throws IllegalStateException if no frame is active
+     * @throws IllegalStateException    if no frame is active
      * @throws IllegalArgumentException if a visible renderable has an unsupported type
      */
     public boolean submit(Renderable3D renderable) {
@@ -206,13 +224,14 @@ public final class ModelBatch3D implements AutoCloseable {
             for (ObjModel3D.Part part : obj.getParts()) {
                 Material3D combined = combine(instance.getMaterial(), part.material());
                 enqueue(new ModelInstance3D().set(instance).setModel(part.model()).setMaterial(combined));
-                if (useOcclusion) occlusion.addOccluder(part.model(), instance.getWorldTransform(occlusionTransform), materials.get(combined));
+                if (useOcclusion)
+                    occlusion.addOccluder(part.model(), instance.getWorldTransform(occlusionTransform), materials.get(combined));
             }
         } else if (renderable instanceof ModelInstance3D instance) {
             enqueue(new ModelInstance3D().set(instance));
-            if (useOcclusion) occlusion.addOccluder(instance.getModel(), instance.getWorldTransform(occlusionTransform), materials.get(instance.getMaterial()));
-        }
-        else if (renderable instanceof BillboardSprite3D billboard) enqueue(new BillboardSprite3D().set(billboard));
+            if (useOcclusion)
+                occlusion.addOccluder(instance.getModel(), instance.getWorldTransform(occlusionTransform), materials.get(instance.getMaterial()));
+        } else if (renderable instanceof BillboardSprite3D billboard) enqueue(new BillboardSprite3D().set(billboard));
         else enqueue(renderable);
         visibleCount++;
         return true;
@@ -241,12 +260,12 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @param node scene subtree root
      * @return accepted submissions reported by the subtree
-     * @throws NullPointerException if node is null
+     * @throws NullPointerException  if node is null
      * @throws IllegalStateException if no frame is active
      */
     public int submit(SceneNode3D node) {
         ensureBegun();
-        return java.util.Objects.requireNonNull(node).submit(this);
+        return Objects.requireNonNull(node).submit(this);
     }
 
     /**
@@ -324,7 +343,9 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @return submitted count
      */
-    public int getSubmittedCount() {return submittedCount;}
+    public int getSubmittedCount() {
+        return submittedCount;
+    }
 
     /**
      * Returns submissions accepted before shadow filtering and OBJ part expansion.
@@ -332,7 +353,9 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @return accepted submission count
      */
-    public int getVisibleCount() {return visibleCount;}
+    public int getVisibleCount() {
+        return visibleCount;
+    }
 
     /**
      * Returns rejected submissions, including null/invisible/missing-data entries and
@@ -340,7 +363,9 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @return culled submission count
      */
-    public int getCulledCount() {return culledCount;}
+    public int getCulledCount() {
+        return culledCount;
+    }
 
     /**
      * Returns hierarchy branches rejected by bounds before individual submission.
@@ -348,7 +373,9 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @return rejected subtree count
      */
-    public int getCulledSubtreeCount() {return culledSubtreeCount;}
+    public int getCulledSubtreeCount() {
+        return culledSubtreeCount;
+    }
 
     /**
      * Tests world-space subtree bounds against the active frustum when culling is enabled.
@@ -359,7 +386,7 @@ public final class ModelBatch3D implements AutoCloseable {
      * @return whether traversal should skip the subtree
      * @throws IllegalStateException if no frame is active
      */
-    boolean rejectSubtree(org.joml.primitives.AABBf bounds, int models) {
+    boolean rejectSubtree(AABBf bounds, int models) {
         ensureBegun();
         if (cullingEnabled && !activeCamera.getFrustum().testAab(bounds.minX, bounds.minY, bounds.minZ, bounds.maxX, bounds.maxY, bounds.maxZ)) {
             submittedCount += models;
@@ -376,14 +403,18 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @return owned mesh backend
      */
-    public MeshBatch3D getMeshBatch() {return meshBatch;}
+    public MeshBatch3D getMeshBatch() {
+        return meshBatch;
+    }
 
     /**
      * Returns the owned billboard backend. Its lifecycle ends when this batch is disposed.
      *
      * @return owned billboard backend
      */
-    public BillboardBatch3D getBillboardBatch() {return billboardBatch;}
+    public BillboardBatch3D getBillboardBatch() {
+        return billboardBatch;
+    }
 
     /**
      * Reports whether frustum checks are enabled; logical visibility and missing-data
@@ -391,7 +422,9 @@ public final class ModelBatch3D implements AutoCloseable {
      *
      * @return current frustum-culling flag
      */
-    public boolean isCullingEnabled() {return cullingEnabled;}
+    public boolean isCullingEnabled() {
+        return cullingEnabled;
+    }
 
     /**
      * Changes frustum-culling behavior for subsequent submissions and subtree tests.
@@ -422,14 +455,18 @@ public final class ModelBatch3D implements AutoCloseable {
      * Use on the owning graphics thread.
      */
     @Override
-    public void close() {dispose();}
+    public void close() {
+        dispose();
+    }
 
     /**
      * Enforces the active-frame precondition before submission, traversal, or end.
      *
      * @throws IllegalStateException if begin has not established an active frame
      */
-    private void ensureBegun() {if (!begun) throw new IllegalStateException("Call ModelBatch3D.begin first");}
+    private void ensureBegun() {
+        if (!begun) throw new IllegalStateException("Call ModelBatch3D.begin first");
+    }
 
     /**
      * Retains one stable renderable reference and captured material/order values for
@@ -439,9 +476,9 @@ public final class ModelBatch3D implements AutoCloseable {
      * Sorting uses the captured depth and material order, so those keys do not change if
      * external scene state changes before queued emission.</p>
      *
-     * @param renderable submitted geometry provider
-     * @param material per-frame material snapshot
-     * @param depth captured camera sort depth
+     * @param renderable    submitted geometry provider
+     * @param material      per-frame material snapshot
+     * @param depth         captured camera sort depth
      * @param materialOrder encounter order used for opaque grouping
      * @author Albert Beaupre
      */

@@ -31,10 +31,5 @@ import org.joml.Vector3f;
  * @param position the mutable world-space hit point retained without copying
  * @author Albert Beaupre
  */
-public record PickResult3D(
-        ModelInstance3D instance,
-        SceneNode3D node,
-        float distance,
-        Vector3f position
-) {
+public record PickResult3D(ModelInstance3D instance, SceneNode3D node, float distance, Vector3f position) {
 }

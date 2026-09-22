@@ -1,5 +1,7 @@
 package valthorne.ui.behavior;
 
+import valthorne.Keyboard;
+
 /**
  * Stores the finite numeric state shared by texture and NanoVG sliders.
  * Values are clamped to an inclusive range and can be snapped to increments
@@ -196,10 +198,10 @@ public final class RangeModel {
      * @return true for a recognized key, even if clamping leaves the value unchanged
      */
     public boolean key(int key, boolean vertical) {
-        if (key == valthorne.Keyboard.HOME) value(min);
-        else if (key == valthorne.Keyboard.END) value(max);
-        else if (key == (vertical ? valthorne.Keyboard.UP : valthorne.Keyboard.RIGHT)) increment(1);
-        else if (key == (vertical ? valthorne.Keyboard.DOWN : valthorne.Keyboard.LEFT)) increment(-1);
+        if (key == Keyboard.HOME) value(min);
+        else if (key == Keyboard.END) value(max);
+        else if (key == (vertical ? Keyboard.UP : Keyboard.RIGHT)) increment(1);
+        else if (key == (vertical ? Keyboard.DOWN : Keyboard.LEFT)) increment(-1);
         else return false;
         return true;
     }

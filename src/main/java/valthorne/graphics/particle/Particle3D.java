@@ -34,8 +34,7 @@ public final class Particle3D {
      * Shared identity transform copied into particle meshes when resetting parent state.
      */
     private static final Matrix4f IDENTITY = new Matrix4f();
-    private final BillboardSprite3D sprite = new BillboardSprite3D()
-            .setMode(BillboardMode3D.SPHERICAL).setAnchor(.5f, .5f); // Owned billboard and canonical position storage.
+    private final BillboardSprite3D sprite = new BillboardSprite3D().setMode(BillboardMode3D.SPHERICAL).setAnchor(.5f, .5f); // Owned billboard and canonical position storage.
     private final Material3D defaultSpriteMaterial = sprite.getMaterial(); // Owned original billboard material restored on reuse.
     private final Vector3f velocity = new Vector3f(); // Live world velocity in units per second.
     private final Vector3f acceleration = new Vector3f(); // Live world acceleration in units per second squared.
@@ -51,6 +50,7 @@ public final class Particle3D {
     long physicsStep; // Step number whose completion should advance this particle's age.
 
     // All optional light configuration and state is allocated only when requested.
+
     /**
      * Lazily allocated point-light configuration and scene-registration state.
      * The particle owns this light independently of borrowed render materials;
@@ -102,7 +102,9 @@ public final class Particle3D {
      *
      * @return true if optional light state exists and is enabled
      */
-    public boolean isLightEnabled() {return attachedLight != null && attachedLight.enabled;}
+    public boolean isLightEnabled() {
+        return attachedLight != null && attachedLight.enabled;
+    }
 
     /**
      * Sets a finite world-space offset and immediately synchronizes light position
@@ -134,7 +136,9 @@ public final class Particle3D {
      *
      * @return owned mutable billboard
      */
-    public BillboardSprite3D getSprite() {return sprite;}
+    public BillboardSprite3D getSprite() {
+        return sprite;
+    }
 
     /**
      * Exposes the canonical world position stored by the billboard. Cosmetic
@@ -143,7 +147,9 @@ public final class Particle3D {
      *
      * @return live position in world units
      */
-    public Vector3f getPosition() {return sprite.getPosition();}
+    public Vector3f getPosition() {
+        return sprite.getPosition();
+    }
 
     /**
      * Exposes world velocity used for cosmetic integration and initial body setup.
@@ -152,7 +158,9 @@ public final class Particle3D {
      *
      * @return live velocity in world units per second
      */
-    public Vector3f getVelocity() {return velocity;}
+    public Vector3f getVelocity() {
+        return velocity;
+    }
 
     /**
      * Exposes constant world acceleration for cosmetic motion. In physics mode
@@ -161,7 +169,9 @@ public final class Particle3D {
      *
      * @return live acceleration in world units per second squared
      */
-    public Vector3f getAcceleration() {return acceleration;}
+    public Vector3f getAcceleration() {
+        return acceleration;
+    }
 
     /**
      * Lazily creates a reusable mesh instance at the canonical position. Merely
@@ -199,21 +209,27 @@ public final class Particle3D {
      *
      * @return live body, or null for a cosmetic or released particle
      */
-    public RigidBody3D getBody() {return body;}
+    public RigidBody3D getBody() {
+        return body;
+    }
 
     /**
      * Reads elapsed simulation time, which may exceed lifetime after a large step.
      *
      * @return age in seconds
      */
-    public float getAge() {return age;}
+    public float getAge() {
+        return age;
+    }
 
     /**
      * Reads the configured expiration threshold without changing age.
      *
      * @return positive finite lifetime in seconds
      */
-    public float getLifetime() {return lifetime;}
+    public float getLifetime() {
+        return lifetime;
+    }
 
     /**
      * Changes the expiration threshold without resetting age. Shortening it below
@@ -236,7 +252,9 @@ public final class Particle3D {
      *
      * @return normalized lifetime progress
      */
-    public float getProgress() {return Math.min(1f, age / lifetime);}
+    public float getProgress() {
+        return Math.min(1f, age / lifetime);
+    }
 
     /**
      * Selects the existing instance only when it has geometry assigned. Does not
@@ -244,7 +262,9 @@ public final class Particle3D {
      *
      * @return renderable mesh instance, or null for billboard selection
      */
-    ModelInstance3D mesh() {return model != null && model.getModel() != null ? model : null;}
+    ModelInstance3D mesh() {
+        return model != null && model.getModel() != null ? model : null;
+    }
 
     /**
      * Transfers owned mesh/light membership between borrowed scenes and synchronizes
@@ -255,8 +275,8 @@ public final class Particle3D {
      */
     void attach(Scene3D destination) {
         if (scene == destination && inScene && !scene.getRenderables().contains(model)) inScene = false;
-        if (attachedLight != null && scene == destination && attachedLight.inScene
-                && !scene.getLights().contains(attachedLight.light)) attachedLight.inScene = false;
+        if (attachedLight != null && scene == destination && attachedLight.inScene && !scene.getLights().contains(attachedLight.light))
+            attachedLight.inScene = false;
         if (scene != destination) {
             if (inScene) scene.remove(model);
             if (attachedLight != null && attachedLight.inScene) {
@@ -312,8 +332,8 @@ public final class Particle3D {
      * mesh parent transform, and immediately synchronizes the body's world pose.
      * The caller must release any previous body before replacing it.
      *
-     * @param body non-null live body controlled by the emitter
-     * @param mass mass used to convert acceleration into force
+     * @param body      non-null live body controlled by the emitter
+     * @param mass      mass used to convert acceleration into force
      * @param firstStep first physics step whose time contributes to age
      */
     void setBody(RigidBody3D body, float mass, long firstStep) {
@@ -366,8 +386,7 @@ public final class Particle3D {
         physicsMass = 0f;
         physicsStep = 0;
         resetMaterial(defaultSpriteMaterial, RenderPass3D.TRANSLUCENT);
-        sprite.setPosition(0, 0, 0).setTextureRegion(null).setMaterial(defaultSpriteMaterial)
-                .setSize(1, 1).setMode(BillboardMode3D.SPHERICAL).setAnchor(.5f, .5f).setVisible(true);
+        sprite.setPosition(0, 0, 0).setTextureRegion(null).setMaterial(defaultSpriteMaterial).setSize(1, 1).setMode(BillboardMode3D.SPHERICAL).setAnchor(.5f, .5f).setVisible(true);
         sprite.getColor().set(1, 1, 1, 1);
         if (attachedLight != null) {
             attachedLight.enabled = attachedLight.inScene = false;
@@ -377,8 +396,7 @@ public final class Particle3D {
         }
         if (model != null) {
             resetMaterial(defaultModelMaterial, RenderPass3D.OPAQUE);
-            model.setModel(null).setMaterial(defaultModelMaterial).setPosition(0, 0, 0)
-                    .setScale(1).setRotation(0, 0, 0).setParentTransform(IDENTITY).setVisible(true);
+            model.setModel(null).setMaterial(defaultModelMaterial).setPosition(0, 0, 0).setScale(1).setRotation(0, 0, 0).setParentTransform(IDENTITY).setVisible(true);
         }
     }
 
@@ -388,13 +406,10 @@ public final class Particle3D {
      * disposed; callers must pass only a particle-owned default material.
      *
      * @param material owned mutable material to reset
-     * @param pass render pass appropriate to billboard or mesh defaults
+     * @param pass     render pass appropriate to billboard or mesh defaults
      */
     private static void resetMaterial(Material3D material, RenderPass3D pass) {
-        material.setRenderPass(pass).setLightingMix(1).setFogMix(1).setRadianceMix(1)
-                .setDepthTest(true).setCullBackFaces(false).setTexture(null).setAlphaCutoff(.001f)
-                .setCastsShadow(true).setReceivesShadow(true).setRoughness(.65f).setMetallic(0)
-                .setTransmission(0).setIndexOfRefraction(1.5f).setEmissionStrength(1).setEmissionLightEnabled(true);
+        material.setRenderPass(pass).setLightingMix(1).setFogMix(1).setRadianceMix(1).setDepthTest(true).setCullBackFaces(false).setTexture(null).setAlphaCutoff(.001f).setCastsShadow(true).setReceivesShadow(true).setRoughness(.65f).setMetallic(0).setTransmission(0).setIndexOfRefraction(1.5f).setEmissionStrength(1).setEmissionLightEnabled(true);
         material.getTint().set(1, 1, 1, 1);
         material.getEmissive().set(0, 0, 0, 0);
     }
@@ -409,9 +424,7 @@ public final class Particle3D {
      */
     boolean update(float delta) {
         float dt = Math.min(delta, Math.max(0, lifetime - age));
-        getPosition().add(velocity.x() * dt + .5f * acceleration.x() * dt * dt,
-                velocity.y() * dt + .5f * acceleration.y() * dt * dt,
-                velocity.z() * dt + .5f * acceleration.z() * dt * dt);
+        getPosition().add(velocity.x() * dt + .5f * acceleration.x() * dt * dt, velocity.y() * dt + .5f * acceleration.y() * dt * dt, velocity.z() * dt + .5f * acceleration.z() * dt * dt);
         velocity.add(acceleration.x() * dt, acceleration.y() * dt, acceleration.z() * dt);
         if (model != null || attachedLight != null) syncModel();
         return advanceAge(delta);

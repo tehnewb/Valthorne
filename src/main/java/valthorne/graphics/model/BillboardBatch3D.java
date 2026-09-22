@@ -1,25 +1,24 @@
 package valthorne.graphics.model;
 
+import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import valthorne.camera.Camera3D;
 import valthorne.graphics.Color;
 import valthorne.graphics.shader.Billboard3DShader;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureRegion;
-import org.joml.Vector3f;
 
 import java.nio.FloatBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
-import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL30.*;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GL20;
 
 /**
  * Accumulates camera-facing textured quads as world-space triangles and streams
@@ -49,12 +48,10 @@ import static org.lwjgl.opengl.GL30.glGenVertexArrays;
  *     batch.dispose();
  * }
  * }</pre>
+ *
  * @author Albert Beaupre
  */
 public final class BillboardBatch3D {
-    private final float[] matrixUpload = new float[16]; // Reusable column-major camera matrix upload array.
-
-
     /**
      * Interleaved vertex width: XYZ position, UV coordinates, and RGBA color.
      */
@@ -67,6 +64,7 @@ public final class BillboardBatch3D {
      * Shared material fallback when the render state omits a material.
      */
     private static final Material3D DEFAULT_MATERIAL = new Material3D();
+    private final float[] matrixUpload = new float[16]; // Reusable column-major camera matrix upload array.
     private final Billboard3DShader shader; // Owned billboard shader program wrapper.
     private final int vaoId; // Owned OpenGL vertex-array name.
     private final int vboId; // Owned OpenGL streaming vertex-buffer name.
@@ -134,7 +132,7 @@ public final class BillboardBatch3D {
      * texture groups or rebuilding camera-dependent geometry.
      *
      * @param texture nonnull shared texture for subsequent sprites
-     * @throws NullPointerException if texture is null
+     * @throws NullPointerException  if texture is null
      * @throws IllegalStateException if this batch is disposed
      */
     public void begin(Texture texture) {
@@ -152,8 +150,8 @@ public final class BillboardBatch3D {
      * require begin and an identical texture reference. Does not check visibility.
      *
      * @param billboard sprite to append
-     * @param camera camera whose current orientation determines the quad basis
-     * @throws IllegalStateException if no texture has been selected
+     * @param camera    camera whose current orientation determines the quad basis
+     * @throws IllegalStateException    if no texture has been selected
      * @throws IllegalArgumentException if the sprite region uses a different texture object
      */
     public void draw(BillboardSprite3D billboard, Camera3D camera) {
@@ -205,7 +203,7 @@ public final class BillboardBatch3D {
      *
      * @param state material, camera, fog, and radiance configuration
      * @throws IllegalStateException if disposed or a nonempty draw has no camera
-     * @throws NullPointerException if state is null for a nonempty draw
+     * @throws NullPointerException  if state is null for a nonempty draw
      */
     public void render(MeshRenderState3D state) {
         if (disposed) throw new IllegalStateException("BillboardBatch3D is disposed");
@@ -244,15 +242,13 @@ public final class BillboardBatch3D {
      * Writes center plus horizontal/right and vertical/up offsets using the
      * basis computed for the current sprite.
      *
-     * @param out destination corner
-     * @param center world-space sprite anchor position
+     * @param out        destination corner
+     * @param center     world-space sprite anchor position
      * @param horizontal horizontal offset in world units
-     * @param vertical vertical offset in world units
+     * @param vertical   vertical offset in world units
      */
     private void setCorner(Vector3f out, Vector3f center, float horizontal, float vertical) {
-        out.set(center)
-                .add(scratchRight.x() * horizontal, scratchRight.y() * horizontal, scratchRight.z() * horizontal)
-                .add(scratchUp.x() * vertical, scratchUp.y() * vertical, scratchUp.z() * vertical);
+        out.set(center).add(scratchRight.x() * horizontal, scratchRight.y() * horizontal, scratchRight.z() * horizontal).add(scratchUp.x() * vertical, scratchUp.y() * vertical, scratchUp.z() * vertical);
     }
 
     /**
@@ -261,7 +257,7 @@ public final class BillboardBatch3D {
      * direction and then positive X when degenerate, and use positive Z as up.
      *
      * @param camera current camera orientation
-     * @param mode spherical or world-Z-aligned orientation mode
+     * @param mode   spherical or world-Z-aligned orientation mode
      */
     private void computeBasis(Camera3D camera, BillboardMode3D mode) {
         if (mode == BillboardMode3D.SPHERICAL) {
@@ -286,9 +282,9 @@ public final class BillboardBatch3D {
      * storage as needed. Position and color components are copied immediately.
      *
      * @param position world-space vertex
-     * @param u horizontal texture coordinate
-     * @param v vertical texture coordinate
-     * @param color vertex color
+     * @param u        horizontal texture coordinate
+     * @param v        vertical texture coordinate
+     * @param color    vertex color
      */
     private void putVertex(Vector3f position, float u, float v, Color color) {
         ensureVertexCapacity(FLOATS_PER_VERTEX);
@@ -329,7 +325,7 @@ public final class BillboardBatch3D {
      * when none is supplied and relies on the caller's snapshot for restoration.
      *
      * @param state nonnull rendering configuration with a current camera
-     * @throws NullPointerException if state is null
+     * @throws NullPointerException  if state is null
      * @throws IllegalStateException if the camera is missing
      */
     private void bindRenderState(MeshRenderState3D state) {
@@ -372,35 +368,16 @@ public final class BillboardBatch3D {
             }
         }
 
-        org.lwjgl.opengl.GL20.glBlendEquationSeparate(org.lwjgl.opengl.GL14.GL_FUNC_ADD, org.lwjgl.opengl.GL14.GL_FUNC_ADD);
-        org.lwjgl.opengl.GL11.glFrontFace(org.lwjgl.opengl.GL11.GL_CCW);
+        GL20.glBlendEquationSeparate(GL14.GL_FUNC_ADD, GL14.GL_FUNC_ADD);
+        GL11.glFrontFace(GL11.GL_CCW);
         shader.bind();
         shader.setUniform3f("u_fog", state.getFogStart(), state.getFogEnd(), state.getFogAmount());
         shader.setUniform1f("u_alphaCutoff", material.getAlphaCutoff());
         shader.setUniformMatrix4(Billboard3DShader.UNIFORM_MVP, camera.getCombined().get(matrixUpload));
-        shader.setUniform3f(Billboard3DShader.UNIFORM_CAMERA_POS,
-                camera.getPosition().x(),
-                camera.getPosition().y(),
-                camera.getPosition().z()
-        );
-        shader.setUniform4f(Billboard3DShader.UNIFORM_FOG_COLOR,
-                state.getFogColor().r(),
-                state.getFogColor().g(),
-                state.getFogColor().b(),
-                state.getFogColor().a()
-        );
-        shader.setUniform4f(Billboard3DShader.UNIFORM_MATERIAL_TINT,
-                material.getTint().r(),
-                material.getTint().g(),
-                material.getTint().b(),
-                material.getTint().a()
-        );
-        shader.setUniform4f(Billboard3DShader.UNIFORM_MATERIAL_EMISSIVE,
-                material.getEmissive().r(),
-                material.getEmissive().g(),
-                material.getEmissive().b(),
-                material.getEmissive().a()
-        );
+        shader.setUniform3f(Billboard3DShader.UNIFORM_CAMERA_POS, camera.getPosition().x(), camera.getPosition().y(), camera.getPosition().z());
+        shader.setUniform4f(Billboard3DShader.UNIFORM_FOG_COLOR, state.getFogColor().r(), state.getFogColor().g(), state.getFogColor().b(), state.getFogColor().a());
+        shader.setUniform4f(Billboard3DShader.UNIFORM_MATERIAL_TINT, material.getTint().r(), material.getTint().g(), material.getTint().b(), material.getTint().a());
+        shader.setUniform4f(Billboard3DShader.UNIFORM_MATERIAL_EMISSIVE, material.getEmissive().r(), material.getEmissive().g(), material.getEmissive().b(), material.getEmissive().a());
         shader.setUniform1f(Billboard3DShader.UNIFORM_MATERIAL_FOG_MIX, material.getFogMix());
         shader.setUniform1f(Billboard3DShader.UNIFORM_MATERIAL_RADIANCE_MIX, material.getRadianceMix());
 

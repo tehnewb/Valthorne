@@ -8,6 +8,7 @@ import valthorne.graphics.model.ModelInstance3D;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import java.util.Objects;
 
 /**
  * A handle to a native rigid body owned by one {@link PhysicsWorld3D}. The world
@@ -23,6 +24,7 @@ import org.joml.Vector3f;
  * Metadata getters remain readable after destruction but are not synchronization
  * primitives.
  * </p>
+ *
  * @author Albert Beaupre
  */
 public final class RigidBody3D implements AutoCloseable {
@@ -47,8 +49,8 @@ public final class RigidBody3D implements AutoCloseable {
      * preventing interpolation from an unrelated initial pose. Called by the owning
      * world after successful native allocation.
      *
-     * @param world owning world
-     * @param id allocated native body ID
+     * @param world    owning world
+     * @param id       allocated native body ID
      * @param settings creation settings supplying immutable handle metadata
      */
     RigidBody3D(PhysicsWorld3D world, int id, BodySettings3D settings) {
@@ -89,7 +91,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @return body ID
      */
-    public int getId() {return id;}
+    public int getId() {
+        return id;
+    }
 
     /**
      * Returns the motion category copied from creation settings. This metadata
@@ -97,7 +101,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @return static, kinematic, or dynamic motion type
      */
-    public MotionType3D getMotionType() {return motion;}
+    public MotionType3D getMotionType() {
+        return motion;
+    }
 
     /**
      * Returns the application collision-layer index, before the world's internal
@@ -105,14 +111,18 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @return creation-time collision layer
      */
-    public int getLayer() {return layer;}
+    public int getLayer() {
+        return layer;
+    }
 
     /**
      * Reports whether this body was created as a contact sensor.
      *
      * @return creation-time sensor flag
      */
-    public boolean isSensor() {return sensor;}
+    public boolean isSensor() {
+        return sensor;
+    }
 
     /**
      * Reports whether the world has invalidated this handle. Reading the flag does
@@ -120,7 +130,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @return true after body destruction
      */
-    public boolean isDestroyed() {return destroyed;}
+    public boolean isDestroyed() {
+        return destroyed;
+    }
 
     /**
      * Returns the application attachment without copying it or checking body
@@ -128,7 +140,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @return borrowed user value, possibly null
      */
-    public Object getUserData() {return userData;}
+    public Object getUserData() {
+        return userData;
+    }
 
     /**
      * Stores an application attachment without taking ownership. Replacing it does
@@ -161,7 +175,7 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param destination nonnull output vector
      * @return destination
-     * @throws NullPointerException if destination is null
+     * @throws NullPointerException  if destination is null
      * @throws IllegalStateException if world access is prohibited or this body is destroyed
      */
     public Vector3f getPosition(Vector3f destination) {
@@ -185,7 +199,7 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param destination nonnull output quaternion
      * @return destination
-     * @throws NullPointerException if destination is null
+     * @throws NullPointerException  if destination is null
      * @throws IllegalStateException if world access is prohibited or this body is destroyed
      */
     public Quaternionf getRotation(Quaternionf destination) {
@@ -209,12 +223,12 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param destination nonnull output vector
      * @return destination, in world distance units per second
-     * @throws NullPointerException if destination is null
+     * @throws NullPointerException  if destination is null
      * @throws IllegalStateException if world access is prohibited or this body is destroyed
      */
     public Vector3f getLinearVelocity(Vector3f destination) {
         check();
-        java.util.Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(destination, "destination");
         Vec3 scratch = nativeVector();
         world.bodies.getLinearVelocity(id, scratch);
         return destination.set(scratch.getX(), scratch.getY(), scratch.getZ());
@@ -225,12 +239,12 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param velocity finite velocity in distance units per second
      * @return this body
-     * @throws NullPointerException if velocity is null
+     * @throws NullPointerException     if velocity is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or static
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or static
      */
     public RigidBody3D setLinearVelocity(Vector3f velocity) {
-        java.util.Objects.requireNonNull(velocity, "velocity");
+        Objects.requireNonNull(velocity, "velocity");
         return setLinearVelocity(velocity.x(), velocity.y(), velocity.z());
     }
 
@@ -250,12 +264,12 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param destination nonnull output vector
      * @return destination, containing world-axis angular velocity in radians per second
-     * @throws NullPointerException if destination is null
+     * @throws NullPointerException  if destination is null
      * @throws IllegalStateException if world access is prohibited or this body is destroyed
      */
     public Vector3f getAngularVelocity(Vector3f destination) {
         check();
-        java.util.Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(destination, "destination");
         Vec3 scratch = nativeVector();
         world.bodies.getAngularVelocity(id, scratch);
         return destination.set(scratch.getX(), scratch.getY(), scratch.getZ());
@@ -266,9 +280,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param velocity finite world-axis angular velocity in radians per second
      * @return this body
-     * @throws NullPointerException if velocity is null
+     * @throws NullPointerException     if velocity is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or static
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or static
      */
     public RigidBody3D setAngularVelocity(Vector3f velocity) {
         check();
@@ -325,7 +339,7 @@ public final class RigidBody3D implements AutoCloseable {
      * @param z Z velocity in distance units per second
      * @return this body
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or static
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or static
      */
     public RigidBody3D setLinearVelocity(float x, float y, float z) {
         check();
@@ -345,9 +359,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param impulse finite world-space momentum change
      * @return this body
-     * @throws NullPointerException if impulse is null
+     * @throws NullPointerException     if impulse is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or nondynamic
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or nondynamic
      */
     public RigidBody3D addImpulse(Vector3f impulse) {
         dynamic();
@@ -359,12 +373,12 @@ public final class RigidBody3D implements AutoCloseable {
      * Applies a world-space impulse at a world point. An offset from the center of
      * mass can also change angular velocity through the body's inertia.
      *
-     * @param impulse finite world-space linear impulse
+     * @param impulse    finite world-space linear impulse
      * @param worldPoint finite world-space application point
      * @return this body
-     * @throws NullPointerException if either vector is null
+     * @throws NullPointerException     if either vector is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or nondynamic
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or nondynamic
      */
     public RigidBody3D addImpulse(Vector3f impulse, Vector3f worldPoint) {
         dynamic();
@@ -378,9 +392,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param impulse finite world-space angular impulse
      * @return this body
-     * @throws NullPointerException if impulse is null
+     * @throws NullPointerException     if impulse is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or nondynamic
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or nondynamic
      */
     public RigidBody3D addAngularImpulse(Vector3f impulse) {
         dynamic();
@@ -395,9 +409,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param force finite world-space force in mass times distance per second squared
      * @return this body
-     * @throws NullPointerException if force is null
+     * @throws NullPointerException     if force is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or nondynamic
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or nondynamic
      */
     public RigidBody3D addForce(Vector3f force) {
         dynamic();
@@ -425,9 +439,9 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param torque finite world-space torque
      * @return this body
-     * @throws NullPointerException if torque is null
+     * @throws NullPointerException     if torque is null
      * @throws IllegalArgumentException if a component is nonfinite
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or nondynamic
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or nondynamic
      */
     public RigidBody3D addTorque(Vector3f torque) {
         dynamic();
@@ -444,14 +458,13 @@ public final class RigidBody3D implements AutoCloseable {
      * @param position finite world position
      * @param rotation finite, nonzero world orientation
      * @return this body
-     * @throws NullPointerException if either argument is null
+     * @throws NullPointerException     if either argument is null
      * @throws IllegalArgumentException if position or orientation is invalid
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed
      */
     public RigidBody3D setTransform(Vector3f position, Quaternionf rotation) {
         check();
-        world.bodies.setPositionAndRotation(id, PhysicsMath3D.position(position), PhysicsMath3D.rotation(rotation),
-                motion == MotionType3D.STATIC ? EActivation.DontActivate : EActivation.Activate);
+        world.bodies.setPositionAndRotation(id, PhysicsMath3D.position(position), PhysicsMath3D.rotation(rotation), motion == MotionType3D.STATIC ? EActivation.DontActivate : EActivation.Activate);
         capture();
         remember();
         sync(1);
@@ -466,9 +479,9 @@ public final class RigidBody3D implements AutoCloseable {
      * @param position finite target world position
      * @param rotation finite, nonzero target world orientation
      * @return this body
-     * @throws NullPointerException if either argument is null
+     * @throws NullPointerException     if either argument is null
      * @throws IllegalArgumentException if position or orientation is invalid
-     * @throws IllegalStateException if world access is prohibited or this body is destroyed or not kinematic
+     * @throws IllegalStateException    if world access is prohibited or this body is destroyed or not kinematic
      */
     public RigidBody3D moveKinematic(Vector3f position, Quaternionf rotation) {
         check();
@@ -485,12 +498,12 @@ public final class RigidBody3D implements AutoCloseable {
      *
      * @param model nonnull visual instance
      * @return this body
-     * @throws NullPointerException if model is null
+     * @throws NullPointerException  if model is null
      * @throws IllegalStateException if world access is prohibited or this body is destroyed
      */
     public RigidBody3D bind(ModelInstance3D model) {
         check();
-        this.model = java.util.Objects.requireNonNull(model);
+        this.model = Objects.requireNonNull(model);
         model.setParentTransform(new Matrix4f());
         sync(1);
         return this;
@@ -546,8 +559,7 @@ public final class RigidBody3D implements AutoCloseable {
                 interpolatedPosition = new Vector3f();
                 interpolatedRotation = new Quaternionf();
             }
-            model.setPosition(interpolatedPosition.set(previousPosition).lerp(currentPosition, alpha))
-                    .setRotation(interpolatedRotation.set(previousRotation).slerp(currentRotation, alpha));
+            model.setPosition(interpolatedPosition.set(previousPosition).lerp(currentPosition, alpha)).setRotation(interpolatedRotation.set(previousRotation).slerp(currentRotation, alpha));
         }
     }
 
@@ -568,5 +580,7 @@ public final class RigidBody3D implements AutoCloseable {
      * @throws IllegalStateException if a live body is closed from an invalid world access context
      */
     @Override
-    public void close() {if (!destroyed) world.destroyBody(this);}
+    public void close() {
+        if (!destroyed) world.destroyBody(this);
+    }
 }

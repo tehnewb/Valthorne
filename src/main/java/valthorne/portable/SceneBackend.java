@@ -7,12 +7,19 @@ package valthorne.portable;
  */
 public interface SceneBackend extends AutoCloseable {
     default void box(float x, float y, float z, float halfSize, int rgb, boolean dynamic) {
-        box(x,y,z,halfSize,halfSize,halfSize,rgb,dynamic);
+        box(x, y, z, halfSize, halfSize, halfSize, rgb, dynamic);
     }
+
     void box(float x, float y, float z, float halfX, float halfY, float halfZ, int rgb, boolean dynamic);
+
     void step(float seconds);
+
     void render();
+
     void light(float x, float y, float z, int rgb, float intensity);
+
     void clear();
-    @Override void close();
+
+    @Override
+    void close();
 }

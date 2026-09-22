@@ -1,5 +1,6 @@
 package valthorne.graphics.lighting3d;
 
+import org.joml.Matrix4f;
 import valthorne.camera.Camera3D;
 import valthorne.graphics.model.PointLight3D;
 
@@ -27,7 +28,7 @@ public final class LightGrid3D {
     public static final int MAX_LIGHTS = 1024, LIGHTS_PER_TILE = 64, STRIDE = LIGHTS_PER_TILE + 1;
     final float[] lights = new float[MAX_LIGHTS * 8]; // Packed active-light records, valid through active times eight floats.
     private final float[] source = new float[MAX_LIGHTS * 8], previous = new float[MAX_LIGHTS * 8]; // Current input packing and prior input snapshot used for change detection.
-    private final org.joml.Matrix4f matrix = new org.joml.Matrix4f(); // Copied combined camera matrix from the previous update.
+    private final Matrix4f matrix = new Matrix4f(); // Copied combined camera matrix from the previous update.
     int[] cells = new int[0]; // Tile headers and packed active-light indices; negative headers use all lights.
     private int columns, rows, tileSize, width, height, active, previousCount = -1, overflow; // Grid dimensions, pixel sizing, active/prior input counts, and overflow statistics.
     private boolean tiled = true, previousTiled; // Requested culling mode and the mode last included in cached data.
@@ -38,7 +39,9 @@ public final class LightGrid3D {
      *
      * @return requested culling mode
      */
-    public boolean isTiled() {return tiled;}
+    public boolean isTiled() {
+        return tiled;
+    }
 
     /**
      * Selects tiled culling or all-active-light fallback without rebuilding immediately.
@@ -57,28 +60,36 @@ public final class LightGrid3D {
      *
      * @return number of packed active lights
      */
-    public int getActiveLightCount() {return active;}
+    public int getActiveLightCount() {
+        return active;
+    }
 
     /**
      * Reads the number of screen-tile columns from the last successful update.
      *
      * @return column count, initially zero
      */
-    public int getColumns() {return columns;}
+    public int getColumns() {
+        return columns;
+    }
 
     /**
      * Reads the number of screen-tile rows from the last successful update.
      *
      * @return row count, initially zero
      */
-    public int getRows() {return rows;}
+    public int getRows() {
+        return rows;
+    }
 
     /**
      * Reads the configured square tile extent used by the latest grid update.
      *
      * @return tile size in pixels, initially zero
      */
-    public int getTileSize() {return tileSize;}
+    public int getTileSize() {
+        return tileSize;
+    }
 
     /**
      * Reads tiles that exceeded their fixed light-index capacity during tiled culling.
@@ -86,7 +97,9 @@ public final class LightGrid3D {
      *
      * @return overflow tile count from the latest rebuild
      */
-    public int getOverflowTileCount() {return overflow;}
+    public int getOverflowTileCount() {
+        return overflow;
+    }
 
     /**
      * Reads average effective light tests per tile, counting fallback tiles as all
@@ -94,7 +107,9 @@ public final class LightGrid3D {
      *
      * @return last rebuild's average, initially zero
      */
-    public double getAverageLightsPerTile() {return average;}
+    public double getAverageLightsPerTile() {
+        return average;
+    }
 
     /**
      * Reads a tile's effective light count, expanding a negative fallback header
@@ -118,17 +133,16 @@ public final class LightGrid3D {
      * bounding-box corners to screen tiles; crossing the eye plane covers all tiles.
      * Alpha and shadow flags are not part of packed data.
      *
-     * @param camera camera with current combined matrix and frustum
-     *
-     * @param input non-null light list of at most MAX_LIGHTS non-null entries
-     * @param width positive viewport width in pixels
-     * @param height positive viewport height in pixels
+     * @param camera   camera with current combined matrix and frustum
+     * @param input    non-null light list of at most MAX_LIGHTS non-null entries
+     * @param width    positive viewport width in pixels
+     * @param height   positive viewport height in pixels
      * @param tileSize positive square tile size in pixels
      * @return true when cached geometry/data was rebuilt and should be uploaded
      * @throws IllegalArgumentException for invalid dimensions, excess lights, non-finite
-     * packed values, or negative RGB
-     * @throws NullPointerException if camera, input, or a light entry is null
-     * @throws ArithmeticException if tile storage size multiplication overflows
+     *                                  packed values, or negative RGB
+     * @throws NullPointerException     if camera, input, or a light entry is null
+     * @throws ArithmeticException      if tile storage size multiplication overflows
      */
     public boolean update(Camera3D camera, List<PointLight3D> input, int width, int height, int tileSize) {
         if (width <= 0 || height <= 0 || tileSize < 1)
@@ -150,10 +164,9 @@ public final class LightGrid3D {
             if (source[p + 4] < 0 || source[p + 5] < 0 || source[p + 6] < 0)
                 throw new IllegalArgumentException("Light colors must be nonnegative");
         }
-        org.joml.Matrix4f m = camera.getCombined();
-        if (this.width == width && this.height == height && this.tileSize == tileSize && previousCount == input.size()
-                && previousTiled == tiled && matrix.equals(m)
-                && Arrays.equals(source, 0, input.size() * 8, previous, 0, input.size() * 8)) return false;
+        Matrix4f m = camera.getCombined();
+        if (this.width == width && this.height == height && this.tileSize == tileSize && previousCount == input.size() && previousTiled == tiled && matrix.equals(m) && Arrays.equals(source, 0, input.size() * 8, previous, 0, input.size() * 8))
+            return false;
         this.width = width;
         this.height = height;
         this.tileSize = tileSize;
@@ -220,10 +233,12 @@ public final class LightGrid3D {
      * Maps a normalized device coordinate to a pixel-derived tile and clamps it
      * to the valid edge tile, including projected bounds outside the viewport.
      *
-     * @param ndc projected coordinate, normally between minus one and one
+     * @param ndc    projected coordinate, normally between minus one and one
      * @param extent viewport width or height in pixels
-     * @param count positive number of tiles on the selected axis
+     * @param count  positive number of tiles on the selected axis
      * @return clamped zero-based tile coordinate
      */
-    private int tile(float ndc, int extent, int count) {return Math.max(0, Math.min(count - 1, (int) Math.floor((ndc * .5f + .5f) * extent / tileSize)));}
+    private int tile(float ndc, int extent, int count) {
+        return Math.max(0, Math.min(count - 1, (int) Math.floor((ndc * .5f + .5f) * extent / tileSize)));
+    }
 }

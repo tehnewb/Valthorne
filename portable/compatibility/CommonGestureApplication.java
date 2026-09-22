@@ -1,19 +1,15 @@
 package compatibility;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import valthorne.Application;
-import valthorne.JGL;
-import valthorne.JGLConfiguration;
-import valthorne.Keyboard;
-import valthorne.Mouse;
-import valthorne.Window;
+import valthorne.*;
 import valthorne.event.EventTypes;
 import valthorne.graphics.Color;
 import valthorne.ui.UIRoot;
 import valthorne.ui.nodes.nano.NanoButton;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Shared Java UI consumer for trusted-input and coroutine compatibility. The
@@ -29,7 +25,7 @@ public final class CommonGestureApplication implements Application {
     private int clicks, keys, texts, scrolls, ordinaryTasks, callbackDepth, checks;
     private boolean armed;
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         JGL.init(new CommonGestureApplication(), JGLConfiguration.defaults()
                 .title("Trusted Java UI input compatibility").size(640, 480).visible(false));
         System.out.println("COMMON_GESTURE_RETURNED");
@@ -51,8 +47,11 @@ public final class CommonGestureApplication implements Application {
     @Override
     public void init() {
         owner = Thread.currentThread();
-        try { Files.createDirectories(CALLBACK_FILE.getParent()); }
-        catch (IOException failure) { throw new UncheckedIOException(failure); }
+        try {
+            Files.createDirectories(CALLBACK_FILE.getParent());
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
         root = new UIRoot();
         NanoButton button = new NanoButton("Capture pointer").action(node -> capture());
         button.getLayout().absolute().left(100).top(100).width(240).height(60);
@@ -137,8 +136,11 @@ public final class CommonGestureApplication implements Application {
     @Override
     public void dispose() {
         if (root != null) root.dispose();
-        try { Files.deleteIfExists(CALLBACK_FILE); }
-        catch (IOException failure) { throw new UncheckedIOException(failure); }
+        try {
+            Files.deleteIfExists(CALLBACK_FILE);
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
         System.out.println("COMMON_GESTURE_VALIDATED checks=" + checks);
     }
 }

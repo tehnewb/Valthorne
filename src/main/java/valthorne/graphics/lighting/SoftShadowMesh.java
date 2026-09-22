@@ -21,6 +21,7 @@ public final class SoftShadowMesh extends DynamicMesh2D {
     /**
      * Allocates the CPU and OpenGL triangle storage used by subsequent rebuilds.
      * A current OpenGL context is required; release it with inherited dispose.
+     *
      * @param maxVertices initial vertex capacity
      */
     public SoftShadowMesh(int maxVertices) {
@@ -35,17 +36,17 @@ public final class SoftShadowMesh extends DynamicMesh2D {
      * the radial direction by softnessLength, with no sign or range validation.
      * Local shader coordinates are divided by radius, or zero when radius is zero.
      *
-     * @param centerX world-space light center X
-     * @param centerY world-space light center Y
-     * @param radius scale for local shader coordinates
+     * @param centerX        world-space light center X
+     * @param centerY        world-space light center Y
+     * @param radius         scale for local shader coordinates
      * @param softnessLength radial fringe length in world units
-     * @param endX ordered endpoint X values; determines the number of pairs
-     * @param endY corresponding endpoint Y values, at least as long as endX
-     * @param fractions corresponding ray fractions, at least as long as endX
-     * @param r red component written to every vertex
-     * @param g green component written to every vertex
-     * @param b blue component written to every vertex
-     * @param a inner alpha for blocked endpoints
+     * @param endX           ordered endpoint X values; determines the number of pairs
+     * @param endY           corresponding endpoint Y values, at least as long as endX
+     * @param fractions      corresponding ray fractions, at least as long as endX
+     * @param r              red component written to every vertex
+     * @param g              green component written to every vertex
+     * @param b              blue component written to every vertex
+     * @param a              inner alpha for blocked endpoints
      * @throws NullPointerException if a required endpoint array is null
      */
     public void setTriangles(float centerX, float centerY, float radius, float softnessLength, float[] endX, float[] endY, float[] fractions, float r, float g, float b, float a) {

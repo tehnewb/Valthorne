@@ -3,10 +3,11 @@ import java.nio.ByteBuffer;
 import org.teavm.jso.*;
 import org.teavm.interop.*;
 import org.teavm.jso.typedarrays.Uint8Array;
+import java.util.Objects;
 /** Existing GLSL compute API compiled to WebGPU; Java callers suspend during GPU transfers. */
 public class ComputeShader {
  private int program;
- public ComputeShader(String source){program=compile(java.util.Objects.requireNonNull(source));}
+ public ComputeShader(String source){program=compile(Objects.requireNonNull(source));}
  @JSBody(script="return !!valthorneHost.compute?.supported();") public static native boolean isComputeSupported();
  /** Dispatch waits for cross-backend image transfers, so these barriers are already satisfied. */
  public static void memoryBarrierAll(){}public static void memoryBarrierImage(){}
@@ -14,7 +15,7 @@ public class ComputeShader {
  public static int createSSBO(long size,int usage){if(size<4||size>Integer.MAX_VALUE)throw new IllegalArgumentException("Invalid buffer size");return create((int)size);}
  @JSBody(params="size",script="return valthorneHost.compute.createBuffer(size);") private static native int create(int size);
  @JSBody(params={"id","binding"},script="valthorneHost.compute.bindBuffer(id,binding);") public static native void bindSSBO(int id,int binding);
- public static void updateSSBO(int id,long offset,ByteBuffer data){java.util.Objects.requireNonNull(data);if(offset<0||offset>Integer.MAX_VALUE)throw new IllegalArgumentException("Invalid buffer offset");Uint8Array bytes=Uint8Array.create(data.remaining());for(int i=0;i<data.remaining();i++)bytes.set(i,(short)(data.get(data.position()+i)&255));update(id,(int)offset,bytes);}
+ public static void updateSSBO(int id,long offset,ByteBuffer data){Objects.requireNonNull(data);if(offset<0||offset>Integer.MAX_VALUE)throw new IllegalArgumentException("Invalid buffer offset");Uint8Array bytes=Uint8Array.create(data.remaining());for(int i=0;i<data.remaining();i++)bytes.set(i,(short)(data.get(data.position()+i)&255));update(id,(int)offset,bytes);}
  @JSBody(params={"id","offset","bytes"},script="valthorneHost.compute.updateBuffer(id,offset,bytes);") private static native void update(int id,int offset,Uint8Array bytes);
  @JSBody(params="id",script="valthorneHost.compute.deleteBuffer(id);") public static native void deleteSSBO(int id);
  public void bind(){bindNative(program);}public void unbind(){bindNative(0);}
