@@ -1,6 +1,9 @@
 package valthorne.encryption;
 
 import java.util.Arrays;
+import whirlpool.NESSIEadd;
+import whirlpool.NESSIEfinalize;
+import whirlpool.NESSIEinit;
 
 /**
  * Whirlpool hash function implementation (NESSIE reference style API).
@@ -185,10 +188,10 @@ public class Whirlpool {
             System.arraycopy(data, off, source, 0, len);
         }
         Whirlpool whirlpool = new Whirlpool();
-        whirlpool.NESSIEinit();
-        whirlpool.NESSIEadd(source, len * 8L);
+        NESSIEinit();
+        NESSIEadd(source, len * 8L);
         byte[] digest = new byte[64];
-        whirlpool.NESSIEfinalize(digest);
+        NESSIEfinalize(digest);
         return digest;
     }
 
