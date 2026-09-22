@@ -262,6 +262,14 @@ public abstract class UINode implements Dimensional {
     }
 
     /**
+     * Requests a standard mouse cursor while this node is hovered or owns pointer capture.
+     * The root applies and releases the temporary cursor, preserving the application's
+     * cursor choice. Overrides should return zero when the interaction is unavailable.
+     * @return a Mouse.CURSOR_* shape, or zero to leave the application cursor unchanged
+     */
+    public int getCursorShape() { return 0; }
+
+    /**
      * Screen pixels (bottom-left) to this node's local top-left coordinates.
      */
     public final Vector2f screenToLocal(float x, float y) {

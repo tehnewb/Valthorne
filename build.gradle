@@ -100,6 +100,8 @@ java {
 sourceSets {
     test {
         java.include 'valthorne/**'
+        // Committed widget regressions coexist with the optional ignored local suites.
+        java.srcDir 'src/widgetTest/java'
     }
 }
 
@@ -207,10 +209,20 @@ tasks.register('verifyUI', Test) {
 
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
+    filter { includeTestsMatching 'valthorne.ui.*' }
+    // Each graphics fixture owns process-global Window/GLFW state.
+    forkEvery = 1
+    maxParallelForks = 1
+}
 
-    filter {
-        includeTestsMatching 'valthorne.ui.*'
-    }
+tasks.register('verifyWidgets', Test) {
+    description = 'Runs committed widget behavior, filesystem, rendering and input regressions.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    filter { includeTestsMatching 'valthorne.ui.widgets.*' }
+    forkEvery = 1
+    maxParallelForks = 1
 }
 
 tasks.withType(JavaCompile).configureEach {

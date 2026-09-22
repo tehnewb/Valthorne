@@ -558,6 +558,7 @@ public class UIRoot extends UIContainer {
         if (isLayoutDirty()) layout(false);
         super.update(delta);
         if (isLayoutDirty()) layout(false);
+        updateCursor();
 
         if (hovered == null) {
             hideActiveTooltip();
@@ -943,6 +944,7 @@ public class UIRoot extends UIContainer {
         cancelPointer();
         if (hovered != null) hovered.setHovered(false);
         hovered = null;
+        Mouse.clearCursorOverride(this);
         setFocusTo(null);
         hideActiveTooltip();
     }
@@ -955,6 +957,17 @@ public class UIRoot extends UIContainer {
      * @param node subtree about to detach
      */
     void nodeWillDetach(UINode node) {
+        cancelInput(node);
+    }
+
+    /**
+     * Clears capture, focus, hover, and tooltip state owned by a particular subtree.
+     * Other controls retain their input state. Useful when a reusable UI window closes
+     * without detaching; passing null has no effect. No release or click is synthesized.
+     * @param node subtree whose interactions are being abandoned
+     */
+    public void cancelInput(UINode node) {
+        if (node == null) return;
         if (within(pressed, node)) cancelPointer();
         if (within(focused, node)) setFocusTo(null);
         if (within(hovered, node)) {
@@ -962,6 +975,18 @@ public class UIRoot extends UIContainer {
             hovered = null;
             hideActiveTooltip();
         }
+        updateCursor();
+    }
+
+    /**
+     * Applies a target's cursor request, favoring capture over hover so resize cursors
+     * persist outside their handles during dragging. Hidden/disabled/detached nodes and
+     * nodes outside the current modal scope release this root's temporary override.
+     */
+    private void updateCursor() {
+        UINode target = pressed != null ? pressed : hovered;
+        int shape = isNodeInteractiveNow(target) && within(target, activeFocusScope()) ? target.getCursorShape() : 0;
+        if (shape == 0) Mouse.clearCursorOverride(this); else Mouse.overrideCursor(this, shape);
     }
 
     /**
@@ -989,6 +1014,7 @@ public class UIRoot extends UIContainer {
         pressed = null;
         pressedButton = -1;
         if (previous != null) previous.onPointerCancel();
+        Mouse.clearCursorOverride(this);
     }
 
     /**
@@ -1241,6 +1267,7 @@ public class UIRoot extends UIContainer {
             pressed = target;
             pressedButton = event.getButton();
             pressed.setPressed(true);
+            updateCursor();
             if (!route(pressed, event, event.getX(), event.getY(), node -> node.onMousePress(event), false))
                 cancelPointer();
 
@@ -1277,6 +1304,14 @@ public class UIRoot extends UIContainer {
             pressedButton = -1;
             target.setPressed(false);
             route(target, event, event.getX(), event.getY(), node -> node.onMouseRelease(event), false);
+            UINode nextHover = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
+            if (hovered != nextHover) {
+                hideActiveTooltip(); hoverTime = 0f;
+                if (hovered != null) hovered.setHovered(false);
+                hovered = nextHover;
+                if (hovered != null) hovered.setHovered(true);
+            }
+            updateCursor();
         }
     }
 
@@ -1327,6 +1362,7 @@ public class UIRoot extends UIContainer {
 
         if (target == null) {
             hovered = null;
+            updateCursor();
             return;
         }
 
@@ -1334,6 +1370,7 @@ public class UIRoot extends UIContainer {
 
         hovered = target;
         hovered.setHovered(true);
+        updateCursor();
         route(hovered, event, event.getToX(), event.getToY(), node -> node.onMouseMove(event), false);
     }
 

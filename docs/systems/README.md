@@ -51,7 +51,7 @@ The checkout targets Java 25. Run repository examples using the Gradle wrapper; 
 | [Tiled maps and tilesets](tiled-maps.md) | 24 | `FileSystemResolver`, `MapChunk`, `MapLayer`, `ResolvedTile`, `TileAnimationFrame`, … |
 | [UI roots, nodes, and input routing](ui-core.md) | 8 | `NanoUtility`, `NodeAction`, `UIConstants`, `UIContainer`, `UIInputEvent`, … |
 | [UI layout and alignment](ui-layout.md) | 13 | `Dimensional`, `Align`, `Alignment`, `FlexDirection`, `FlexWrap`, … |
-| [Standard UI controls](ui-controls.md) | 17 | `Button`, `Checkbox`, `CollapsibleSection`, `DrawableNode`, `Grid`, … |
+| [Standard UI controls](ui-controls.md) | 29 | `Button`, `Window`, `FileChooser`, `DirectoryTree`, `ColorPicker`, … |
 | [NanoVG UI controls](ui-nano.md) | 15 | `NanoButton`, `NanoCheckbox`, `NanoComboBox`, `NanoContainer`, `NanoGrid`, … |
 | [Virtual lists, tables, and selection](ui-data.md) | 6 | `RowHeightIndex`, `SelectionModel`, `TableModel`, `DataTable`, `TableColumn`, … |
 | [Shared UI behavior and editing models](ui-behavior.md) | 6 | `ActivationBehavior`, `ChangeSignal`, `RangeModel`, `ScrollBehavior`, `TextEditing`, … |
@@ -78,7 +78,9 @@ Examples in component descriptions may be partial integration fragments rather t
 
 ## Source coverage
 
-The manual contains 47 focused guides for the 440 Java source files in this release. Related guides link across shared concepts without duplicating ownership of source coverage.
+The source index groups documented components by system. The new file, menu, and
+editing controls are explained in the [widget guide](../ui-widgets.md), with their
+source entries under standard UI controls. Related guides connect shared concepts.
 
 <details>
 <summary>Source-to-guide index</summary>
@@ -423,6 +425,18 @@ The manual contains 47 focused guides for the 440 Java source files in this rele
 | [ui/NanoUtility.java](../../src/main/java/valthorne/ui/NanoUtility.java) | [ui-core](ui-core.md) |
 | [ui/NodeAction.java](../../src/main/java/valthorne/ui/NodeAction.java) | [ui-core](ui-core.md) |
 | [ui/nodes/Button.java](../../src/main/java/valthorne/ui/nodes/Button.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/BreadcrumbBar.java](../../src/main/java/valthorne/ui/nodes/BreadcrumbBar.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/ColorPicker.java](../../src/main/java/valthorne/ui/nodes/ColorPicker.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/ComboBox.java](../../src/main/java/valthorne/ui/nodes/ComboBox.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/FileExplorer.java](../../src/main/java/valthorne/ui/nodes/FileExplorer.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/FileChooser.java](../../src/main/java/valthorne/ui/nodes/FileChooser.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/DirectoryTree.java](../../src/main/java/valthorne/ui/nodes/DirectoryTree.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/FileIcon.java](../../src/main/java/valthorne/ui/nodes/FileIcon.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/Window.java](../../src/main/java/valthorne/ui/nodes/Window.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/MenuBar.java](../../src/main/java/valthorne/ui/nodes/MenuBar.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/NumberSpinner.java](../../src/main/java/valthorne/ui/nodes/NumberSpinner.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/PopupMenu.java](../../src/main/java/valthorne/ui/nodes/PopupMenu.java) | [ui-controls](ui-controls.md) |
+| [ui/nodes/RadioGroup.java](../../src/main/java/valthorne/ui/nodes/RadioGroup.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/Checkbox.java](../../src/main/java/valthorne/ui/nodes/Checkbox.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/CollapsibleSection.java](../../src/main/java/valthorne/ui/nodes/CollapsibleSection.java) | [ui-controls](ui-controls.md) |
 | [ui/nodes/DataTable.java](../../src/main/java/valthorne/ui/nodes/DataTable.java) | [ui-data](ui-data.md) |

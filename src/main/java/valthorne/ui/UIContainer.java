@@ -290,6 +290,8 @@ public abstract class UIContainer extends UINode {
      * root/parent references, and compacts child order. Notifies the root first so
      * capture, focus, hover, and tooltips in the subtree can be cleared. Null or absent
      * children have no effect; descendant relationships within the detached subtree remain.
+     * Membership is removed before destruction callbacks so a callback that closes
+     * an overlay and triggers layout cannot traverse partially destroyed Yoga nodes.
      *
      * @param child immediate child to detach
      */
@@ -310,16 +312,36 @@ public abstract class UIContainer extends UINode {
         if (hasYogaNode() && child.hasYogaNode())
             Yoga.YGNodeRemoveChild(getYogaMemoryAddress(), child.getYogaMemoryAddress());
 
-        detachTree(child);
-        child.setParent(null);
-        propagateRoot(child, null);
-
         int move = size - index - 1;
         if (move > 0) System.arraycopy(children, index + 1, children, index, move);
-
         children[--size] = null;
-
+        child.setParent(null);
         markLayoutDirty();
+        try {
+            detachTree(child);
+        } finally {
+            propagateRoot(child, null);
+        }
+    }
+
+    /**
+     * Moves an existing child to the last drawing and hit-testing position without
+     * detaching it, destroying its native node, or disturbing focus and pointer capture.
+     * Yoga order is updated as well, so flow-layout children also change layout order.
+     * @param child direct child to raise
+     * @throws IllegalArgumentException if the supplied node is not a direct child
+     */
+    public void bringToFront(UINode child) {
+        int index = -1;
+        for (int i = 0; i < size; i++) if (children[i] == child) { index = i; break; }
+        if (index < 0) throw new IllegalArgumentException("Node is not a child of this container");
+        if (index == size - 1) return;
+        if (getYogaMemoryAddress() != UIConstants.NULL && child.getYogaMemoryAddress() != UIConstants.NULL) {
+            Yoga.YGNodeRemoveChild(getYogaMemoryAddress(), child.getYogaMemoryAddress());
+            Yoga.YGNodeInsertChild(getYogaMemoryAddress(), child.getYogaMemoryAddress(), size - 1);
+        }
+        System.arraycopy(children, index + 1, children, index, size - index - 1);
+        children[size - 1] = child; markLayoutDirty();
     }
 
     /**

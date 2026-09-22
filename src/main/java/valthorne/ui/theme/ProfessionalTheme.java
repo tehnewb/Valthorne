@@ -142,6 +142,40 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         data.rule(Button.class, StyleState.FOCUSED).set(Button.BACKGROUND_KEY, focus);
         data.rule(Button.class, StyleState.PRESSED).set(Button.BACKGROUND_KEY, pressed);
         data.rule(Button.class, StyleState.DISABLED).set(Button.BACKGROUND_KEY, inactive);
+        data.rule(Panel.class, "window-frame").set(Panel.BACKGROUND_KEY, normal);
+        data.rule(Button.class, "window-title").set(Button.BACKGROUND_KEY, over);
+        data.rule(Button.class, "window-title", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, focus);
+        data.rule(Button.class, "window-title", StyleState.PRESSED).set(Button.BACKGROUND_KEY, pressed);
+        data.rule(Button.class, "window-close").set(Button.BACKGROUND_KEY, over);
+        data.rule(Button.class, "window-close", StyleState.HOVERED).set(Button.BACKGROUND_KEY, skin(error, error));
+        data.rule(Button.class, "window-close", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, focus);
+        data.rule(Button.class, "window-close", StyleState.PRESSED).set(Button.BACKGROUND_KEY, skin(error, accent));
+        Drawable clearGrip = squareSkin(new Color(0x00000000), new Color(0x00000000));
+        data.rule(Button.class, "window-grip").set(Button.BACKGROUND_KEY, clearGrip);
+        data.rule(Button.class, "window-grip", StyleState.HOVERED).set(Button.BACKGROUND_KEY, fill);
+        data.rule(Button.class, "window-grip", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, fill);
+        data.rule(Button.class, "window-grip", StyleState.PRESSED).set(Button.BACKGROUND_KEY, fill);
+        Drawable pane = squareSkin(raised, raised), chrome = squareSkin(surface, border);
+        Drawable flat = squareSkin(surface, surface), rowHover = squareSkin(hover, hover);
+        Drawable rowSelected = squareSkin(hover, accent), editor = squareSkin(raised, border);
+        Drawable editorFocus = squareSkin(raised, accent), command = squareSkin(hover, border);
+        data.rule(Panel.class, "chooser-pane").set(Panel.BACKGROUND_KEY, pane);
+        data.rule(Panel.class, "chooser-chrome").set(Panel.BACKGROUND_KEY, chrome);
+        data.rule(Button.class, "chooser-row").set(Button.BACKGROUND_KEY, pane);
+        data.rule(Button.class, "chooser-row", StyleState.HOVERED).set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Button.class, "chooser-row", StyleState.SELECTED).set(Button.BACKGROUND_KEY, rowSelected);
+        data.rule(Button.class, "chooser-row", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, rowSelected);
+        for (String name : List.of("chooser-tool", "chooser-heading", "chooser-divider")) {
+            data.rule(Button.class, name).set(Button.BACKGROUND_KEY, name.equals("chooser-heading") ? pane : flat);
+            data.rule(Button.class, name, StyleState.HOVERED).set(Button.BACKGROUND_KEY, rowHover);
+            data.rule(Button.class, name, StyleState.FOCUSED).set(Button.BACKGROUND_KEY, editorFocus);
+        }
+        data.rule(Button.class, "chooser-action").set(Button.BACKGROUND_KEY, command);
+        data.rule(Button.class, "chooser-action", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, editorFocus);
+        data.rule(Button.class, "chooser-primary").set(Button.BACKGROUND_KEY, rowSelected);
+        data.rule(TextField.class, "chooser-editor").set(TextField.BACKGROUND_KEY, editor)
+                .set(TextField.HOVER_BACKGROUND_KEY, editor).set(TextField.FOCUSED_BACKGROUND_KEY, editorFocus)
+                .set(TextField.PADDING_KEY, 6f);
         data.rule(TextField.class).set(TextField.BACKGROUND_KEY, normal).set(TextField.HOVER_BACKGROUND_KEY, over)
                 .set(TextField.FOCUSED_BACKGROUND_KEY, focus).set(TextField.PLACEHOLDER_COLOR_KEY, muted)
                 .set(TextField.CARET_COLOR_KEY, accent).set(TextField.SELECTION_COLOR_KEY, new Color(0x665B8DEF))
@@ -241,6 +275,25 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         var skin = new NinePatchTexture(new TextureData(pixels, size, size), radius, radius, radius, radius);
         skins.add(skin);
         return new NinePatchDrawable(skin);
+    }
+
+    /**
+     * Creates a square one-pixel bordered skin for desktop-style chooser chrome.
+     * The texture is owned with the rest of this theme and disposed by close.
+     * @param fill interior color
+     * @param edge one-pixel edge color, equal to fill for borderless rows
+     * @return borrowed nine-patch drawable
+     */
+    private Drawable squareSkin(Color fill, Color edge) {
+        int size = 4;
+        var pixels = BufferUtils.createByteBuffer(size * size * 4);
+        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) {
+            Color color = x == 0 || y == 0 || x == size - 1 || y == size - 1 ? edge : fill;
+            pixels.put((byte) (color.r() * 255)).put((byte) (color.g() * 255)).put((byte) (color.b() * 255)).put((byte) (color.a() * 255));
+        }
+        pixels.flip();
+        var texture = new NinePatchTexture(new TextureData(pixels, size, size), 1, 1, 1, 1); skins.add(texture);
+        return new valthorne.graphics.texture.NinePatchDrawable(texture);
     }
 
     /**
