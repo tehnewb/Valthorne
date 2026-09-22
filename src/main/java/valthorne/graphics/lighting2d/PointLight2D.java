@@ -36,15 +36,34 @@ public final class PointLight2D {
     long revision, shadowRevision; // General configuration and shadow-geometry change counters.
     float elevation;
 
-    /** Height above the ground plane; zero preserves the original planar light. */
-    public float getElevation() { return elevation; }
-    /** Current nonnegative emission multiplier. */
-    public float getIntensity() { return intensity; }
-    /** Whether occluder shadows are enabled for this light. */
-    public boolean isCastsShadows() { return shadows; }
+    /**
+     * Height above the ground plane; zero preserves the original planar light.
+     */
+    public float getElevation() {
+        return elevation;
+    }
+
+    /**
+     * Current nonnegative emission multiplier.
+     */
+    public float getIntensity() {
+        return intensity;
+    }
+
+    /**
+     * Whether occluder shadows are enabled for this light.
+     */
+    public boolean isCastsShadows() {
+        return shadows;
+    }
+
     public PointLight2D setElevation(float height) {
         nonnegative(height);
-        if(elevation!=height){elevation=height;revision++;shadowRevision++;}
+        if (elevation != height) {
+            elevation = height;
+            revision++;
+            shadowRevision++;
+        }
         return this;
     }
 
@@ -66,7 +85,9 @@ public final class PointLight2D {
      * @param x the candidate positive setting
      * @throws IllegalArgumentException if x is non-finite or not positive
      */
-    static void positive(float x) {if (finite(x) <= 0) throw new IllegalArgumentException("Value must be positive");}
+    static void positive(float x) {
+        if (finite(x) <= 0) throw new IllegalArgumentException("Value must be positive");
+    }
 
     /**
      * Requires a finite scalar at least zero; either signed zero is accepted.
@@ -83,14 +104,18 @@ public final class PointLight2D {
      *
      * @return the light center's X coordinate in world units
      */
-    public float getX() {return x;}
+    public float getX() {
+        return x;
+    }
 
     /**
      * Reads the vertical coordinate within the XY world plane.
      *
      * @return the light center's Y coordinate in world units
      */
-    public float getY() {return y;}
+    public float getY() {
+        return y;
+    }
 
     /**
      * Returns the influence radius used for lighting coverage and occluder queries.
@@ -98,7 +123,9 @@ public final class PointLight2D {
      *
      * @return the positive influence radius in world units
      */
-    public float getRadius() {return radius;}
+    public float getRadius() {
+        return radius;
+    }
 
     /**
      * Changes the light's influence radius. A changed radius advances both

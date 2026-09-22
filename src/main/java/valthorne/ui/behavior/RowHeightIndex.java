@@ -73,7 +73,9 @@ public final class RowHeightIndex {
      *
      * @return the number of indexed rows, possibly zero
      */
-    public int size() {return heights.length;}
+    public int size() {
+        return heights.length;
+    }
 
     /**
      * Reads a row's current stride in constant time, including any gap captured
@@ -83,7 +85,9 @@ public final class RowHeightIndex {
      * @return the row's finite positive stride
      * @throws IndexOutOfBoundsException if index is outside the current rows
      */
-    public float height(int index) {return heights[Objects.checkIndex(index, heights.length)];}
+    public float height(int index) {
+        return heights[Objects.checkIndex(index, heights.length)];
+    }
 
     /**
      * Replaces one row's stride and propagates its difference through the partial
@@ -128,7 +132,9 @@ public final class RowHeightIndex {
      *
      * @return the total indexed extent in UI coordinate units
      */
-    public double totalHeight() {return offset(size());}
+    public double totalHeight() {
+        return offset(size());
+    }
 
     /**
      * Locates a position within the cumulative strides in logarithmic time.

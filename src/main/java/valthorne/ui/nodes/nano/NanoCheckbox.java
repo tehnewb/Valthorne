@@ -11,6 +11,7 @@ import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import valthorne.ui.behavior.ActivationBehavior;
 
 /**
  * Focusable NanoVG checkbox using the shared activation policy for Enter, Space,
@@ -353,7 +354,7 @@ public class NanoCheckbox extends UINode implements NanoNode {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.key(this, event, this::toggle);
+        ActivationBehavior.key(this, event, this::toggle);
     }
 
     /**
@@ -365,7 +366,7 @@ public class NanoCheckbox extends UINode implements NanoNode {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.release(this, event, this::toggle);
+        ActivationBehavior.release(this, event, this::toggle);
     }
 
     /**

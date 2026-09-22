@@ -1,9 +1,15 @@
 package valthorne.ui;
 
+import org.joml.Matrix4f;
+import valthorne.Window;
+import valthorne.graphics.font.slug.SlugBatch;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.nodes.nano.NanoNode;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
+import valthorne.graphics.Color;
 
 /**
  * Coordinates texture-batch and NanoVG painting within one UI root draw.
@@ -62,6 +68,10 @@ public final class UIRenderContext {
     private final float zoom; // Captured camera scale, or one when the root has no viewport camera.
     private final UIRoot root; // Owning root supplying inspection settings and per-draw snapshots.
     private boolean nanoActive; // True while NanoVG is selected; false while texture painting is selected.
+    private SlugBatch activeSlugBatch; // Active curve-text renderer, or null while another backend is selected.
+    private final Matrix4f slugProjection = new Matrix4f(); // Per-draw projection captured when Slug is first selected.
+    private final int[] slugViewport = new int[4]; // Per-draw framebuffer viewport captured once for Slug rendering.
+    private boolean slugViewportCaptured; // Whether projection and viewport were captured during this draw.
     private int nodesDrawn, backendSwitches, nanoFlushes; // Node attempts, backend transitions, and NanoVG submissions for this draw.
 
     /**
@@ -163,7 +173,22 @@ public final class UIRenderContext {
         nodesDrawn++;
         root.getInspector().record(node, root);
         boolean previousBackend = nanoActive;
-        if (node instanceof NanoNode nano) {
+        if (node instanceof SlugRenderable slug && slug.usesSlugBackend()) {
+            boolean previousNano = nanoActive;
+            SlugBatch previousSlug = activeSlugBatch;
+            SlugBatch requested = slug.getSlugBatch();
+            if (requested == null) requested = root.getOrCreateSlugBatch();
+            selectSlugBackend(requested);
+            try {
+                slug.drawSlug(requested, batch);
+            } finally {
+                if (restoreBackend) {
+                    if (previousSlug != null) selectSlugBackend(previousSlug);
+                    else leaveSlugBackend();
+                    if (previousNano) selectBackend(true);
+                }
+            }
+        } else if (node instanceof NanoNode nano) {
             if (vg == 0L) throw new IllegalStateException("NanoVG context is unavailable.");
             selectBackend(true);
             nvgSave(vg);
@@ -209,12 +234,17 @@ public final class UIRenderContext {
      */
     public void drawChildren(UIContainer container, UINode excluded) {
         boolean parentBackend = nanoActive;
+        SlugBatch parentSlug = activeSlugBatch;
         try {
             for (int i = 0; i < container.size(); i++) {
                 UINode child = container.get(i);
                 if (child != excluded) drawNode(child, false);
             }
-        } finally {selectBackend(parentBackend);}
+        } finally {
+            if (parentSlug != null) selectSlugBackend(parentSlug);
+            else leaveSlugBackend();
+            selectBackend(parentBackend);
+        }
     }
 
     /**
@@ -282,7 +312,7 @@ public final class UIRenderContext {
                 nvgBeginPath(vg);
                 nvgRect(vg, b.x(), b.y(), b.width(), b.height());
                 nvgStrokeWidth(vg, entry.focused() || entry.captured() ? 2 : 1);
-                nvgStrokeColor(vg, NanoUtility.color1(new valthorne.graphics.Color(entry.captured() ? 0xFFFFB454 : entry.focused() ? 0xFF67E8F9 : 0x665B8DEF)));
+                nvgStrokeColor(vg, NanoUtility.color1(new Color(entry.captured() ? 0xFFFFB454 : entry.focused() ? 0xFF67E8F9 : 0x665B8DEF)));
                 nvgStroke(vg);
                 nvgRestore(vg);
             }
@@ -305,6 +335,7 @@ public final class UIRenderContext {
      * @param nano true to select NanoVG, false to select texture painting
      */
     private void selectBackend(boolean nano) {
+        if (activeSlugBatch != null) leaveSlugBackend();
         if (nanoActive == nano) return;
         backendSwitches++;
         if (nano) {
@@ -315,6 +346,40 @@ public final class UIRenderContext {
             batch.resumeAfterExternalDraw();
         }
         nanoActive = nano;
+    }
+
+    /**
+     * Selects a Slug renderer, keeping an existing interval alive when the requested
+     * instance is unchanged. Switching instances or leaving NanoVG completes the old
+     * backend first so painter order remains intact.
+     */
+    private void selectSlugBackend(SlugBatch requested) {
+        if (activeSlugBatch == requested) return;
+        leaveSlugBackend();
+        if (nanoActive) selectBackend(false);
+        batch.flush();
+        if (!slugViewportCaptured) {
+            slugProjection.set(Window.getProjectionMatrix());
+            glGetIntegerv(GL_VIEWPORT, slugViewport);
+            slugViewportCaptured = true;
+        }
+        requested.beginManaged(slugProjection, slugViewport[2], slugViewport[3]);
+        activeSlugBatch = requested;
+        backendSwitches++;
+    }
+
+    /** Completes the active Slug interval and restores TextureBatch graphics state. */
+    private void leaveSlugBackend() {
+        if (activeSlugBatch == null) return;
+        SlugBatch ending = activeSlugBatch;
+        activeSlugBatch = null;
+        try {
+            ending.endManaged();
+        } finally {
+            ending.cancelManaged();
+            batch.resumeAfterExternalDraw();
+            backendSwitches++;
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package valthorne.ui;
 
+import valthorne.graphics.font.slug.SlugBatch;
 import org.lwjgl.util.yoga.Yoga;
 import valthorne.Keyboard;
 import valthorne.Mouse;
@@ -29,6 +30,19 @@ import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
+import java.util.function.Consumer;
+import org.lwjgl.opengl.GL11;
+import valthorne.JGL;
+import valthorne.event.Event;
+import valthorne.event.EventHandler;
+import valthorne.event.EventTypes;
+import valthorne.ui.behavior.TextEditing;
+import valthorne.ui.nodes.nano.NanoContainer;
+import valthorne.ui.nodes.nano.NanoImage;
+import valthorne.ui.nodes.nano.NanoLabel;
+import valthorne.ui.nodes.nano.NanoPanel;
+import valthorne.ui.theme.ThemeData;
+import valthorne.ui.theme.ThemeDataChangeEvent;
 
 /**
  * <p>
@@ -151,11 +165,12 @@ public class UIRoot extends UIContainer {
      * Bundled default-font candidates tried in order when no valid override file exists.
      */
     private static final String[] DEFAULT_NANO_FONT_RESOURCES = {"ui/AtkinsonHyperlegible-Regular.ttf", "ui/font.otf"};
-    private final valthorne.event.EventHandler<valthorne.ui.theme.ThemeDataChangeEvent> themeListener = event -> refreshTheme(this, event.getData()); // Persistent listener invalidating nodes that use changed theme data.
+    private final EventHandler<ThemeDataChangeEvent> themeListener = event -> refreshTheme(this, event.getData()); // Persistent listener invalidating nodes that use changed theme data.
     private final UIInspector inspector = new UIInspector(); // Root-owned optional draw inspection controller.
     private final List<FocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
+    private SlugBatch slugBatch; // Lazily created shared curve-text renderer.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final List<Path> extractedNanoFonts = new ArrayList<>(); // Temporary font files extracted from bundled resources when NanoVG requires a filesystem path.
     private final RootKeyListener keyListener = new RootKeyListener(); // Root-level keyboard listener instance
@@ -168,17 +183,17 @@ public class UIRoot extends UIContainer {
     private UIFrameStats frameStats = new UIFrameStats(0, 0, 0, 0, 0, 0, 0); // Latest immutable drawing and layout statistics.
     private long pendingLayoutPasses, pendingLayoutNanos; // Layout work accumulated until the next recorded draw.
     private UINode focused; // Node that currently owns keyboard focus
-    private final valthorne.event.EventHandler<TextInputEvent> textListener = event -> route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false); // Persistent committed-text listener targeting the current focus.
+    private final EventHandler<TextInputEvent> textListener = event -> route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false); // Persistent committed-text listener targeting the current focus.
     private UINode pressed; // Node currently being pressed by the mouse
     private int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
-    private final java.util.ArrayList<valthorne.ui.nodes.nano.NanoLabel> selectionLabels = new java.util.ArrayList<>();
+    private final ArrayList<NanoLabel> selectionLabels = new ArrayList<>();
     private boolean textDragPending, textDragActive;
     private float textPressX, textPressY;
     private int textAnchorLabel, textAnchorOffset;
 
     private void collectSelectableText(UINode node) {
         if (!isNodeInteractiveNow(node)) return;
-        if (node instanceof valthorne.ui.nodes.nano.NanoLabel label && label.isSelectable())
+        if (node instanceof NanoLabel label && label.isSelectable())
             selectionLabels.add(label);
         if (node instanceof UIContainer container)
             for (UINode child : container.getChildren()) collectSelectableText(child);
@@ -239,7 +254,7 @@ public class UIRoot extends UIContainer {
     private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
     private float hoverTime; // Time accumulated while hovering the current node
     private Tooltip activeTooltip; // Tooltip currently being displayed in the overlay layer
-    private final valthorne.event.EventHandler<WindowFocusEvent> focusListener = event -> {
+    private final EventHandler<WindowFocusEvent> focusListener = event -> {
         if (!event.isFocused()) cancelInput();
     }; // Persistent window-focus listener cancelling UI input on focus loss.
 
@@ -279,9 +294,9 @@ public class UIRoot extends UIContainer {
         Mouse.addMouseListener(mouseListener);
         Mouse.addScrollListener(scrollListener);
         Window.addWindowResizeListener(windowListener);
-        valthorne.JGL.subscribe(valthorne.event.EventTypes.WINDOW_FOCUS, focusListener);
-        valthorne.JGL.subscribe(valthorne.event.EventTypes.TEXT_INPUT, textListener);
-        valthorne.JGL.subscribe(valthorne.event.EventTypes.THEME_DATA_CHANGE, themeListener);
+        JGL.subscribe(EventTypes.WINDOW_FOCUS, focusListener);
+        JGL.subscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.subscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
     }
 
     /**
@@ -306,7 +321,7 @@ public class UIRoot extends UIContainer {
      * @param node subtree to inspect
      * @param data changed theme data
      */
-    private void refreshTheme(UINode node, valthorne.ui.theme.ThemeData data) {
+    private void refreshTheme(UINode node, ThemeData data) {
         if (node.getTheme() == data) {
             node.invalidateStyle();
             node.markLayoutDirty();
@@ -666,7 +681,7 @@ public class UIRoot extends UIContainer {
         float width = viewport != null ? viewport.getWorldWidth() : getWidth();
         float height = viewport != null ? viewport.getWorldHeight() : getHeight();
         int[] pixels = new int[4];
-        org.lwjgl.opengl.GL11.glGetIntegerv(org.lwjgl.opengl.GL11.GL_VIEWPORT, pixels);
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, pixels);
         float ratio = Math.max(pixels[2] / Math.max(1f, width), pixels[3] / Math.max(1f, height));
         nvgBeginFrame(vg, width, height, Math.max(0.01f, ratio));
     }
@@ -691,15 +706,16 @@ public class UIRoot extends UIContainer {
         Mouse.removeMouseListener(mouseListener);
         Mouse.removeScrollListener(scrollListener);
         Window.removeWindowResizeListener(windowListener);
-        valthorne.JGL.unsubscribe(valthorne.event.EventTypes.WINDOW_FOCUS, focusListener);
-        valthorne.JGL.unsubscribe(valthorne.event.EventTypes.TEXT_INPUT, textListener);
-        valthorne.JGL.unsubscribe(valthorne.event.EventTypes.THEME_DATA_CHANGE, themeListener);
+        JGL.unsubscribe(EventTypes.WINDOW_FOCUS, focusListener);
+        JGL.unsubscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.unsubscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
         cancelInput();
         focusScopes.clear();
 
         detachFromRoot();
         Yoga.YGConfigFree(yogaConfig);
         batch.dispose();
+        if (slugBatch != null) slugBatch.dispose();
         if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
         nanoVGHandle = 0L;
         cleanupExtractedNanoFonts();
@@ -714,6 +730,18 @@ public class UIRoot extends UIContainer {
      */
     public UINode getFocused() {
         return focused;
+    }
+
+    /**
+     * Returns the root-owned shared Slug renderer, creating it on first use. Keeping
+     * this package-private prevents callers from disturbing its managed draw scope.
+     *
+     * @return live shared renderer
+     */
+    SlugBatch getOrCreateSlugBatch() {
+        if (disposed) throw new IllegalStateException("UIRoot has been disposed.");
+        if (slugBatch == null) slugBatch = new SlugBatch(4096);
+        return slugBatch;
     }
 
     /**
@@ -977,7 +1005,7 @@ public class UIRoot extends UIContainer {
      * @param bubbleHandlers whether ancestor event-specific handlers also run
      * @return true if delivery reached the target phase, even if its callback consumes the event
      */
-    private boolean route(UINode target, valthorne.event.Event event, float x, float y, java.util.function.Consumer<UINode> handler, boolean bubbleHandlers) {
+    private boolean route(UINode target, Event event, float x, float y, Consumer<UINode> handler, boolean bubbleHandlers) {
         if (!isNodeInteractiveNow(target) || event.isConsumed()) return false;
         List<UINode> path = new ArrayList<>();
         UINode boundary = activeFocusScope();
@@ -1117,13 +1145,13 @@ public class UIRoot extends UIContainer {
     private void handleKeyPressed(KeyPressEvent event) {
         hideActiveTooltip();
         if (!isNodeFocusableNow(focused)) setFocusTo(null);
-        if (focused instanceof valthorne.ui.nodes.nano.NanoLabel && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.A) {
+        if (focused instanceof NanoLabel && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.A) {
             clearDocumentSelection(); collectSelectableText(activeFocusScope());
             for (var label : selectionLabels) label.documentSelection(0, label.selectionTextLength());
             textDragActive = !selectionLabels.isEmpty(); textAnchorLabel = 0; textAnchorOffset = 0;
             event.consume(); return;
         }
-        if (textDragActive && focused instanceof valthorne.ui.nodes.nano.NanoLabel
+        if (textDragActive && focused instanceof NanoLabel
                 && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.C) {
             StringBuilder text = new StringBuilder();
             for (var label : selectionLabels) {
@@ -1133,7 +1161,7 @@ public class UIRoot extends UIContainer {
                 if (text.length() > 0) text.append('\n');
                 text.append(selected);
             }
-            valthorne.ui.behavior.TextEditing.copyText(text.toString());
+            TextEditing.copyText(text.toString());
             event.consume();
             return;
         }
@@ -1194,10 +1222,10 @@ public class UIRoot extends UIContainer {
         }
         clearDocumentSelection();
         boolean textSurface = target == this
-                || target instanceof valthorne.ui.nodes.nano.NanoLabel label && label.isSelectable()
-                || target != null && (target.getClass() == valthorne.ui.nodes.nano.NanoPanel.class
-                    || target.getClass() == valthorne.ui.nodes.nano.NanoContainer.class
-                    || target.getClass() == valthorne.ui.nodes.nano.NanoImage.class);
+                || target instanceof NanoLabel label && label.isSelectable()
+                || target != null && (target.getClass() == NanoPanel.class
+                    || target.getClass() == NanoContainer.class
+                    || target.getClass() == NanoImage.class);
         if (event.getButton() == Mouse.LEFT && textSurface) {
             collectSelectableText(activeFocusScope());
             textPressX = event.getX(); textPressY = event.getY();

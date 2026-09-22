@@ -16,6 +16,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import valthorne.event.events.KeyPressEvent;
+import valthorne.ui.behavior.ActivationBehavior;
 
 /**
  * Focusable NanoVG text link that requests URI opening through the desktop or
@@ -239,7 +241,7 @@ public class NanoHyperlink extends UINode implements NanoNode {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.release(this, event, this::activate);
+        ActivationBehavior.release(this, event, this::activate);
         armed = false;
     }
 
@@ -256,8 +258,8 @@ public class NanoHyperlink extends UINode implements NanoNode {
      * @param event the routed keyboard press
      */
     @Override
-    public void onKeyPress(valthorne.event.events.KeyPressEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.key(this, event, this::activate);
+    public void onKeyPress(KeyPressEvent event) {
+        ActivationBehavior.key(this, event, this::activate);
     }
 
     /**

@@ -17,12 +17,12 @@ public final class PointLight extends Light {
      * by update when active and dirty.
      *
      * @param rayHandler handler providing the occlusion world
-     * @param rays base ray count, at least three
-     * @param color color copied into the light
-     * @param distance radial extent in world units
-     * @param x world-space center X
-     * @param y world-space center Y
-     * @throws NullPointerException if handler or color is null
+     * @param rays       base ray count, at least three
+     * @param color      color copied into the light
+     * @param distance   radial extent in world units
+     * @param x          world-space center X
+     * @param y          world-space center Y
+     * @throws NullPointerException     if handler or color is null
      * @throws IllegalArgumentException if rays is below three
      */
     public PointLight(RayHandler rayHandler, int rays, Color color, float distance, float x, float y) {
@@ -45,7 +45,7 @@ public final class PointLight extends Light {
      * Writes an unoccluded endpoint at index times one full turn divided by base rays.
      * Does not validate the index, array length, or radial extent.
      *
-     * @param index ray index in circular order
+     * @param index  ray index in circular order
      * @param output destination with at least two elements for world X/Y
      */
     @Override

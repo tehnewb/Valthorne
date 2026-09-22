@@ -38,7 +38,7 @@ abstract class DynamicMesh2D {
      * The caller supplies a valid positive capacity and OpenGL primitive mode.
      *
      * @param maxVertices maximum writable vertex count
-     * @param drawMode OpenGL draw primitive constant
+     * @param drawMode    OpenGL draw primitive constant
      */
     protected DynamicMesh2D(int maxVertices, int drawMode) {
         this.drawMode = drawMode;
@@ -74,14 +74,14 @@ abstract class DynamicMesh2D {
     /**
      * Appends one interleaved vertex to CPU storage without bounds growth or uploading.
      *
-     * @param x position X
-     * @param y position Y
+     * @param x      position X
+     * @param y      position Y
      * @param localX local shading coordinate X
      * @param localY local shading coordinate Y
-     * @param r red component
-     * @param g green component
-     * @param b blue component
-     * @param a alpha component
+     * @param r      red component
+     * @param g      green component
+     * @param b      blue component
+     * @param a      alpha component
      * @throws java.nio.BufferOverflowException if fixed storage is exhausted
      */
     protected final void putVertex(float x, float y, float localX, float localY, float r, float g, float b, float a) {

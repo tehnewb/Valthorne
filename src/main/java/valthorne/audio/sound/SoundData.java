@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import valthorne.Audio;
 
 /**
  * <p>
@@ -270,6 +271,6 @@ public record SoundData(SoundSource source, ByteBuffer data, long streamOffset, 
      * @return a new SoundPlayer initialized with the current SoundData
      */
     public SoundPlayer asSoundPlayer() {
-        return valthorne.Audio.create(this);
+        return Audio.create(this);
     }
 }

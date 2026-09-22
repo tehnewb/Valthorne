@@ -109,6 +109,7 @@ public final class SlugBatch {
 
     /**
      * Reads one integer GL state value into reusable direct scratch on the context thread.
+     *
      * @param name scalar OpenGL state selector
      * @return captured integer value
      */
@@ -116,6 +117,7 @@ public final class SlugBatch {
         glGetIntegerv(name, stateBuffer);
         return stateBuffer.get(0);
     }
+
     private final SlugShader shader; // GLSL Slug shader.
     private final int vao; // Vertex array object.
     private final int cornerVbo; // Static four-corner VBO.
@@ -123,7 +125,7 @@ public final class SlugBatch {
 
     private SlugFont activeFont; // Font whose curve/band textures are bound for the current queue.
     private int instanceCount; // Number of queued glyph instances.
-    private boolean drawing; // True between begin and end.
+    private boolean drawing, managed; // Active-pass and engine-managed-state flags.
     private boolean disposed, oldDepth, oldCull, oldDepthMask; // Disposal flag and saved depth-test, cull, and depth-write state.
     private int oldProgram, oldVao, oldBuffer, oldActive, oldTexture0, oldTexture1, oldSampler0, oldSampler1; // Saved program, vertex/buffer bindings, active unit, textures, and samplers.
     private int oldSrcAlpha, oldDstAlpha, oldEquationRgb, oldEquationAlpha; // Saved alpha blend factors and separate RGB/alpha blend equations.
@@ -138,17 +140,22 @@ public final class SlugBatch {
      * Outside glyphs are rejected; intersecting quads and their em-space coordinates
      * are cropped before upload. Hardware scissor state and existing queued glyphs
      * are unchanged. The rectangle follows world axes, including under rotated projections.
-     * @param x rectangle left coordinate in glyph world units
-     * @param y rectangle lower coordinate in glyph world units
-     * @param width finite nonnegative rectangle width
+     *
+     * @param x      rectangle left coordinate in glyph world units
+     * @param y      rectangle lower coordinate in glyph world units
+     * @param width  finite nonnegative rectangle width
      * @param height finite nonnegative rectangle height
      * @throws IllegalArgumentException if any component is nonfinite or a dimension is negative
      */
     public void setClip(float x, float y, float width, float height) {
         if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(width) || !Float.isFinite(height) || width < 0 || height < 0)
             throw new IllegalArgumentException("Clip must be finite with nonnegative dimensions");
-        clipMinX = x; clipMinY = y; clipMaxX = x + width; clipMaxY = y + height;
+        clipMinX = x;
+        clipMinY = y;
+        clipMaxX = x + width;
+        clipMaxY = y + height;
     }
+
     /**
      * Removes the optional CPU clip rectangle for subsequent submissions. Viewport
      * rejection still applies when begin can derive bounds from the projection.
@@ -157,25 +164,39 @@ public final class SlugBatch {
         clipMinX = clipMinY = Float.NEGATIVE_INFINITY;
         clipMaxX = clipMaxY = Float.POSITIVE_INFINITY;
     }
+
     /**
      * Reads accepted glyph submissions since the latest begin, including flushed glyphs.
+     *
      * @return accepted instance count for the current or most recently completed pass
      */
-    public int getGlyphsSubmitted() { return glyphsSubmitted; }
+    public int getGlyphsSubmitted() {
+        return glyphsSubmitted;
+    }
+
     /**
      * Reads actual nonempty batch draws since the latest begin; font changes and capacity
      * flushes can make this exceed one even during a single text pass.
+     *
      * @return draw-call count for the current or most recently completed pass
      */
-    public int getDrawCalls() { return drawCalls; }
+    public int getDrawCalls() {
+        return drawCalls;
+    }
+
     /**
      * Rejects submission unless this batch is alive and inside a begin/end interval.
+     *
      * @throws IllegalStateException if disposed or not drawing
      */
-    void requireDrawing() { if (!drawing || disposed) throw new IllegalStateException("SlugBatch must be alive and drawing"); }
+    void requireDrawing() {
+        if (!drawing || disposed) throw new IllegalStateException("SlugBatch must be alive and drawing");
+    }
+
     /**
      * Tests a world-space glyph or run rectangle against viewport and optional clip bounds,
      * expanding it by the effective antialiasing padding. Intersection does not crop pixels.
+     *
      * @param x0 minimum x
      * @param y0 minimum y
      * @param x1 maximum x
@@ -183,9 +204,9 @@ public final class SlugBatch {
      * @return whether submission may contribute visible coverage
      */
     boolean intersects(float x0, float y0, float x1, float y1) {
-        return x1 + effectivePadding > Math.max(viewMinX, clipMinX) && y1 + effectivePadding > Math.max(viewMinY, clipMinY)
-                && x0 - effectivePadding < Math.min(viewMaxX, clipMaxX) && y0 - effectivePadding < Math.min(viewMaxY, clipMaxY);
+        return x1 + effectivePadding > Math.max(viewMinX, clipMinX) && y1 + effectivePadding > Math.max(viewMinY, clipMinY) && x0 - effectivePadding < Math.min(viewMaxX, clipMaxX) && y0 - effectivePadding < Math.min(viewMaxY, clipMaxY);
     }
+
     private boolean blendEnabledBeforeBegin; // Blend state captured at begin().
     private int blendSrcBeforeBegin; // Blend source factor captured at begin().
     private int blendDstBeforeBegin; // Blend destination factor captured at begin().
@@ -272,7 +293,7 @@ public final class SlugBatch {
      * @param value color component
      * @return unsigned byte value stored as an int
      */
-    private static int toByte(float value) {
+    static int toByte(float value) {
         int v = (int) (value * 255.0f + 0.5f);
         if (v < 0) return 0;
         if (v > 255) return 255;
@@ -294,6 +315,22 @@ public final class SlugBatch {
      * @param viewportH current viewport height in pixels
      */
     public void begin(Matrix4f mvp, float viewportW, float viewportH) {
+        begin(mvp, viewportW, viewportH, false);
+    }
+
+    /**
+     * Begins an engine-managed pass without synchronously querying OpenGL state.
+     * The owner must restore its own pipeline state after {@link #endManaged()}.
+     *
+     * @param mvp       model-view-projection matrix used to transform glyph positions
+     * @param viewportW active viewport width in pixels
+     * @param viewportH active viewport height in pixels
+     */
+    public void beginManaged(Matrix4f mvp, float viewportW, float viewportH) {
+        begin(mvp, viewportW, viewportH, true);
+    }
+
+    private void begin(Matrix4f mvp, float viewportW, float viewportH, boolean managed) {
         if (disposed) throw new IllegalStateException("SlugBatch is disposed");
         if (drawing) {
             throw new IllegalStateException("SlugBatch is already drawing.");
@@ -310,31 +347,50 @@ public final class SlugBatch {
         if (mvp.m01() == 0 && mvp.m10() == 0 && mvp.m03() == 0 && mvp.m13() == 0 && mvp.m33() > 0 && mvp.m00() != 0 && mvp.m11() != 0) {
             float x0 = (-mvp.m33() - mvp.m30()) / mvp.m00(), x1 = (mvp.m33() - mvp.m30()) / mvp.m00();
             float y0 = (-mvp.m33() - mvp.m31()) / mvp.m11(), y1 = (mvp.m33() - mvp.m31()) / mvp.m11();
-            viewMinX = Math.min(x0,x1); viewMaxX = Math.max(x0,x1);
-            viewMinY = Math.min(y0,y1); viewMaxY = Math.max(y0,y1);
+            viewMinX = Math.min(x0, x1);
+            viewMaxX = Math.max(x0, x1);
+            viewMinY = Math.min(y0, y1);
+            viewMaxY = Math.max(y0, y1);
             float sx = Math.abs(mvp.m00()) * viewportW / (2 * mvp.m33());
             float sy = Math.abs(mvp.m11()) * viewportH / (2 * mvp.m33());
-            if (Math.abs(sx-sy) < Math.min(sx,sy) * .0001f) projectionScale = sx;
-            effectivePadding = Math.max(quadPadding, .5f / Math.min(sx,sy));
+            if (Math.abs(sx - sy) < Math.min(sx, sy) * .0001f) projectionScale = sx;
+            effectivePadding = Math.max(quadPadding, .5f / Math.min(sx, sy));
         }
 
         drawing = true;
+        this.managed = managed;
         instanceCount = 0;
         activeFont = null;
         instanceBuffer.clear();
         glyphsSubmitted = drawCalls = 0;
-        oldProgram = integerState(GL_CURRENT_PROGRAM); oldVao = integerState(GL_VERTEX_ARRAY_BINDING);
-        oldBuffer = integerState(GL_ARRAY_BUFFER_BINDING); oldActive = integerState(GL_ACTIVE_TEXTURE);
-        glActiveTexture(GL_TEXTURE0); oldTexture0 = integerState(GL_TEXTURE_BINDING_2D); oldSampler0 = integerState(GL_SAMPLER_BINDING);
-        glActiveTexture(GL_TEXTURE0+1); oldTexture1 = integerState(GL_TEXTURE_BINDING_2D); oldSampler1 = integerState(GL_SAMPLER_BINDING);
-        glBindSampler(0,0); glBindSampler(1,0);
-        oldDepth = glIsEnabled(GL_DEPTH_TEST); oldCull = glIsEnabled(GL_CULL_FACE); oldDepthMask = integerState(GL_DEPTH_WRITEMASK) != 0;
-        oldSrcAlpha = integerState(GL_BLEND_SRC_ALPHA); oldDstAlpha = integerState(GL_BLEND_DST_ALPHA);
-        oldEquationRgb = integerState(GL_BLEND_EQUATION_RGB); oldEquationAlpha = integerState(GL_BLEND_EQUATION_ALPHA);
+        if (!managed) {
+            oldProgram = integerState(GL_CURRENT_PROGRAM);
+            oldVao = integerState(GL_VERTEX_ARRAY_BINDING);
+            oldBuffer = integerState(GL_ARRAY_BUFFER_BINDING);
+            oldActive = integerState(GL_ACTIVE_TEXTURE);
+            glActiveTexture(GL_TEXTURE0);
+            oldTexture0 = integerState(GL_TEXTURE_BINDING_2D);
+            oldSampler0 = integerState(GL_SAMPLER_BINDING);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            oldTexture1 = integerState(GL_TEXTURE_BINDING_2D);
+            oldSampler1 = integerState(GL_SAMPLER_BINDING);
+            glBindSampler(0, 0);
+            glBindSampler(1, 0);
+            oldDepth = glIsEnabled(GL_DEPTH_TEST);
+            oldCull = glIsEnabled(GL_CULL_FACE);
+            oldDepthMask = integerState(GL_DEPTH_WRITEMASK) != 0;
+            oldSrcAlpha = integerState(GL_BLEND_SRC_ALPHA);
+            oldDstAlpha = integerState(GL_BLEND_DST_ALPHA);
+            oldEquationRgb = integerState(GL_BLEND_EQUATION_RGB);
+            oldEquationAlpha = integerState(GL_BLEND_EQUATION_ALPHA);
 
-        blendEnabledBeforeBegin = glIsEnabled(GL_BLEND);
-        blendSrcBeforeBegin = integerState(GL_BLEND_SRC);
-        blendDstBeforeBegin = integerState(GL_BLEND_DST);
+            blendEnabledBeforeBegin = glIsEnabled(GL_BLEND);
+            blendSrcBeforeBegin = integerState(GL_BLEND_SRC);
+            blendDstBeforeBegin = integerState(GL_BLEND_DST);
+        } else {
+            glBindSampler(0, 0);
+            glBindSampler(1, 0);
+        }
 
         shader.bind();
         matrixBuffer.clear();
@@ -344,7 +400,9 @@ public final class SlugBatch {
         glEnable(GL_BLEND);
         glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-        glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDepthMask(false);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDepthMask(false);
 
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, instanceVbo);
@@ -358,14 +416,50 @@ public final class SlugBatch {
             throw new IllegalStateException("Call begin() before end().");
         }
 
-        try { flush(); } finally { restore(); }
+        try {
+            flush();
+        } finally {
+            if (managed) finishManaged();
+            else restore();
+        }
+    }
+
+    /**
+     * Flushes and completes an engine-managed pass without restoring OpenGL state.
+     */
+    public void endManaged() {
+        if (!drawing || !managed) throw new IllegalStateException("Call beginManaged() before endManaged().");
+        try {
+            flush();
+        } finally {
+            finishManaged();
+        }
+    }
+
+    /**
+     * Abandons an engine-managed pass without drawing or restoring OpenGL state.
+     */
+    public void cancelManaged() {
+        if (drawing && managed) finishManaged();
+    }
+
+    private void finishManaged() {
+        drawing = managed = false;
+        activeFont = null;
+        instanceBuffer.clear();
+        instanceCount = 0;
     }
 
     /**
      * Abandons unflushed glyphs and restores captured GL state if a pass is active.
      * Already flushed draws remain visible. Safe to call after end or from a finally block.
      */
-    public void cancel() { if (drawing) restore(); }
+    public void cancel() {
+        if (drawing) {
+            if (managed) finishManaged();
+            else restore();
+        }
+    }
 
     /**
      * Restores the program, vertex/buffer bindings, texture and sampler units zero and one,
@@ -376,11 +470,17 @@ public final class SlugBatch {
         glBindBuffer(GL_ARRAY_BUFFER, oldBuffer);
         glBindVertexArray(oldVao);
         glUseProgram(oldProgram);
-        glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,oldTexture0); glBindSampler(0,oldSampler0);
-        glActiveTexture(GL_TEXTURE0+1); glBindTexture(GL_TEXTURE_2D,oldTexture1); glBindSampler(1,oldSampler1);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, oldTexture0);
+        glBindSampler(0, oldSampler0);
+        glActiveTexture(GL_TEXTURE0 + 1);
+        glBindTexture(GL_TEXTURE_2D, oldTexture1);
+        glBindSampler(1, oldSampler1);
         glActiveTexture(oldActive);
-        if(oldDepth) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-        if(oldCull) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+        if (oldDepth) glEnable(GL_DEPTH_TEST);
+        else glDisable(GL_DEPTH_TEST);
+        if (oldCull) glEnable(GL_CULL_FACE);
+        else glDisable(GL_CULL_FACE);
         glDepthMask(oldDepthMask);
 
         if (blendEnabledBeforeBegin) {
@@ -403,12 +503,12 @@ public final class SlugBatch {
      * zero size. Converts world padding back into em coordinates so the outline
      * lookup covers the enlarged quad.
      *
-     * @param font borrowed live font supplying data textures
-     * @param glyph compiled glyph metadata
+     * @param font      borrowed live font supplying data textures
+     * @param glyph     compiled glyph metadata
      * @param baselineX world baseline X
      * @param baselineY world baseline Y
-     * @param size world units per em
-     * @param color copied draw color
+     * @param size      world units per em
+     * @param color     copied draw color
      * @throws IllegalStateException if begin has not started a drawing scope
      */
     void drawGlyph(SlugFont font, SlugGlyph glyph, float baselineX, float baselineY, float size, Color color) {
@@ -419,8 +519,14 @@ public final class SlugBatch {
             return;
         }
         if (font.curveTexture() == 0) throw new IllegalStateException("Slug font is disposed");
-        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Size must be finite and nonnegative");
-        if (!intersects(baselineX + glyph.x0 * size, baselineY + glyph.y0 * size, baselineX + glyph.x1 * size, baselineY + glyph.y1 * size)) return;
+        if (!Float.isFinite(size) || size < 0)
+            throw new IllegalArgumentException("Size must be finite and nonnegative");
+        drawGlyph(font, glyph, baselineX, baselineY, size, toByte(color.r()), toByte(color.g()), toByte(color.b()), toByte(color.a()));
+    }
+
+    void drawGlyph(SlugFont font, SlugGlyph glyph, float baselineX, float baselineY, float size, int r, int g, int b, int a) {
+        if (!intersects(baselineX + glyph.x0 * size, baselineY + glyph.y0 * size, baselineX + glyph.x1 * size, baselineY + glyph.y1 * size))
+            return;
 
         if (activeFont != font) {
             flush();
@@ -437,17 +543,11 @@ public final class SlugBatch {
         float y0 = baselineY + glyph.y0 * size - pad;
         float x1 = baselineX + glyph.x1 * size + pad;
         float y1 = baselineY + glyph.y1 * size + pad;
-        float cx0 = Math.max(x0, Math.max(viewMinX,clipMinX)), cy0 = Math.max(y0, Math.max(viewMinY,clipMinY));
-        float cx1 = Math.min(x1, Math.min(viewMaxX,clipMaxX)), cy1 = Math.min(y1, Math.min(viewMaxY,clipMaxY));
+        float cx0 = Math.max(x0, Math.max(viewMinX, clipMinX)), cy0 = Math.max(y0, Math.max(viewMinY, clipMinY));
+        float cx1 = Math.min(x1, Math.min(viewMaxX, clipMaxX)), cy1 = Math.min(y1, Math.min(viewMaxY, clipMaxY));
         if (cx0 >= cx1 || cy0 >= cy1) return;
 
-        putInstance(
-                cx0, cy0, cx1, cy1,
-                (cx0 - baselineX) * invSize, (cy0 - baselineY) * invSize, (cx1 - baselineX) * invSize, (cy1 - baselineY) * invSize,
-                glyph.glyphPack, glyph.glyphInfoPack,
-                glyph.bandScaleX, glyph.bandScaleY, glyph.bandOffsetX, glyph.bandOffsetY,
-                projectionScale > 0 ? size * projectionScale : -1, color.r(), color.g(), color.b(), color.a()
-        );
+        putInstance(cx0, cy0, cx1, cy1, (cx0 - baselineX) * invSize, (cy0 - baselineY) * invSize, (cx1 - baselineX) * invSize, (cy1 - baselineY) * invSize, glyph.glyphPack, glyph.glyphInfoPack, glyph.bandScaleX, glyph.bandScaleY, glyph.bandOffsetX, glyph.bandOffsetY, projectionScale > 0 ? size * projectionScale : -1, r, g, b, a);
     }
 
     /**
@@ -455,38 +555,33 @@ public final class SlugBatch {
      * increments the queue count. The caller ensures capacity first. Colors are
      * rounded and clamped to normalized byte attributes.
      *
-     * @param x0 world rectangle minimum X
-     * @param y0 world rectangle minimum Y
-     * @param x1 world rectangle maximum X
-     * @param y1 world rectangle maximum Y
-     * @param tx0 em-space rectangle minimum X
-     * @param ty0 em-space rectangle minimum Y
-     * @param tx1 em-space rectangle maximum X
-     * @param ty1 em-space rectangle maximum Y
-     * @param glyphPack packed band-texture start address
+     * @param x0            world rectangle minimum X
+     * @param y0            world rectangle minimum Y
+     * @param x1            world rectangle maximum X
+     * @param y1            world rectangle maximum Y
+     * @param tx0           em-space rectangle minimum X
+     * @param ty0           em-space rectangle minimum Y
+     * @param tx1           em-space rectangle maximum X
+     * @param ty1           em-space rectangle maximum Y
+     * @param glyphPack     packed band-texture start address
      * @param glyphInfoPack packed band counts and fill rule
-     * @param bandScaleX em-to-vertical-band scale
-     * @param bandScaleY em-to-horizontal-band scale
-     * @param bandOffsetX vertical-band coordinate offset
-     * @param bandOffsetY horizontal-band coordinate offset
-     * @param pixelsPerEm absolute drawing scale for antialiasing
-     * @param r red component
-     * @param g green component
-     * @param b blue component
-     * @param a alpha component
+     * @param bandScaleX    em-to-vertical-band scale
+     * @param bandScaleY    em-to-horizontal-band scale
+     * @param bandOffsetX   vertical-band coordinate offset
+     * @param bandOffsetY   horizontal-band coordinate offset
+     * @param pixelsPerEm   absolute drawing scale for antialiasing
+     * @param r             red component
+     * @param g             green component
+     * @param b             blue component
+     * @param a             alpha component
      */
-    private void putInstance(float x0, float y0, float x1, float y1,
-                             float tx0, float ty0, float tx1, float ty1,
-                             int glyphPack, int glyphInfoPack,
-                             float bandScaleX, float bandScaleY, float bandOffsetX, float bandOffsetY,
-                             float pixelsPerEm,
-                             float r, float g, float b, float a) {
+    private void putInstance(float x0, float y0, float x1, float y1, float tx0, float ty0, float tx1, float ty1, int glyphPack, int glyphInfoPack, float bandScaleX, float bandScaleY, float bandOffsetX, float bandOffsetY, float pixelsPerEm, int r, int g, int b, int a) {
         instanceBuffer.putFloat(x0).putFloat(y0).putFloat(x1).putFloat(y1);
         instanceBuffer.putFloat(tx0).putFloat(ty0).putFloat(tx1).putFloat(ty1);
         instanceBuffer.putInt(glyphPack).putInt(glyphInfoPack);
         instanceBuffer.putFloat(bandScaleX).putFloat(bandScaleY).putFloat(bandOffsetX).putFloat(bandOffsetY);
         instanceBuffer.putFloat(pixelsPerEm);
-        instanceBuffer.put((byte) toByte(r)).put((byte) toByte(g)).put((byte) toByte(b)).put((byte) toByte(a));
+        instanceBuffer.put((byte) r).put((byte) g).put((byte) b).put((byte) a);
         instanceCount++;
         glyphsSubmitted++;
     }

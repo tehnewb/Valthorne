@@ -1,6 +1,10 @@
 package valthorne.ui.theme;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * <p>
@@ -101,7 +105,7 @@ public final class StyleMap {
      * @param changed the nonnull synchronous mutation callback
      * @throws NullPointerException if changed is null
      */
-    public StyleMap(Runnable changed) {this.changed = java.util.Objects.requireNonNull(changed);}
+    public StyleMap(Runnable changed) {this.changed = Objects.requireNonNull(changed);}
 
     /**
      * Copies explicitly stored values into an unmodifiable map ordered by key
@@ -111,11 +115,11 @@ public final class StyleMap {
      *
      * @return an unmodifiable, shallow snapshot indexed by registered key name
      */
-    public java.util.Map<String, Object> snapshot() {
-        java.util.Map<String, Object> result = new java.util.TreeMap<>();
+    public Map<String, Object> snapshot() {
+        Map<String, Object> result = new TreeMap<>();
         for (StyleKey<?> key : StyleKey.registeredKeys())
             if (contains(key)) result.put(key.getName(), get(key));
-        return java.util.Collections.unmodifiableMap(result);
+        return Collections.unmodifiableMap(result);
     }
 
     /**
@@ -140,7 +144,7 @@ public final class StyleMap {
     public <T> void set(StyleKey<T> key, T value) {
         int id = key.getID();
         ensureCapacity(id + 1);
-        if (java.util.Objects.equals(values[id], value)) return;
+        if (Objects.equals(values[id], value)) return;
         values[id] = value;
         changed.run();
     }
@@ -240,7 +244,7 @@ public final class StyleMap {
         boolean modified = false;
         for (int i = 0; i < other.values.length; i++) {
             Object value = other.values[i];
-            if (value != null && !java.util.Objects.equals(values[i], value)) {
+            if (value != null && !Objects.equals(values[i], value)) {
                 values[i] = value;
                 modified = true;
             }

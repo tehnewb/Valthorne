@@ -6,6 +6,7 @@ import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.graphics.Color;
 
 /**
  * <p>
@@ -360,7 +361,7 @@ public class ProgressBar extends Panel {
             float textX = getRenderX() + (getWidth() - font.getWidth(displayText)) * 0.5f;
             float textY = getRenderY() + (getHeight() - font.getHeight(displayText)) * 0.5f;
             font.draw(batch, displayText, textX, textY, getStyle() != null && getStyle().get(Label.COLOR_KEY) != null
-                    ? getStyle().get(Label.COLOR_KEY) : valthorne.graphics.Color.WHITE);
+                    ? getStyle().get(Label.COLOR_KEY) : Color.WHITE);
         }
     }
 

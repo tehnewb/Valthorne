@@ -11,6 +11,7 @@ import valthorne.audio.AudioFormat;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -33,7 +34,7 @@ public class OggSoundDecoder implements SoundDecoder {
      *
      * @param data complete encoded OGG Vorbis payload
      * @return metadata with 16-bit PCM depth, encoded byte length, and duration in
-     *         seconds, or minus one duration when sample count is unavailable
+     * seconds, or minus one duration when sample count is unavailable
      * @throws RuntimeException if STB cannot open the encoded stream
      */
     public static SoundMetadata probe(byte[] data) {
@@ -68,7 +69,7 @@ public class OggSoundDecoder implements SoundDecoder {
      *
      * @param path filesystem path to an OGG Vorbis file
      * @return metadata with 16-bit PCM depth and duration in seconds; unavailable
-     *         duration or encoded byte count is represented by minus one
+     * duration or encoded byte count is represented by minus one
      * @throws RuntimeException if STB cannot open the file
      */
     public static SoundMetadata probe(String path) {
@@ -91,7 +92,7 @@ public class OggSoundDecoder implements SoundDecoder {
                 float duration = sampleCount > 0 ? sampleCount / (float) sampleRate : -1f;
                 long encodedBytes;
                 try {
-                    encodedBytes = java.nio.file.Files.size(Path.of(path));
+                    encodedBytes = Files.size(Path.of(path));
                 } catch (Exception e) {
                     encodedBytes = -1L;
                 }

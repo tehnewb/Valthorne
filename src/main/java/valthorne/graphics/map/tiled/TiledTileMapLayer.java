@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Stores a TMX tile layer as either a finite row-major ID array or a collection
@@ -146,7 +147,7 @@ public class TiledTileMapLayer extends MapLayer {
                     int lw = TiledXML.readInteger(r, "width", 0);
                     int lh = TiledXML.readInteger(r, "height", 0);
 
-                    if (!java.util.Objects.equals(name, layerName)) {
+                    if (!Objects.equals(name, layerName)) {
                         TiledXML.skipElement(r);
                         continue;
                     }

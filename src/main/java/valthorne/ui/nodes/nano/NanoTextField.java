@@ -14,6 +14,9 @@ import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import valthorne.Mouse;
+import valthorne.ui.behavior.TextEditModel;
+import valthorne.ui.behavior.TextEditing;
 
 /**
  * Single-line NanoVG editor backed by the shared TextEditModel for sanitized text,
@@ -125,7 +128,7 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     public static final StyleKey<NodeAction<NanoTextField>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<NanoTextField>>) (Class<?>) NodeAction.class);
 
-    private final valthorne.ui.behavior.TextEditModel editor = new valthorne.ui.behavior.TextEditModel(); // Owned editing, validation, selection, and undo state.
+    private final TextEditModel editor = new TextEditModel(); // Owned editing, validation, selection, and undo state.
     // Renderer snapshot; all mutations are owned by the shared editor.
     private String text = ""; // Synchronized raw editor text; masking does not alter this snapshot.
     private String placeholder = ""; // Sanitized hint drawn only for empty display text.
@@ -592,7 +595,7 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     @Override
     public void onMousePress(MousePressEvent event) {
-        if (event.getButton() != valthorne.Mouse.LEFT) return;
+        if (event.getButton() != Mouse.LEFT) return;
         float mouseX = getEventX(event);
 
         if (pendingClick && doubleClickTimer <= doubleClickWindow) {
@@ -656,7 +659,7 @@ public class NanoTextField extends UINode implements NanoNode {
     @Override
     public void onKeyPress(KeyPressEvent event) {
         if (!isFocused() || isDisabled()) return;
-        if (valthorne.ui.behavior.TextEditing.key(editor, event, masking)) {
+        if (TextEditing.key(editor, event, masking)) {
             event.consume();
         } else if (event.getKey() == Keyboard.ENTER) {
             if (editor.isValid()) {
@@ -939,7 +942,7 @@ public class NanoTextField extends UINode implements NanoNode {
      *
      * @return owned mutable editor
      */
-    public valthorne.ui.behavior.TextEditModel getEditor() {return editor;}
+    public TextEditModel getEditor() {return editor;}
 
     /**
      * Copies current text, caret, and anchor into renderer state after any editor
@@ -968,7 +971,7 @@ public class NanoTextField extends UINode implements NanoNode {
      * @param event committed text-input event
      */
     @Override
-    public void onTextInput(valthorne.event.events.TextInputEvent event) {
+    public void onTextInput(TextInputEvent event) {
         if (isFocused() && isEnabled()) {
             editor.insert(event.getText());
             event.consume();
@@ -1050,7 +1053,7 @@ public class NanoTextField extends UINode implements NanoNode {
      * empty selections suppress export; common clipboard access failures are ignored.
      */
     private void copySelection() {
-        valthorne.ui.behavior.TextEditing.copy(editor, masking);
+        TextEditing.copy(editor, masking);
     }
 
     /**
@@ -1058,7 +1061,7 @@ public class NanoTextField extends UINode implements NanoNode {
      * unavailable clipboard leaves selected text unchanged.
      */
     private void cutSelection() {
-        if (valthorne.ui.behavior.TextEditing.copy(editor, masking)) editor.deleteSelection();
+        if (TextEditing.copy(editor, masking)) editor.deleteSelection();
     }
 
     /**
@@ -1066,7 +1069,7 @@ public class NanoTextField extends UINode implements NanoNode {
      * the editor's normal constraints. Common access failures leave editing usable.
      */
     private void pasteClipboard() {
-        valthorne.ui.behavior.TextEditing.paste(editor);
+        TextEditing.paste(editor);
     }
 
     /**
@@ -1212,6 +1215,6 @@ public class NanoTextField extends UINode implements NanoNode {
      * @return sanitized non-null text
      */
     private String sanitize(String value) {
-        return valthorne.ui.behavior.TextEditModel.sanitize(value);
+        return TextEditModel.sanitize(value);
     }
 }

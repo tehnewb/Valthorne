@@ -7,6 +7,7 @@ import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NodeAction;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.behavior.ActivationBehavior;
 
 /**
  * <p>
@@ -216,7 +217,7 @@ public class Checkbox extends Panel {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.key(this, event, this::toggle);
+        ActivationBehavior.key(this, event, this::toggle);
     }
 
     /**
@@ -232,7 +233,7 @@ public class Checkbox extends Panel {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.release(this, event, this::toggle);
+        ActivationBehavior.release(this, event, this::toggle);
     }
 
     /**

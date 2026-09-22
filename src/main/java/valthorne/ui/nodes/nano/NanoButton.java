@@ -12,6 +12,7 @@ import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import static org.lwjgl.nanovg.NanoVG.*;
+import valthorne.ui.behavior.ActivationBehavior;
 
 /**
  * Focusable NanoVG button with centered text and state-specific background,
@@ -530,7 +531,7 @@ public class NanoButton extends UINode implements NanoNode {
      */
     @Override
     public void onKeyPress(KeyPressEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.key(this, event, this::activate);
+        ActivationBehavior.key(this, event, this::activate);
     }
 
     /**
@@ -542,7 +543,7 @@ public class NanoButton extends UINode implements NanoNode {
      */
     @Override
     public void onMouseRelease(MouseReleaseEvent event) {
-        valthorne.ui.behavior.ActivationBehavior.release(this, event, this::activate);
+        ActivationBehavior.release(this, event, this::activate);
     }
 
     /**

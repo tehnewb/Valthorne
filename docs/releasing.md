@@ -1,6 +1,6 @@
 # Publishing Valthorne
 
-The stable version is `2.1.0` in `gradle.properties`. Normal builds and verification
+The stable version is `2.2.0` in `gradle.properties`. Normal builds and verification
 need no signing/upload secrets. Tests, integration-test folders, benchmarks and
 the engine's `src/examples/` directory are excluded from Git. Public examples are
 maintained in the separate [companion project](https://github.com/tehnewb/Valthorne-examples).
@@ -32,7 +32,7 @@ maintained in the separate [companion project](https://github.com/tehnewb/Valtho
    `verify3D`, `verifyPhysics3D`, `verifyLighting` and `verifyUI` suites provide
    additional regression coverage when their ignored source files are available.
 4. Inspect `build/docs/javadoc/` and
-   `build/release-repository/io/github/tehnewb/Valthorne/2.1.0/`. Library, sources
+   `build/release-repository/io/github/tehnewb/Valthorne/2.2.0/`. Library, sources
    and Javadoc JARs must contain no examples or test folders. Preserve runtime
    shaders, fonts, Filament materials/environment, and license notices.
 5. Record the exact validated commit and platform outcomes. See the
@@ -66,7 +66,7 @@ for manual publication in the Central Portal. Neither task is part of CI or
 `verifyRelease`. Maven Central versions are immutable; publish changed code under
 a new version. Publication may take time to propagate to Maven Central mirrors.
 
-After publication, resolve `io.github.tehnewb:Valthorne:2.1.0` from Maven Central
+After publication, resolve `io.github.tehnewb:Valthorne:2.2.0` from Maven Central
 in an independent consumer, verify the artifact/signature files, and tag the
-validated commit `v2.1.0`. Include the JARs, sources, Javadoc and checksums in the
+validated commit `v2.2.0`. Include the JARs, sources, Javadoc and checksums in the
 GitHub release. Future development must use a new version.

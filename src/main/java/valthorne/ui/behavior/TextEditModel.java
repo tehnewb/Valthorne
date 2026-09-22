@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.Arrays;
 
 /**
  * Single-line editing independent of fonts, rendering and native input.
@@ -377,7 +378,7 @@ public final class TextEditModel {
     public int boundary(int index) {
         index = Math.clamp(index, 0, text.length());
         if (ascii) return index;
-        int at = java.util.Arrays.binarySearch(boundaries, 0, boundaryCount, index);
+        int at = Arrays.binarySearch(boundaries, 0, boundaryCount, index);
         return boundaries[at >= 0 ? at : Math.max(0, -at - 2)];
     }
 
@@ -401,7 +402,7 @@ public final class TextEditModel {
         if (index < 0) return 0;
         if (index >= text.length()) return text.length();
         if (ascii) return index + 1;
-        int at = java.util.Arrays.binarySearch(boundaries, 0, boundaryCount, index);
+        int at = Arrays.binarySearch(boundaries, 0, boundaryCount, index);
         return boundaries[at >= 0 ? at + 1 : -at - 1];
     }
 
@@ -466,7 +467,7 @@ public final class TextEditModel {
         var matcher = GRAPHEME.matcher(text);
         while (matcher.find()) {
             if (boundaryCount == boundaries.length)
-                boundaries = java.util.Arrays.copyOf(boundaries, boundaries.length * 2);
+                boundaries = Arrays.copyOf(boundaries, boundaries.length * 2);
             boundaries[boundaryCount++] = matcher.end();
         }
     }
