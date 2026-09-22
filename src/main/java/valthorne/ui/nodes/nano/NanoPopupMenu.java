@@ -1,4 +1,4 @@
-package valthorne.ui.nodes;
+package valthorne.ui.nodes.nano;
 
 import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
@@ -10,13 +10,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Scrollable command menu hosted in the root's modal overlay. Outside presses and
+ * NanoVG variant. Scrollable command menu hosted in the root's modal overlay. Outside presses and
  * Escape dismiss it; arrows, Home, End, Enter and Space navigate or activate enabled
  * commands. Closing restores the focus saved by the root before opening. Commands
  * run synchronously after dismissal, so they may safely open another modal.
  * <pre>{@code
- * PopupMenu menu = new PopupMenu().items(List.of(
- *     new PopupMenu.Item("Save", () -> saveDocument(), true)));
+ * NanoPopupMenu menu = new NanoPopupMenu().items(List.of(
+ *     new NanoPopupMenu.Item("Save", () -> saveDocument(), true)));
  * menu.showBelow(saveButton);
  * }</pre>
  * Use on the UI thread. Items are immutable snapshots; replacing items closes the
@@ -24,7 +24,7 @@ import java.util.Objects;
  * flat command list; nested submenus and global shortcut registration are not implied.
  * @author Albert Beaupre
  */
-public class PopupMenu extends Panel {
+public class NanoPopupMenu extends NanoContainer {
     /**
      * Immutable command description. Disabled items remain visible but cannot activate.
      * The callback is borrowed and is not invoked during construction or formatting.
@@ -45,23 +45,24 @@ public class PopupMenu extends Panel {
     }
 
     private List<Item> items = List.of(); // Immutable command snapshot in display order.
-    private VirtualList options; // Owned transient rows for the current opening.
+    private NanoVirtualList options; // Owned transient rows for the current opening.
     private UIRoot owner; // Root hosting this menu, or null while closed.
     private int highlighted = -1; // Keyboard target, or -1 when no command is enabled.
     private java.util.function.IntConsumer horizontal; // Optional menu-bar switch callback for Left/Right.
+    private java.util.function.Predicate<MousePressEvent> outsidePress; // Optional heading switch on shield presses.
 
     /**
      * Creates an empty transparent input shield; only its option rows are styled.
      * Attach through showBelow rather than adding the menu as normal content.
      */
-    public PopupMenu() { setClickable(true); setScrollable(true); setFocusable(true); }
+    public NanoPopupMenu() { setClickable(true); setScrollable(true); setFocusable(true); }
 
     /**
      * Copies commands and dismisses any prior opening. Validation precedes mutation.
      * @param items nonnull list containing no null commands
      * @return this menu
      */
-    public PopupMenu items(List<Item> items) {
+    public NanoPopupMenu items(List<Item> items) {
         List<Item> copy = List.copyOf(items);
         close(); this.items = copy; return this;
     }
@@ -91,11 +92,10 @@ public class PopupMenu extends Panel {
         if (isDisabled() || items.isEmpty() || anchor.getRoot() == null || anchor.isDisabled()) return;
         UIRoot root = anchor.getRoot();
         clear();
-        options = new VirtualList(items.size(), index -> {
+        options = new NanoVirtualList(items.size(), index -> {
             Item item = items.get(index);
-            Button row = new CommandButton(index).action(button -> activate(index));
-            row.setStyleName("menu-item");
-            row.getLayout().itemsStart().justifyCenter().paddingLeft(12);
+            NanoButton row = new CommandButton(index).action(button -> activate(index));
+            row.setStyleName("menu-item"); row.leftAligned(true);
             row.setEnabled(item.enabled());
             return row;
         });
@@ -149,6 +149,9 @@ public class PopupMenu extends Panel {
      */
     void horizontalNavigation(java.util.function.IntConsumer listener) { horizontal = listener; }
 
+    /** Lets an owning menu bar switch headings with a single pointer press. */
+    void outsidePress(java.util.function.Predicate<MousePressEvent> listener) { outsidePress = listener; }
+
     /**
      * Reveals and focuses a specified enabled row after opening, without activation.
      * Closed menus and disabled entries retain their current highlight.
@@ -182,7 +185,8 @@ public class PopupMenu extends Panel {
      * @param context current routed preview event
      */
     @Override public void onInputPreview(UIInputEvent context) {
-        if (context.event() instanceof MousePressEvent && context.target() == this) {
+        if (context.event() instanceof MousePressEvent press && context.target() == this) {
+            if (outsidePress != null && outsidePress.test(press)) { context.consume(); return; }
             close(); context.consume();
         } else if (context.event() instanceof KeyPressEvent key) {
             for (UINode node = context.target(); node != null && node != this; node = node.getParent()) {
@@ -217,7 +221,7 @@ public class PopupMenu extends Panel {
      * The immutable index belongs to one opening and is discarded when rows are cleared.
      * @author Albert Beaupre
      */
-    private final class CommandButton extends Button {
+    private final class CommandButton extends NanoButton {
         private final int index; // Command position represented by this transient row.
 
         /**

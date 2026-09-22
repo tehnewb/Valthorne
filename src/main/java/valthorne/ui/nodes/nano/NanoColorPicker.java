@@ -1,19 +1,18 @@
-package valthorne.ui.nodes;
+package valthorne.ui.nodes.nano;
 
 import valthorne.graphics.Color;
 import valthorne.ui.Canvas2D;
-import valthorne.ui.nodes.nano.NanoNode;
 import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * RGBA color editor with selectable channel-slider, hue/saturation-wheel, or combined
+ * NanoVG variant. RGBA color editor with selectable channel-slider, hue/saturation-wheel, or combined
  * modes, hexadecimal entry, and a checkerboard alpha preview. Wheel brightness and
  * opacity have independent sliders. Colors are copied at input, output, and notification
  * boundaries so a listener cannot silently mutate the editor's internal value.
  * Hexadecimal text uses #RRGGBB or Valthorne's #AARRGGBB order, not CSS RRGGBBAA.
  * <pre>{@code
- * ColorPicker picker = new ColorPicker().mode(ColorPicker.Mode.WHEEL).color(Color.RED);
+ * NanoColorPicker picker = new NanoColorPicker().mode(NanoColorPicker.Mode.WHEEL).color(Color.RED);
  * picker.getLayout().width(300).height(360);
  * picker.onChange(color -> material.setTint(color));
  * root.add(picker);
@@ -22,7 +21,7 @@ import java.util.function.Consumer;
  * once per changed packed value. Use on the UI thread. The wheel owns a cached NanoVG image, released with the picker.
  * @author Albert Beaupre
  */
-public class ColorPicker extends Panel {
+public class NanoColorPicker extends NanoContainer {
     /**
      * Selects the visible editing surfaces without changing the current color.
      * Both surfaces edit the same packed value and share hexadecimal and alpha input.
@@ -44,33 +43,33 @@ public class ColorPicker extends Panel {
     }
 
     private Color value = Color.WHITE.copy(); // Owned current packed RGBA color.
-    private final Slider[] channels = new Slider[4]; // Owned red, green, blue, and alpha editors.
-    private final TextField hex = new TextField("#AARRGGBB"); // Owned hexadecimal commit field.
+    private final NanoSlider[] channels = new NanoSlider[4]; // Owned red, green, blue, and alpha editors.
+    private final NanoTextField hex = new NanoTextField("#AARRGGBB"); // Owned hexadecimal commit field.
     private Consumer<Color> change = color -> {}; // User-change listener receiving defensive copies.
-    private final Panel[] channelRows = new Panel[4]; // Owned RGBA rows whose layout follows the selected mode.
+    private final NanoPanel[] channelRows = new NanoPanel[4]; // Owned RGBA rows whose layout follows the selected mode.
     private final Wheel wheel = new Wheel(); // Owned hue/saturation input and NanoVG painting surface.
-    private final Panel brightnessRow = new Panel(); // Owned wheel brightness editor row.
-    private final Slider brightness = new Slider(0, 1, 1); // HSV value component, independent of alpha.
+    private final NanoPanel brightnessRow = NanoWidgetSupport.panel(); // Owned wheel brightness editor row.
+    private final NanoSlider brightness = new NanoSlider(0, 1, 1); // HSV value component, independent of alpha.
     private Mode mode = Mode.SLIDERS; // Current visible editing surfaces.
     private float hue, saturation, luminance = 1; // HSV hue in turns, saturation, and value; retained through black edits.
 
     /**
      * Creates a white picker with integer 0..255 sliders and a 40-unit preview.
      */
-    public ColorPicker() {
+    public NanoColorPicker() {
         getLayout().column().minWidth(240);
         Swatch swatch = new Swatch(); swatch.getLayout().height(40).widthPercent(100).noShrink(); add(swatch);
         wheel.getLayout().widthPercent(100).noShrink(); add(wheel);
         brightnessRow.getLayout().row().itemsCenter().widthPercent(100).noShrink();
-        Label brightnessLabel = new Label("Value"); brightnessLabel.getLayout().minWidth(56).noShrink();
+        NanoLabel brightnessLabel = new NanoLabel("Value"); brightnessLabel.getLayout().minWidth(56).noShrink();
         brightness.getLayout().grow(1).minWidth(0).heightPercent(100);
         brightness.action(slider -> selectHSV(hue, saturation, slider.getValue()));
         brightnessRow.add(brightnessLabel, brightness); add(brightnessRow);
         String[] names = {"Red", "Green", "Blue", "Alpha"};
         for (int i = 0; i < 4; i++) {
-            Panel row = new Panel(); row.getLayout().row().itemsCenter().height(32).widthPercent(100).noShrink();
-            Label label = new Label(names[i]); label.getLayout().minWidth(56).noShrink();
-            Slider slider = new Slider(0, 255, 255).stepSize(1).action(s -> editChannels());
+            NanoPanel row = NanoWidgetSupport.panel(); row.getLayout().row().itemsCenter().height(32).widthPercent(100).noShrink();
+            NanoLabel label = new NanoLabel(names[i]); label.getLayout().minWidth(56).noShrink();
+            NanoSlider slider = new NanoSlider(0, 255, 255).stepSize(1).action(s -> editChannels());
             slider.getLayout().grow(1).minWidth(0).heightPercent(100);
             channels[i] = slider; channelRows[i] = row; row.add(label, slider); add(row);
         }
@@ -89,7 +88,7 @@ public class ColorPicker extends Panel {
      * @param color nonnull input color
      * @return this picker
      */
-    public ColorPicker color(Color color) {
+    public NanoColorPicker color(Color color) {
         value = Objects.requireNonNull(color).copy();
         float r = value.r(), g = value.g(), b = value.b();
         float max = Math.max(r, Math.max(g, b)), min = Math.min(r, Math.min(g, b)), delta = max - min;
@@ -111,7 +110,7 @@ public class ColorPicker extends Panel {
      * @param mode nonnull editor mode
      * @return this picker
      */
-    public ColorPicker mode(Mode mode) {
+    public NanoColorPicker mode(Mode mode) {
         this.mode = Objects.requireNonNull(mode);
         boolean showWheel = mode != Mode.SLIDERS;
         wheel.setVisible(showWheel); wheel.getLayout().height(showWheel ? 220 : 0);
@@ -139,7 +138,7 @@ public class ColorPicker extends Panel {
      * Borrows the HSV value slider for focus and styling; direct value setters are silent.
      * @return owned brightness slider
      */
-    public Slider getBrightness() { return brightness; }
+    public NanoSlider getBrightness() { return brightness; }
 
     /**
      * Applies a user HSV edit while retaining alpha. Hue wraps in turns; saturation
@@ -188,7 +187,7 @@ public class ColorPicker extends Panel {
      * its rim. Arrow keys adjust hue/saturation without requiring a pointing device.
      * @author Albert Beaupre
      */
-    private final class Wheel extends Panel implements NanoNode {
+    private final class Wheel extends NanoPanel implements NanoNode {
         private boolean dragging; // Whether an accepted primary press owns this gesture.
         private final valthorne.ui.nodes.ColorWheelImage wheelImage = new valthorne.ui.nodes.ColorWheelImage();
 
@@ -224,7 +223,7 @@ public class ColorPicker extends Panel {
          * @param event routed screen-space press
          */
         @Override public void onMousePress(valthorne.event.events.MousePressEvent event) {
-            if (isDisabled() || ColorPicker.this.isDisabled() || event.getButton() != valthorne.Mouse.LEFT) return;
+            if (isDisabled() || NanoColorPicker.this.isDisabled() || event.getButton() != valthorne.Mouse.LEFT) return;
             dragging = point(event.getX(), event.getY(), true);
             if (dragging) event.consume();
         }
@@ -234,7 +233,7 @@ public class ColorPicker extends Panel {
          * @param event routed drag with current screen-space endpoint
          */
         @Override public void onMouseDrag(valthorne.event.events.MouseDragEvent event) {
-            if (dragging && !isDisabled() && !ColorPicker.this.isDisabled()) {
+            if (dragging && !isDisabled() && !NanoColorPicker.this.isDisabled()) {
                 point(event.getToX(), event.getToY(), false); event.consume();
             }
         }
@@ -260,7 +259,7 @@ public class ColorPicker extends Panel {
          * @param event routed key press
          */
         @Override public void onKeyPress(valthorne.event.events.KeyPressEvent event) {
-            if (isDisabled() || ColorPicker.this.isDisabled()) return;
+            if (isDisabled() || NanoColorPicker.this.isDisabled()) return;
             switch (event.getKey()) {
                 case valthorne.Keyboard.LEFT -> selectHSV(hue - 1f / 180, saturation, luminance);
                 case valthorne.Keyboard.RIGHT -> selectHSV(hue + 1f / 180, saturation, luminance);
@@ -294,20 +293,20 @@ public class ColorPicker extends Panel {
      * @param index zero for red, one green, two blue, three alpha
      * @return owned slider
      */
-    public Slider getChannel(int index) { return channels[index]; }
+    public NanoSlider getChannel(int index) { return channels[index]; }
 
     /**
      * Borrows the hexadecimal text field; call commitHex to apply pending text.
      * @return owned entry field
      */
-    public TextField getHexField() { return hex; }
+    public NanoTextField getHexField() { return hex; }
 
     /**
      * Replaces the user-edit listener without an initial notification.
      * @param listener nonnull callback receiving a new color copy
      * @return this picker
      */
-    public ColorPicker onChange(Consumer<Color> listener) { change = Objects.requireNonNull(listener); return this; }
+    public NanoColorPicker onChange(Consumer<Color> listener) { change = Objects.requireNonNull(listener); return this; }
 
     /**
      * Parses six RGB or eight ARGB hexadecimal digits, optionally prefixed by #.
@@ -351,7 +350,7 @@ public class ColorPicker extends Panel {
      * Shared dispatch supplies ancestor scrolling and clipping in top-left UI coordinates.
      * @author Albert Beaupre
      */
-    private final class Swatch extends Panel implements NanoNode {
+    private final class Swatch extends NanoPanel implements NanoNode {
         /**
          * Draws clipped eight-unit checks, then overlays the current color. No GPU
          * resources are allocated and no child traversal is needed for this leaf.

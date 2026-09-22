@@ -130,12 +130,12 @@ public class ScrollPanel extends UIContainer {
     /**
      * Style key used to resolve the height of the horizontal scrollbar.
      */
-    public static final StyleKey<Float> HORIZONTAL_BAR_HEIGHT_KEY = StyleKey.of("horizontalBarHeight", Float.class, 8f);
+    public static final StyleKey<Float> HORIZONTAL_BAR_HEIGHT_KEY = StyleKey.of("horizontalBarHeight", Float.class, 4f);
 
     /**
      * Style key used to resolve the width of the vertical scrollbar.
      */
-    public static final StyleKey<Float> VERTICAL_BAR_WIDTH_KEY = StyleKey.of("verticalBarWidth", Float.class, 8f);
+    public static final StyleKey<Float> VERTICAL_BAR_WIDTH_KEY = StyleKey.of("verticalBarWidth", Float.class, 4f);
 
     /**
      * Style key used to resolve padding around scrollbar bars.
@@ -168,8 +168,8 @@ public class ScrollPanel extends UIContainer {
     private Drawable horizontalBarForeground; // Resolved drawable for the horizontal scrollbar thumb
     private Drawable verticalBarBackground; // Resolved drawable for the vertical scrollbar track
     private Drawable verticalBarForeground; // Resolved drawable for the vertical scrollbar thumb
-    private float horizontalBarHeight = 8f; // Resolved height of the horizontal scrollbar
-    private float verticalBarWidth = 8f; // Resolved width of the vertical scrollbar
+    private float horizontalBarHeight = 4f; // Resolved height of the horizontal scrollbar
+    private float verticalBarWidth = 4f; // Resolved width of the vertical scrollbar
     private float barPadding = 4f; // Resolved padding applied to scrollbar positioning
     private float minThumbSize = 18f; // Resolved minimum size for scrollbar thumbs
 
@@ -496,6 +496,9 @@ public class ScrollPanel extends UIContainer {
         return Math.max(0f, (content.getHeight() - getHeight()) + metrics.horizontalBarHeight);
     }
 
+    /** Returns the resolved vertical scrollbar width for content layout. */
+    public float getVerticalBarWidth() { return verticalBarWidth; }
+
     /**
      * <p>
      * Invalidates this node's style tree and refreshes cached style-driven values.
@@ -784,8 +787,8 @@ public class ScrollPanel extends UIContainer {
         horizontalBarForeground = null;
         verticalBarBackground = null;
         verticalBarForeground = null;
-        horizontalBarHeight = 8f;
-        verticalBarWidth = 8f;
+        horizontalBarHeight = 4f;
+        verticalBarWidth = 4f;
         barPadding = 4f;
         minThumbSize = 18f;
 

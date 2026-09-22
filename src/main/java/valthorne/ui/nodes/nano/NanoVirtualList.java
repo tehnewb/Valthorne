@@ -181,7 +181,7 @@ public class NanoVirtualList extends NanoScrollPanel {
         long endRow = heights == null ? (long) Math.ceil(((double) getScrollY() + getHeight()) / (rowHeight + gap)) : (long) heights.indexAt((double) getScrollY() + getHeight()) + 1;
         int nextFirst = (int) Math.min(itemCount, Math.max(0, startRow - overscan) * columns);
         int nextLast = (int) Math.min(itemCount, (Math.min(itemCount, endRow) + overscan) * columns);
-        float width = Math.max(0, getWidth() - 16);
+        float width = Math.max(0, getWidth() - (getMaxScrollY() > 0 ? getVerticalBarWidth() : 0));
         boolean extra = live.size() > nextLast - nextFirst;
         if (first == nextFirst && last == nextLast && lastWidth == width && !extra) return;
         first = nextFirst; last = nextLast; lastWidth = width;

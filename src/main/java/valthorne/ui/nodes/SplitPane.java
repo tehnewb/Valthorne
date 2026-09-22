@@ -283,6 +283,11 @@ public class SplitPane extends Panel {
      * @author Albert Beaupre
      */
     private final class Divider extends Button {
+        /** Requests the cursor for the axis this divider can resize. */
+        @Override public int getCursorShape() {
+            if (SplitPane.this.isDisabled() || isDisabled()) return 0;
+            return vertical ? Mouse.CURSOR_VRESIZE : Mouse.CURSOR_HRESIZE;
+        }
         /**
          * Begins dragging for an enabled left-button press, preserving the pointer's offset
          * from the first-pane boundary. Consumes accepted presses; other presses are ignored.

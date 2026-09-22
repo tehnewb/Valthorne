@@ -91,11 +91,11 @@ public class NanoScrollPanel extends NanoContainer {
     /**
      * Theme horizontal bar height for scrollbar painting; sizes use UI units.
      */
-    public static final StyleKey<Float> HORIZONTAL_BAR_HEIGHT_KEY = StyleKey.of("nano.scrollpanel.horizontalBarHeight", Float.class, 16f);
+    public static final StyleKey<Float> HORIZONTAL_BAR_HEIGHT_KEY = StyleKey.of("nano.scrollpanel.horizontalBarHeight", Float.class, 8f);
     /**
      * Theme vertical bar width for scrollbar painting; sizes use UI units.
      */
-    public static final StyleKey<Float> VERTICAL_BAR_WIDTH_KEY = StyleKey.of("nano.scrollpanel.verticalBarWidth", Float.class, 16f);
+    public static final StyleKey<Float> VERTICAL_BAR_WIDTH_KEY = StyleKey.of("nano.scrollpanel.verticalBarWidth", Float.class, 8f);
     /**
      * Theme bar padding for scrollbar painting; sizes use UI units.
      */
@@ -360,6 +360,9 @@ public class NanoScrollPanel extends NanoContainer {
         if (content == null) return 0f;
         return Math.max(0f, (content.getHeight() - getHeight()) + metrics.horizontalBarHeight);
     }
+
+    /** Returns the styled vertical track thickness for virtual row layout. */
+    public float getVerticalBarWidth() { return verticalBarWidth; }
 
     /**
      * Invalidates inherited style state and immediately rebuilds this panel's local
