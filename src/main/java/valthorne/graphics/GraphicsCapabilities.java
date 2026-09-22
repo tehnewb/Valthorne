@@ -4,13 +4,6 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GLCapabilities;
 
 import static org.lwjgl.opengl.GL11.*;
-import gl.GL_ARB_compute_shader;
-import gl.GL_ARB_shader_image_load_store;
-import gl.GL_ARB_shader_storage_buffer_object;
-import gl.OpenGL33;
-import gl.OpenGL41;
-import gl.OpenGL42;
-import gl.OpenGL43;
 
 /**
  * Immutable snapshot of the current desktop OpenGL context. This is a feature
@@ -32,14 +25,14 @@ public record GraphicsCapabilities(String vendor, String renderer, String versio
     public static GraphicsCapabilities current() {
         GLCapabilities gl = GL.getCapabilities();
         return new GraphicsCapabilities(glGetString(GL_VENDOR), glGetString(GL_RENDERER),
-                glGetString(GL_VERSION), OpenGL33, supportsCompute(gl), OpenGL43,
-                FilamentPlatform.supported() && OpenGL41);
+                glGetString(GL_VERSION), gl.OpenGL33, supportsCompute(gl), gl.OpenGL43,
+                FilamentPlatform.supported() && gl.OpenGL41);
     }
 
     /** Checks the operations used by ComputeShader; custom GLSL must also fit the context. */
     public static boolean supportsCompute(GLCapabilities gl) {
-        return OpenGL43 || (GL_ARB_compute_shader && GL_ARB_shader_storage_buffer_object
-                && (OpenGL42 || GL_ARB_shader_image_load_store));
+        return gl.OpenGL43 || (gl.GL_ARB_compute_shader && gl.GL_ARB_shader_storage_buffer_object
+                && (gl.OpenGL42 || gl.GL_ARB_shader_image_load_store));
     }
 
     /** Rejects contexts below the bundled desktop shaders' baseline before allocation. */
