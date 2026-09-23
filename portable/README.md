@@ -7,32 +7,26 @@ browser distribution. Android remains future work.
 
 ## Build and run
 
-Requires the repository's Java 25 build environment, Node/npm, and a WebGL 2 /
-WebAssembly browser. No Android SDK or Emscripten compiler is needed.
+Use JDK 25 and Node/npm. Install browser dependencies with `npm ci` in
+`portable/web`. To compile the shared library and browser sources:
 
-From the repository root:
+`./gradlew -p portable :core:classes :web:classes`
 
-```powershell
-cd portable/web
-npm ci
-cd ../..
-./gradlew -p portable :core:verifyCoreCompatibility :web:webDist
-node portable/web/serve.mjs
-```
+Export an application by supplying `-PapplicationMain`, `-PapplicationSources`,
+and optionally `-PapplicationResources` to `buildGame -Ptarget=web`.
+The separate examples repository supplies the FPS application:
 
-On Windows use `gradlew.bat`. Open http://127.0.0.1:8095. The server binds only to
-localhost; it serves the generated distribution, not the source repository.
-Drag to orbit, scroll to zoom, drop bodies, recolor the moving light, pause, and
-rebuild the stack. Dynamic bodies are capped at 80 in the Java playground.
-Choose **First-person arena** for the Java integration game, or open
-`/?scene=arena`. Click Enter arena to capture the mouse; WASD moves, Shift sprints,
-Space jumps, R reloads, and Escape releases the mouse. Shots use Jolt raycasts;
-impacts emit transparent particles with optional physics and attached lights.
+`node portable/fps.mjs build web`
 
-Deploy `portable/web/build/dist/` as static files over HTTPS, preserving its
-directory layout. Serve `.wasm` as `application/wasm`. Runtime dependencies and
-licenses are bundled; no CDN access is needed after deployment. The selected
-single-threaded Jolt build does not require cross-origin isolation headers.
+Serve the result with `node portable/web/serve.mjs`. Use `gradlew.bat` on Windows.
+The bundled test applications, default test launcher, and automated test runners
+have been removed. Exports now require an application entry point.
+
+## Historical backend notes
+
+The notes below describe earlier validation and implementation work. References
+to compatibility fixtures, browser test scripts, and verify commands are historical;
+those suites are no longer present or available to run.
 
 ## Same application source, selected backend
 

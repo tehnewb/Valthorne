@@ -1,9 +1,9 @@
 package valthorne.graphics.particle;
 
 import org.joml.Vector3f;
-import valthorne.graphics.model.ModelBatch3D;
-import valthorne.graphics.model.ModelInstance3D;
-import valthorne.graphics.model.Scene3D;
+import valthorne.graphics.render.ModelBatch3D;
+import valthorne.graphics.scene.ModelInstance3D;
+import valthorne.graphics.scene.Scene3D;
 import valthorne.math.physics.BodySettings3D;
 import valthorne.math.physics.MotionType3D;
 import valthorne.math.physics.PhysicsWorld3D;

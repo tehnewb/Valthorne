@@ -4,7 +4,7 @@ import org.teavm.interop.*;
 import org.teavm.jso.*;
 import org.teavm.jso.typedarrays.Uint8Array;
 import valthorne.audio.AudioFormat;
-import valthorne.audio.sound.*;
+import valthorne.audio.*;
 public final class AudioDecode {
  private AudioDecode(){}
  @Async public static native SoundData decode(SoundSource source,byte[] bytes,AudioFormat format);

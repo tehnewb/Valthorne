@@ -57,7 +57,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Dimensional
 
-[Source](../../src/main/java/valthorne/ui/Dimensional.java#L13)
+[Source](../../src/main/java/valthorne/math/geometry/Dimensional.java#L13)
 
 The Dimensional interface combines the behaviors of both Sizeable and Locatable interfaces.
 Implementing this interface indicates that an object possesses both size and location properties.
@@ -3703,7 +3703,7 @@ otherwise `false`.
 
 ### Locatable
 
-[Source](../../src/main/java/valthorne/ui/Locatable.java#L12)
+[Source](../../src/main/java/valthorne/math/geometry/Locatable.java#L12)
 
 The Locatable interface provides a contract for classes that represent objects with
 a specific position in a two-dimensional coordinate system.
@@ -3770,7 +3770,7 @@ Sets the position of the object within a two-dimensional coordinate system.
 
 ### Sizeable
 
-[Source](../../src/main/java/valthorne/ui/Sizeable.java#L16)
+[Source](../../src/main/java/valthorne/math/geometry/Sizeable.java#L16)
 
 The Sizeable interface defines a contract for objects that have width and height properties.
 Implementing classes are expected to provide mechanisms to retrieve their dimensions.

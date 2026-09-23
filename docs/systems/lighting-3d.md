@@ -441,7 +441,7 @@ thread before first disposal; subsequent calls return immediately.
 
 ### PointLight3D
 
-[Source](../../src/main/java/valthorne/graphics/model/PointLight3D.java#L28)
+[Source](../../src/main/java/valthorne/graphics/lighting3d/PointLight3D.java#L28)
 
 Mutable world-space point-light parameters consumed by the 3D lighting system.
 A new light is white at the origin, with a range of ten world units and an
@@ -599,7 +599,7 @@ finite coordinates; this setter does not reject non-finite values itself.
 
 ### ShadowMap3D
 
-[Source](../../src/main/java/valthorne/graphics/model/ShadowMap3D.java#L31)
+[Source](../../src/main/java/valthorne/graphics/render/ShadowMap3D.java#L31)
 
 Owns a directional-light depth map and the batch used to render opaque and
 alpha-cutout scene geometry into it. A square orthographic camera defines the

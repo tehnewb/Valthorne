@@ -50,7 +50,7 @@ The sections below explain each component and its declared public or protected o
 
 ### OcclusionCuller3D
 
-[Source](../../src/main/java/valthorne/graphics/model/OcclusionCuller3D.java#L32)
+[Source](../../src/main/java/valthorne/graphics/render/OcclusionCuller3D.java#L32)
 
 Conservative, current-frame CPU visibility tests using actual opaque triangles.
 A bound is occluded only when its entire projected rectangle lies strictly behind
@@ -147,7 +147,7 @@ Tests a world-space bound, for example a prepared scene subtree.
 
 ### OcclusionCuller3D.Visibility
 
-[Source](../../src/main/java/valthorne/graphics/model/OcclusionCuller3D.java#L39)
+[Source](../../src/main/java/valthorne/graphics/render/OcclusionCuller3D.java#L39)
 
 Result of a conservative test for one camera pass. A visible result includes
 uncertain projections and does not promise that a pixel will be drawn. Rejections

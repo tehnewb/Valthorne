@@ -38,24 +38,17 @@ Before opening a pull request, please run:
 ./gradlew verifyRelease
 ```
 
-Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources and
-Javadoc. Tests, integration-test folders, benchmarks, examples and their resources
-are ignored by Git in this engine checkout. They are not required in a fresh checkout.
-Public demos are maintained in the separate [examples project](https://github.com/tehnewb/Valthorne-examples).
-`verifyRelease` additionally checks the published artifacts and separate consumers.
-For rendering changes, run `./gradlew verifyGraphicsConsumer` with a compatible OpenGL driver
-and display. Focused `verify3D`, `verifyLighting`, and `verifyUI` tasks also include
-graphics tests. Filament requires Windows x64; compute rendering requires OpenGL 4.3.
+Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources,
+and Javadoc; `verifyRelease` additionally checks publication artifacts and metadata.
+The previous desktop, browser, and integration test suites have been removed.
+Record manual runtime verification separately; a successful build checks compilation
+and packaging, not rendering or interaction behavior.
 
-Keep optional local JUnit tests under the ignored `src/test/java/valthorne/`. Tag tests that create an
-OpenGL context with `@Tag("graphics")`; do not silently skip driver failures on
-supported graphics hosts. Local default-package demos and `src/test/java/games`
-use private assets and are excluded from the maintained source sets.
+Public demos are maintained in the separate [examples project](https://github.com/tehnewb/Valthorne-examples).
 
 ## Repository ownership
 
-Keep engine code and runtime resources under `src/main`. Release and generated
-consumer checks live in `gradle/release.gradle` and `gradle/consumer-check.gradle`;
+Keep engine code and runtime resources under `src/main`. Release packaging checks live in `gradle/release.gradle`;
 optional local benchmark configuration lives in `gradle/benchmarks.gradle`.
 
 Make runnable demo and demo-resource changes in

@@ -4,7 +4,7 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.teavm.jso.typedarrays.Float32Array;
-import valthorne.graphics.model.ModelInstance3D;
+import valthorne.graphics.scene.ModelInstance3D;
 import java.util.Objects;
 
 /** Browser implementation of the existing owned Jolt body handle. */

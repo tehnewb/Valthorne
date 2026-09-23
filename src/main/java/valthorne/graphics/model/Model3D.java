@@ -9,7 +9,7 @@ import valthorne.graphics.Color;
  * CPU-side triangle geometry conventionally expressed in Z-up local space. The
  * constructor copies triangles and calculates an axis-aligned local bound; no GPU
  * resources are allocated. Public accessors protect positions, attributes, and bounds
- * with copies, while package-internal rendering code reads trusted shared storage.
+ * with copies, while rendering code traverses a cached read-only triangle view.
  *
  * <p>The model imposes no automatic axis conversion or unit scale and does not reject
  * degenerate or non-finite geometry. An empty triangle array is accepted. Materials,
@@ -19,7 +19,8 @@ import valthorne.graphics.Color;
  */
 public class Model3D {
 
-    private final Triangle[] triangles; // Owned triangle snapshots, shared only with trusted package code.
+    private final java.util.List<Triangle> triangleView;
+    private final Triangle[] triangles; // Owned triangle snapshots; public accessors protect mutable attributes.
     private final AABBf localBounds = new AABBf(); // Local bounds accumulated during construction.
 
     /**
@@ -42,6 +43,7 @@ public class Model3D {
             localBounds.union(triangle.b());
             localBounds.union(triangle.c());
         }
+        triangleView = java.util.Collections.unmodifiableList(java.util.Arrays.asList(this.triangles));
     }
 
     /**
@@ -55,25 +57,24 @@ public class Model3D {
     }
 
     /**
-     * Exposes internal triangle storage to trusted package rendering code without an
-     * array allocation. Callers must not replace elements or mutate triangle attributes.
+     * Returns a cached, unmodifiable view of protected triangles without an
+     * array allocation. Triangle accessors protect their mutable attributes.
      *
-     * @return owned triangle array
+     * @return unmodifiable triangle view
      */
-    Triangle[] triangles() {
-        return triangles;
+    public java.util.List<Triangle> getTriangleView() {
+        return triangleView;
     }
 
-    // Trusted package access; callers must not modify the stored geometry bound.
-
     /**
-     * Borrows the construction-time model-local geometry bound without allocating a copy.
-     * Trusted rendering code must not mutate it; public callers should use the copying accessor.
+     * Copies the construction-time model-local bound into caller-owned storage.
+     * The destination can be reused by renderers to avoid per-frame allocation.
      *
-     * @return owned mutable bound exposed read-only by convention
+     * @param destination caller-owned destination
+     * @return destination
      */
-    AABBf localBounds() {
-        return localBounds;
+    public AABBf getLocalBounds(AABBf destination) {
+        return destination.set(localBounds);
     }
 
     /**

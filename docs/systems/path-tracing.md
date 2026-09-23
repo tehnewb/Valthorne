@@ -217,7 +217,7 @@ and caller-owned textures are not disposed by this facade.
 
 ### PathTracer3D
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracer3D.java#L32)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracer3D.java#L32)
 
 Multi-bounce GPU path tracer for triangle scenes. Requires OpenGL 4.3.
 Uses shader cores with a balanced BVH, not hardware ray-tracing extensions.
@@ -486,7 +486,7 @@ the render method's thread check. Borrowed models and textures are untouched.
 
 ### PathTracer3D.RenderMode
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracer3D.java#L43)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracer3D.java#L43)
 
 REALTIME reprojects validated lighting history during camera movement;
 PROGRESSIVE accumulates a stationary view without temporal reprojection.
@@ -518,7 +518,7 @@ Accumulates a stationary view at the selected quality's resolution scale.
 
 ### PathTracer3D.Quality
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracer3D.java#L67)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracer3D.java#L67)
 
 Preset tracing cost: resolution scale in progressive mode, nominal samples
 per rendered frame, and maximum path bounces. Realtime mode always uses full
@@ -557,7 +557,7 @@ Full-resolution progressive rendering with four nominal samples and up to twelve
 
 ### PathTracer3D.State — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracer3D.java#L429)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracer3D.java#L429)
 
 Captures the GL bindings and enable flags modified by path tracing, including
 seven image units, three shader-storage ranges, texture/sampler units zero
@@ -585,7 +585,7 @@ the guarded renderer does not change.
 
 ### PathTracingScene — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L35)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracingScene.java#L35)
 
 Collects visible triangle-model instances and builds packed geometry, emitter
 sampling data, and a surface-area-heuristic bounding-volume hierarchy for the GPU
@@ -610,7 +610,7 @@ this package-private object owns CPU lists, matrices, and packed arrays only.
 
 ### PathTracingScene.Collector — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L43)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracingScene.java#L43)
 
 Retains reusable instance, transform, and combined-material storage for one renderer.
 Each capture refreshes the same snapshot; callers must finish consuming it before
@@ -621,7 +621,7 @@ later attempt starts cleanly. Source scene resources remain borrowed.
 
 ### PathTracingScene.Capacity — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L86)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracingScene.java#L86)
 
 Tracks peak active list size and consecutive small captures for reusable scene
 scratch. Retired references are removed immediately, while backing arrays shrink
@@ -631,7 +631,7 @@ after 32 captures below one quarter of the peak, or immediately when empty.
 
 ### PathTracingScene.Instance — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/PathTracingScene.java#L578)
+[Source](../../src/main/java/valthorne/graphics/render/PathTracingScene.java#L578)
 
 Collected geometry source and effective material with a captured world matrix.
 The record itself does not defensively copy its mutable components.

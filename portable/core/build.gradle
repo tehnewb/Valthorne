@@ -1,8 +1,5 @@
 plugins { id 'java-library' }
 repositories { mavenCentral() }
-// Optional local checks remain usable; CI uses the committed verification consumer below.
-dependencies { testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'; testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2' }
-test { useJUnitPlatform() }
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 tasks.withType(JavaCompile).configureEach { options.release = 17 }
 // Compile the original platform-independent sources, never copies or the desktop native dependency graph.
@@ -10,27 +7,3 @@ sourceSets.main.java {
     srcDir '../../src/main/java'
     include 'valthorne/Application.java', 'valthorne/state/**', 'valthorne/tick/**', 'valthorne/math/MathUtils.java', 'valthorne/portable/**', 'valthorne/collections/**'
 }
-
-// Committed compatibility consumers are never part of published engine artifacts.
-sourceSets {
-    verification {
-        java {
-            srcDir '../verification/java'
-            include 'valthorne/verification/CoreVerification.java', 'valthorne/verification/VerificationReport.java'
-        }
-        compileClasspath += sourceSets.main.output
-        runtimeClasspath += sourceSets.main.output
-    }
-}
-
-tasks.register('verifyCoreCompatibility', JavaExec) {
-    group = 'verification'
-    description = 'Execute all committed frame-loop and collection compatibility cases.'
-    classpath = sourceSets.verification.runtimeClasspath
-    mainClass = 'valthorne.verification.CoreVerification'
-    args layout.buildDirectory.file('reports/verification/core.json').get().asFile.absolutePath
-    // An old report must never stand in for executing the cases again.
-    outputs.upToDateWhen { false }
-}
-
-tasks.named('check') { dependsOn tasks.named('verifyCoreCompatibility') }

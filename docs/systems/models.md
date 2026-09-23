@@ -73,7 +73,7 @@ The sections below explain each component and its declared public or protected o
 
 ### BillboardBatch3D
 
-[Source](../../src/main/java/valthorne/graphics/model/BillboardBatch3D.java#L54)
+[Source](../../src/main/java/valthorne/graphics/render/BillboardBatch3D.java#L54)
 
 Accumulates camera-facing textured quads as world-space triangles and streams
 them through one owned OpenGL vertex buffer. A batch uses one borrowed texture
@@ -195,7 +195,7 @@ the borrowed texture is not disposed.
 
 ### BillboardMode3D
 
-[Source](../../src/main/java/valthorne/graphics/model/BillboardMode3D.java#L16)
+[Source](../../src/main/java/valthorne/graphics/scene/BillboardMode3D.java#L16)
 
 Controls the camera-derived basis used to expand a `BillboardSprite3D`
 into a world-space quad. `BillboardBatch3D` applies the selected basis
@@ -236,7 +236,7 @@ to tilt and roll with the view. Suitable for freely camera-facing particles.
 
 ### BillboardRenderable3D
 
-[Source](../../src/main/java/valthorne/graphics/model/BillboardRenderable3D.java#L19)
+[Source](../../src/main/java/valthorne/graphics/scene/BillboardRenderable3D.java#L19)
 
 Defines textured billboard emission for a `Renderable3D`. The model
 batch uses the region's texture to group compatible submissions and passes
@@ -284,7 +284,7 @@ shared destination; the model batch owns those operations.
 
 ### BillboardSprite3D
 
-[Source](../../src/main/java/valthorne/graphics/model/BillboardSprite3D.java#L29)
+[Source](../../src/main/java/valthorne/graphics/scene/BillboardSprite3D.java#L29)
 
 Camera-facing textured quad positioned by an anchor in 3D world space.
 Defaults are unit width and height, a bottom-center anchor (0.5, 0), white
@@ -1100,7 +1100,7 @@ The texture remains borrowed. Self-assignment is supported.
 
 ### MeshBatch3D
 
-[Source](../../src/main/java/valthorne/graphics/model/MeshBatch3D.java#L63)
+[Source](../../src/main/java/valthorne/graphics/render/MeshBatch3D.java#L63)
 
 Accumulates world-space triangles in a growable CPU buffer and submits them
 through an owned OpenGL vertex array and buffer. Each vertex stores position,
@@ -1480,7 +1480,7 @@ until the batch itself becomes unreachable.
 
 ### MeshRenderable3D
 
-[Source](../../src/main/java/valthorne/graphics/model/MeshRenderable3D.java#L16)
+[Source](../../src/main/java/valthorne/graphics/scene/MeshRenderable3D.java#L16)
 
 Defines the mesh-emission backend of a `Renderable3D`. Implementations
 append world-space triangle vertices to a batch supplied by `ModelBatch3D`;
@@ -1515,7 +1515,7 @@ ownership of the batch or require the implementation to render it.
 
 ### MeshRenderState3D
 
-[Source](../../src/main/java/valthorne/graphics/model/MeshRenderState3D.java#L20)
+[Source](../../src/main/java/valthorne/graphics/render/MeshRenderState3D.java#L20)
 
 Mutable draw configuration combining camera, material, compatibility lighting,
 fog, shadow-map references, and optional screen-space radiance mapping. Cameras,
@@ -2204,7 +2204,7 @@ Copies the triangle's color so callers can modify it without altering geometry.
 
 ### ModelBatch3D
 
-[Source](../../src/main/java/valthorne/graphics/model/ModelBatch3D.java#L40)
+[Source](../../src/main/java/valthorne/graphics/render/ModelBatch3D.java#L40)
 
 Frame submission batch with frustum/opaque-triangle occlusion culling, material batching
 and shared mesh/billboard transparency ordering. Submit opaque walls first to improve occlusion coverage.
@@ -2519,7 +2519,7 @@ Use on the owning graphics thread.
 
 ### ModelBatch3D.Submission — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/ModelBatch3D.java#L448)
+[Source](../../src/main/java/valthorne/graphics/render/ModelBatch3D.java#L448)
 
 Retains one stable renderable reference and captured material/order values for
 deferred frame emission. Texture resources remain shared with their owners.
@@ -2707,7 +2707,7 @@ resources are owned or released by this operation.
 
 ### ModelInstance3D
 
-[Source](../../src/main/java/valthorne/graphics/model/ModelInstance3D.java#L32)
+[Source](../../src/main/java/valthorne/graphics/scene/ModelInstance3D.java#L32)
 
 Places borrowed model geometry using local translation, rotation, scale, and a
 copied parent transform. World matrices and bounds are computed lazily; direct
@@ -3516,7 +3516,7 @@ opaque white and an unspecified texture remains absent.
 
 ### PickResult3D
 
-[Source](../../src/main/java/valthorne/graphics/model/PickResult3D.java#L34)
+[Source](../../src/main/java/valthorne/graphics/scene/PickResult3D.java#L34)
 
 Describes a world-space model-triangle hit returned by
 `Scene3D#pick(org.joml.primitives.Rayf)`. Scene picking selects the closest
@@ -3551,7 +3551,7 @@ construction accepts null references and arbitrary distances without checks.
 
 ### ProceduralMeshEmitter3D
 
-[Source](../../src/main/java/valthorne/graphics/model/ProceduralMeshEmitter3D.java#L17)
+[Source](../../src/main/java/valthorne/graphics/scene/ProceduralMeshEmitter3D.java#L17)
 
 Supplies geometry on demand for a `ProceduralRenderable3D`. This callback
 is invoked from the renderable's mesh-emission method and receives both the
@@ -3587,7 +3587,7 @@ owner allows a reusable emitter to honor each instance's current transform.
 
 ### ProceduralRenderable3D
 
-[Source](../../src/main/java/valthorne/graphics/model/ProceduralRenderable3D.java#L33)
+[Source](../../src/main/java/valthorne/graphics/scene/ProceduralRenderable3D.java#L33)
 
 A procedurally emitted mesh with a material, affine transform, and conservative
 frustum culling. The emitter supplies world-space vertices; use this object's
@@ -4022,7 +4022,7 @@ Updates the transform cache before writing the caller's destination.
 
 ### Renderable3D
 
-[Source](../../src/main/java/valthorne/graphics/model/Renderable3D.java#L25)
+[Source](../../src/main/java/valthorne/graphics/scene/Renderable3D.java#L25)
 
 Supplies material, visibility and sorting information to `ModelBatch3D`.
 A directly submitted implementation must also implement `MeshRenderable3D`
@@ -4123,7 +4123,7 @@ batch sorts translucent and additive objects from larger to smaller depth.
 
 ### RenderPass3D
 
-[Source](../../src/main/java/valthorne/graphics/model/RenderPass3D.java#L18)
+[Source](../../src/main/java/valthorne/graphics/render/RenderPass3D.java#L18)
 
 Selects the ordering and blending category of a `Material3D`.
 `ModelBatch3D` processes these categories in declaration order: opaque
@@ -4173,7 +4173,7 @@ alpha-weighted source color to the destination for effects such as glow.
 
 ### RenderStateSnapshot3D
 
-[Source](../../src/main/java/valthorne/graphics/model/RenderStateSnapshot3D.java#L30)
+[Source](../../src/main/java/valthorne/graphics/render/RenderStateSnapshot3D.java#L30)
 
 Captures a selected set of OpenGL state for restoration around 3D rendering.
 Construction reads the current context immediately; `close()` writes
@@ -4233,7 +4233,7 @@ resources alive for every restoration.
 
 ### Scene3D
 
-[Source](../../src/main/java/valthorne/graphics/model/Scene3D.java#L34)
+[Source](../../src/main/java/valthorne/graphics/scene/Scene3D.java#L34)
 
 Groups loose renderables and root-node hierarchies for submission and model
 picking. Membership is stored in insertion order, with loose renderables
@@ -4464,7 +4464,7 @@ requires the graphics context expected by the batch to be current.
 
 ### SceneNode3D
 
-[Source](../../src/main/java/valthorne/graphics/model/SceneNode3D.java#L32)
+[Source](../../src/main/java/valthorne/graphics/scene/SceneNode3D.java#L32)
 
 Hierarchical placement node with optional borrowed model geometry and material.
 Child transforms compose with parent matrices, preserving shear from rotated

@@ -5,7 +5,7 @@ import org.teavm.interop.*;
 import org.teavm.jso.*;
 import org.teavm.jso.typedarrays.Uint8Array;
 import valthorne.audio.AudioFormat;
-import valthorne.audio.sound.*;
+import valthorne.audio.*;
 import valthorne.web.BrowserIO;
 
 /** Suspends the Java caller while a bounded decoder supplies the next PCM block. */

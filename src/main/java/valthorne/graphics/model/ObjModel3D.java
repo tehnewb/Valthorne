@@ -1,5 +1,8 @@
 package valthorne.graphics.model;
 
+import valthorne.graphics.render.RenderPass3D;
+import valthorne.graphics.render.RenderStateSnapshot3D;
+
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import valthorne.graphics.Color;

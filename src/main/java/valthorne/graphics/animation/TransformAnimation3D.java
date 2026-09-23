@@ -1,7 +1,7 @@
 package valthorne.graphics.animation;
 
-import valthorne.graphics.model.ModelInstance3D;
-import valthorne.graphics.model.SceneNode3D;
+import valthorne.graphics.scene.ModelInstance3D;
+import valthorne.graphics.scene.SceneNode3D;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 

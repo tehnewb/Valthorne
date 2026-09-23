@@ -1,10 +1,5 @@
 package valthorne.audio;
 
-import valthorne.audio.sound.Mp3SoundDecoder;
-import valthorne.audio.sound.OggSoundDecoder;
-import valthorne.audio.sound.SoundDecoder;
-import valthorne.audio.sound.WaveSoundDecoder;
-
 /**
  * <p>
  * {@code AudioFormat} enumerates the audio container or codec types currently recognized

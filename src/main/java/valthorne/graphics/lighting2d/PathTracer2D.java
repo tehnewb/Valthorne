@@ -1,5 +1,12 @@
 package valthorne.graphics.lighting2d;
 
+import valthorne.graphics.model.Material3D;
+import valthorne.graphics.model.Model3D;
+import valthorne.graphics.model.ModelBuilder3D;
+import valthorne.graphics.scene.ModelInstance3D;
+import valthorne.graphics.render.PathTracer3D;
+import valthorne.graphics.scene.Scene3D;
+
 import valthorne.camera.OrthographicCamera3D;
 import valthorne.graphics.Color;
 import valthorne.graphics.model.*;

@@ -54,7 +54,7 @@ The sections below explain each component and its declared public or protected o
 
 ### FilamentRenderer3D
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L59)
+[Source](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java#L59)
 
 Adapts Valthorne triangle scenes to Filament 1.75 through Windows x64 OpenGL
 texture sharing. Create, render, configure, and close on the GLFW context's
@@ -328,7 +328,7 @@ Repeated calls on the owner thread have no effect.
 
 ### FilamentRenderer3D.Quality
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L68)
+[Source](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java#L68)
 
 Quality presets at full output resolution. PERFORMANCE uses half-resolution
 ambient occlusion without MSAA; INTERACTIVE uses full-resolution AO without MSAA, HIGH requests
@@ -375,7 +375,7 @@ Full-resolution ambient occlusion with eight requested MSAA samples, subject to 
 
 ### FilamentRenderer3D.EntryState — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L150)
+[Source](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java#L150)
 
 Tracks synchronization and visibility for one reusable native renderable slot.
 The signature represents the last submitted instance state; initialization separates
@@ -385,7 +385,7 @@ a valid first signature from a default value, and visibility tracks native scene
 
 ### FilamentRenderer3D.ExplicitLight — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L213)
+[Source](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java#L213)
 
 Owner-thread cache for one reusable explicit native point-light slot. Stores
 the last uploaded source components so moving lights update only changed
@@ -395,7 +395,7 @@ parameters without invalidating mesh/material bindings.
 
 ### FilamentRenderer3D.Mesh — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L246)
+[Source](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java#L246)
 
 Owned immutable native mesh buffers and local bounds cached by source model
 identity. Bounds use center/half-extent representation for Filament culling.
@@ -417,7 +417,7 @@ supplying independent transforms; constructing this record does not allocate a m
 
 ### FilamentRenderer3D.Entry — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/FilamentRenderer3D.java#L269)
+[Source](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java#L269)
 
 Reusable native renderable/material slot associated with a borrowed source
 model. The reserved light entity gains a component only when emission lighting
@@ -434,7 +434,7 @@ is enabled and nonzero.
 
 ### VertexCompaction3D — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/model/VertexCompaction3D.java#L10)
+[Source](../../src/main/java/valthorne/graphics/render/VertexCompaction3D.java#L10)
 
 Indexes immutable interleaved mesh uploads by exact vertex contents. Every attribute
 participates in equality, so position sharing never erases normal, UV, or color seams.

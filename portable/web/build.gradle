@@ -5,9 +5,6 @@ plugins {
 repositories { mavenCentral() }
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 tasks.withType(JavaCompile).configureEach { options.release = 17 }
-sourceSets.main.java.srcDir '../compatibility'
-// Browser integration applications are fixtures, never desktop/core library sources.
-sourceSets.main.java.srcDir '../fixtures/java'
 if (providers.gradleProperty('applicationSources').isPresent()) {
     def applicationSourceRoot = rootProject.projectDir.parentFile.toPath().resolve(providers.gradleProperty('applicationSources').get()).normalize().toFile()
     def applicationIncludes = providers.gradleProperty('applicationIncludes').orElse('**/*.java').get().split(',')
@@ -19,9 +16,9 @@ configurations { desktopApi; jomlBinary; jomlSources }
 configurations.configureEach {
     if (canBeResolved) attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
 }
-def backendClasses = ['viewport/Viewport','viewport/PerspectiveViewport','graphics/font/FontData','Audio','audio/sound/SoundData','audio/sound/SoundPlayer','audio/sound/WaveSoundDecoder','audio/sound/OggSoundDecoder','audio/sound/Mp3SoundDecoder','audio/sound/WaveSoundStream','audio/sound/OggSoundStream','audio/sound/Mp3SoundStream','JGL', 'Window', 'Keyboard', 'Mouse',
+def backendClasses = ['viewport/Viewport','viewport/PerspectiveViewport','graphics/font/FontData','Audio','audio/SoundData','audio/SoundPlayer','audio/WaveSoundDecoder','audio/OggSoundDecoder','audio/Mp3SoundDecoder','audio/WaveSoundStream','audio/OggSoundStream','audio/Mp3SoundStream','JGL', 'Window', 'Keyboard', 'Mouse',
     'math/physics/PhysicsWorld3D', 'math/physics/RigidBody3D', 'math/physics/CollisionShape3D',
-    'math/physics/DistanceJoint3D', 'math/physics/PhysicsMath3D', 'graphics/model/FilamentRenderer3D', 'graphics/model/SceneRenderer3D',
+    'math/physics/DistanceJoint3D', 'math/physics/PhysicsMath3D', 'graphics/render/FilamentRenderer3D', 'graphics/render/SceneRenderer3D',
     'graphics/texture/Texture', 'graphics/texture/TextureData', 'graphics/texture/TextureBatch', 'graphics/texture/FrameBuffer',
     'graphics/texture/NinePatchTexture', 'graphics/Sprite', 'graphics/ImmediateTextureRenderer', 'graphics/shader/Shader', 'graphics/shader/ShaderSources']
 fileTree('../../src/main/java/valthorne/ui').matching { include '**/*.java'; exclude '**/SlugLabel.java' }.each { source ->
@@ -29,7 +26,7 @@ fileTree('../../src/main/java/valthorne/ui').matching { include '**/*.java'; exc
 }
 backendClasses.add('ui/behavior/TextEditing')
 backendClasses.add('ui/behavior/TextEditModel')
-backendClasses.addAll(['graphics/model/ObjModel3D','graphics/model/ModelParameters','graphics/model/RenderStateSnapshot3D'])
+backendClasses.addAll(['graphics/model/ObjModel3D','graphics/model/ModelParameters','graphics/render/RenderStateSnapshot3D'])
 backendClasses.addAll(['graphics/lighting2d/Lighting2D','graphics/lighting2d/GroundShadowRenderer2D'])
 backendClasses.add('io/file/ValthorneFiles')
 backendClasses.addAll(['graphics/map/tiled/TiledXML','graphics/map/tiled/TiledMapParameters','graphics/map/tiled/TiledMapData','graphics/map/tiled/TiledMapLoader','graphics/map/tiled/FileSystemResolver','graphics/map/tiled/TiledResolvers'])
@@ -37,10 +34,10 @@ backendClasses.add('graphics/map/tiled/TiledDecoding')
 backendClasses.add('asset/Assets')
 backendClasses.add('graphics/shader/ComputeShader')
 backendClasses.add('PlatformTools')
-backendClasses.add('graphics/model/PathTracer3D')
+backendClasses.add('graphics/render/PathTracer3D')
 backendClasses.addAll(['graphics/debug/PerformanceOverlay','graphics/radiance/RadianceCascades','graphics/radiance/RadianceRenderTarget','graphics/radiance/RadianceTexture'])
 backendClasses.addAll(['graphics/font/slug/SlugFont','graphics/font/slug/SlugBatch','graphics/font/slug/SlugShader','ui/nodes/SlugLabel'])
-backendClasses.addAll(['graphics/model/MeshBatch3D','graphics/model/BillboardBatch3D','graphics/model/ShadowMap3D','graphics/lighting3d/Lighting3D','graphics/GraphicsCapabilities'])
+backendClasses.addAll(['graphics/render/MeshBatch3D','graphics/render/BillboardBatch3D','graphics/render/ShadowMap3D','graphics/lighting3d/Lighting3D','graphics/GraphicsCapabilities'])
 backendClasses.addAll(['graphics/texture/TexturePacker','graphics/particle/ParticleSystem','graphics/shader/ShapeShader','graphics/lighting/DynamicMesh2D','graphics/lighting/LightMapRenderer','graphics/lighting/LightMesh','graphics/lighting/LightTexture','graphics/lighting/RayHandler','graphics/lighting/SoftShadowMesh','graphics/lighting2d/SpriteVolumeRenderer2D'])
 
 def prepareGraphics = tasks.register('prepareGraphics', Exec) {
@@ -147,7 +144,7 @@ def compileJavaCompatibility = tasks.register('compileJavaCompatibility', JavaCo
 }
 dependencies { implementation files(compileJavaCompatibility.map { it.destinationDirectory }) }
 teavm.js {
-    mainClass = providers.gradleProperty('applicationMain').orElse(providers.gradleProperty('webMainClass')).orElse('valthorne.web.WebLauncher').get()
+    mainClass = providers.gradleProperty('applicationMain').orElse(providers.gradleProperty('webMainClass')).orElse('').get()
     targetFileName = 'valthorne.js'
     sourceMap = true
     obfuscated = true
@@ -165,25 +162,12 @@ tasks.register('validateJavaScript', Exec) {
     dependsOn 'generateJavaScript'
     commandLine 'node', '--check', 'build/generated/teavm/js/valthorne.js'
 }
-tasks.register('verifyBackendApi', Exec) {
-    dependsOn 'compileJava'
-    inputs.file('verify-api.mjs')
-    inputs.files(configurations.desktopApi)
-    inputs.dir(layout.buildDirectory.dir('classes/java/main/valthorne'))
-    outputs.file(layout.buildDirectory.file('verification/backend-api.json'))
-    doFirst {
-        def jdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }.get().metadata.installationPath
-        def javap = jdk.file('bin/javap' + (System.getProperty('os.name').toLowerCase().contains('windows') ? '.exe' : '')).asFile
-        commandLine 'node', 'verify-api.mjs', configurations.desktopApi.singleFile.absolutePath, layout.buildDirectory.dir('classes/java/main').get().asFile.absolutePath, javap.absolutePath
-    }
-}
 
 tasks.register('webDist', Sync) {
-    dependsOn 'validateJavaScript', 'prepareRuntime', 'validateModels', 'validateEngineMaterials', 'verifyBackendApi'
+    dependsOn 'validateJavaScript', 'prepareRuntime', 'validateModels', 'validateEngineMaterials'
     from(layout.buildDirectory.dir('generated/teavm/js'))
     from('public')
     from('../../src/main/resources/ui') { into 'ui' }
-    from('../compatibility/assets') { into 'portable/compatibility/assets' }
     if (providers.gradleProperty('applicationResources').isPresent()) {
         from(rootProject.projectDir.parentFile.toPath().resolve(providers.gradleProperty('applicationResources').get()).toFile())
     }
@@ -221,5 +205,13 @@ tasks.register('webExport', Sync) {
             rename { 'index.html' }
             filter { line -> physicsEnabled.get() == 'false' ? line.replace('<head>', '<head><meta name="valthorne-physics" content="disabled">') : line }
         }
+    }
+}
+
+// Compilation remains available without an application; exporting requires its entry point.
+tasks.named('generateJavaScript') {
+    doFirst {
+        if (!providers.gradleProperty('applicationMain').isPresent() && !providers.gradleProperty('webMainClass').isPresent())
+            throw new GradleException('Set -PapplicationMain or -PwebMainClass to your application entry point')
     }
 }

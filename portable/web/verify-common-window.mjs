@@ -1,7 +1,0 @@
-import {chromium}from'@playwright/test';import assert from'node:assert/strict';
-const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
-try{
- const page=await browser.newPage({viewport:{width:900,height:700}}),messages=[],errors=[];let captured;page.on('console',m=>{messages.push(m.text());if(m.text()==='COMMON_WINDOW_READY')captured=page.evaluate(()=>{const p=valthorneHost.platform,w=p.window,rect=w.stage.getBoundingClientRect();return{size:[w.width,w.height],position:[rect.left,rect.top],icon:document.querySelector('link[rel=icon]')?.href.startsWith('data:image/png'),cursor:p.canvas.style.cursor};});});page.on('pageerror',e=>errors.push(e.stack||String(e)));
- await page.goto(process.env.TEST_URL||'http://127.0.0.1:8095');await page.waitForFunction(()=>globalThis.valthorneHost?.closed||globalThis.valthorneError,null,{timeout:30000});assert.equal(await page.evaluate(()=>globalThis.valthorneError),undefined,messages.join('\n'));assert.deepEqual(errors,[],messages.join('\n'));assert(messages.includes('COMMON_WINDOW_VALIDATED checks=7'),messages.join('\n'));
- const result=await captured;assert.deepEqual(result.size,[640,480]);assert.equal(result.icon,true);assert.equal(result.cursor,'default');assert.equal(await page.locator('#valthorne-window').count(),0);console.log('COMMON_WINDOW_BROWSER_VALIDATED '+JSON.stringify(result));
-}finally{await browser.close();}

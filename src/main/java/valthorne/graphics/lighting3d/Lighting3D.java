@@ -3,7 +3,7 @@ package valthorne.graphics.lighting3d;
 import org.lwjgl.BufferUtils;
 import valthorne.camera.Camera3D;
 import valthorne.graphics.Color;
-import valthorne.graphics.model.PointLight3D;
+import valthorne.graphics.lighting3d.PointLight3D;
 import valthorne.graphics.shader.Shader;
 
 import java.nio.FloatBuffer;

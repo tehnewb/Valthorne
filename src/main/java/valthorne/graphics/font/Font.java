@@ -3,7 +3,7 @@ package valthorne.graphics.font;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.ui.Dimensional;
+import valthorne.math.geometry.Dimensional;
 
 import java.util.Arrays;
 

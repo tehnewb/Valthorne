@@ -1,5 +1,7 @@
 package valthorne.ui;
 
+import valthorne.math.geometry.Dimensional;
+
 import org.lwjgl.util.yoga.Yoga;
 import valthorne.Window;
 import valthorne.collections.bits.ShortBits;

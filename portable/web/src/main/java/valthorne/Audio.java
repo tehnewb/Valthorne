@@ -1,7 +1,7 @@
 package valthorne;
 import java.util.*;
 import java.util.concurrent.Callable;
-import valthorne.audio.sound.*;
+import valthorne.audio.*;
 /** Browser audio tasks execute on the application's coroutine, without a native context thread. */
 public class Audio {
  private Audio(){}

@@ -13,7 +13,7 @@ import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.GraphicsCapabilities;
 import valthorne.graphics.texture.TextureData;
-import valthorne.ui.Dimensional;
+import valthorne.math.geometry.Dimensional;
 import valthorne.web.WindowImages;
 
 /** Browser window backend. Browser-owned window placement is not emulated. */

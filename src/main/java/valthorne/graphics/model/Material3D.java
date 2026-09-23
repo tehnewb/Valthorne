@@ -1,5 +1,7 @@
 package valthorne.graphics.model;
 
+import valthorne.graphics.render.RenderPass3D;
+
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
 import java.util.Objects;

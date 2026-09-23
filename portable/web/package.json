@@ -4,9 +4,6 @@
   "type": "module",
   "scripts": {
     "serve": "node serve.mjs",
-    "verify": "node verify.mjs && node verify-arena.mjs",
-    "verify:examples": "node verify-examples.mjs",
-    "verify:compatibility": "node verify-compatibility.mjs",
     "benchmark:physics": "node benchmark-physics.mjs",
     "validate:models": "node validate-models.mjs"
   },

@@ -2,7 +2,7 @@ package valthorne.graphics.lighting3d;
 
 import org.joml.Matrix4f;
 import valthorne.camera.Camera3D;
-import valthorne.graphics.model.PointLight3D;
+import valthorne.graphics.lighting3d.PointLight3D;
 
 import java.util.Arrays;
 import java.util.List;

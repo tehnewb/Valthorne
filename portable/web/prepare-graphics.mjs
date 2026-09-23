@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const output=path.join(root,'portable/web/build/generated/graphics');
-export const sharedGraphics=['viewport/Viewport','viewport/PerspectiveViewport','graphics/texture/Texture','graphics/texture/TextureBatch','graphics/texture/FrameBuffer','graphics/texture/NinePatchTexture','graphics/Sprite','graphics/ImmediateTextureRenderer','graphics/shader/Shader','audio/sound/SoundPlayer'];
+export const sharedGraphics=['viewport/Viewport','viewport/PerspectiveViewport','graphics/texture/Texture','graphics/texture/TextureBatch','graphics/texture/FrameBuffer','graphics/texture/NinePatchTexture','graphics/Sprite','graphics/ImmediateTextureRenderer','graphics/shader/Shader','audio/SoundPlayer'];
 async function collectUI(dir,prefix='ui'){
     for(const item of await readdir(dir,{withFileTypes:true})){
         const name=prefix+'/'+item.name;
@@ -18,9 +18,9 @@ sharedGraphics.push('io/file/ValthorneFiles');
 sharedGraphics.push('asset/Assets');
 sharedGraphics.push('graphics/debug/PerformanceOverlay','graphics/radiance/RadianceCascades','graphics/radiance/RadianceRenderTarget','graphics/radiance/RadianceTexture');
 sharedGraphics.push('graphics/font/slug/SlugFont','graphics/font/slug/SlugBatch','graphics/font/slug/SlugShader','ui/nodes/SlugLabel');
-sharedGraphics.push('graphics/model/MeshBatch3D','graphics/model/BillboardBatch3D','graphics/model/ShadowMap3D','graphics/lighting3d/Lighting3D','graphics/GraphicsCapabilities');
-sharedGraphics.push('graphics/model/SceneRenderer3D');
-sharedGraphics.push('graphics/model/PathTracer3D');
+sharedGraphics.push('graphics/render/MeshBatch3D','graphics/render/BillboardBatch3D','graphics/render/ShadowMap3D','graphics/lighting3d/Lighting3D','graphics/GraphicsCapabilities');
+sharedGraphics.push('graphics/render/SceneRenderer3D');
+sharedGraphics.push('graphics/render/PathTracer3D');
 sharedGraphics.push('graphics/texture/TexturePacker','graphics/particle/ParticleSystem','graphics/shader/ShapeShader','graphics/lighting/DynamicMesh2D','graphics/lighting/LightMapRenderer','graphics/lighting/LightMesh','graphics/lighting/LightTexture','graphics/lighting/RayHandler','graphics/lighting/SoftShadowMesh','graphics/lighting2d/SpriteVolumeRenderer2D');
 sharedGraphics.push(...['TiledXML','TiledMapParameters','TiledMapData','TiledMapLoader','FileSystemResolver','TiledResolvers','TiledDecoding'].map(name=>'graphics/map/tiled/'+name));
 function replaceMethod(source,signature,body){
@@ -41,7 +41,7 @@ for(const name of sharedGraphics){
         source=source.replace('import java.awt.Desktop;','');
         source=replaceMethod(source,'private boolean openInBrowser(', 'return valthorne.web.BrowserNavigation.open(link);');
     }
-    if(name==='graphics/model/PathTracer3D'){
+    if(name==='graphics/render/PathTracer3D'){
         source=source.replace('import org.lwjgl.system.MemoryUtil;','import valthorne.web.graphics.BrowserPathTraceGL;');
         source=source.replace(/if\(!GL.getCapabilities\(\).OpenGL43\)throw new IllegalStateException\([^\r\n]+/,'if(!BrowserPathTraceGL.supported())throw new IllegalStateException("Path tracing requires WebGL2 float rendering and filtering");');
         source=source.replaceAll('glBindBuffer(GL_SHADER_STORAGE_BUFFER,','BrowserPathTraceGL.bindBuffer(')
@@ -76,7 +76,7 @@ for(const name of sharedGraphics){
         const body=source.slice(start+1,end-1);
         source=source.slice(0,start+1)+'try(var rasterState=new BrowserRadianceShader.PassState()){'+body+'}'+source.slice(end-1);
     }
-    if(name==='graphics/model/SceneRenderer3D')source=source.replaceAll('org.lwjgl.glfw.GLFW.glfwGetCurrentContext()','valthorne.web.graphics.BrowserGL.contextToken()').replaceAll('with a GLFW context current','with a browser graphics context current');
+    if(name==='graphics/render/SceneRenderer3D')source=source.replaceAll('org.lwjgl.glfw.GLFW.glfwGetCurrentContext()','valthorne.web.graphics.BrowserGL.contextToken()').replaceAll('with a GLFW context current','with a browser graphics context current');
     if(name==='graphics/GraphicsCapabilities'){
         source=source.replace('import org.lwjgl.opengl.GL;','').replace('import org.lwjgl.system.Platform;','');
         source=replaceBody(source,'current','return new GraphicsCapabilities(valthorne.web.graphics.BrowserGL.glGetString(0x1F00),valthorne.web.graphics.BrowserGL.glGetString(0x1F01),valthorne.web.graphics.BrowserGL.glGetString(0x1F02),true,valthorne.graphics.shader.ComputeShader.isComputeSupported(),valthorne.web.graphics.BrowserPathTraceGL.supported(),true);');
@@ -131,7 +131,7 @@ for(const name of sharedGraphics){
     if(name.startsWith('ui/'))source=source.replace(/^(package [^;]+;)/m,'$1\nimport static valthorne.web.ui.BrowserNano.*;');
     source=source.replaceAll('org.lwjgl.opengl.GL11.','').replaceAll('org.lwjgl.opengl.GL20.','').replaceAll('org.lwjgl.opengl.GL14.','').replaceAll('org.lwjgl.opengl.GL13.','');
     source=source.replace(/org\.lwjgl\.opengl\.GL\d+\./g,'');
-    if(name==='graphics/model/MeshBatch3D')source=source.replaceAll('glDisable(GL_FRAMEBUFFER_SRGB);','');
+    if(name==='graphics/render/MeshBatch3D')source=source.replaceAll('glDisable(GL_FRAMEBUFFER_SRGB);','');
     if(name==='graphics/particle/ParticleSystem')source=source.replaceAll('glEnable(GL_PROGRAM_POINT_SIZE);','').replaceAll('glDisable(GL_PROGRAM_POINT_SIZE);','');
     if(name==='graphics/model/ObjModel3D'){
         source=source.replace(/return Path\.of\(source\)\.resolveSibling\(relative\)\.normalize\(\)\.toString\(\)\.replace\([^;]+;/,'return valthorne.web.BrowserIO.resolveSibling(source, relative);');
@@ -183,7 +183,7 @@ public static boolean copyText(String text){return text!=null&&!text.isEmpty()&&
 public static void paste(TextEditModel model){String text=valthorne.web.ui.BrowserClipboard.read();if(text!=null)model.insert(text);}
 }`;
     }
-    if(name==='audio/sound/SoundPlayer'){
+    if(name==='audio/SoundPlayer'){
         source=source.replace(/^import static org\.lwjgl\.openal\.[^;]+;\r?\n/gm,'');
         source=source.replace('import static valthorne.web.graphics.BrowserGL.*;','import static valthorne.web.audio.BrowserAL.*;');
     }

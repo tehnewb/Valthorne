@@ -4,7 +4,7 @@ import valthorne.Window;
 import valthorne.camera.Camera3D;
 import valthorne.camera.PerspectiveCamera;
 import valthorne.graphics.DrawFunction;
-import valthorne.graphics.model.RenderStateSnapshot3D;
+import valthorne.graphics.render.RenderStateSnapshot3D;
 import org.joml.Matrix4f;
 import org.joml.primitives.Rayf;
 import org.joml.Vector3f;

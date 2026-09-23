@@ -3,14 +3,14 @@ package valthorne.graphics.particle;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import valthorne.graphics.model.BillboardMode3D;
-import valthorne.graphics.model.BillboardSprite3D;
+import valthorne.graphics.scene.BillboardMode3D;
+import valthorne.graphics.scene.BillboardSprite3D;
 import valthorne.graphics.model.Material3D;
 import valthorne.graphics.model.Model3D;
-import valthorne.graphics.model.ModelInstance3D;
-import valthorne.graphics.model.RenderPass3D;
-import valthorne.graphics.model.Scene3D;
-import valthorne.graphics.model.PointLight3D;
+import valthorne.graphics.scene.ModelInstance3D;
+import valthorne.graphics.render.RenderPass3D;
+import valthorne.graphics.scene.Scene3D;
+import valthorne.graphics.lighting3d.PointLight3D;
 import valthorne.math.physics.RigidBody3D;
 
 /**
