@@ -2,7 +2,7 @@ package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
-import valthorne.graphics.model.RenderStateSnapshot3D;
+import valthorne.graphics.render.RenderStateSnapshot3D;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.shader.ShaderSources;
 

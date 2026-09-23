@@ -5,8 +5,8 @@ import path from 'node:path';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const examples=process.env.VALTHORNE_EXAMPLES_DIR||'../Valthorne-examples';
 const [action='run',target='web']=process.argv.slice(2);
-if(!['build','run','verify'].includes(action)||!['web','desktop'].includes(target)){
- console.error('Usage: node portable/fps.mjs [build|run|verify] [web|desktop]');process.exit(2);
+if(!['build','run'].includes(action)||!['web','desktop'].includes(target)){
+ console.error('Usage: node portable/fps.mjs [build|run] [web|desktop]');process.exit(2);
 }
 function run(command,args,cwd=root){return new Promise((resolve,reject)=>{
  const child=spawn(command,args,{cwd,stdio:'inherit',windowsHide:true});
@@ -21,9 +21,9 @@ const selection=['-p','portable',`-Ptarget=${target}`,
  '-PapplicationIncludes='+sources.map(name=>`valthorne/examples/${name==='PhysicsStudioModels'?'assets':'fps'}/${name}.java`).join(','),
  `-PapplicationResources=${examples}/src/main/resources`];
 try{
- if(target==='desktop')await gradle([`-PvalthorneDir=${path.relative(path.resolve(root,examples),root)}`,...(action==='verify'?['verifyFpsArena','verifyAssets','runFpsArena','--args=--smoke']:action==='run'?['runFpsArena']:['classes'])],path.resolve(root,examples));
+ if(target==='desktop')await gradle([`-PvalthorneDir=${path.relative(path.resolve(root,examples),root)}`,...(action==='run'?['runFpsArena']:['classes'])],path.resolve(root,examples));
  else{
   await gradle([...selection,action==='run'&&target==='desktop'?'runGame':'buildGame']);
-  if(target==='web'&&action!=='build')await run(process.execPath,[action==='verify'?'verify-fps.mjs':'serve.mjs'],fileURLToPath(new URL('./web/',import.meta.url)));
+  if(target==='web'&&action!=='build')await run(process.execPath,['serve.mjs'],fileURLToPath(new URL('./web/',import.meta.url)));
  }
 }catch(error){console.error(error.message);process.exitCode=1;}

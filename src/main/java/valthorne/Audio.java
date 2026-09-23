@@ -3,8 +3,8 @@ package valthorne;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALCCapabilities;
-import valthorne.audio.sound.SoundData;
-import valthorne.audio.sound.SoundPlayer;
+import valthorne.audio.SoundData;
+import valthorne.audio.SoundPlayer;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;

@@ -1,7 +1,7 @@
-// Compile the exact web compatibility application against the desktop engine.
+// Compile application sources against the desktop engine.
 sourceSets {
     game {
-        java.srcDir providers.gradleProperty('applicationSources').orElse('portable/compatibility')
+        java.srcDir providers.gradleProperty('applicationSources').orElse('src/game/java')
         if (providers.gradleProperty('applicationIncludes').isPresent()) java.include providers.gradleProperty('applicationIncludes').get().split(',')
         compileClasspath += sourceSets.main.output
         runtimeClasspath += sourceSets.main.output
@@ -15,5 +15,5 @@ configurations {
 tasks.register('runGame', JavaExec) {
     group = 'application'
     classpath = sourceSets.game.runtimeClasspath
-    mainClass = providers.gradleProperty('applicationMain').orElse('compatibility.CommonApplication')
+    mainClass = providers.gradleProperty('applicationMain')
 }

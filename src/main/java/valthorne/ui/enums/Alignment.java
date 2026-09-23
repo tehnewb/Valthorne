@@ -1,8 +1,8 @@
 package valthorne.ui.enums;
 
 import org.joml.Vector2f;
-import valthorne.ui.Dimensional;
-import valthorne.ui.Sizeable;
+import valthorne.math.geometry.Dimensional;
+import valthorne.math.geometry.Sizeable;
 
 /**
  * Defines simple horizontal and vertical alignment modes used to position one object relative

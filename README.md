@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 2.3.0" src="https://img.shields.io/badge/version-2.3.0-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 2.4.0" src="https://img.shields.io/badge/version-2.4.0-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -23,7 +23,7 @@ OpenAL, NanoVG, Yoga, and an optional Filament renderer. It provides the runtime
 rendering, content, physics, audio, UI, and utility systems needed to build a game
 without hiding the underlying desktop APIs.
 
-The current release is **2.3.0** and requires **JDK 25**. Valthorne is licensed
+The current release is **2.4.0** and requires **JDK 25**. Valthorne is licensed
 under [Apache-2.0](LICENSE).
 
 ## What is included
@@ -60,7 +60,7 @@ in the [platform matrix](docs/platforms.md).
 
 ## Add Valthorne to a project
 
-Valthorne 2.3.0 is available from Maven Central:
+Valthorne 2.4.0 is available from Maven Central:
 
 ```groovy
 repositories {
@@ -68,7 +68,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:2.3.0'
+    implementation 'io.github.tehnewb:Valthorne:2.4.0'
 }
 ```
 
@@ -201,18 +201,14 @@ Use the included Gradle wrapper:
 ```sh
 ./gradlew build
 ./gradlew verifyRelease
-./gradlew verifyGraphicsConsumer
 ```
 
 - `build` compiles the library and creates the binary, source, and Javadoc archives.
-- `verifyRelease` checks release packaging, metadata, native physics, and isolated
-  module-path and Maven-style consumers.
-- `verifyGraphicsConsumer` launches a published-library consumer with a real OpenGL
-  context and verifies rendered pixels; it requires a usable display and driver.
+- `verifyRelease` checks release packaging, runtime resources, licenses, and metadata.
 
-Focused `verifyPhysics3D`, `verify3D`, `verifyLighting`, `verifyUI`, and benchmark
-tasks are also available when their local test sources and required graphics
-environment are present. See [contributing](CONTRIBUTING.md) and the
+The previous automated test suites and their runners have been removed. Builds
+do not provide runtime regression coverage. Optional local benchmarks remain.
+See [contributing](CONTRIBUTING.md) and the
 [release procedure](docs/releasing.md) before submitting or publishing changes.
 
 ## Repository organization
@@ -221,7 +217,7 @@ environment are present. See [contributing](CONTRIBUTING.md) and the
 - `src/main/resources` — packaged shaders, Filament materials, fonts, and licenses.
 - `docs` — integration guides, subsystem contracts, and performance records.
 - `portable` — shared-source desktop and TeaVM web compatibility tooling.
-- `gradle` — verification, publication, consumer-test, and benchmark tasks.
+- `gradle` — packaging validation, publication, and benchmark tasks.
 - `images` — project branding.
 
 The project website is maintained separately in

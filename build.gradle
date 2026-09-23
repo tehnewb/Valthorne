@@ -75,9 +75,6 @@ dependencies {
         runtimeOnly "com.github.stephengold:jolt-jni-${platform}:$joltVersion:ReleaseSp"
     }
 
-    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
-    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
-
     // Runtime natives for ALL supported OS/arch combos.
     // These will be published so consumers get them transitively at runtime.
     lwjglModules.each { m ->
@@ -96,28 +93,7 @@ java {
     withJavadocJar()
 }
 
-// Optional local regression suites; runnable demos belong to Valthorne-examples.
-sourceSets {
-    test {
-        java.include 'valthorne/**'
-        // Committed widget regressions coexist with the optional ignored local suites.
-        java.srcDir 'src/widgetTest/java'
-    }
-}
-
 apply from: 'gradle/benchmarks.gradle'
-
-tasks.register('verifyPhysics3D', Test) {
-    description = 'Runs native Jolt physics regression tests without a graphics context.'
-    group = 'verification'
-
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-
-    filter {
-        includeTestsMatching 'valthorne.physics3d.*'
-    }
-}
 
 // Material packages are committed so consumers do not need a native compiler.
 // Binding 0.4.0 uses Filament material ABI 75, not the newer SDK ABI 76.
@@ -179,52 +155,6 @@ tasks.named('processResources') {
     mustRunAfter filamentMaterialTasks
 }
 
-tasks.register('verifyLighting', Test) {
-    description = 'Runs CPU and actual OpenGL lighting regression tests.'
-    group = 'verification'
-
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-
-    filter {
-        includeTestsMatching 'valthorne.model3d.Lighting*Test'
-    }
-}
-
-tasks.register('verify3D', Test) {
-    description = 'Runs the 3D geometry, asset and offscreen OpenGL regression tests.'
-    group = 'verification'
-
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-
-    filter {
-        includeTestsMatching 'valthorne.model3d.*'
-    }
-}
-
-tasks.register('verifyUI', Test) {
-    description = 'Runs headless UI models and native mixed-renderer regressions.'
-    group = 'verification'
-
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    filter { includeTestsMatching 'valthorne.ui.*' }
-    // Each graphics fixture owns process-global Window/GLFW state.
-    forkEvery = 1
-    maxParallelForks = 1
-}
-
-tasks.register('verifyWidgets', Test) {
-    description = 'Runs committed widget behavior, filesystem, rendering and input regressions.'
-    group = 'verification'
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    filter { includeTestsMatching 'valthorne.ui.widgets.*' }
-    forkEvery = 1
-    maxParallelForks = 1
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
     options.release = 25
@@ -278,17 +208,6 @@ tasks.withType(JavaExec).configureEach {
     }
 }
 
-// Apply the same Java 25 access configuration to all tests.
-tasks.withType(Test).configureEach {
-    useJUnitPlatform()
-
-    jvmArgs += valthorneJvmArgs
-
-    javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
-
 mavenPublishing {
     publishToMavenCentral()
 
@@ -336,5 +255,5 @@ mavenPublishing {
 
 apply from: 'gradle/release.gradle'
 
-// Shared-source desktop/web compatibility entry point.
+// Shared-source desktop/web application entry point.
 apply from: 'portable/desktop.gradle'

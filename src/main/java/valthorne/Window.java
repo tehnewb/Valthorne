@@ -10,7 +10,7 @@ import valthorne.graphics.Color;
 import valthorne.graphics.ImmediateTextureRenderer;
 import valthorne.graphics.texture.TextureData;
 import org.joml.Matrix4f;
-import valthorne.ui.Dimensional;
+import valthorne.math.geometry.Dimensional;
 
 import java.nio.IntBuffer;
 

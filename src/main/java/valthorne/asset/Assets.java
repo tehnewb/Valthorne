@@ -1,7 +1,7 @@
 package valthorne.asset;
 
-import valthorne.audio.sound.SoundLoader;
-import valthorne.audio.sound.SoundParameters;
+import valthorne.audio.SoundLoader;
+import valthorne.audio.SoundParameters;
 import valthorne.graphics.font.FontLoader;
 import valthorne.graphics.font.FontParameters;
 import valthorne.graphics.font.slug.SlugLoader;

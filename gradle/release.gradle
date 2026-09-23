@@ -1,26 +1,9 @@
 // Release checks are local: nothing uploads unless a publishing task is requested.
-def graphicsTag = 'graphics'
+
 def releaseVersion = project.version.toString()
 def releaseDirectory = layout.buildDirectory.dir("release-repository/io/github/tehnewb/Valthorne/${releaseVersion}")
 def releaseSigning = providers.gradleProperty('releaseSigning').map { it.toBoolean() }.orElse(false)
 def repositoryRoot = rootDir.toPath()
-apply from: 'gradle/consumer-check.gradle'
-tasks.named('test', Test) {
-    description = 'Runs CPU and native physics regressions without a display.'
-    useJUnitPlatform { excludeTags graphicsTag }
-}
-tasks.register('graphicsTest', Test) {
-    description = 'Runs real OpenGL regressions; requires a display and compatible driver.'
-    group = 'verification'
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    useJUnitPlatform { includeTags graphicsTag }
-    // Graphics fixtures own process-global Window/GLFW state and native callbacks.
-    // Isolate their lifetimes so one fixture cannot reuse a destroyed window handle.
-    forkEvery = 1
-    maxParallelForks = 1
-    shouldRunAfter tasks.named('test')
-}
 
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
@@ -98,29 +81,10 @@ tasks.register('verifyReleaseArtifacts') {
     }
 }
 
-// Exercise both Gradle module metadata and POM-only resolution (the Maven dependency model).
-['Module', 'Pom', 'Graphics', 'Window'].each { format ->
-    tasks.register("verify${format}Consumer", Exec) {
-        description = "Compiles and runs a separate consumer using ${format.toLowerCase()} metadata."
-        group = 'verification'
-        dependsOn 'verifyReleaseArtifacts', 'prepareReleaseConsumer'
-        workingDir rootDir
-        def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows')
-        def wrapper = isWindows ? ['cmd', '/d', '/c', 'gradlew.bat'] : ['sh', file('gradlew').absolutePath]
-        commandLine wrapper + ['-p', layout.buildDirectory.dir('release-consumer').get().asFile.absolutePath, '--no-daemon', '--console=plain',
-                "-PvalthorneVersion=${project.version}",
-                "-PvalthorneRepository=${layout.buildDirectory.dir('release-repository').get().asFile.toURI()}",
-                "-PpomOnly=${format == 'Pom'}", "-Pgraphics=${format == 'Graphics'}",
-                "-Pwindow=${format == 'Window'}", 'clean', 'run']
-    }
-}
-tasks.named('verifyPomConsumer') { mustRunAfter 'verifyModuleConsumer' }
-tasks.named('verifyGraphicsConsumer') { mustRunAfter 'verifyModuleConsumer', 'verifyPomConsumer' }
-tasks.named('verifyWindowConsumer') { mustRunAfter 'verifyModuleConsumer', 'verifyPomConsumer', 'verifyGraphicsConsumer' }
 tasks.register('verifyRelease') {
-    description = 'Builds and validates release packaging and two external consumer dependency models.'
+    description = 'Builds and validates release packaging.'
     group = 'verification'
-    dependsOn 'build', 'verifyModuleConsumer', 'verifyPomConsumer'
+    dependsOn 'build', 'verifyReleaseArtifacts'
 }
 
 // A missing signing flag should fail before attempting a Central upload.

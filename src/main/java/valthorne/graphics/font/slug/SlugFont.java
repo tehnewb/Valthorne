@@ -7,7 +7,7 @@ import valthorne.graphics.Color;
 import valthorne.graphics.font.Font;
 import valthorne.graphics.font.FontData;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.ui.Dimensional;
+import valthorne.math.geometry.Dimensional;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
