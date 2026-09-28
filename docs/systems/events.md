@@ -66,7 +66,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Event
 
-[Source](../../src/main/java/valthorne/event/Event.java#L41)
+[Source](../../src/main/java/valthorne/event/Event.java)
 
 Base class for every event dispatched by `EventPublisher`.
 
@@ -170,7 +170,7 @@ Returns a lightweight diagnostic representation.
 
 ### EventHandler
 
-[Source](../../src/main/java/valthorne/event/EventHandler.java#L32)
+[Source](../../src/main/java/valthorne/event/EventHandler.java)
 
 Minimal synchronous handler used by the high-throughput event dispatcher.
 
@@ -218,7 +218,7 @@ Handles one synchronously dispatched event.
 
 ### EventPublisher
 
-[Source](../../src/main/java/valthorne/event/EventPublisher.java#L74)
+[Source](../../src/main/java/valthorne/event/EventPublisher.java)
 
 High-throughput synchronous event dispatcher built around immutable route snapshots.
 
@@ -415,7 +415,7 @@ New publications observe an entirely empty route table.
 
 ### EventPublisher.Registration — internal support type
 
-[Source](../../src/main/java/valthorne/event/EventPublisher.java#L385)
+[Source](../../src/main/java/valthorne/event/EventPublisher.java)
 
 Cold-path registration metadata. These objects are never traversed by `publish(Event)`.
 
@@ -426,7 +426,7 @@ The handler is a borrowed reference; this record does not invoke it or manage it
 
 ### KeyEvent
 
-[Source](../../src/main/java/valthorne/event/events/KeyEvent.java#L35)
+[Source](../../src/main/java/valthorne/event/events/KeyEvent.java)
 
 Keyboard event payload containing a key code and modifier bit mask.
 
@@ -574,7 +574,7 @@ The result describes this event's payload at the time it is read.
 
 ### KeyPressEvent
 
-[Source](../../src/main/java/valthorne/event/events/KeyPressEvent.java#L13)
+[Source](../../src/main/java/valthorne/event/events/KeyPressEvent.java)
 
 Keyboard press notification carrying a GLFW key code and modifier mask.
 Uses the dedicated KEY_PRESS event route and inherits mutable event-consumption
@@ -602,7 +602,7 @@ Key and modifier values are retained without querying current keyboard state.
 
 ### KeyReleaseEvent
 
-[Source](../../src/main/java/valthorne/event/events/KeyReleaseEvent.java#L13)
+[Source](../../src/main/java/valthorne/event/events/KeyReleaseEvent.java)
 
 Keyboard release notification carrying a GLFW key code and modifier mask.
 Uses the dedicated KEY_RELEASE event route and inherits mutable event-consumption
@@ -630,7 +630,7 @@ Key and modifier values are retained without querying current keyboard state.
 
 ### MouseDragEvent
 
-[Source](../../src/main/java/valthorne/event/events/MouseDragEvent.java#L20)
+[Source](../../src/main/java/valthorne/event/events/MouseDragEvent.java)
 
 Mouse movement event emitted while a button is being dragged.
 
@@ -689,7 +689,7 @@ No input is accumulated or normalized; signed-short endpoint storage can affect 
 
 ### MouseEvent
 
-[Source](../../src/main/java/valthorne/event/events/MouseEvent.java#L33)
+[Source](../../src/main/java/valthorne/event/events/MouseEvent.java)
 
 Shared payload superclass for mouse-related events.
 
@@ -877,7 +877,7 @@ The result describes this event's payload at the time it is read.
 
 ### MouseMoveEvent
 
-[Source](../../src/main/java/valthorne/event/events/MouseMoveEvent.java#L22)
+[Source](../../src/main/java/valthorne/event/events/MouseMoveEvent.java)
 
 Mouse movement event containing starting and ending cursor coordinates.
 
@@ -992,7 +992,7 @@ or consumption state. Storage uses the declared field type without range validat
 
 ### MousePressEvent
 
-[Source](../../src/main/java/valthorne/event/events/MousePressEvent.java#L13)
+[Source](../../src/main/java/valthorne/event/events/MousePressEvent.java)
 
 Mouse-button press notification carrying button, modifier, and cursor values.
 Uses the dedicated MOUSE_PRESS route and inherited event-consumption state.
@@ -1022,7 +1022,7 @@ The values are retained without validation or coordinate conversion.
 
 ### MouseReleaseEvent
 
-[Source](../../src/main/java/valthorne/event/events/MouseReleaseEvent.java#L13)
+[Source](../../src/main/java/valthorne/event/events/MouseReleaseEvent.java)
 
 Mouse-button release notification carrying button, modifier, and cursor values.
 Uses the dedicated MOUSE_RELEASE route and inherited event-consumption state.
@@ -1052,7 +1052,7 @@ The values are retained without validation or coordinate conversion.
 
 ### MouseScrollEvent
 
-[Source](../../src/main/java/valthorne/event/events/MouseScrollEvent.java#L30)
+[Source](../../src/main/java/valthorne/event/events/MouseScrollEvent.java)
 
 Mouse scroll notification containing horizontal and vertical input deltas.
 Offsets describe one scroll callback, not cursor coordinates, accumulated
@@ -1195,7 +1195,7 @@ the integer range; use the precise accessor for deltas smaller than one.
 
 ### TextInputEvent
 
-[Source](../../src/main/java/valthorne/event/events/TextInputEvent.java#L19)
+[Source](../../src/main/java/valthorne/event/events/TextInputEvent.java)
 
 Carries committed text on the `EventTypes#TEXT_INPUT` route.
 The keyboard's native character callback creates a string from each received
@@ -1240,7 +1240,7 @@ Its length counts UTF-16 code units and may differ from its code-point count.
 
 ### WindowFocusEvent
 
-[Source](../../src/main/java/valthorne/event/events/WindowFocusEvent.java#L18)
+[Source](../../src/main/java/valthorne/event/events/WindowFocusEvent.java)
 
 Reports a native window focus transition on `EventTypes#WINDOW_FOCUS`.
 The payload describes whether the window gained or lost focus, rather than
@@ -1282,7 +1282,7 @@ query the window's current state, which may have changed since publication.
 
 ### WindowResizeEvent
 
-[Source](../../src/main/java/valthorne/event/events/WindowResizeEvent.java#L22)
+[Source](../../src/main/java/valthorne/event/events/WindowResizeEvent.java)
 
 Event emitted when a window changes dimensions.
 
@@ -1421,7 +1421,7 @@ or consumption state. Storage uses the declared field type without range validat
 
 ### EventType
 
-[Source](../../src/main/java/valthorne/event/EventType.java#L32)
+[Source](../../src/main/java/valthorne/event/EventType.java)
 
 Immutable, strongly typed descriptor for one numeric event route.
 
@@ -1498,7 +1498,7 @@ Returns a compact diagnostic representation such as `key-press[1]`.
 
 ### EventTypes
 
-[Source](../../src/main/java/valthorne/event/EventTypes.java#L43)
+[Source](../../src/main/java/valthorne/event/EventTypes.java)
 
 Central registry of every built-in event route used by the Valthorne event system.
 
@@ -1665,7 +1665,7 @@ longer strings. This is separate from physical key commands.
 
 ### KeyAdapter
 
-[Source](../../src/main/java/valthorne/event/listeners/KeyAdapter.java#L18)
+[Source](../../src/main/java/valthorne/event/listeners/KeyAdapter.java)
 
 Adapter with no-op key callbacks so subclasses override only the events they need.
 
@@ -1706,7 +1706,7 @@ this callback to handle the notification while leaving other callbacks inactive.
 
 ### KeyListener
 
-[Source](../../src/main/java/valthorne/event/listeners/KeyListener.java#L30)
+[Source](../../src/main/java/valthorne/event/listeners/KeyListener.java)
 
 Convenience handler for both key-press and key-release routes.
 
@@ -1804,7 +1804,7 @@ information from reusable events.
 
 ### MouseAdapter
 
-[Source](../../src/main/java/valthorne/event/listeners/MouseAdapter.java#L19)
+[Source](../../src/main/java/valthorne/event/listeners/MouseAdapter.java)
 
 Adapter with no-op implementations for the four callbacks in `MouseListener`.
 
@@ -1868,7 +1868,7 @@ this callback to handle the notification while leaving other callbacks inactive.
 
 ### MouseListener
 
-[Source](../../src/main/java/valthorne/event/listeners/MouseListener.java#L26)
+[Source](../../src/main/java/valthorne/event/listeners/MouseListener.java)
 
 Convenience handler spanning the four primary mouse action routes.
 
@@ -1995,7 +1995,7 @@ information from reusable events.
 
 ### MouseScrollListener
 
-[Source](../../src/main/java/valthorne/event/listeners/MouseScrollListener.java#L20)
+[Source](../../src/main/java/valthorne/event/listeners/MouseScrollListener.java)
 
 Specialized high-throughput handler for `MouseScrollEvent`.
 
@@ -2081,7 +2081,7 @@ information from reusable events.
 
 ### WindowResizeListener
 
-[Source](../../src/main/java/valthorne/event/listeners/WindowResizeListener.java#L19)
+[Source](../../src/main/java/valthorne/event/listeners/WindowResizeListener.java)
 
 Specialized high-throughput handler for `WindowResizeEvent`.
 

@@ -48,7 +48,7 @@ The sections below explain each component and its declared public or protected o
 
 ### ValthorneFileException
 
-[Source](../../src/main/java/valthorne/io/file/ValthorneFileException.java#L10)
+[Source](../../src/main/java/valthorne/io/file/ValthorneFileException.java)
 
 Base runtime exception for Valthorne file operations.
 Wraps file access or decoding failures without requiring checked exception
@@ -84,7 +84,7 @@ Creates a failure that preserves the underlying exception.
 
 ### ValthorneFileNotFoundException
 
-[Source](../../src/main/java/valthorne/io/file/ValthorneFileNotFoundException.java#L10)
+[Source](../../src/main/java/valthorne/io/file/ValthorneFileNotFoundException.java)
 
 Thrown when a classpath resource cannot be found.
 Allows callers to distinguish a missing resource from other file failures while
@@ -110,7 +110,7 @@ The constructor only records the message; it does not attempt another lookup.
 
 ### ValthorneFiles
 
-[Source](../../src/main/java/valthorne/io/file/ValthorneFiles.java#L22)
+[Source](../../src/main/java/valthorne/io/file/ValthorneFiles.java)
 
 Utility class for handling file operations related to classpath resources.
 Provides methods for reading, checking existence, and extracting files
@@ -238,7 +238,7 @@ try-with-resources. Leading slashes and surrounding whitespace are normalized.
 
 ### FileUtility
 
-[Source](../../src/main/java/valthorne/utility/FileUtility.java#L89)
+[Source](../../src/main/java/valthorne/utility/FileUtility.java)
 
 ##### FileUtility
 

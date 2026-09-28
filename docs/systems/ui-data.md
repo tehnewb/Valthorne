@@ -51,7 +51,7 @@ The sections below explain each component and its declared public or protected o
 
 ### RowHeightIndex
 
-[Source](../../src/main/java/valthorne/ui/behavior/RowHeightIndex.java#L35)
+[Source](../../src/main/java/valthorne/ui/behavior/RowHeightIndex.java)
 
 Maintains measured row strides and cumulative offsets for a variable-height
 list without scanning every preceding row. A Fenwick tree stores partial sums
@@ -217,7 +217,7 @@ or the estimate is non-finite or not positive
 
 ### SelectionModel
 
-[Source](../../src/main/java/valthorne/ui/behavior/SelectionModel.java#L35)
+[Source](../../src/main/java/valthorne/ui/behavior/SelectionModel.java)
 
 Mutable index-based selection for lists, grids and trees, with single-item,
 toggle and inclusive range policies. Membership uses a bit set without
@@ -463,7 +463,7 @@ selection emits one notification.
 
 ### TableModel
 
-[Source](../../src/main/java/valthorne/ui/behavior/TableModel.java#L23)
+[Source](../../src/main/java/valthorne/ui/behavior/TableModel.java)
 
 UI-thread model projecting a shallow immutable row snapshot through filtering
 and stable sorting. Visible membership is stored as primitive source indices;
@@ -612,7 +612,7 @@ notification even if the visible indices are unchanged.
 
 ### DataTable
 
-[Source](../../src/main/java/valthorne/ui/nodes/DataTable.java#L31)
+[Source](../../src/main/java/valthorne/ui/nodes/DataTable.java)
 
 Sortable, filterable table with fixed headers and virtualized fixed-height rows.
 Columns divide available width by relative weight and may create cells using
@@ -800,7 +800,7 @@ is unchanged; successful model sorting resets selection and scroll position.
 
 ### DataTable.Cell — internal support type
 
-[Source](../../src/main/java/valthorne/ui/nodes/DataTable.java#L216)
+[Source](../../src/main/java/valthorne/ui/nodes/DataTable.java)
 
 Internal cell container limiting both hit testing and drawing to its bounds.
 Texture-batch clipping includes the active translation and is unwound even
@@ -840,7 +840,7 @@ restores the enclosing scissor in a finally block.
 
 ### TableColumn
 
-[Source](../../src/main/java/valthorne/ui/nodes/TableColumn.java#L23)
+[Source](../../src/main/java/valthorne/ui/nodes/TableColumn.java)
 
 Immutable column definition for a virtual DataTable. Width is proportional
 to the sum of column weights, and each visible cell is built from a fresh
@@ -902,7 +902,7 @@ by sorting and rendering, so it should provide stable results.
 
 ### VirtualList
 
-[Source](../../src/main/java/valthorne/ui/nodes/VirtualList.java#L38)
+[Source](../../src/main/java/valthorne/ui/nodes/VirtualList.java)
 
 Fixed-height virtualized list/grid or measured variable-height single-column list.
 Factories can return either renderer's nodes.

@@ -47,7 +47,7 @@ The sections below explain each component and its declared public or protected o
 
 ### AssetLoader
 
-[Source](../../src/main/java/valthorne/asset/AssetLoader.java#L14)
+[Source](../../src/main/java/valthorne/asset/AssetLoader.java)
 
 Converts an asset request into loaded data. `Assets` selects a registered
 loader by the request's concrete parameter class and can invoke it on an executor
@@ -82,7 +82,7 @@ define validation and ownership of the returned data.
 
 ### AssetParameters
 
-[Source](../../src/main/java/valthorne/asset/AssetParameters.java#L11)
+[Source](../../src/main/java/valthorne/asset/AssetParameters.java)
 
 Describes an asset request and its identity in the shared `Assets` cache.
 The concrete parameter class selects the registered loader; `key()` selects
@@ -110,7 +110,7 @@ non-null when used with `Assets`; generating it should not load the asset.
 
 ### Assets
 
-[Source](../../src/main/java/valthorne/asset/Assets.java#L87)
+[Source](../../src/main/java/valthorne/asset/Assets.java)
 
 Asset manager for Valthorne that supports "prepare then load" and direct async loads with caching.
 

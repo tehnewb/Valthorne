@@ -57,7 +57,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Dimensional
 
-[Source](../../src/main/java/valthorne/math/geometry/Dimensional.java#L13)
+[Source](../../src/main/java/valthorne/math/geometry/Dimensional.java)
 
 The Dimensional interface combines the behaviors of both Sizeable and Locatable interfaces.
 Implementing this interface indicates that an object possesses both size and location properties.
@@ -69,7 +69,7 @@ but serves as a marker for objects that are both sizeable and locatable.
 
 ### Align
 
-[Source](../../src/main/java/valthorne/ui/enums/Align.java#L41)
+[Source](../../src/main/java/valthorne/ui/enums/Align.java)
 
 `Align` represents the alignment rules used by the Yoga layout engine
 for aligning items along the cross axis of a flex container.
@@ -178,7 +178,7 @@ Returns the raw Yoga alignment constant used internally by the Yoga layout engin
 
 ### Alignment
 
-[Source](../../src/main/java/valthorne/ui/enums/Alignment.java#L72)
+[Source](../../src/main/java/valthorne/ui/enums/Alignment.java)
 
 Defines simple horizontal and vertical alignment modes used to position one object relative
 to another object.
@@ -367,7 +367,7 @@ setup and OpenGL-style positioning.
 
 ### FlexDirection
 
-[Source](../../src/main/java/valthorne/ui/enums/FlexDirection.java#L38)
+[Source](../../src/main/java/valthorne/ui/enums/FlexDirection.java)
 
 `FlexDirection` defines the primary axis used by the Yoga flex layout
 engine when arranging child elements.
@@ -441,7 +441,7 @@ Returns the raw Yoga constant used internally by the Yoga layout engine.
 
 ### FlexWrap
 
-[Source](../../src/main/java/valthorne/ui/enums/FlexWrap.java#L34)
+[Source](../../src/main/java/valthorne/ui/enums/FlexWrap.java)
 
 `FlexWrap` controls whether children inside a flex container
 are allowed to wrap onto multiple lines.
@@ -505,7 +505,7 @@ Returns the raw Yoga constant used internally by the Yoga layout engine.
 
 ### JustifyContent
 
-[Source](../../src/main/java/valthorne/ui/enums/JustifyContent.java#L34)
+[Source](../../src/main/java/valthorne/ui/enums/JustifyContent.java)
 
 `JustifyContent` controls how child elements are distributed
 along the main axis of a flex container.
@@ -593,7 +593,7 @@ Returns the Yoga constant used by the layout engine.
 
 ### LayoutUnit
 
-[Source](../../src/main/java/valthorne/ui/enums/LayoutUnit.java#L31)
+[Source](../../src/main/java/valthorne/ui/enums/LayoutUnit.java)
 
 `LayoutUnit` defines the unit type used when specifying layout values
 such as width, height, margin, or padding.
@@ -648,7 +648,7 @@ Interprets the value as a percentage of the applicable reference dimension.
 
 ### Overflow
 
-[Source](../../src/main/java/valthorne/ui/enums/Overflow.java#L33)
+[Source](../../src/main/java/valthorne/ui/enums/Overflow.java)
 
 `Overflow` controls how content is handled when it exceeds
 the bounds of its container.
@@ -711,7 +711,7 @@ Returns the Yoga constant used internally by the layout engine.
 
 ### PositionType
 
-[Source](../../src/main/java/valthorne/ui/enums/PositionType.java#L45)
+[Source](../../src/main/java/valthorne/ui/enums/PositionType.java)
 
 `PositionType` determines how an element's position is calculated
 within the Yoga layout system.
@@ -775,7 +775,7 @@ Returns the Yoga constant used by the layout engine.
 
 ### Layout
 
-[Source](../../src/main/java/valthorne/ui/Layout.java#L38)
+[Source](../../src/main/java/valthorne/ui/Layout.java)
 
 Mutable layout configuration containing dimensions, edge offsets, spacing, and
 flexbox policy for a UINode. This object stores values; the root's layout solver
@@ -3537,7 +3537,7 @@ not notify, so a spacing-only reset may require explicit invalidation.
 
 ### LayoutValue
 
-[Source](../../src/main/java/valthorne/ui/LayoutValue.java#L26)
+[Source](../../src/main/java/valthorne/ui/LayoutValue.java)
 
 Represents a value used for layout calculations. The value is expressed in
 a specific unit, which can be either auto, points, or percent.
@@ -3703,7 +3703,7 @@ otherwise `false`.
 
 ### Locatable
 
-[Source](../../src/main/java/valthorne/math/geometry/Locatable.java#L12)
+[Source](../../src/main/java/valthorne/math/geometry/Locatable.java)
 
 The Locatable interface provides a contract for classes that represent objects with
 a specific position in a two-dimensional coordinate system.
@@ -3770,7 +3770,7 @@ Sets the position of the object within a two-dimensional coordinate system.
 
 ### Sizeable
 
-[Source](../../src/main/java/valthorne/math/geometry/Sizeable.java#L16)
+[Source](../../src/main/java/valthorne/math/geometry/Sizeable.java)
 
 The Sizeable interface defines a contract for objects that have width and height properties.
 Implementing classes are expected to provide mechanisms to retrieve their dimensions.

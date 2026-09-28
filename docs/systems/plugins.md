@@ -47,7 +47,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Plugin
 
-[Source](../../src/main/java/valthorne/plugin/Plugin.java#L11)
+[Source](../../src/main/java/valthorne/plugin/Plugin.java)
 
 Represents a plugin interface that defines the lifecycle methods for a plugin system.
 Implementing classes should provide initialization and cleanup logic to be executed
@@ -81,7 +81,7 @@ and perform other shutdown tasks as needed.
 
 ### PluginLoader
 
-[Source](../../src/main/java/valthorne/plugin/PluginLoader.java#L43)
+[Source](../../src/main/java/valthorne/plugin/PluginLoader.java)
 
 A utility class for loading plugins from JAR files asynchronously.
 Plugins are expected to implement the `Plugin` interface, and this class manages their discovery,
@@ -215,7 +215,7 @@ Convenience overload: unloads and removes the first loaded plugin of the given t
 
 ### PluginLoadingException
 
-[Source](../../src/main/java/valthorne/plugin/PluginLoadingException.java#L11)
+[Source](../../src/main/java/valthorne/plugin/PluginLoadingException.java)
 
 Unchecked failure carrying plugin-loading context and its underlying cause.
 The loader uses this to preserve the original exception while identifying the

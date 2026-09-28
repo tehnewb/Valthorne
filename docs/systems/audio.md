@@ -64,7 +64,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Audio
 
-[Source](../../src/main/java/valthorne/Audio.java#L92)
+[Source](../../src/main/java/valthorne/Audio.java)
 
 `Audio` is the central audio runtime manager for Valthorne. It owns the
 OpenAL device and context, runs a dedicated audio thread, executes audio-bound
@@ -325,7 +325,7 @@ Otherwise it is queued for execution on the audio thread.
 
 ### Audio.ListenerPosition
 
-[Source](../../src/main/java/valthorne/Audio.java#L146)
+[Source](../../src/main/java/valthorne/Audio.java)
 
 Immutable logical listener coordinates used by ambient sound areas.
 Publishing a new snapshot triggers area-gain reevaluation without changing
@@ -339,7 +339,7 @@ OpenAL's panning transform. Use the same world-coordinate units as the sound are
 
 ### AudioFormat
 
-[Source](../../src/main/java/valthorne/audio/AudioFormat.java#L39)
+[Source](../../src/main/java/valthorne/audio/AudioFormat.java)
 
 `AudioFormat` enumerates the audio container or codec types currently recognized
 by Valthorne's sound loading pipeline. Each enum constant stores the signature bytes
@@ -475,7 +475,7 @@ Returns the decoder associated with this format.
 
 ### Mp3SoundDecoder
 
-[Source](../../src/main/java/valthorne/audio/Mp3SoundDecoder.java#L24)
+[Source](../../src/main/java/valthorne/audio/Mp3SoundDecoder.java)
 
 `Mp3SoundDecoder` decodes MP3 audio into 16-bit signed PCM using the Java
 sound system. It also exposes probing helpers that extract lightweight metadata
@@ -532,7 +532,7 @@ Decodes MP3 bytes into buffered PCM sound data.
 
 ### Mp3SoundStream
 
-[Source](../../src/main/java/valthorne/audio/Mp3SoundStream.java#L19)
+[Source](../../src/main/java/valthorne/audio/Mp3SoundStream.java)
 
 `Mp3SoundStream` provides chunked PCM decoding for MP3 data using the Java
 sound system. It supports both file-backed and in-memory sources and can reopen
@@ -629,7 +629,7 @@ Closes both source and PCM streams.
 
 ### OggSoundDecoder
 
-[Source](../../src/main/java/valthorne/audio/OggSoundDecoder.java#L27)
+[Source](../../src/main/java/valthorne/audio/OggSoundDecoder.java)
 
 Decodes complete OGG Vorbis payloads into interleaved 16-bit PCM and probes
 metadata without retaining a streaming decoder. Probing accepts either a file
@@ -700,7 +700,7 @@ encoded input or create an OpenAL source.
 
 ### OggSoundStream
 
-[Source](../../src/main/java/valthorne/audio/OggSoundStream.java#L22)
+[Source](../../src/main/java/valthorne/audio/OggSoundStream.java)
 
 Decodes file-backed or memory-backed OGG Vorbis audio into interleaved signed
 16-bit PCM through an owned native STB decoder. Reads and seeks share one decoder
@@ -807,7 +807,7 @@ Closes the native decoder handle.
 
 ### SoundArea
 
-[Source](../../src/main/java/valthorne/audio/SoundArea.java#L11)
+[Source](../../src/main/java/valthorne/audio/SoundArea.java)
 
 Immutable ambient sound zone. Full gain inside, smoothstep attenuation outside,
 zero gain at and beyond the fade distance. Two-dimensional zones ignore Z.
@@ -922,7 +922,7 @@ no per-call objects and validates all coordinates, including ignored Z.
 
 ### SoundData
 
-[Source](../../src/main/java/valthorne/audio/SoundData.java#L53)
+[Source](../../src/main/java/valthorne/audio/SoundData.java)
 
 `SoundData` is the central immutable description of loaded sound content in
 Valthorne. It can represent either fully buffered PCM data or a stream-backed audio
@@ -1023,7 +1023,7 @@ Creates a managed player on the audio thread, with automatic stream and area upd
 
 ### SoundDecoder
 
-[Source](../../src/main/java/valthorne/audio/SoundDecoder.java#L25)
+[Source](../../src/main/java/valthorne/audio/SoundDecoder.java)
 
 `SoundDecoder` defines the contract used by Valthorne to convert raw encoded
 audio bytes into a fully decoded `SoundData` instance suitable for playback
@@ -1062,7 +1062,7 @@ Decodes the supplied encoded audio bytes into `SoundData`.
 
 ### SoundLoader
 
-[Source](../../src/main/java/valthorne/audio/SoundLoader.java#L23)
+[Source](../../src/main/java/valthorne/audio/SoundLoader.java)
 
 `SoundLoader` is the asset-loader bridge between generic asset loading and the
 sound system. It accepts `SoundParameters`, inspects the underlying
@@ -1097,7 +1097,7 @@ Loads sound data from the source defined by the supplied parameters.
 
 ### SoundMetadata
 
-[Source](../../src/main/java/valthorne/audio/SoundMetadata.java#L26)
+[Source](../../src/main/java/valthorne/audio/SoundMetadata.java)
 
 `SoundMetadata` stores lightweight information about a piece of audio without
 requiring the full decoded PCM data to be retained. It is primarily used during
@@ -1137,7 +1137,7 @@ or `Long#MAX_VALUE` if the estimate would overflow
 
 ### SoundParameters
 
-[Source](../../src/main/java/valthorne/audio/SoundParameters.java#L24)
+[Source](../../src/main/java/valthorne/audio/SoundParameters.java)
 
 Represents the parameters required to initialize or manage a sound resource.
 This record combines a `SoundSource`, which specifies the source of the
@@ -1279,7 +1279,7 @@ even when other parameters differ.
 
 ### SoundPlayer
 
-[Source](../../src/main/java/valthorne/audio/SoundPlayer.java#L102)
+[Source](../../src/main/java/valthorne/audio/SoundPlayer.java)
 
 `SoundPlayer` is Valthorne's high-level playback controller for a single
 `SoundData` instance. It wraps one OpenAL source and handles all of the
@@ -1942,7 +1942,7 @@ Returns the underlying sound data object used by this player.
 
 ### SoundSource
 
-[Source](../../src/main/java/valthorne/audio/SoundSource.java#L20)
+[Source](../../src/main/java/valthorne/audio/SoundSource.java)
 
 `SoundSource` describes where raw sound data originates. It is modeled as a
 sealed interface with compact record implementations for file-path sources and
@@ -1959,7 +1959,7 @@ SoundSource bytesSource = new SoundSource.BytesSource(bytes);
 
 ### SoundSource.PathSource
 
-[Source](../../src/main/java/valthorne/audio/SoundSource.java#L30)
+[Source](../../src/main/java/valthorne/audio/SoundSource.java)
 
 Immutable filesystem-path description for deferred sound loading or streaming.
 Construction validates only that the string is nonblank; it does not open the
@@ -1986,7 +1986,7 @@ Validates the stored path.
 
 ### SoundSource.BytesSource
 
-[Source](../../src/main/java/valthorne/audio/SoundSource.java#L51)
+[Source](../../src/main/java/valthorne/audio/SoundSource.java)
 
 In-memory encoded audio source that retains the supplied nonempty byte array.
 Unlike a defensive-copy value object, the array is shared and the generated
@@ -2014,7 +2014,7 @@ Validates the stored bytes.
 
 ### SoundStream
 
-[Source](../../src/main/java/valthorne/audio/SoundStream.java#L25)
+[Source](../../src/main/java/valthorne/audio/SoundStream.java)
 
 `SoundStream` represents a pull-based decoded PCM stream used for long or
 compressed audio playback. Implementations expose stream metadata, seeking, chunked
@@ -2111,7 +2111,7 @@ Closes this stream and releases any underlying resources.
 
 ### WaveSoundDecoder
 
-[Source](../../src/main/java/valthorne/audio/WaveSoundDecoder.java#L56)
+[Source](../../src/main/java/valthorne/audio/WaveSoundDecoder.java)
 
 `WaveSoundDecoder` loads uncompressed PCM WAV audio into Valthorne's
 `SoundData` model. It supports probing both in-memory byte arrays and
@@ -2205,7 +2205,7 @@ non-streaming `SoundData` record marked as `AudioFormat#WAV`.
 
 ### WaveSoundStream
 
-[Source](../../src/main/java/valthorne/audio/WaveSoundStream.java#L52)
+[Source](../../src/main/java/valthorne/audio/WaveSoundStream.java)
 
 `WaveSoundStream` provides pull-based chunked PCM reading for WAV audio that
 is being played through Valthorne's streaming pipeline. It can stream either from a

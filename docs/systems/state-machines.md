@@ -61,7 +61,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Condition
 
-[Source](../../src/main/java/valthorne/state/Condition.java#L18)
+[Source](../../src/main/java/valthorne/state/Condition.java)
 
 A boolean condition used to decide transitions.
 
@@ -94,7 +94,7 @@ Evaluates the condition.
 
 ### Guard
 
-[Source](../../src/main/java/valthorne/state/Guard.java#L23)
+[Source](../../src/main/java/valthorne/state/Guard.java)
 
 A guard blocks transitions.
 
@@ -139,7 +139,7 @@ Return false to block the transition.
 
 ### State
 
-[Source](../../src/main/java/valthorne/state/State.java#L33)
+[Source](../../src/main/java/valthorne/state/State.java)
 
 A state in a finite state machine (FSM).
 
@@ -218,7 +218,7 @@ This is called before the transition action (if any) and before entering the nex
 
 ### StateContext
 
-[Source](../../src/main/java/valthorne/state/StateContext.java#L42)
+[Source](../../src/main/java/valthorne/state/StateContext.java)
 
 Context passed into states, guards, and transition actions.
 
@@ -327,7 +327,7 @@ This can be used to inspect `Transition#reason()` or other transition metadata.
 
 ### StateMachine
 
-[Source](../../src/main/java/valthorne/state/StateMachine.java#L120)
+[Source](../../src/main/java/valthorne/state/StateMachine.java)
 
 A condition-driven finite state machine (FSM).
 
@@ -671,7 +671,7 @@ If `initial` is null, the machine becomes idle (no current state).
 
 ### Transition
 
-[Source](../../src/main/java/valthorne/state/Transition.java#L40)
+[Source](../../src/main/java/valthorne/state/Transition.java)
 
 A transition rule.
 
@@ -822,7 +822,7 @@ Actions run after oldState.onExit and before newState.onEnter.
 
 ### TransitionAction
 
-[Source](../../src/main/java/valthorne/state/TransitionAction.java#L29)
+[Source](../../src/main/java/valthorne/state/TransitionAction.java)
 
 Runs when a transition is taken.
 
@@ -871,7 +871,7 @@ This runs after the old state exits and before the new state enters.
 
 ### Trigger
 
-[Source](../../src/main/java/valthorne/state/Trigger.java#L28)
+[Source](../../src/main/java/valthorne/state/Trigger.java)
 
 A queued FSM event (trigger).
 

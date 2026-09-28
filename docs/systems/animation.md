@@ -52,7 +52,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Animation
 
-[Source](../../src/main/java/valthorne/graphics/animation/Animation.java#L80)
+[Source](../../src/main/java/valthorne/graphics/animation/Animation.java)
 
 A lightweight, time-driven frame animation player.
 
@@ -608,7 +608,7 @@ call `reset()` after changing the mode.
 
 ### AnimationAdapter
 
-[Source](../../src/main/java/valthorne/graphics/animation/AnimationAdapter.java#L13)
+[Source](../../src/main/java/valthorne/graphics/animation/AnimationAdapter.java)
 
 Adapter class for the `AnimationListener` interface.
 
@@ -661,7 +661,7 @@ by the animation before this notification is delivered.
 
 ### AnimationFrame
 
-[Source](../../src/main/java/valthorne/graphics/animation/AnimationFrame.java#L18)
+[Source](../../src/main/java/valthorne/graphics/animation/AnimationFrame.java)
 
 Represents a single frame within an animation sequence. Each frame is associated
 with a `Drawable` object that can be rendered, as well as a duration
@@ -678,7 +678,7 @@ as non-rendering content and clamps negative frame durations for timing.
 
 ### AnimationListener
 
-[Source](../../src/main/java/valthorne/graphics/animation/AnimationListener.java#L11)
+[Source](../../src/main/java/valthorne/graphics/animation/AnimationListener.java)
 
 AnimationListener for animation lifecycle events.
 
@@ -732,7 +732,7 @@ BIDIRECTIONAL: a "full loop" is counted when the ping-pong returns back to the s
 
 ### AnimationUtility
 
-[Source](../../src/main/java/valthorne/graphics/animation/AnimationUtility.java#L14)
+[Source](../../src/main/java/valthorne/graphics/animation/AnimationUtility.java)
 
 Constructs frame sequences from existing texture regions, wrapping each region
 in a drawable without copying or taking ownership of its texture. Uniform-duration
@@ -803,7 +803,7 @@ entries in longer rows are ignored. Textures remain owned by the caller.
 
 ### PlaybackMode
 
-[Source](../../src/main/java/valthorne/graphics/animation/PlaybackMode.java#L11)
+[Source](../../src/main/java/valthorne/graphics/animation/PlaybackMode.java)
 
 Selects the direction policy used by Animation when advancing frames.
 Forward and reverse traverse one direction; bidirectional changes direction at
@@ -849,7 +849,7 @@ between directions as needed during playback or processing.
 
 ### TransformAnimation3D
 
-[Source](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java#L36)
+[Source](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java)
 
 Samples immutable local-transform keyframes using linear position and scale
 interpolation and shortest-path quaternion interpolation. Time is measured in
@@ -962,7 +962,7 @@ interpolation produces an invalid transform
 
 ### TransformAnimation3D.Keyframe
 
-[Source](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java#L148)
+[Source](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java)
 
 Immutable transform sample at a nonnegative time. Position, rotation and
 scale are copied on construction and access. Position and scale must be

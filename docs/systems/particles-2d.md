@@ -56,7 +56,7 @@ The sections below explain each component and its declared public or protected o
 
 ### BoxSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/BoxSpawnDistributor.java#L16)
+[Source](../../src/main/java/valthorne/graphics/particle/BoxSpawnDistributor.java)
 
 A concrete implementation of the `SpawnDistributor` interface that distributes
 spawn locations within the bounds of a rectangular area. The rectangle is defined
@@ -148,7 +148,7 @@ The positive edges are excluded by Random.nextFloat's half-open interval.
 
 ### CircleSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/CircleSpawnDistributor.java#L16)
+[Source](../../src/main/java/valthorne/graphics/particle/CircleSpawnDistributor.java)
 
 A `CircleSpawnDistributor` is an implementation of the `SpawnDistributor` interface
 that calculates spawn offsets within a circular region. Spawn positions can either be uniformly
@@ -238,7 +238,7 @@ two in area mode.
 
 ### ConeSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/ConeSpawnDistributor.java#L18)
+[Source](../../src/main/java/valthorne/graphics/particle/ConeSpawnDistributor.java)
 
 A `ConeSpawnDistributor` is a specific implementation of the `SpawnDistributor` interface
 that calculates spawn offsets within a conical region. The cone is defined by a direction, a spread
@@ -288,7 +288,7 @@ area density when edgeOnly is false.
 
 ### LineSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/LineSpawnDistributor.java#L16)
+[Source](../../src/main/java/valthorne/graphics/particle/LineSpawnDistributor.java)
 
 The LineSpawnDistributor class provides an implementation of the SpawnDistributor interface
 where spawn positions are distributed along a straight line defined by two endpoints.
@@ -334,7 +334,7 @@ the second is excluded except for degenerate segments.
 
 ### Particle
 
-[Source](../../src/main/java/valthorne/graphics/particle/Particle.java#L38)
+[Source](../../src/main/java/valthorne/graphics/particle/Particle.java)
 
 A pooled particle state container used by `ParticleSystem` during CPU simulation.
 
@@ -669,7 +669,7 @@ Returns the current interpolated color used for rendering.
 
 ### ParticleEmitter
 
-[Source](../../src/main/java/valthorne/graphics/particle/ParticleEmitter.java#L48)
+[Source](../../src/main/java/valthorne/graphics/particle/ParticleEmitter.java)
 
 Configuration object that controls how `ParticleSystem` spawns and initializes particles.
 
@@ -1229,7 +1229,7 @@ The `SpawnDistributor` computes an offset (dx, dy) from the system's base positi
 
 ### ParticleSystem
 
-[Source](../../src/main/java/valthorne/graphics/particle/ParticleSystem.java#L78)
+[Source](../../src/main/java/valthorne/graphics/particle/ParticleSystem.java)
 
 Particle system optimized for rendering speed using point sprites (one vertex per particle) and a single draw call.
 
@@ -1450,7 +1450,7 @@ This disposes the internal shader and deletes the internal VBO. It does not disp
 
 ### PointSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/PointSpawnDistributor.java#L15)
+[Source](../../src/main/java/valthorne/graphics/particle/PointSpawnDistributor.java)
 
 A concrete implementation of the `SpawnDistributor` interface. The
 `PointSpawnDistributor` provides a fixed point spawn distribution,
@@ -1483,7 +1483,7 @@ read or advance the supplied random generator.
 
 ### RadialBurstSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/RadialBurstSpawnDistributor.java#L23)
+[Source](../../src/main/java/valthorne/graphics/particle/RadialBurstSpawnDistributor.java)
 
 A radial burst spawn distributor that calculates offsets for positioning entities or particles
 in a circular burst pattern around an origin point. The spawn positions are distributed
@@ -1534,7 +1534,7 @@ A zero radius produces the origin.
 
 ### RectEdgeSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/RectEdgeSpawnDistributor.java#L20)
+[Source](../../src/main/java/valthorne/graphics/particle/RectEdgeSpawnDistributor.java)
 
 A `RectEdgeSpawnDistributor` is responsible for distributing spawn offsets along the edges
 of a rectangle. The rectangle is defined by its half-width and half-height. Spawn positions
@@ -1583,7 +1583,7 @@ and height differ.
 
 ### RingSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/RingSpawnDistributor.java#L15)
+[Source](../../src/main/java/valthorne/graphics/particle/RingSpawnDistributor.java)
 
 Implements the `SpawnDistributor` interface to distribute spawn locations
 within a ring-shaped area. The spawn points are calculated randomly and uniformly
@@ -1626,7 +1626,7 @@ root, giving uniform area density across the annulus for valid finite radii.
 
 ### SpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/SpawnDistributor.java#L13)
+[Source](../../src/main/java/valthorne/graphics/particle/SpawnDistributor.java)
 
 An interface representing a mechanism for distributing spawn offsets. Implementations
 determine how positions are calculated for entities or particles relative to an origin.
@@ -1654,7 +1654,7 @@ allowing stochastic variations for distributing entities or particles.
 
 ### SpiralSpawnDistributor
 
-[Source](../../src/main/java/valthorne/graphics/particle/SpiralSpawnDistributor.java#L17)
+[Source](../../src/main/java/valthorne/graphics/particle/SpiralSpawnDistributor.java)
 
 The SpiralSpawnDistributor is an implementation of the SpawnDistributor interface.
 This class generates stochastic spawn offsets based on a spiral pattern.

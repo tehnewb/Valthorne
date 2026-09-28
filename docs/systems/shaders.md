@@ -60,7 +60,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Billboard3DShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/Billboard3DShader.java#L23)
+[Source](../../src/main/java/valthorne/graphics/shader/Billboard3DShader.java)
 
 GLSL 3.30 program for textured billboard geometry already oriented in world
 space by BillboardBatch3D. The vertex stage transforms supplied positions;
@@ -226,7 +226,7 @@ Compiles the bundled shader resources, records attribute bindings and reloads th
 
 ### BlurShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/BlurShader.java#L48)
+[Source](../../src/main/java/valthorne/graphics/shader/BlurShader.java)
 
 Simple 3x3 box blur shader (fixed-function friendly) built on top of `Shader`.
 
@@ -314,7 +314,7 @@ and ensures the shader is bound before these values are applied.
 
 ### BurnShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/BurnShader.java#L52)
+[Source](../../src/main/java/valthorne/graphics/shader/BurnShader.java)
 
 "Burn away" / dissolve shader built on top of `Shader`.
 
@@ -410,7 +410,7 @@ This method:
 
 ### ComputeShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/ComputeShader.java#L48)
+[Source](../../src/main/java/valthorne/graphics/shader/ComputeShader.java)
 
 Minimal wrapper for an OpenGL compute shader program (GL 4.3+).
 
@@ -676,7 +676,7 @@ uniforms have location -1 and are ignored by OpenGL.
 
 ### DepthShader3D
 
-[Source](../../src/main/java/valthorne/graphics/shader/DepthShader3D.java#L22)
+[Source](../../src/main/java/valthorne/graphics/shader/DepthShader3D.java)
 
 GLSL 3.30 depth-pass shader that preserves alpha-cutout silhouettes without
 evaluating lighting or writing a color output. Surviving fragments use normal
@@ -713,7 +713,7 @@ or linking failures follow the base constructor's error handling.
 
 ### FlashShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/FlashShader.java#L46)
+[Source](../../src/main/java/valthorne/graphics/shader/FlashShader.java)
 
 Time-based flash shader.
 
@@ -806,7 +806,7 @@ This method sets:
 
 ### GlowShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/GlowShader.java#L52)
+[Source](../../src/main/java/valthorne/graphics/shader/GlowShader.java)
 
 Soft glow around a sprite using alpha falloff sampling.
 
@@ -913,7 +913,7 @@ Configures and binds this shader program for rendering with a soft glow effect.
 
 ### LightingShader3D
 
-[Source](../../src/main/java/valthorne/graphics/shader/LightingShader3D.java#L16)
+[Source](../../src/main/java/valthorne/graphics/shader/LightingShader3D.java)
 
 Specialized forward-lighting shader using tiled point-light lists and GGX
 material shading. Shares the world-space mesh vertex contract with Mesh3DShader.
@@ -942,7 +942,7 @@ the rendering pipeline before use.
 
 ### Mesh3DShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/Mesh3DShader.java#L17)
+[Source](../../src/main/java/valthorne/graphics/shader/Mesh3DShader.java)
 
 Compatibility raster shader for world-space 3D mesh vertices. Supports vertex
 color and albedo tinting, directional and up to eight point lights, directional
@@ -1131,7 +1131,7 @@ Also used by specialized 3D lighting shaders.
 
 ### OutlineShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/OutlineShader.java#L49)
+[Source](../../src/main/java/valthorne/graphics/shader/OutlineShader.java)
 
 Draws a crisp outline around non-transparent pixels.
 
@@ -1235,7 +1235,7 @@ dimensions and updates the relevant uniforms using the given parameters.
 
 ### ReflectionShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/ReflectionShader.java#L28)
+[Source](../../src/main/java/valthorne/graphics/shader/ReflectionShader.java)
 
 Renders a vertically mirrored, tinted sprite reflection with a fading alpha
 and optional horizontal ripple. Sampling parameters use backing-texture pixels.
@@ -1301,7 +1301,7 @@ program is not restored.
 
 ### Shader
 
-[Source](../../src/main/java/valthorne/graphics/shader/Shader.java#L58)
+[Source](../../src/main/java/valthorne/graphics/shader/Shader.java)
 
 OpenGL shader program wrapper that compiles, links, validates, and manages a GLSL
 vertex/fragment shader pair, with hot-reload support and cached lookups.
@@ -1715,7 +1715,7 @@ It will unbind the program first to avoid leaving OpenGL bound to a deleted id.
 
 ### ShaderSources
 
-[Source](../../src/main/java/valthorne/graphics/shader/ShaderSources.java#L16)
+[Source](../../src/main/java/valthorne/graphics/shader/ShaderSources.java)
 
 Reads bundled UTF-8 GLSL stages and templates below /valthorne/shaders/.
 Uses classpath streams so the same paths work from development resources and
@@ -1751,7 +1751,7 @@ filesystem access or path normalization.
 
 ### ShapeShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/ShapeShader.java#L29)
+[Source](../../src/main/java/valthorne/graphics/shader/ShapeShader.java)
 
 A simple, general-purpose shader for drawing `Shape` polygons with explicit
 vertex buffers and projection uniforms.
@@ -1814,7 +1814,7 @@ callers should dispose the instance once.
 
 ### TexturedQuadShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/TexturedQuadShader.java#L13)
+[Source](../../src/main/java/valthorne/graphics/shader/TexturedQuadShader.java)
 
 Shared shader base for textured quad rendering with explicit attributes and uniforms.
 
@@ -1923,7 +1923,7 @@ Returns the cached bundled fragment source without another resource read.
 
 ### WaterShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/WaterShader.java#L58)
+[Source](../../src/main/java/valthorne/graphics/shader/WaterShader.java)
 
 Simple UV-distortion "water" shader (wobble / ripple) for 2D sprites.
 

@@ -70,7 +70,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Button
 
-[Source](../../src/main/java/valthorne/ui/nodes/Button.java#L23)
+[Source](../../src/main/java/valthorne/ui/nodes/Button.java)
 
 A themed panel with a centered label and primary-button/keyboard activation.
 Release activation uses the root's left-button hit-test policy; keyboard activation
@@ -201,7 +201,7 @@ Focus routing and repeat filtering are not performed by this callback itself.
 
 ### Checkbox
 
-[Source](../../src/main/java/valthorne/ui/nodes/Checkbox.java#L80)
+[Source](../../src/main/java/valthorne/ui/nodes/Checkbox.java)
 
 `Checkbox` is a toggleable UI control built on top of `Panel`.
 It supports checked and unchecked states, optional action callbacks, keyboard
@@ -405,7 +405,7 @@ the checkbox bounds at half the checkbox's width and height.
 
 ### CollapsibleSection
 
-[Source](../../src/main/java/valthorne/ui/nodes/CollapsibleSection.java#L18)
+[Source](../../src/main/java/valthorne/ui/nodes/CollapsibleSection.java)
 
 Retained disclosure widget with a fixed header and one content subtree.
 Starts expanded; collapsing hides the body, assigns it zero height, and skips
@@ -502,7 +502,7 @@ not part of this update path.
 
 ### DrawableNode
 
-[Source](../../src/main/java/valthorne/ui/nodes/DrawableNode.java#L15)
+[Source](../../src/main/java/valthorne/ui/nodes/DrawableNode.java)
 
 Adapts a borrowed drawable to a UI node's current render position and dimensions.
 Drawing stretches the drawable across the node bounds; layout and drawable
@@ -595,7 +595,7 @@ resource ownership to or from the node.
 
 ### Grid
 
-[Source](../../src/main/java/valthorne/ui/nodes/Grid.java#L84)
+[Source](../../src/main/java/valthorne/ui/nodes/Grid.java)
 
 `Grid` is a layout-oriented container that arranges its children in a
 wrapped row-based grid using the underlying Yoga flex layout system.
@@ -874,7 +874,7 @@ This implementation delegates directly to the superclass draw method.
 
 ### Image
 
-[Source](../../src/main/java/valthorne/ui/nodes/Image.java#L54)
+[Source](../../src/main/java/valthorne/ui/nodes/Image.java)
 
 `Image` is a simple UI node that renders a `Texture`.
 It is intended for displaying static or dynamically swapped images inside
@@ -1023,7 +1023,7 @@ Returns the current color assigned to this image node.
 
 ### Label
 
-[Source](../../src/main/java/valthorne/ui/nodes/Label.java#L66)
+[Source](../../src/main/java/valthorne/ui/nodes/Label.java)
 
 `Label` is a lightweight UI node used to display text.
 It resolves its font and optional color from the current style and sizes
@@ -1267,7 +1267,7 @@ Does nothing for a missing font or empty text.
 
 ### Modal
 
-[Source](../../src/main/java/valthorne/ui/nodes/Modal.java#L90)
+[Source](../../src/main/java/valthorne/ui/nodes/Modal.java)
 
 `Modal` is a top-level overlay dialog container built on top of
 `Panel`. It is designed to display a centered dialog panel above the
@@ -1594,7 +1594,7 @@ panel itself and its contents.
 
 ### Panel
 
-[Source](../../src/main/java/valthorne/ui/nodes/Panel.java#L73)
+[Source](../../src/main/java/valthorne/ui/nodes/Panel.java)
 
 `Panel` is the basic drawable container node in the Valthorne UI system.
 It extends `UIContainer`, which means it can hold and manage child
@@ -1702,7 +1702,7 @@ are visited, with no resource disposal by this method.
 
 ### ProgressBar
 
-[Source](../../src/main/java/valthorne/ui/nodes/ProgressBar.java#L84)
+[Source](../../src/main/java/valthorne/ui/nodes/ProgressBar.java)
 
 `ProgressBar` is a visual UI component used to display progress between
 a configured minimum and maximum value. It supports smooth animated transitions
@@ -1963,7 +1963,7 @@ the root for visibility checks and a prepared batch.
 
 ### ScrollPanel
 
-[Source](../../src/main/java/valthorne/ui/nodes/ScrollPanel.java#L101)
+[Source](../../src/main/java/valthorne/ui/nodes/ScrollPanel.java)
 
 `ScrollPanel` is a container node that provides scrollable viewing of a single
 content node. It supports horizontal scrolling, vertical scrolling, optional
@@ -2509,7 +2509,7 @@ their valid ranges, or reset to zero when the corresponding direction is disable
 
 ### ScrollPanel.ScrollMetrics — internal support type
 
-[Source](../../src/main/java/valthorne/ui/nodes/ScrollPanel.java#L919)
+[Source](../../src/main/java/valthorne/ui/nodes/ScrollPanel.java)
 
 `ScrollMetrics` is a small reusable data holder that stores the computed
 geometry and visibility state of the horizontal and vertical scrollbars.
@@ -2536,7 +2536,7 @@ if (metrics.showVerticalBar) {
 
 ### Slider
 
-[Source](../../src/main/java/valthorne/ui/nodes/Slider.java#L106)
+[Source](../../src/main/java/valthorne/ui/nodes/Slider.java)
 
 `Slider` is an interactive UI control used to select a numeric value within
 a configurable range. It supports mouse dragging, mouse wheel adjustment,
@@ -3276,7 +3276,7 @@ renders them in order: track first, fill second, and thumb last.
 
 ### SlugLabel
 
-[Source](../../src/main/java/valthorne/ui/nodes/SlugLabel.java#L29)
+[Source](../../src/main/java/valthorne/ui/nodes/SlugLabel.java)
 
 Retained curve-rendered text for regular or NanoVG UI containers. Text and size changes
 refresh a reusable glyph layout and the node's measured dimensions; each draw renders
@@ -3417,7 +3417,7 @@ work. A finally block cancels unfinished submission and clears the shared CPU cl
 
 ### SplitPane
 
-[Source](../../src/main/java/valthorne/ui/nodes/SplitPane.java#L31)
+[Source](../../src/main/java/valthorne/ui/nodes/SplitPane.java)
 
 Two mixed-renderer panes separated by a captured, keyboard-accessible divider.
 Vertical means top/bottom; horizontal means left/right. When minimum sizes cannot
@@ -3600,7 +3600,7 @@ the requested ratio and minima; insufficient space is shared proportionally.
 
 ### SplitPane.Divider — internal support type
 
-[Source](../../src/main/java/valthorne/ui/nodes/SplitPane.java#L285)
+[Source](../../src/main/java/valthorne/ui/nodes/SplitPane.java)
 
 Implements pointer dragging and axis-aware keyboard resizing for its enclosing
 split pane. The root provides input routing and capture; this control retains
@@ -3670,7 +3670,7 @@ when constraints prevent movement; other keys are ignored.
 
 ### TabbedPane
 
-[Source](../../src/main/java/valthorne/ui/nodes/TabbedPane.java#L31)
+[Source](../../src/main/java/valthorne/ui/nodes/TabbedPane.java)
 
 Retains lazily constructed tab pages with headers that support pointer and keyboard
 selection. Pages may use either rendering backend. Only the selected page is visible
@@ -3835,7 +3835,7 @@ without receiving updates; the deck's generic update traversal is bypassed.
 
 ### TabbedPane.Tab — internal support type
 
-[Source](../../src/main/java/valthorne/ui/nodes/TabbedPane.java#L217)
+[Source](../../src/main/java/valthorne/ui/nodes/TabbedPane.java)
 
 Retains one header, its deferred factory, and its instantiated page reference.
 The enclosing pane controls attachment, selection, and disposal through its
@@ -3845,7 +3845,7 @@ header and deck containers.
 
 ### TextField
 
-[Source](../../src/main/java/valthorne/ui/nodes/TextField.java#L120)
+[Source](../../src/main/java/valthorne/ui/nodes/TextField.java)
 
 `TextField` is an interactive single-line text input control built on top of
 `Panel`. It supports typing, caret movement, text selection, clipboard
@@ -4396,7 +4396,7 @@ handling. Current text, caret, and selection contents are preserved.
 
 ### Tooltip
 
-[Source](../../src/main/java/valthorne/ui/nodes/Tooltip.java#L64)
+[Source](../../src/main/java/valthorne/ui/nodes/Tooltip.java)
 
 `Tooltip` is a lightweight floating UI node used to display a short piece
 of text near another UI element, typically after a hover delay.

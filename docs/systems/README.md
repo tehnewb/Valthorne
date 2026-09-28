@@ -78,7 +78,12 @@ The checkout targets Java 25. Build the library with the Gradle wrapper; on Wind
 
 ## Using the operation references
 
-Each component links to its Java source. Collapsible references include explicitly declared public/protected methods, constructors, constants, and documented extension fields. Record component contracts describe their generated accessors; inherited methods remain with the base type. Internal support types are identified separately so their presence is not mistaken for a public extension API.
+Detailed component sections link to their Java source. Their collapsible
+references describe the public or protected API recorded when the section was
+written; use the source for the current signatures. Record component contracts
+describe generated accessors, and inherited methods remain with the base type.
+Internal support types are identified separately so their presence is not
+mistaken for a public extension API.
 
 Examples in component descriptions may be partial integration fragments rather than standalone applications. Paths, models, callbacks, and variables such as `scene`, `camera`, and `deltaSeconds` must be supplied by the surrounding application. Follow ownership notes before copying cleanup code into a shared-resource design.
 

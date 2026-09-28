@@ -54,7 +54,7 @@ The sections below explain each component and its declared public or protected o
 
 ### AES
 
-[Source](../../src/main/java/valthorne/encryption/AES.java#L33)
+[Source](../../src/main/java/valthorne/encryption/AES.java)
 
 The `AES` class provides an implementation of the `EncryptionStrategy`
 interface using the AES (Advanced Encryption Standard) algorithm.
@@ -127,7 +127,7 @@ to produce a decrypted byte array.
 
 ### AESGCM
 
-[Source](../../src/main/java/valthorne/encryption/AESGCM.java#L31)
+[Source](../../src/main/java/valthorne/encryption/AESGCM.java)
 
 The `AESGCM` class provides an implementation of the `EncryptionStrategy`
 interface using the AES algorithm in Galois/Counter Mode (GCM). AES-GCM is an authenticated
@@ -197,7 +197,7 @@ The authentication tag is verified during decryption.
 
 ### Blowfish
 
-[Source](../../src/main/java/valthorne/encryption/Blowfish.java#L26)
+[Source](../../src/main/java/valthorne/encryption/Blowfish.java)
 
 The `Blowfish` class provides an implementation of the `EncryptionStrategy`
 interface using the Blowfish symmetric-key block cipher, designed by Bruce Schneier.
@@ -261,7 +261,7 @@ secret key and processes the encrypted data to produce the decrypted plaintext.
 
 ### ChaCha20Poly1305
 
-[Source](../../src/main/java/valthorne/encryption/ChaCha20Poly1305.java#L36)
+[Source](../../src/main/java/valthorne/encryption/ChaCha20Poly1305.java)
 
 The `ChaCha20Poly1305` class provides an implementation of the `EncryptionStrategy`
 interface using the ChaCha20-Poly1305 algorithm. ChaCha20 is a high-performance stream cipher
@@ -337,7 +337,7 @@ is thrown if the data has been tampered with.
 
 ### ECC
 
-[Source](../../src/main/java/valthorne/encryption/ECC.java#L33)
+[Source](../../src/main/java/valthorne/encryption/ECC.java)
 
 The `ECC` class provides an implementation of the `EncryptionStrategy`
 interface using the Elliptic Curve Integrated Encryption Scheme (ECIES). ECIES is a hybrid
@@ -423,7 +423,7 @@ private key and processes the encrypted data to produce the decrypted plaintext.
 
 ### EncryptionStrategy
 
-[Source](../../src/main/java/valthorne/encryption/EncryptionStrategy.java#L61)
+[Source](../../src/main/java/valthorne/encryption/EncryptionStrategy.java)
 
 The `EncryptionStrategy` interface defines a contract for implementing
 both asymmetric and symmetric encryption and decryption strategies. Classes
@@ -688,7 +688,7 @@ encrypted data, which can be stored or transmitted securely.
 
 ### ISAAC
 
-[Source](../../src/main/java/valthorne/encryption/ISAAC.java#L51)
+[Source](../../src/main/java/valthorne/encryption/ISAAC.java)
 
 ISAAC (Indirection, Shift, Accumulate, Add, and Count) pseudo-random number generator.
 
@@ -824,7 +824,7 @@ This implementation consumes results from the end of the array backward via `cou
 
 ### RSA
 
-[Source](../../src/main/java/valthorne/encryption/RSA.java#L32)
+[Source](../../src/main/java/valthorne/encryption/RSA.java)
 
 The `RSA` class provides an implementation of the `EncryptionStrategy`
 interface using the RSA (Rivest-Shamir-Adleman) encryption algorithm. RSA is a
@@ -917,7 +917,7 @@ The private key must correspond to the public key that was used for encryption.
 
 ### SHA256
 
-[Source](../../src/main/java/valthorne/encryption/SHA256.java#L28)
+[Source](../../src/main/java/valthorne/encryption/SHA256.java)
 
 The `SHA256Strategy` class implements the `EncryptionStrategy` interface
 to provide a mechanism for hashing data using the SHA-256 algorithm.
@@ -978,7 +978,7 @@ The `decrypt` operation is not supported for SHA-256 as it is a one-way hash fun
 
 ### SHA512
 
-[Source](../../src/main/java/valthorne/encryption/SHA512.java#L28)
+[Source](../../src/main/java/valthorne/encryption/SHA512.java)
 
 The `SHA512` class implements the `EncryptionStrategy` interface
 to provide a mechanism for hashing data using the SHA-512 algorithm.
@@ -1041,7 +1041,7 @@ The `decrypt` operation is not supported for SHA-512 as it is a one-way hash fun
 
 ### Whirlpool
 
-[Source](../../src/main/java/valthorne/encryption/Whirlpool.java#L68)
+[Source](../../src/main/java/valthorne/encryption/Whirlpool.java)
 
 Whirlpool hash function implementation (NESSIE reference style API).
 

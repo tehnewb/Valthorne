@@ -104,7 +104,7 @@ The sections below explain each component and its declared public or protected o
 
 ### SlugBatch
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugBatch.java#L56)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugBatch.java)
 
 Fast 2D instanced batch renderer for `SlugFont` glyphs.
 
@@ -315,7 +315,7 @@ Returns the maximum glyph capacity of this batch.
 
 ### SlugCurve
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugCurve.java#L18)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugCurve.java)
 
 A single quadratic Bezier segment stored in normalized em-space.
 
@@ -378,7 +378,7 @@ Returns the largest y coordinate used by this curve.
 
 ### SlugFont
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L62)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java)
 
 Owns GPU outline data and font metrics for a contiguous character range,
 using Slug-style banded curve evaluation. Loading compiles glyph outlines into
@@ -753,7 +753,7 @@ and font-byte data, so measurement still works while drawing is no longer valid.
 
 ### SlugFont.UploadState — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L659)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java)
 
 Scopes texture-upload state on the current GL context. Construction disables the
 pixel-unpack buffer and establishes tightly packed rows; close restores the previous
@@ -778,7 +778,7 @@ skip offsets, and byte-swap flag on the same context used during construction.
 
 ### SlugFont.FloatTexelWriter — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L1180)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java)
 
 CPU staging writer for four-float curve texels. Each quadratic occupies two
 adjacent texels, with row-end padding to keep the pair on the same row.
@@ -788,7 +788,7 @@ Address packing assumes the production width of 4096.
 
 ### SlugFont.UIntTexelWriter — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java#L1265)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugFont.java)
 
 CPU staging writer for two-integer band headers and curve-address texels.
 Tracks linear texel offsets before padding rows for an RG32UI upload.
@@ -800,7 +800,7 @@ uploads; texture creation and disposal belong to SlugFont rather than this helpe
 
 ### SlugGlyph
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugGlyph.java#L13)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugGlyph.java)
 
 Metadata needed to draw one Slug glyph.
 
@@ -867,7 +867,7 @@ Returns this glyph's height in em units.
 
 ### SlugShader — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugShader.java#L18)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugShader.java)
 
 GLSL shader used by the fast 2D Slug font renderer.
 
@@ -892,7 +892,7 @@ Creates the shader program.
 
 ### SlugTextRun
 
-[Source](../../src/main/java/valthorne/graphics/font/slug/SlugTextRun.java#L25)
+[Source](../../src/main/java/valthorne/graphics/font/slug/SlugTextRun.java)
 
 Reusable pre-laid-out Slug text.
 

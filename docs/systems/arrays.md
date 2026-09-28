@@ -78,7 +78,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Array
 
-[Source](../../src/main/java/valthorne/collections/array/Array.java#L17)
+[Source](../../src/main/java/valthorne/collections/array/Array.java)
 
 Resizable indexed storage for object references with no separate logical element count.
 Every allocated slot is readable, including untouched null entries. Set may
@@ -189,7 +189,7 @@ therefore cause a caller-side ClassCastException.
 
 ### ByteArray
 
-[Source](../../src/main/java/valthorne/collections/array/ByteArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/ByteArray.java)
 
 Resizable indexed storage for byte values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -277,7 +277,7 @@ this object's current storage.
 
 ### CharArray
 
-[Source](../../src/main/java/valthorne/collections/array/CharArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/CharArray.java)
 
 Resizable indexed storage for char values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -365,7 +365,7 @@ this object's current storage.
 
 ### DoubleArray
 
-[Source](../../src/main/java/valthorne/collections/array/DoubleArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/DoubleArray.java)
 
 Resizable indexed storage for double values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -453,7 +453,7 @@ this object's current storage.
 
 ### FloatArray
 
-[Source](../../src/main/java/valthorne/collections/array/FloatArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/FloatArray.java)
 
 Resizable indexed storage for float values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -541,7 +541,7 @@ this object's current storage.
 
 ### IntArray
 
-[Source](../../src/main/java/valthorne/collections/array/IntArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/IntArray.java)
 
 Resizable indexed storage for int values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -629,7 +629,7 @@ this object's current storage.
 
 ### LongArray
 
-[Source](../../src/main/java/valthorne/collections/array/LongArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/LongArray.java)
 
 Resizable indexed storage for long values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -717,7 +717,7 @@ this object's current storage.
 
 ### ShortArray
 
-[Source](../../src/main/java/valthorne/collections/array/ShortArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/ShortArray.java)
 
 Resizable indexed storage for short values with no separate logical element count.
 Every allocated slot is readable, including untouched zero entries. Set may
@@ -805,7 +805,7 @@ this object's current storage.
 
 ### SwapOnRemoveArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveArray.java#L15)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveArray.java)
 
 The SwapOnRemoveArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -968,7 +968,7 @@ Returns a string representation of the array.
 
 ### SwapOnRemoveByteArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveByteArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveByteArray.java)
 
 The SwapOnRemoveByteArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -1129,7 +1129,7 @@ Returns a string representation of the array.
 
 ### SwapOnRemoveCharArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveCharArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveCharArray.java)
 
 The SwapOnRemoveCharArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -1290,7 +1290,7 @@ Returns a string representation of the array.
 
 ### SwapOnRemoveDoubleArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveDoubleArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveDoubleArray.java)
 
 The SwapOnRemoveDoubleArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -1451,7 +1451,7 @@ Returns a string representation of the array.
 
 ### SwapOnRemoveFloatArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveFloatArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveFloatArray.java)
 
 The SwapOnRemoveFloatArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -1612,7 +1612,7 @@ Returns a string representation of the array.
 
 ### SwapOnRemoveIntArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveIntArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveIntArray.java)
 
 The SwapOnRemoveIntArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -1773,7 +1773,7 @@ Returns a string representation of the array.
 
 ### SwapOnRemoveLongArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveLongArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveLongArray.java)
 
 The SwapOnRemoveLongArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain
@@ -1934,7 +1934,7 @@ Checks if the array is full.
 
 ### SwapOnRemoveShortArray
 
-[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveShortArray.java#L14)
+[Source](../../src/main/java/valthorne/collections/array/SwapOnRemoveShortArray.java)
 
 The SwapOnRemoveShortArray class is a resizable array-based collection that allows elements to be efficiently
 added and removed. When an element is removed, it is swapped with the last element in the array to maintain

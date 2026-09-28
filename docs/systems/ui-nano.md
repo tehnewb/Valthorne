@@ -71,7 +71,7 @@ The sections below explain each component and its declared public or protected o
 
 ### NanoButton
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoButton.java#L29)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoButton.java)
 
 Focusable NanoVG button with centered text and state-specific background,
 border, and text colors. Enter, Space, and accepted left-button releases use
@@ -691,7 +691,7 @@ Skips invisible nodes and a zero handle. Requires root-prepared frame state.
 
 ### NanoCheckbox
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoCheckbox.java#L28)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoCheckbox.java)
 
 Focusable NanoVG checkbox using the shared activation policy for Enter, Space,
 and accepted left-button releases. Checked state lives in the inherited node
@@ -1102,7 +1102,7 @@ nodes and a zero handle are skipped; the root owns frame and clipping state.
 
 ### NanoComboBox
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoComboBox.java#L33)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoComboBox.java)
 
 Keyboard-accessible selection control with a clipped, virtualized modal overlay.
 Item membership is copied on assignment, while item objects remain shared. The
@@ -1282,7 +1282,7 @@ is prevented by attachment, disabled state, or an empty list.
 
 ### NanoComboBox.Popup — internal support type
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoComboBox.java#L244)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoComboBox.java)
 
 Root-sized modal receiver around the virtual option list. Handles dismissal and
 navigation keys while option buttons perform selection. Its lifetime is controlled
@@ -1320,7 +1320,7 @@ Other keys are left for option button activation or normal routing.
 
 ### NanoContainer
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoContainer.java#L21)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoContainer.java)
 
 Base container that participates in NanoVG rendering while delegating child
 traversal to the root's shared UI render context. Children can use either
@@ -1370,7 +1370,7 @@ NanoVG handle is not used directly because child dispatch belongs to the root.
 
 ### NanoGrid
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoGrid.java#L26)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoGrid.java)
 
 Wrapping NanoVG container with uniform optional cell constraints and state-aware
 background/border painting. Point-valued cell sizes determine the grid's own
@@ -1833,7 +1833,7 @@ traversal afterward. Requires a valid context and enclosing root dispatch.
 
 ### NanoHyperlink
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoHyperlink.java#L38)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoHyperlink.java)
 
 Focusable NanoVG text link that requests URI opening through the desktop or
 platform launcher. Null text becomes empty text; null or blank destinations
@@ -2134,7 +2134,7 @@ Paints visible text in the prepared NanoVG context, skipping a zero handle. Refr
 
 ### NanoImage
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoImage.java#L30)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoImage.java)
 
 UI image node that uploads borrowed TextureData to a lazily created NanoVG
 image and stretches it across the node's layout rectangle. The image pattern
@@ -2255,7 +2255,7 @@ dirty; assigning the identical reference performs no work or refresh.
 
 ### NanoLabel
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoLabel.java#L26)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoLabel.java)
 
 NanoVG text leaf with explicit line breaks, expanded tab stops, and left/top
 alignment. Fonts are selected by an already registered NanoVG name; this node
@@ -2539,7 +2539,7 @@ begun the NanoVG frame and prepared transforms and clipping.
 
 ### NanoModal
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoModal.java#L35)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoModal.java)
 
 NanoVG modal overlay containing a centered dialog panel and optional content.
 The constructor's parent locates the root when opening; root registration owns
@@ -2886,7 +2886,7 @@ and mixed-renderer dialog children receive prepared backend state.
 
 ### NanoNode
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoNode.java#L25)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoNode.java)
 
 Declares the NanoVG painting capability of a `valthorne.ui.UINode`.
 During `valthorne.ui.UIRoot#draw()`, the active render context detects
@@ -2934,7 +2934,7 @@ child-traversal boundary; adjacent siblings can share a NanoVG interval.
 
 ### NanoPanel
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoPanel.java#L19)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoPanel.java)
 
 NanoVG container painting a rounded background and optional inset border before
 mixed-renderer child traversal. Draw colors use disabled, pressed, focused,
@@ -3226,7 +3226,7 @@ NanoVG frame and visibility handling through normal root dispatch.
 
 ### NanoProgressBar
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoProgressBar.java#L27)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoProgressBar.java)
 
 NanoVG progress indicator with a target value and a separately animated display
 value. Horizontal fill grows left to right; vertical fill grows from the bottom.
@@ -3664,7 +3664,7 @@ not traverse children or manage NanoVG lifetime.
 
 ### NanoScrollPanel
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoScrollPanel.java#L40)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoScrollPanel.java)
 
 Scrollable NanoVG container with one managed content node and optional horizontal
 and vertical scrollbars. Offsets apply immediately; target fields retain the
@@ -4169,7 +4169,7 @@ and synchronizes targets with applied positions. Uses current cached bar widths.
 
 ### NanoScrollPanel.ScrollMetrics — internal support type
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoScrollPanel.java#L876)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoScrollPanel.java)
 
 Reusable top-left layout-space geometry for visible scrollbar tracks and thumbs.
 One instance belongs to the panel and is overwritten by each metric refresh;
@@ -4179,7 +4179,7 @@ all positions and dimensions use UI units. Hidden bars receive zero geometry.
 
 ### NanoSlider
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoSlider.java#L34)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoSlider.java)
 
 Focusable NanoVG range control with mouse, wheel, and keyboard input. Values
 are clamped and optionally snapped by RangeModel; horizontal values increase
@@ -4844,7 +4844,7 @@ Capture lifecycle and cancellation are managed by the surrounding root/node poli
 
 ### NanoTextField
 
-[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoTextField.java#L45)
+[Source](../../src/main/java/valthorne/ui/nodes/nano/NanoTextField.java)
 
 Single-line NanoVG editor backed by the shared TextEditModel for sanitized text,
 grapheme-aware movement, selection, undo/redo, and validation. Renderer fields

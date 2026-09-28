@@ -50,7 +50,7 @@ The sections below explain each component and its declared public or protected o
 
 ### ActivationBehavior
 
-[Source](../../src/main/java/valthorne/ui/behavior/ActivationBehavior.java#L24)
+[Source](../../src/main/java/valthorne/ui/behavior/ActivationBehavior.java)
 
 Applies the activation policy shared by texture and NanoVG buttons and
 checkboxes. Keyboard activation accepts Enter or Space on an enabled node;
@@ -109,7 +109,7 @@ when the release is accepted
 
 ### ChangeSignal
 
-[Source](../../src/main/java/valthorne/ui/behavior/ChangeSignal.java#L31)
+[Source](../../src/main/java/valthorne/ui/behavior/ChangeSignal.java)
 
 Synchronous change notification shared by UI models such as text editing and
 selection. Each registration receives an independent subscription handle and
@@ -175,7 +175,7 @@ callbacks, and subscription changes already made are not rolled back.
 
 ### ChangeSignal.Entry — internal support type
 
-[Source](../../src/main/java/valthorne/ui/behavior/ChangeSignal.java#L82)
+[Source](../../src/main/java/valthorne/ui/behavior/ChangeSignal.java)
 
 Identity-based registration and removal handle tied to its enclosing
 signal. The closed flag makes removal idempotent but is deliberately not
@@ -204,7 +204,7 @@ still invoke this entry after close returns.
 
 ### RangeModel
 
-[Source](../../src/main/java/valthorne/ui/behavior/RangeModel.java#L30)
+[Source](../../src/main/java/valthorne/ui/behavior/RangeModel.java)
 
 Stores the finite numeric state shared by texture and NanoVG sliders.
 Values are clamped to an inclusive range and can be snapped to increments
@@ -415,7 +415,7 @@ Up/Down do so for vertical ranges. Other keys leave the value unchanged.
 
 ### ScrollBehavior
 
-[Source](../../src/main/java/valthorne/ui/behavior/ScrollBehavior.java#L21)
+[Source](../../src/main/java/valthorne/ui/behavior/ScrollBehavior.java)
 
 Computes scroll offsets consistently for texture and NanoVG scroll panels.
 Wheel deltas are scaled into content-coordinate units and subtracted from
@@ -477,7 +477,7 @@ modified by this helper.
 
 ### TextEditing
 
-[Source](../../src/main/java/valthorne/ui/behavior/TextEditing.java#L27)
+[Source](../../src/main/java/valthorne/ui/behavior/TextEditing.java)
 
 Shared keyboard-shortcut and system-clipboard adapter for texture and NanoVG
 text fields backed by TextEditModel. Navigation and edits delegate to the model;
@@ -562,7 +562,7 @@ status is returned. Other failures may propagate.
 
 ### TextEditModel
 
-[Source](../../src/main/java/valthorne/ui/behavior/TextEditModel.java#L32)
+[Source](../../src/main/java/valthorne/ui/behavior/TextEditModel.java)
 
 Single-line editing independent of fonts, rendering and native input.
 Indices are UTF-16 offsets snapped to extended grapheme boundaries. Maximum length
@@ -937,7 +937,7 @@ uses grapheme boundaries and is not locale-sensitive word analysis.
 
 ### TextEditModel.State — internal support type
 
-[Source](../../src/main/java/valthorne/ui/behavior/TextEditModel.java#L486)
+[Source](../../src/main/java/valthorne/ui/behavior/TextEditModel.java)
 
 Immutable edit-history snapshot sharing the immutable text string. Endpoints
 represent the selection before an edit and are restored without revalidation.

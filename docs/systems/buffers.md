@@ -45,7 +45,7 @@ The sections below explain each component and its declared public or protected o
 
 ### ByteOrder
 
-[Source](../../src/main/java/valthorne/io/buffer/ByteOrder.java#L10)
+[Source](../../src/main/java/valthorne/io/buffer/ByteOrder.java)
 
 Selects the ordering of bytes in multi-byte values read or written by
 `DynamicByteBuffer`. The choice changes byte significance within a value;
@@ -76,7 +76,7 @@ Little-endian order (the least significant byte first).
 
 ### DynamicByteBuffer
 
-[Source](../../src/main/java/valthorne/io/buffer/DynamicByteBuffer.java#L62)
+[Source](../../src/main/java/valthorne/io/buffer/DynamicByteBuffer.java)
 
 A utility class for reading and writing various data types to a byte buffer with support for bit-level operations.
 

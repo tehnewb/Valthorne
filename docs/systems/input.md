@@ -47,7 +47,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Keyboard
 
-[Source](../../src/main/java/valthorne/Keyboard.java#L108)
+[Source](../../src/main/java/valthorne/Keyboard.java)
 
 The `Keyboard` class is Valthorne's global keyboard input manager. It provides
 a centralized static API for tracking key state, modifier state, Caps Lock state,
@@ -1232,7 +1232,7 @@ callback pipeline.
 
 ### Mouse
 
-[Source](../../src/main/java/valthorne/Mouse.java#L104)
+[Source](../../src/main/java/valthorne/Mouse.java)
 
 The `Mouse` class is Valthorne's global static mouse input manager for GLFW-based
 applications. It centralizes cursor position tracking, mouse button state, scroll wheel

@@ -48,7 +48,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Bits
 
-[Source](../../src/main/java/valthorne/collections/bits/Bits.java#L84)
+[Source](../../src/main/java/valthorne/collections/bits/Bits.java)
 
 ##### Bits
 
@@ -357,7 +357,7 @@ Bits[ 0000...0001 0000...0100 ]
 
 ### ByteBits
 
-[Source](../../src/main/java/valthorne/collections/bits/ByteBits.java#L68)
+[Source](../../src/main/java/valthorne/collections/bits/ByteBits.java)
 
 ##### ByteBits
 
@@ -709,7 +709,7 @@ packed byte representation.
 
 ### IntBits
 
-[Source](../../src/main/java/valthorne/collections/bits/IntBits.java#L52)
+[Source](../../src/main/java/valthorne/collections/bits/IntBits.java)
 
 ##### IntBits
 
@@ -1032,7 +1032,7 @@ Returns the raw integer bit mask stored by this container.
 
 ### LongBits
 
-[Source](../../src/main/java/valthorne/collections/bits/LongBits.java#L73)
+[Source](../../src/main/java/valthorne/collections/bits/LongBits.java)
 
 ##### LongBits
 
@@ -1424,7 +1424,7 @@ Returns the raw long value currently stored by this container.
 
 ### ShortBits
 
-[Source](../../src/main/java/valthorne/collections/bits/ShortBits.java#L56)
+[Source](../../src/main/java/valthorne/collections/bits/ShortBits.java)
 
 ##### ShortBits
 

@@ -55,7 +55,7 @@ The sections below explain each component and its declared public or protected o
 
 ### ProfessionalTheme
 
-[Source](../../src/main/java/valthorne/ui/theme/ProfessionalTheme.java#L34)
+[Source](../../src/main/java/valthorne/ui/theme/ProfessionalTheme.java)
 
 Builds a density-scaled light or dark skin for texture and NanoVG UI controls.
 The theme owns its bundled font and all nine-patch textures allocated by
@@ -216,7 +216,7 @@ to the released resources and must no longer be rendered.
 
 ### ResolvedStyle
 
-[Source](../../src/main/java/valthorne/ui/theme/ResolvedStyle.java#L55)
+[Source](../../src/main/java/valthorne/ui/theme/ResolvedStyle.java)
 
 `ResolvedStyle` represents the final computed style values for a UI element
 after theme tokens, matching rules, and explicit overrides have been merged together.
@@ -315,7 +315,7 @@ access to the whole result is needed.
 
 ### StyleKey
 
-[Source](../../src/main/java/valthorne/ui/theme/StyleKey.java#L75)
+[Source](../../src/main/java/valthorne/ui/theme/StyleKey.java)
 
 `StyleKey` is the strongly typed identifier used throughout Valthorne's
 theming and styling system. A style key represents a named property that can
@@ -539,7 +539,7 @@ to identify during debugging and logging.
 
 ### StyleMap
 
-[Source](../../src/main/java/valthorne/ui/theme/StyleMap.java#L86)
+[Source](../../src/main/java/valthorne/ui/theme/StyleMap.java)
 
 `StyleMap` is the core value container used by Valthorne's theming system.
 It stores style values indexed by `StyleKey` ID, allowing very fast lookups
@@ -782,7 +782,7 @@ empty, so callers can use this operation as an explicit invalidation.
 
 ### StyleState
 
-[Source](../../src/main/java/valthorne/ui/theme/StyleState.java#L82)
+[Source](../../src/main/java/valthorne/ui/theme/StyleState.java)
 
 `StyleState` is a compact mutable container used to represent the active
 visual and interaction state of a UI element in Valthorne's theming system.
@@ -1088,7 +1088,7 @@ This is mainly useful for debugging and logging.
 
 ### Theme
 
-[Source](../../src/main/java/valthorne/ui/theme/Theme.java#L69)
+[Source](../../src/main/java/valthorne/ui/theme/Theme.java)
 
 `Theme` is the root abstraction for creating UI theme definitions in Valthorne.
 It exists as a simple factory-style contract whose responsibility is to build and
@@ -1166,7 +1166,7 @@ returned object before handing it back to the caller.
 
 ### ThemeData
 
-[Source](../../src/main/java/valthorne/ui/theme/ThemeData.java#L98)
+[Source](../../src/main/java/valthorne/ui/theme/ThemeData.java)
 
 `ThemeData` is the central runtime representation of a UI theme in Valthorne.
 It stores style tokens, named resources, and rule sets that can later be resolved
@@ -1553,7 +1553,7 @@ ThemeData instance still targets the same route.
 
 ### ThemeDataChangeEvent
 
-[Source](../../src/main/java/valthorne/ui/theme/ThemeDataChangeEvent.java#L20)
+[Source](../../src/main/java/valthorne/ui/theme/ThemeDataChangeEvent.java)
 
 Represents an event that carries `ThemeData` as its payload, typically emitted when
 theme-related data changes in the system. This event extends the `Event` class, enabling
@@ -1609,7 +1609,7 @@ Sets the theme-related data for this event.
 
 ### ThemeListener
 
-[Source](../../src/main/java/valthorne/ui/theme/ThemeListener.java#L18)
+[Source](../../src/main/java/valthorne/ui/theme/ThemeListener.java)
 
 A `ThemeListener` listens for changes in theme data and performs actions upon receiving
 theme-related events.
@@ -1656,7 +1656,7 @@ theme changes.
 
 ### ThemeRule
 
-[Source](../../src/main/java/valthorne/ui/theme/ThemeRule.java#L77)
+[Source](../../src/main/java/valthorne/ui/theme/ThemeRule.java)
 
 `ThemeRule` represents a single rule entry inside the Valthorne theming system.
 A rule targets a specific UI element type, an optional style name, and a set of
@@ -1916,7 +1916,7 @@ the map's callback after storage; this does not register a standalone rule.
 
 ### UITokens
 
-[Source](../../src/main/java/valthorne/ui/theme/UITokens.java#L31)
+[Source](../../src/main/java/valthorne/ui/theme/UITokens.java)
 
 Shared semantic style keys for UI dimensions and palette roles. ThemeData can
 supply these as base tokens, while rules and per-node overrides may replace

@@ -72,7 +72,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Color
 
-[Source](../../src/main/java/valthorne/graphics/Color.java#L12)
+[Source](../../src/main/java/valthorne/graphics/Color.java)
 
 Represents a color in RGBA format. Colors are immutable and stored internally as 32-bit integers
 in the format 0xAARRGGBB where AA=alpha, RR=red, GG=green, BB=blue.
@@ -1318,7 +1318,7 @@ from this object's properties.
 
 ### Drawable
 
-[Source](../../src/main/java/valthorne/graphics/Drawable.java#L19)
+[Source](../../src/main/java/valthorne/graphics/Drawable.java)
 
 Defines an interface for objects that can be drawn to a specific position
 and size on a rendering surface. Implementations of this interface
@@ -1453,7 +1453,7 @@ Retrieves the height of the drawable object.
 
 ### DrawFunction
 
-[Source](../../src/main/java/valthorne/graphics/DrawFunction.java#L15)
+[Source](../../src/main/java/valthorne/graphics/DrawFunction.java)
 
 Functional interface representing a drawing functionality.
 This interface defines a single abstract method, `draw`, which can
@@ -1484,7 +1484,7 @@ propagate to the invoking code; the interface performs no recovery or scheduling
 
 ### ImmediateTextureRenderer
 
-[Source](../../src/main/java/valthorne/graphics/ImmediateTextureRenderer.java#L28)
+[Source](../../src/main/java/valthorne/graphics/ImmediateTextureRenderer.java)
 
 Shared immediate quad renderer used by standalone textured draw helpers.
 
@@ -1537,7 +1537,7 @@ restore GL state or configure blending/depth policy.
 
 ### Sprite
 
-[Source](../../src/main/java/valthorne/graphics/Sprite.java#L89)
+[Source](../../src/main/java/valthorne/graphics/Sprite.java)
 
 `Sprite` represents a textured 2D drawable built from a `TextureRegion`.
 It stores transform state such as position, size, scale, rotation, rotation origin,
@@ -2362,7 +2362,7 @@ reset to one, the origin is reset to zero, the tint color is set to
 
 ### FrameBuffer
 
-[Source](../../src/main/java/valthorne/graphics/texture/FrameBuffer.java#L55)
+[Source](../../src/main/java/valthorne/graphics/texture/FrameBuffer.java)
 
 Simple 2D framebuffer (render target) you can draw to, then draw its color texture like a sprite.
 
@@ -2586,7 +2586,7 @@ You can bind this texture and sample it in shaders, or draw it using fixed-funct
 
 ### NinePatchDrawable
 
-[Source](../../src/main/java/valthorne/graphics/texture/NinePatchDrawable.java#L16)
+[Source](../../src/main/java/valthorne/graphics/texture/NinePatchDrawable.java)
 
 `NinePatchDrawable` is a small `Drawable` adapter that wraps a
 `NinePatchTexture` so it can be used anywhere a generic drawable object
@@ -2713,7 +2713,7 @@ part of the `Drawable` contract with clear documentation.
 
 ### NinePatchTexture
 
-[Source](../../src/main/java/valthorne/graphics/texture/NinePatchTexture.java#L91)
+[Source](../../src/main/java/valthorne/graphics/texture/NinePatchTexture.java)
 
 `NinePatchTexture` represents a drawable nine-patch texture built around a
 backing `Texture` and a `TextureRegion`. It divides a texture into a
@@ -3323,7 +3323,7 @@ This delegates directly to the wrapped texture.
 
 ### SpriteCulling
 
-[Source](../../src/main/java/valthorne/graphics/texture/SpriteCulling.java#L18)
+[Source](../../src/main/java/valthorne/graphics/texture/SpriteCulling.java)
 
 Allocation-free conservative clip test for a sprite quad on the world XY plane
 at Z zero. The test rotates its four corners around a local origin, translates
@@ -3383,7 +3383,7 @@ values do not provide a meaningful visibility guarantee.
 
 ### Texture
 
-[Source](../../src/main/java/valthorne/graphics/texture/Texture.java#L84)
+[Source](../../src/main/java/valthorne/graphics/texture/Texture.java)
 
 `Texture` represents a GPU-backed 2D OpenGL texture in Valthorne.
 It acts as the primary wrapper around a texture object ID and its associated
@@ -3700,7 +3700,7 @@ The reset behavior restores the filtering mode to
 
 ### TextureAtlas
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureAtlas.java#L40)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureAtlas.java)
 
 Builds a square GPU texture atlas and keyed region views from borrowed CPU
 image data. Inputs may be complete textures, decoded images, or rectangular
@@ -3917,7 +3917,7 @@ height-sorted order.
 
 ### TextureAtlas.Item — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureAtlas.java#L388)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureAtlas.java)
 
 One borrowed source rectangle and its mutable shelf-packing destination.
 Failed placement attempts may overwrite only a prefix of the item list; every
@@ -3927,7 +3927,7 @@ successful build assigns all final destinations before copying pixels.
 
 ### TextureAtlas.Result
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureAtlas.java#L432)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureAtlas.java)
 
 Holds one built atlas's CPU data, GPU texture, and unmodifiable key mapping.
 Region and pixel objects remain mutable; the wrapper supplies no automatic
@@ -3988,7 +3988,7 @@ share the atlas texture.
 
 ### TextureBatch
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureBatch.java#L94)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureBatch.java)
 
 `TextureBatch` is Valthorne's instanced textured-quad renderer. It is designed
 to batch many sprite draw operations into as few OpenGL draw calls as possible while
@@ -4864,7 +4864,7 @@ instance VBOs. After this method is called, the batch should no longer be used.
 
 ### TextureBatchContract
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureBatchContract.java#L65)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureBatchContract.java)
 
 `TextureBatchContract` defines the shared rendering contract used by
 `TextureBatch` and its shaders. It centralizes all attribute indices,
@@ -5226,7 +5226,7 @@ before the method returns.
 
 ### TextureBatchShader
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureBatchShader.java#L71)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureBatchShader.java)
 
 ##### TextureBatchShader
 
@@ -5378,7 +5378,7 @@ This value should match the texture unit configuration expected by the
 
 ### TextureData
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureData.java#L41)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureData.java)
 
 Immutable container holding OpenGL texture information and its decoded width/height.
 
@@ -5519,7 +5519,7 @@ memory leaks. It should be called when the texture data is no longer needed.
 
 ### TextureDrawable
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureDrawable.java#L16)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureDrawable.java)
 
 A drawable implementation that renders a texture on the screen.
 
@@ -5614,7 +5614,7 @@ Returns the texture associated with this drawable.
 
 ### TextureFilter
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureFilter.java#L23)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureFilter.java)
 
 Represents the filtering mode applied to an OpenGL texture.
 
@@ -5735,7 +5735,7 @@ Checks whether magnification uses nearest-neighbor sampling. This predicate alon
 
 ### TextureLoader
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureLoader.java#L17)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureLoader.java)
 
 TextureLoader is responsible for loading texture data based on given parameters. It implements
 the `AssetLoader` interface and supports loading textures from both filesystem paths and
@@ -5773,7 +5773,7 @@ data has its own lifetime and must be released when no longer required.
 
 ### TexturePacker
 
-[Source](../../src/main/java/valthorne/graphics/texture/TexturePacker.java#L52)
+[Source](../../src/main/java/valthorne/graphics/texture/TexturePacker.java)
 
 CPU-side texture atlas builder that copies pixels from existing `TextureData`, `Texture`,
 or `TextureRegion` sources into a new RGBA8 atlas buffer.
@@ -5942,7 +5942,7 @@ Bounds behavior:
 
 ### TexturePacker.RegionRequest — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/texture/TexturePacker.java#L291)
+[Source](../../src/main/java/valthorne/graphics/texture/TexturePacker.java)
 
 Immutable description of one region copy request.
 
@@ -5962,7 +5962,7 @@ destination coordinates both use a top-left pixel origin.
 
 ### TextureParameters
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureParameters.java#L25)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureParameters.java)
 
 Represents configuration parameters for loading a texture asset.
 A texture can be sourced either from a file system path or in-memory bytes,
@@ -6138,7 +6138,7 @@ even when other parameters differ.
 
 ### TextureRegion
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureRegion.java#L74)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureRegion.java)
 
 `TextureRegion` represents a rectangular subsection of a `Texture`.
 Instead of rendering an entire texture, this class allows a specific portion
@@ -6407,7 +6407,7 @@ Returns the normalized V coordinate for the bottom side of the region.
 
 ### TextureRegionDrawable
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureRegionDrawable.java#L18)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureRegionDrawable.java)
 
 A drawable implementation that allows rendering a `TextureRegion` to a specified
 position and size. This class wraps a `TextureRegion` and provides a mechanism
@@ -6513,7 +6513,7 @@ represents the rectangular portion of a texture being drawn.
 
 ### TextureSource
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureSource.java#L14)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureSource.java)
 
 Represents a source for a texture, which can either be loaded from a file path or from raw image bytes.
 This interface is sealed, allowing only specific implementations for texture sources.
@@ -6525,7 +6525,7 @@ only and defer resource existence checks until loading.
 
 ### TextureSource.PathSource
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureSource.java#L24)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureSource.java)
 
 Immutable description of an encoded image file to be loaded later.
 Construction validates nonblank path text without checking existence or image
@@ -6555,7 +6555,7 @@ checked for emptiness but the original path text is retained unchanged.
 
 ### TextureSource.BytesSource
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureSource.java#L46)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureSource.java)
 
 Immutable encoded-image source that copies bytes on construction and access.
 The byte array must be nonempty, but image-format validity is deferred to loading.
@@ -6597,7 +6597,7 @@ does not modify this source; every call allocates another array.
 
 ### TextureUtility
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureUtility.java#L24)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureUtility.java)
 
 CPU helpers for extracting a simplified pixel contour and dividing a texture
 into grid regions. Contour tracing reads retained RGBA bytes, selects the largest
@@ -6679,7 +6679,7 @@ at the low-Y edge. Too many rows or columns can produce zero-sized regions.
 
 ### TextureUtility.Point — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureUtility.java#L630)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureUtility.java)
 
 Immutable integer pixel-edge coordinate used as a graph key during boundary
 stitching. Equality and hashing compare coordinate values.
@@ -6719,7 +6719,7 @@ Combines coordinate values consistently with equality for boundary lookup.
 
 ### TextureUtility.Edge — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/texture/TextureUtility.java#L680)
+[Source](../../src/main/java/valthorne/graphics/texture/TextureUtility.java)
 
 Directed pixel-boundary segment with a mutable traversal marker. Endpoints
 are immutable point values; stitching consumes each edge at most once.

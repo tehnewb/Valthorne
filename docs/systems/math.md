@@ -53,7 +53,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Area
 
-[Source](../../src/main/java/valthorne/math/geometry/Area.java#L12)
+[Source](../../src/main/java/valthorne/math/geometry/Area.java)
 
 Represents a geometric area defined by a sequence of points that form its boundary.
 Provides geometric operations such as point containment and area intersection.
@@ -108,7 +108,7 @@ or if one area contains any point from the other area.
 
 ### Border
 
-[Source](../../src/main/java/valthorne/math/geometry/Border.java#L13)
+[Source](../../src/main/java/valthorne/math/geometry/Border.java)
 
 Represents a border with a specified color and thickness.
 This class allows customization of a border's appearance
@@ -185,7 +185,7 @@ Stores border thickness without clamping or finite-value validation.
 
 ### Circle
 
-[Source](../../src/main/java/valthorne/math/geometry/Circle.java#L19)
+[Source](../../src/main/java/valthorne/math/geometry/Circle.java)
 
 A polygonal circle defined by the bottom-left corner of its bounding square,
 a nonnegative radius, and at least three perimeter samples. The center is
@@ -348,7 +348,7 @@ Coordinate setters overwrite its vectors, and segment changes replace the array.
 
 ### Polygon
 
-[Source](../../src/main/java/valthorne/math/geometry/Polygon.java#L14)
+[Source](../../src/main/java/valthorne/math/geometry/Polygon.java)
 
 Represents a polygon defined by a sequence of vertices in 2D space.
 A polygon is required to have a minimum of three vertices.
@@ -411,7 +411,7 @@ Null entries are possible because vertex elements are not validated.
 
 ### Rectangle
 
-[Source](../../src/main/java/valthorne/math/geometry/Rectangle.java#L15)
+[Source](../../src/main/java/valthorne/math/geometry/Rectangle.java)
 
 Represents a rectangle defined by its top-left corner coordinates and its dimensions.
 Provides methods to retrieve and manipulate the rectangle's properties,
@@ -591,7 +591,7 @@ overwritten by the next bounds update; copy values when retaining a snapshot.
 
 ### RoundedRectangle
 
-[Source](../../src/main/java/valthorne/math/geometry/RoundedRectangle.java#L19)
+[Source](../../src/main/java/valthorne/math/geometry/RoundedRectangle.java)
 
 Mutable axis-aligned rounded rectangle represented by reusable boundary points.
 Positive-radius corners use segmentsPerCorner plus one samples each, including
@@ -821,7 +821,7 @@ when sampling count changes. External coordinate edits do not update origin/size
 
 ### Shape
 
-[Source](../../src/main/java/valthorne/math/geometry/Shape.java#L14)
+[Source](../../src/main/java/valthorne/math/geometry/Shape.java)
 
 The Shape class serves as an abstract base class for defining 2D geometric shapes.
 It provides core functionality such as color and border management, rendering methods,
@@ -926,7 +926,7 @@ its thickness is greater than 0, and its color is defined.
 
 ### Triangle
 
-[Source](../../src/main/java/valthorne/math/geometry/Triangle.java#L14)
+[Source](../../src/main/java/valthorne/math/geometry/Triangle.java)
 
 Mutable 2D triangle with three copied vertex positions. Vertex getters and
 points expose the same internal vectors, so direct edits affect geometry.
@@ -1059,7 +1059,7 @@ the defining fields; modify their coordinates or use setters instead.
 
 ### MathUtils
 
-[Source](../../src/main/java/valthorne/math/MathUtils.java#L24)
+[Source](../../src/main/java/valthorne/math/MathUtils.java)
 
 Static numeric helpers for game calculations: interpolation, angles, random
 sampling, statistics, easing, distances, and integer bit operations. Methods

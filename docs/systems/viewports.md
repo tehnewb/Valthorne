@@ -50,7 +50,7 @@ The sections below explain each component and its declared public or protected o
 
 ### FillViewport
 
-[Source](../../src/main/java/valthorne/viewport/FillViewport.java#L37)
+[Source](../../src/main/java/valthorne/viewport/FillViewport.java)
 
 A viewport strategy that preserves the logical world aspect ratio while ensuring the screen
 is completely filled, even if part of the world must be cropped.
@@ -117,7 +117,7 @@ the current world size.
 
 ### FitViewport
 
-[Source](../../src/main/java/valthorne/viewport/FitViewport.java#L34)
+[Source](../../src/main/java/valthorne/viewport/FitViewport.java)
 
 A viewport strategy that preserves the logical world aspect ratio while fitting the entire
 world inside the available screen area.
@@ -181,7 +181,7 @@ orthographic projection is then rebuilt for the current world size.
 
 ### PerspectiveViewport
 
-[Source](../../src/main/java/valthorne/viewport/PerspectiveViewport.java#L45)
+[Source](../../src/main/java/valthorne/viewport/PerspectiveViewport.java)
 
 Viewport that binds a 3D camera's combined projection-view matrix into the engine.
 
@@ -528,7 +528,7 @@ It can differ from the viewport's pixel height after explicit sizing.
 
 ### ScreenViewport
 
-[Source](../../src/main/java/valthorne/viewport/ScreenViewport.java#L37)
+[Source](../../src/main/java/valthorne/viewport/ScreenViewport.java)
 
 A viewport strategy where the viewport fills the entire screen and, by default, the logical
 world size matches the actual screen size.
@@ -608,7 +608,7 @@ The fallback orthographic projection is then rebuilt so world units match screen
 
 ### StretchViewport
 
-[Source](../../src/main/java/valthorne/viewport/StretchViewport.java#L33)
+[Source](../../src/main/java/valthorne/viewport/StretchViewport.java)
 
 A viewport strategy that stretches the logical world to fill the entire screen rectangle.
 
@@ -671,7 +671,7 @@ projection is rebuilt for the current world size.
 
 ### Viewport
 
-[Source](../../src/main/java/valthorne/viewport/Viewport.java#L106)
+[Source](../../src/main/java/valthorne/viewport/Viewport.java)
 
 Base 2D viewport abstraction responsible for mapping a logical world area into a screen-space
 rectangle, applying the proper OpenGL viewport and engine-managed projection state,

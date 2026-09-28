@@ -48,7 +48,7 @@ The sections below explain each component and its declared public or protected o
 
 ### RadianceCascadeLevel
 
-[Source](../../src/main/java/valthorne/graphics/radiance/RadianceCascadeLevel.java#L17)
+[Source](../../src/main/java/valthorne/graphics/radiance/RadianceCascadeLevel.java)
 
 Stores one level's probe geometry and three owned floating-point textures: an
 interval target, a scratch target used for alternating extension passes, and a
@@ -221,7 +221,7 @@ or use it after the enclosing solver rebuilds or disposes this level.
 
 ### RadianceCascades
 
-[Source](../../src/main/java/valthorne/graphics/radiance/RadianceCascades.java#L54)
+[Source](../../src/main/java/valthorne/graphics/radiance/RadianceCascades.java)
 
 Flatland/screenspace radiance cascades built around the scaling described in the
 original paper: probe spacing doubles per level, ray count doubles per level,
@@ -393,7 +393,7 @@ and must not be rendered after disposal.
 
 ### RadianceCascadeSettings
 
-[Source](../../src/main/java/valthorne/graphics/radiance/RadianceCascadeSettings.java#L17)
+[Source](../../src/main/java/valthorne/graphics/radiance/RadianceCascadeSettings.java)
 
 Mutable configuration retained by a radiance-cascade solver. Configure hierarchy
 dimensions before constructing the solver: changing them later does not itself
@@ -749,7 +749,7 @@ This modifies configuration only and does not notify or rebuild an existing solv
 
 ### RadianceRenderTarget — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/radiance/RadianceRenderTarget.java#L19)
+[Source](../../src/main/java/valthorne/graphics/radiance/RadianceRenderTarget.java)
 
 Owns an RGBA16F texture and, optionally, a color-only framebuffer used by the
 radiance pipeline. All resource operations require the owning OpenGL context.
@@ -764,7 +764,7 @@ This helper has no closed-state guard; dispose after use and do not render again
 
 ### RadianceSceneBuffer
 
-[Source](../../src/main/java/valthorne/graphics/radiance/RadianceSceneBuffer.java#L28)
+[Source](../../src/main/java/valthorne/graphics/radiance/RadianceSceneBuffer.java)
 
 Owns a nearest-filtered floating-point framebuffer for captured radiance scene data.
 Begin/end temporarily replace the framebuffer and viewport; all resource and drawing
@@ -917,7 +917,7 @@ again; previously returned texture wrappers must no longer be used.
 
 ### RadianceTexture
 
-[Source](../../src/main/java/valthorne/graphics/radiance/RadianceTexture.java#L19)
+[Source](../../src/main/java/valthorne/graphics/radiance/RadianceTexture.java)
 
 Wraps an existing radiance texture ID for use by the texture-rendering API.
 The four-byte CPU placeholder supplies dimensions only and is not a full image

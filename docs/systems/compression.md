@@ -65,7 +65,7 @@ The sections below explain each component and its declared public or protected o
 
 ### BZIP2Strategy
 
-[Source](../../src/main/java/valthorne/compression/BZIP2Strategy.java#L30)
+[Source](../../src/main/java/valthorne/compression/BZIP2Strategy.java)
 
 The BZIP2Strategy class implements the CompressionStrategy interface, providing
 methods for compressing and decompressing data using the BZIP2 compression format.
@@ -124,7 +124,7 @@ The supplied encoded array is not modified.
 
 ### CompressionStrategy
 
-[Source](../../src/main/java/valthorne/compression/CompressionStrategy.java#L16)
+[Source](../../src/main/java/valthorne/compression/CompressionStrategy.java)
 
 The `CompressionStrategy` interface defines the contract for classes that implement various compression
 and decompression algorithms. Classes implementing this interface should provide methods to encode (compress)
@@ -227,7 +227,7 @@ Decompresses the input data represented as a byte array.
 
 ### Deflate
 
-[Source](../../src/main/java/valthorne/compression/Deflate.java#L22)
+[Source](../../src/main/java/valthorne/compression/Deflate.java)
 
 The Deflate class implements the CompressionStrategy interface and provides methods
 for compressing and decompressing data using the Deflate compression algorithm.
@@ -276,7 +276,7 @@ Decompresses the given byte array using the Deflate decompression algorithm.
 
 ### GZIP
 
-[Source](../../src/main/java/valthorne/compression/GZIP.java#L24)
+[Source](../../src/main/java/valthorne/compression/GZIP.java)
 
 The GZIP class implements the CompressionStrategy interface and provides methods
 for compressing and decompressing data using the GZIP (GNU ZIP) compression algorithm.
@@ -325,7 +325,7 @@ Decompresses the given byte array using the GZIP decompression algorithm.
 
 ### LZMAStrategy
 
-[Source](../../src/main/java/valthorne/compression/LZMAStrategy.java#L28)
+[Source](../../src/main/java/valthorne/compression/LZMAStrategy.java)
 
 The LZMAStrategy class implements the CompressionStrategy interface and provides
 methods for compressing and decompressing data using the LZMA (Lempel\u2013Ziv\u2013Markov chain algorithm) compression algorithm.
@@ -380,7 +380,7 @@ The supplied encoded array is not modified.
 
 ### XZStrategy
 
-[Source](../../src/main/java/valthorne/compression/XZStrategy.java#L35)
+[Source](../../src/main/java/valthorne/compression/XZStrategy.java)
 
 The XZStrategy class implements the CompressionStrategy interface and provides methods
 for compressing and decompressing data using the XZ compression algorithm.
@@ -444,7 +444,7 @@ The supplied encoded array is not modified.
 
 ### ZIP
 
-[Source](../../src/main/java/valthorne/compression/ZIP.java#L31)
+[Source](../../src/main/java/valthorne/compression/ZIP.java)
 
 The ZIP class implements the CompressionStrategy interface and provides methods
 for compressing and decompressing data using the ZIP compression format.

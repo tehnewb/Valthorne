@@ -46,7 +46,7 @@ The sections below explain each component and its declared public or protected o
 
 ### NumberUtility
 
-[Source](../../src/main/java/valthorne/utility/NumberUtility.java#L82)
+[Source](../../src/main/java/valthorne/utility/NumberUtility.java)
 
 ##### NumberUtility
 
@@ -863,7 +863,7 @@ This method delegates to `String#valueOf(double)`.
 
 ### ReflectionUtility
 
-[Source](../../src/main/java/valthorne/utility/ReflectionUtility.java#L13)
+[Source](../../src/main/java/valthorne/utility/ReflectionUtility.java)
 
 Provides JavaBean-style accessor names and exact-signature method discovery.
 Name generation does not verify that an accessor exists or invoke it. Discovery
@@ -929,7 +929,7 @@ returns false; a security failure during the inherited lookup can propagate.
 
 ### TextUtility
 
-[Source](../../src/main/java/valthorne/utility/TextUtility.java#L67)
+[Source](../../src/main/java/valthorne/utility/TextUtility.java)
 
 ##### TextUtility
 

@@ -49,7 +49,7 @@ The sections below explain each component and its declared public or protected o
 
 ### GameScreen
 
-[Source](../../src/main/java/valthorne/scene/GameScreen.java#L47)
+[Source](../../src/main/java/valthorne/scene/GameScreen.java)
 
 ##### GameScreen
 
@@ -189,7 +189,7 @@ Returns the currently active scene.
 
 ### Scene
 
-[Source](../../src/main/java/valthorne/scene/Scene.java#L94)
+[Source](../../src/main/java/valthorne/scene/Scene.java)
 
 ##### Scene
 
@@ -619,7 +619,7 @@ Returns whether the shared scene infrastructure has already been initialized.
 
 ### SceneKeyListener
 
-[Source](../../src/main/java/valthorne/scene/SceneKeyListener.java#L33)
+[Source](../../src/main/java/valthorne/scene/SceneKeyListener.java)
 
 ##### SceneKeyListener
 
@@ -701,7 +701,7 @@ Changes which scene receives forwarded key events.
 
 ### SceneMouseListener
 
-[Source](../../src/main/java/valthorne/scene/SceneMouseListener.java#L35)
+[Source](../../src/main/java/valthorne/scene/SceneMouseListener.java)
 
 ##### SceneMouseListener
 
@@ -809,7 +809,7 @@ Changes which scene receives forwarded mouse events.
 
 ### SceneMouseScrollListener
 
-[Source](../../src/main/java/valthorne/scene/SceneMouseScrollListener.java#L25)
+[Source](../../src/main/java/valthorne/scene/SceneMouseScrollListener.java)
 
 ##### SceneMouseScrollListener
 
@@ -875,7 +875,7 @@ Changes which scene receives forwarded scroll events.
 
 ### SceneWindowResizeListener
 
-[Source](../../src/main/java/valthorne/scene/SceneWindowResizeListener.java#L31)
+[Source](../../src/main/java/valthorne/scene/SceneWindowResizeListener.java)
 
 ##### SceneWindowResizeListener
 

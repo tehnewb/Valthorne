@@ -55,7 +55,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Font
 
-[Source](../../src/main/java/valthorne/graphics/font/Font.java#L98)
+[Source](../../src/main/java/valthorne/graphics/font/Font.java)
 
 Renders cached bitmap glyphs from a baked `FontData` atlas through a `TextureBatch`.
 
@@ -681,7 +681,7 @@ Borrows the FontData associated with this font without copying glyph or atlas da
 
 ### Font.CachedQuad — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/Font.java#L1485)
+[Source](../../src/main/java/valthorne/graphics/font/Font.java)
 
 Cached render data for one drawable glyph.
 
@@ -696,7 +696,7 @@ source text without rebuilding layout every frame.
 
 ### Font.OutlineOffset — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/font/Font.java#L1512)
+[Source](../../src/main/java/valthorne/graphics/font/Font.java)
 
 Cached offset data used for outline rendering.
 
@@ -707,7 +707,7 @@ used to soften the outline edge.
 
 ### FontData
 
-[Source](../../src/main/java/valthorne/graphics/font/FontData.java#L32)
+[Source](../../src/main/java/valthorne/graphics/font/FontData.java)
 
 Represents baked font atlas data and metrics for a specific pixel size and character range.
 
@@ -821,7 +821,7 @@ Tests whether a UTF-16 character falls within the contiguous baked glyph-array r
 
 ### FontLoader
 
-[Source](../../src/main/java/valthorne/graphics/font/FontLoader.java#L21)
+[Source](../../src/main/java/valthorne/graphics/font/FontLoader.java)
 
 The FontLoader class is responsible for loading font data using specified font parameters.
 It implements the AssetLoader interface, utilizing FontParameters as the configuration
@@ -860,7 +860,7 @@ manage its lifetime and separately construct a rendering font when needed.
 
 ### FontParameters
 
-[Source](../../src/main/java/valthorne/graphics/font/FontParameters.java#L22)
+[Source](../../src/main/java/valthorne/graphics/font/FontParameters.java)
 
 Describes an encoded font source, asset name, bake size, and character range.
 Construction validates a non-null source, nonblank name, positive font size, and
@@ -1037,7 +1037,7 @@ even when other parameters differ.
 
 ### FontSource
 
-[Source](../../src/main/java/valthorne/graphics/font/FontSource.java#L14)
+[Source](../../src/main/java/valthorne/graphics/font/FontSource.java)
 
 Represents the source of font data. It is a sealed interface that has two specific implementations:
 one for file path-based font sources and another for raw byte array-based font sources.
@@ -1049,7 +1049,7 @@ only and defer resource existence checks until loading.
 
 ### FontSource.PathSource
 
-[Source](../../src/main/java/valthorne/graphics/font/FontSource.java#L24)
+[Source](../../src/main/java/valthorne/graphics/font/FontSource.java)
 
 Immutable description of a font path whose contents are loaded later.
 Only nonblank path text is validated; construction does not check existence,
@@ -1079,7 +1079,7 @@ checked for emptiness but the original path text is retained unchanged.
 
 ### FontSource.BytesSource
 
-[Source](../../src/main/java/valthorne/graphics/font/FontSource.java#L45)
+[Source](../../src/main/java/valthorne/graphics/font/FontSource.java)
 
 A record that represents a font source defined by raw byte data.
 This source allows a font to be initialized with a byte array of the font's encoded data.
@@ -1119,7 +1119,7 @@ does not modify this source; every call allocates another array.
 
 ### FontStyler
 
-[Source](../../src/main/java/valthorne/graphics/font/FontStyler.java#L27)
+[Source](../../src/main/java/valthorne/graphics/font/FontStyler.java)
 
 Represents a functional interface for applying custom styling to glyphs during rendering.
 Implementations of this interface define the logic for modifying glyph styles based
@@ -1168,7 +1168,7 @@ within the text layout.
 
 ### Glyph
 
-[Source](../../src/main/java/valthorne/graphics/font/Glyph.java#L24)
+[Source](../../src/main/java/valthorne/graphics/font/Glyph.java)
 
 Represents a glyph in a font, containing positional and offset information.
 
@@ -1218,7 +1218,7 @@ Calculates the height of the glyph's bounding box.
 
 ### GlyphContext
 
-[Source](../../src/main/java/valthorne/graphics/font/GlyphContext.java#L13)
+[Source](../../src/main/java/valthorne/graphics/font/GlyphContext.java)
 
 Represents context information for a glyph in the text rendering pipeline.
 
@@ -1354,7 +1354,7 @@ Updates all properties of the glyph context with the provided values.
 
 ### GlyphStyle
 
-[Source](../../src/main/java/valthorne/graphics/font/GlyphStyle.java#L16)
+[Source](../../src/main/java/valthorne/graphics/font/GlyphStyle.java)
 
 Represents the visual styling attributes for a glyph.
 

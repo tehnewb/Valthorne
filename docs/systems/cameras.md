@@ -51,7 +51,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Camera
 
-[Source](../../src/main/java/valthorne/camera/Camera.java#L38)
+[Source](../../src/main/java/valthorne/camera/Camera.java)
 
 The `Camera` class serves as the abstract foundation for all 2D camera
 implementations within the JGL framework. It provides common properties and
@@ -184,7 +184,7 @@ Returns the active projection matrix used by the camera during rendering.
 
 ### Camera3D
 
-[Source](../../src/main/java/valthorne/camera/Camera3D.java#L36)
+[Source](../../src/main/java/valthorne/camera/Camera3D.java)
 
 Owns a mutable camera pose, projection and view matrices, their combined inverse,
 and a frustum for projection, picking, and culling. Subclasses supply the projection
@@ -761,7 +761,7 @@ aspect ratio without replacing the owned matrix reference.
 
 ### OrbitCameraController
 
-[Source](../../src/main/java/valthorne/camera/OrbitCameraController.java#L24)
+[Source](../../src/main/java/valthorne/camera/OrbitCameraController.java)
 
 Maintains a Z-up editor camera's orbit center, angular pose, and viewing distance.
 Input integration is left to the caller: drag deltas rotate or pan, wheel deltas
@@ -865,7 +865,7 @@ until the camera is rebuilt.
 
 ### OrthographicCamera
 
-[Source](../../src/main/java/valthorne/camera/OrthographicCamera.java#L34)
+[Source](../../src/main/java/valthorne/camera/OrthographicCamera.java)
 
 The `OrthographicCamera` class provides a standard 2D orthographic camera.
 It extends `Camera` and constructs an axis-aligned orthographic projection
@@ -923,7 +923,7 @@ The projection boundaries are computed so that the camera centers on
 
 ### OrthographicCamera3D
 
-[Source](../../src/main/java/valthorne/camera/OrthographicCamera3D.java#L12)
+[Source](../../src/main/java/valthorne/camera/OrthographicCamera3D.java)
 
 Orthographic camera whose visible height is `worldHeight / zoom` world
 units. Width follows the viewport aspect ratio, and the projection is centered
@@ -1003,7 +1003,7 @@ The base rebuild operation updates the remaining derived camera state.
 
 ### PerspectiveCamera
 
-[Source](../../src/main/java/valthorne/camera/PerspectiveCamera.java#L12)
+[Source](../../src/main/java/valthorne/camera/PerspectiveCamera.java)
 
 Perspective camera with a configurable vertical field of view in degrees.
 The default angle is 67 degrees; aspect ratio comes from the viewport dimensions
@@ -1058,7 +1058,7 @@ the view matrix, inverse matrix, or frustum itself.
 
 ### UIOrthographicCamera
 
-[Source](../../src/main/java/valthorne/camera/UIOrthographicCamera.java#L40)
+[Source](../../src/main/java/valthorne/camera/UIOrthographicCamera.java)
 
 The `UIOrthographicCamera` class provides a specialized orthographic camera
 designed for UI and screen-space rendering. Unlike a world-space camera, this camera

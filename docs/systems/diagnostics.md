@@ -48,7 +48,7 @@ The sections below explain each component and its declared public or protected o
 
 ### PerformanceOverlay
 
-[Source](../../src/main/java/valthorne/graphics/debug/PerformanceOverlay.java#L28)
+[Source](../../src/main/java/valthorne/graphics/debug/PerformanceOverlay.java)
 
 Small atlas-based FPS/frame-time display. Create/dispose on the GL thread.
 Printable ASCII is rasterized once with AWT into an owned texture atlas. Frame
@@ -128,7 +128,7 @@ become unusable afterward; close on the owning graphics thread after drawing end
 
 ### UIFrameStats
 
-[Source](../../src/main/java/valthorne/ui/UIFrameStats.java#L33)
+[Source](../../src/main/java/valthorne/ui/UIFrameStats.java)
 
 Immutable snapshot of CPU timing and drawing counters published by a UI root.
 Layout counters accumulate until the root records a draw's statistics, then
@@ -161,7 +161,7 @@ and the root initially exposes an all-zero snapshot.
 
 ### UIInspector
 
-[Source](../../src/main/java/valthorne/ui/UIInspector.java#L44)
+[Source](../../src/main/java/valthorne/ui/UIInspector.java)
 
 Collects opt-in inspection data from nodes dispatched during a UI root draw.
 Entries describe translated layout bounds, the effective batch clip, focus
@@ -265,7 +265,7 @@ references and nested style values are not deep-copied.
 
 ### UIInspector.Bounds
 
-[Source](../../src/main/java/valthorne/ui/UIInspector.java#L132)
+[Source](../../src/main/java/valthorne/ui/UIInspector.java)
 
 Immutable rectangle captured in top-left render-space layout units.
 Values describe a node box or a scissor rectangle before camera projection.
@@ -280,7 +280,7 @@ The record stores supplied values without normalization or validation.
 
 ### UIInspector.Entry
 
-[Source](../../src/main/java/valthorne/ui/UIInspector.java#L150)
+[Source](../../src/main/java/valthorne/ui/UIInspector.java)
 
 Captures one node-dispatch observation. Rectangle and boolean values are
 snapshots; the node remains a live reference. Internally recorded style maps

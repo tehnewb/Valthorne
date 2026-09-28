@@ -67,7 +67,7 @@ The sections below explain each component and its declared public or protected o
 
 ### ByteFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/ByteFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/ByteFastStack.java)
 
 Array-backed last-in, first-out storage for byte values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -202,7 +202,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### ByteFastStack.ByteFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/ByteFastStack.java#L153)
+[Source](../../src/main/java/valthorne/collections/stack/ByteFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -252,7 +252,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### CharFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/CharFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/CharFastStack.java)
 
 Array-backed last-in, first-out storage for char values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -387,7 +387,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### CharFastStack.CharFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/CharFastStack.java#L150)
+[Source](../../src/main/java/valthorne/collections/stack/CharFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -437,7 +437,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### DoubleFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/DoubleFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/DoubleFastStack.java)
 
 Array-backed last-in, first-out storage for double values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -572,7 +572,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### DoubleFastStack.DoubleFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/DoubleFastStack.java#L150)
+[Source](../../src/main/java/valthorne/collections/stack/DoubleFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -622,7 +622,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### FastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/FastStack.java#L22)
+[Source](../../src/main/java/valthorne/collections/stack/FastStack.java)
 
 Array-backed last-in, first-out storage for object references. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -759,7 +759,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### FastStack.FastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/FastStack.java#L152)
+[Source](../../src/main/java/valthorne/collections/stack/FastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -809,7 +809,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### FloatFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/FloatFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/FloatFastStack.java)
 
 Array-backed last-in, first-out storage for float values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -944,7 +944,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### FloatFastStack.FloatFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/FloatFastStack.java#L148)
+[Source](../../src/main/java/valthorne/collections/stack/FloatFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -994,7 +994,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### IntFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/IntFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/IntFastStack.java)
 
 Array-backed last-in, first-out storage for int values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -1129,7 +1129,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### IntFastStack.IntFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/IntFastStack.java#L148)
+[Source](../../src/main/java/valthorne/collections/stack/IntFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -1179,7 +1179,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### LongFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/LongFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/LongFastStack.java)
 
 Array-backed last-in, first-out storage for long values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -1314,7 +1314,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### LongFastStack.LongFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/LongFastStack.java#L150)
+[Source](../../src/main/java/valthorne/collections/stack/LongFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;
@@ -1364,7 +1364,7 @@ Use the enclosing stack's operations outside iteration instead.
 
 ### ShortFastStack
 
-[Source](../../src/main/java/valthorne/collections/stack/ShortFastStack.java#L21)
+[Source](../../src/main/java/valthorne/collections/stack/ShortFastStack.java)
 
 Array-backed last-in, first-out storage for short values. Positive
 capacity doubles when full; push and pop normally access only the top slot.
@@ -1499,7 +1499,7 @@ removal. Keep the stack unchanged while using the iterator.
 
 ### ShortFastStack.ShortFastStackIterator — internal support type
 
-[Source](../../src/main/java/valthorne/collections/stack/ShortFastStack.java#L152)
+[Source](../../src/main/java/valthorne/collections/stack/ShortFastStack.java)
 
 Live-storage iterator with an independent descending cursor initialized from
 the enclosing stack's top slot. It is neither a snapshot nor fail-fast;

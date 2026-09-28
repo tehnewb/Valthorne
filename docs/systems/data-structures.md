@@ -48,7 +48,7 @@ The sections below explain each component and its declared public or protected o
 
 ### StringObjectMap
 
-[Source](../../src/main/java/valthorne/collections/map/StringObjectMap.java#L84)
+[Source](../../src/main/java/valthorne/collections/map/StringObjectMap.java)
 
 `StringObjectMap` is a hash map implementation specialized for `String`
 keys and arbitrary object values. It uses open addressing with linear probing
@@ -388,7 +388,7 @@ Values are copied in table iteration order, which is not insertion order.
 
 ### IntUUIDQueue
 
-[Source](../../src/main/java/valthorne/collections/queue/IntUUIDQueue.java#L17)
+[Source](../../src/main/java/valthorne/collections/queue/IntUUIDQueue.java)
 
 Sequential int index generator with a reusable-index buffer. Callers return
 indices with push; buffered values are normally reused in last-in, first-out
@@ -467,7 +467,7 @@ buffer. Modifying the result does not change subsequent allocation.
 
 ### LongUUIDQueue
 
-[Source](../../src/main/java/valthorne/collections/queue/LongUUIDQueue.java#L17)
+[Source](../../src/main/java/valthorne/collections/queue/LongUUIDQueue.java)
 
 Sequential long index generator with a reusable-index buffer. Callers return
 indices with push; buffered values are normally reused in last-in, first-out
@@ -546,7 +546,7 @@ buffer. Modifying the result does not change subsequent allocation.
 
 ### ShortUUIDQueue
 
-[Source](../../src/main/java/valthorne/collections/queue/ShortUUIDQueue.java#L17)
+[Source](../../src/main/java/valthorne/collections/queue/ShortUUIDQueue.java)
 
 Sequential short index generator with a reusable-index buffer. Callers return
 indices with push; buffered values are normally reused in last-in, first-out
@@ -625,7 +625,7 @@ buffer. Modifying the result does not change subsequent allocation.
 
 ### IntBinaryTree
 
-[Source](../../src/main/java/valthorne/collections/tree/IntBinaryTree.java#L20)
+[Source](../../src/main/java/valthorne/collections/tree/IntBinaryTree.java)
 
 Array-backed integer search tree whose nodes refer to children by array index.
 Greater values follow the left link and other values follow the right link;
@@ -684,7 +684,7 @@ Returns a string representation of the binary tree.
 
 ### IntBinaryTree.Node — internal support type
 
-[Source](../../src/main/java/valthorne/collections/tree/IntBinaryTree.java#L104)
+[Source](../../src/main/java/valthorne/collections/tree/IntBinaryTree.java)
 
 Mutable array-stored tree node containing an integer and child indices.
 Minus one denotes a missing child. Links refer to the enclosing tree's storage

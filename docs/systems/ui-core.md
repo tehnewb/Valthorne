@@ -58,7 +58,7 @@ The sections below explain each component and its declared public or protected o
 
 ### NanoUtility
 
-[Source](../../src/main/java/valthorne/ui/NanoUtility.java#L26)
+[Source](../../src/main/java/valthorne/ui/NanoUtility.java)
 
 Shared NanoVG color conversion and text measurement helpers. Four per-thread
 color slots and per-thread metric arrays avoid repeated scratch allocation.
@@ -334,7 +334,7 @@ changes native font state through metric calls.
 
 ### NodeAction
 
-[Source](../../src/main/java/valthorne/ui/NodeAction.java#L11)
+[Source](../../src/main/java/valthorne/ui/NodeAction.java)
 
 Represents an action that can be performed on a given node of type `N`.
 Implementations receive the node itself and may update its state. This contract
@@ -363,7 +363,7 @@ that mutate UI state should follow the owning root's threading requirements.
 
 ### UIConstants
 
-[Source](../../src/main/java/valthorne/ui/UIConstants.java#L16)
+[Source](../../src/main/java/valthorne/ui/UIConstants.java)
 
 ##### UIConstants
 
@@ -417,7 +417,7 @@ The following layout categories are applied:
 
 ### UIContainer
 
-[Source](../../src/main/java/valthorne/ui/UIContainer.java#L78)
+[Source](../../src/main/java/valthorne/ui/UIContainer.java)
 
 ##### UIContainer
 
@@ -716,7 +716,7 @@ Java child membership is retained for a future attachment.
 
 ### UIContainer.ChildView — internal support type
 
-[Source](../../src/main/java/valthorne/ui/UIContainer.java#L482)
+[Source](../../src/main/java/valthorne/ui/UIContainer.java)
 
 Read-only list adapter over the enclosing container's current child storage.
 Membership is live rather than copied, and random indexed access delegates to
@@ -756,7 +756,7 @@ Returns the enclosing container's current child count.
 
 ### UIInputEvent
 
-[Source](../../src/main/java/valthorne/ui/UIInputEvent.java#L29)
+[Source](../../src/main/java/valthorne/ui/UIInputEvent.java)
 
 Describes one receiver's preview or bubble callback during root input routing.
 The target remains the original destination, while the current target identifies
@@ -827,7 +827,7 @@ performed by another receiver or directly through the underlying event.
 
 ### UINode
 
-[Source](../../src/main/java/valthorne/ui/UINode.java#L116)
+[Source](../../src/main/java/valthorne/ui/UINode.java)
 
 ##### UINode
 
@@ -2111,7 +2111,7 @@ If the provided text is null or blank, the tooltip is removed. Otherwise a new
 
 ### UIRenderContext
 
-[Source](../../src/main/java/valthorne/ui/UIRenderContext.java#L56)
+[Source](../../src/main/java/valthorne/ui/UIRenderContext.java)
 
 Coordinates texture-batch and NanoVG painting within one UI root draw.
 Containers retain responsibility for child traversal; this context selects
@@ -2302,7 +2302,7 @@ translation to the rectangle. Prefer nonnegative finite dimensions.
 
 ### UIRenderContext.Scope
 
-[Source](../../src/main/java/valthorne/ui/UIRenderContext.java#L331)
+[Source](../../src/main/java/valthorne/ui/UIRenderContext.java)
 
 Owns one pending restoration action for a translation or clipping scope.
 Use with try-with-resources inside the root draw and close nested scopes in
@@ -2334,7 +2334,7 @@ the current drawing or stack state
 
 ### UIRoot
 
-[Source](../../src/main/java/valthorne/ui/UIRoot.java#L144)
+[Source](../../src/main/java/valthorne/ui/UIRoot.java)
 
 `UIRoot` is the top-level root container for Valthorne's UI system.
 It acts as the central coordinator for layout, rendering, focus management,
@@ -2805,7 +2805,7 @@ disposal, so callers must arrange ownership of both contexts.
 
 ### UIRoot.FocusScope — internal support type
 
-[Source](../../src/main/java/valthorne/ui/UIRoot.java#L1392)
+[Source](../../src/main/java/valthorne/ui/UIRoot.java)
 
 One modal input boundary and the focus target that preceded it. Both nodes
 are borrowed references; eligibility is rechecked when restoring focus.
@@ -2820,7 +2820,7 @@ a scope may restore its previous focus only if that node is still attached and e
 
 ### UIRoot.RootKeyListener — internal support type
 
-[Source](../../src/main/java/valthorne/ui/UIRoot.java#L1404)
+[Source](../../src/main/java/valthorne/ui/UIRoot.java)
 
 Persistent global keyboard adapter owned by this root. Forwards press and
 release events into scoped root routing and is unregistered during disposal.
@@ -2858,7 +2858,7 @@ Forwards a key release event to `UIRoot#handleKeyReleased(KeyReleaseEvent)`.
 
 ### UIRoot.RootMouseListener — internal support type
 
-[Source](../../src/main/java/valthorne/ui/UIRoot.java#L1440)
+[Source](../../src/main/java/valthorne/ui/UIRoot.java)
 
 Persistent pointer adapter forwarding presses, releases, drags, and movement
 to the owning root's capture and hover logic.
@@ -2916,7 +2916,7 @@ Forwards a mouse move event to `UIRoot#handleMouseMoved(MouseMoveEvent)`.
 
 ### UIRoot.RootScrollListener — internal support type
 
-[Source](../../src/main/java/valthorne/ui/UIRoot.java#L1500)
+[Source](../../src/main/java/valthorne/ui/UIRoot.java)
 
 Persistent global scroll adapter forwarding events into the owning root's
 hit testing and bubbling path.
@@ -2944,7 +2944,7 @@ Forwards a mouse scroll event to `UIRoot#handleMouseScrolled(MouseScrollEvent)`.
 
 ### UIRoot.RootWindowListener — internal support type
 
-[Source](../../src/main/java/valthorne/ui/UIRoot.java#L1524)
+[Source](../../src/main/java/valthorne/ui/UIRoot.java)
 
 Persistent resize adapter updating the root and optional viewport when the
 window dimensions change. Unregistered with the root lifecycle.

@@ -95,7 +95,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Application
 
-[Source](../../src/main/java/valthorne/Application.java#L11)
+[Source](../../src/main/java/valthorne/Application.java)
 
 Defines the initialization, frame update, rendering, and cleanup callbacks of a
 Valthorne application. Implementations keep application state between callbacks
@@ -152,7 +152,7 @@ dispose of any resources that were allocated during the application's lifecycle.
 
 ### JGL
 
-[Source](../../src/main/java/valthorne/JGL.java#L43)
+[Source](../../src/main/java/valthorne/JGL.java)
 
 The `JGL` class forms the core of the Valthorne 2D game engine framework.
 It operates as a high-level orchestrator responsible for managing the application's lifecycle,
@@ -327,7 +327,7 @@ animations or physics updates, ensuring consistent behavior regardless of frame 
 
 ### JGLConfiguration
 
-[Source](../../src/main/java/valthorne/JGLConfiguration.java#L83)
+[Source](../../src/main/java/valthorne/JGLConfiguration.java)
 
 `JGLConfiguration` is the central fluent configuration object used to define
 how Valthorne should create and initialize its GLFW window and OpenGL context.
@@ -1312,7 +1312,7 @@ override a previously assigned standard hint if the same GLFW hint constant is u
 
 ### SwapInterval
 
-[Source](../../src/main/java/valthorne/SwapInterval.java#L11)
+[Source](../../src/main/java/valthorne/SwapInterval.java)
 
 Represents available swap interval (VSync) settings.
 Values are passed to the window's buffer-swap configuration. Positive intervals
@@ -1379,7 +1379,7 @@ Reading the value has no effect on the active graphics context.
 
 ### Window
 
-[Source](../../src/main/java/valthorne/Window.java#L46)
+[Source](../../src/main/java/valthorne/Window.java)
 
 GLFW window wrapper for Valthorne.
 

@@ -45,7 +45,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Pool
 
-[Source](../../src/main/java/valthorne/io/pool/Pool.java#L77)
+[Source](../../src/main/java/valthorne/io/pool/Pool.java)
 
 `Pool` is a generic reusable object pool designed to reduce repeated
 allocations by recycling objects instead of constantly creating and discarding them.
@@ -203,7 +203,7 @@ new ones through the factory.
 
 ### Poolable
 
-[Source](../../src/main/java/valthorne/io/pool/Poolable.java#L21)
+[Source](../../src/main/java/valthorne/io/pool/Poolable.java)
 
 Represents an interface for objects that can be pooled and reused.
 Implementations of this interface must provide a mechanism to reset

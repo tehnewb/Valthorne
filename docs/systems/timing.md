@@ -54,7 +54,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Tick
 
-[Source](../../src/main/java/valthorne/tick/Tick.java#L42)
+[Source](../../src/main/java/valthorne/tick/Tick.java)
 
 A lightweight time-based tick utility.
 
@@ -221,7 +221,7 @@ Returns the current delay interval.
 
 ### TimeUtility
 
-[Source](../../src/main/java/valthorne/utility/TimeUtility.java#L29)
+[Source](../../src/main/java/valthorne/utility/TimeUtility.java)
 
 Time-related utilities focused on real engine needs (game loop, cooldowns, timers),
 without duplicating obvious `System` wrappers.

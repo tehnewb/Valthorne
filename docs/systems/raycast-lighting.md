@@ -56,7 +56,7 @@ The sections below explain each component and its declared public or protected o
 
 ### ConeLight
 
-[Source](../../src/main/java/valthorne/graphics/lighting/ConeLight.java#L15)
+[Source](../../src/main/java/valthorne/graphics/lighting/ConeLight.java)
 
 Directional two-dimensional light whose rays cover an angular sector. The
 center direction is counterclockwise from positive X; the aperture is the full
@@ -223,7 +223,7 @@ marking endpoint geometry dirty.
 
 ### DynamicMesh2D — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting/DynamicMesh2D.java#L28)
+[Source](../../src/main/java/valthorne/graphics/lighting/DynamicMesh2D.java)
 
 Owns fixed-capacity CPU float storage, a vertex buffer, and a vertex array for
 two-dimensional light geometry. Each vertex contains position XY, local XY, and RGBA
@@ -327,7 +327,7 @@ track disposal, so the owner must call it once and avoid subsequent use.
 
 ### Light
 
-[Source](../../src/main/java/valthorne/graphics/lighting/Light.java#L21)
+[Source](../../src/main/java/valthorne/graphics/lighting/Light.java)
 
 Shared mutable configuration and ray results for two-dimensional lights.
 Derived classes choose endpoint directions and rebuild active, dirty lights.
@@ -927,7 +927,7 @@ Returns pending rebuild state without recomputing geometry.
 
 ### LightMapRenderer
 
-[Source](../../src/main/java/valthorne/graphics/lighting/LightMapRenderer.java#L23)
+[Source](../../src/main/java/valthorne/graphics/lighting/LightMapRenderer.java)
 
 OpenGL helper for composing a two-dimensional light map and baking irradiance
 into it. Draws a fullscreen triangle into the caller's current framebuffer and
@@ -991,7 +991,7 @@ OpenGL context. Do not render afterward; repeated disposal is not guarded.
 
 ### LightMesh
 
-[Source](../../src/main/java/valthorne/graphics/lighting/LightMesh.java#L14)
+[Source](../../src/main/java/valthorne/graphics/lighting/LightMesh.java)
 
 Uploads a closed triangle fan for a two-dimensional light footprint. The first
 vertex is the light center, followed by ordered ray endpoints and a repeated first
@@ -1042,7 +1042,7 @@ the caller supplies perimeter order. Zero radius produces zero local coordinates
 
 ### LightOccluder
 
-[Source](../../src/main/java/valthorne/graphics/lighting/LightOccluder.java#L14)
+[Source](../../src/main/java/valthorne/graphics/lighting/LightOccluder.java)
 
 Associates a borrowed geometric area with a collider identity and light-blocking
 category mask. Geometry queries delegate directly to the area, so changes to the
@@ -1160,7 +1160,7 @@ A null light is treated as an unfiltered query and always returns true.
 
 ### LightTexture
 
-[Source](../../src/main/java/valthorne/graphics/lighting/LightTexture.java#L24)
+[Source](../../src/main/java/valthorne/graphics/lighting/LightTexture.java)
 
 Adapts an RGBA16F lighting texture to the normal texture API with explicit native
 ownership. The size-only constructor allocates storage; the ID constructor wraps
@@ -1227,7 +1227,7 @@ and filter references. The stored texture ID is retained; dispose only once.
 
 ### PointLight
 
-[Source](../../src/main/java/valthorne/graphics/lighting/PointLight.java#L12)
+[Source](../../src/main/java/valthorne/graphics/lighting/PointLight.java)
 
 Casts evenly spaced rays around a full circle to form a radial light footprint.
 Active dirty lights rebuild endpoints; unchanged or inactive lights retain their
@@ -1284,7 +1284,7 @@ Does not validate the index, array length, or radial extent.
 
 ### PolygonLight
 
-[Source](../../src/main/java/valthorne/graphics/lighting/PolygonLight.java#L14)
+[Source](../../src/main/java/valthorne/graphics/lighting/PolygonLight.java)
 
 Refines a radial light footprint by adding rays at and around nearby occluder
 vertices. Base rays maintain circular coverage while extra angles improve corner
@@ -1343,7 +1343,7 @@ Does not validate the index, array length, or radial extent.
 
 ### RayCastHit
 
-[Source](../../src/main/java/valthorne/graphics/lighting/RayCastHit.java#L11)
+[Source](../../src/main/java/valthorne/graphics/lighting/RayCastHit.java)
 
 Reusable mutable result of a two-dimensional segment cast. Position, segment
 fraction, hit status, and borrowed collider identity are independent stored values;
@@ -1507,7 +1507,7 @@ modify or dispose any previously referenced collider.
 
 ### RayCastWorld
 
-[Source](../../src/main/java/valthorne/graphics/lighting/RayCastWorld.java#L14)
+[Source](../../src/main/java/valthorne/graphics/lighting/RayCastWorld.java)
 
 Supplies segment queries for two-dimensional light occlusion. Implementations
 define geometry storage and hit-object reuse. The output-parameter overload allows
@@ -1596,7 +1596,7 @@ can override this to support lights that cast extra rays near occluder corners.
 
 ### RayHandler
 
-[Source](../../src/main/java/valthorne/graphics/lighting/RayHandler.java#L41)
+[Source](../../src/main/java/valthorne/graphics/lighting/RayHandler.java)
 
 Screen-space two-dimensional lighting pipeline combining ray-cast light fans,
 soft fringes, and an ambient light map. Coordinates correspond to the supplied
@@ -1777,7 +1777,7 @@ all subordinate resources is not guarded.
 
 ### ShapeRaycastWorld
 
-[Source](../../src/main/java/valthorne/graphics/lighting/ShapeRaycastWorld.java#L33)
+[Source](../../src/main/java/valthorne/graphics/lighting/ShapeRaycastWorld.java)
 
 Mutable polygon-boundary occlusion world backed by a uniform spatial grid.
 Shapes are borrowed, duplicates are allowed, and category masks filter which
@@ -2016,7 +2016,7 @@ The wrappers themselves remain mutable and refer to borrowed shapes.
 
 ### ShapeRaycastWorld.Bounds — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting/ShapeRaycastWorld.java#L578)
+[Source](../../src/main/java/valthorne/graphics/lighting/ShapeRaycastWorld.java)
 
 Reusable axis-aligned extent for one registered occluder. Validity is
 separate from coordinates so empty geometry can reuse existing storage.
@@ -2028,7 +2028,7 @@ rejection. An overlapping bound does not establish an exact ray intersection.
 
 ### ShapeRaycastWorld.IntBag — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting/ShapeRaycastWorld.java#L612)
+[Source](../../src/main/java/valthorne/graphics/lighting/ShapeRaycastWorld.java)
 
 Growable primitive index list for one spatial bucket. Only entries before
 size are valid; capacity grows without boxing occluder indices.
@@ -2040,7 +2040,7 @@ which entries are meaningful and rebuilds buckets when occluder placement change
 
 ### SoftShadowMesh
 
-[Source](../../src/main/java/valthorne/graphics/lighting/SoftShadowMesh.java#L14)
+[Source](../../src/main/java/valthorne/graphics/lighting/SoftShadowMesh.java)
 
 Reusable GPU triangle mesh for radially fading shadow fringes. Each qualifying
 edge between cyclic light-ray endpoints becomes a quad fading from its hit
@@ -2095,7 +2095,7 @@ Local shader coordinates are divided by radius, or zero when radius is zero.
 
 ### VertexCastLight — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting/VertexCastLight.java#L16)
+[Source](../../src/main/java/valthorne/graphics/lighting/VertexCastLight.java)
 
 Base for lights that accumulate, sort, and compact ray angles before casting.
 Angle storage grows as needed and is reused across updates. Numerical deduplication

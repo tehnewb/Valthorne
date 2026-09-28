@@ -73,7 +73,7 @@ The sections below explain each component and its declared public or protected o
 
 ### FileSystemResolver
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/FileSystemResolver.java#L17)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/FileSystemResolver.java)
 
 Reads Tiled dependencies from the filesystem relative to their referring file.
 Absolute dependency paths are used directly; relative paths use the normalized
@@ -110,7 +110,7 @@ The returned array is newly allocated by the file read.
 
 ### MapChunk
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/MapChunk.java#L21)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/MapChunk.java)
 
 Represents a rectangular chunk of a map consisting of tiles.
 
@@ -153,7 +153,7 @@ Non-null arrays are neither copied nor checked against the dimensions.
 
 ### MapLayer
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/MapLayer.java#L17)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/MapLayer.java)
 
 Represents a base class for various types of map layers.
 It provides a common structure and functionality for handling map layers,
@@ -296,7 +296,7 @@ an empty map is returned.
 
 ### ResolvedTile
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/ResolvedTile.java#L21)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/ResolvedTile.java)
 
 Represents a resolved tile in a tiled map system. A ResolvedTile contains information
 about its position, graphical ID, local identifier within its tileset, the associated
@@ -318,7 +318,7 @@ the lifetime of the tileset's rendering resources.
 
 ### TileAnimationFrame
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TileAnimationFrame.java#L20)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TileAnimationFrame.java)
 
 Represents a single frame of a tile animation within a tilemap.
 Each frame is defined by a tile ID and its duration in milliseconds.
@@ -360,7 +360,7 @@ document order, and the reader remains open at the closing element or end of inp
 
 ### TiledDecoding
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDecoding.java#L22)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDecoding.java)
 
 Decodes TMX tile-layer payloads into raw global-ID bit patterns, including Tiled's
 flip flags. CSV and MIME Base64 are supported; Base64 may additionally use gzip
@@ -403,7 +403,7 @@ zlib decompression. Neither path validates IDs against a tileset.
 
 ### TiledDependencyResolver
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencyResolver.java#L13)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencyResolver.java)
 
 Defines an interface for resolving dependencies in Tiled map structures or related assets
 such as external tileset or image files. This allows implementations to provide functionality
@@ -438,7 +438,7 @@ content of the dependency as a byte array.
 
 ### TiledDependencySource
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencySource.java#L30)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencySource.java)
 
 Describes how Tiled map dependencies should be resolved.
 
@@ -459,7 +459,7 @@ cache archives, classpath resource bundles, or other custom asset systems.
 
 ### TiledDependencySource.FileSystemSource
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencySource.java#L42)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencySource.java)
 
 Represents dependency resolution through the file system.
 
@@ -470,7 +470,7 @@ TMX or TSX path using normal file-system rules.
 
 ### TiledDependencySource.MapSource
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencySource.java#L57)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledDependencySource.java)
 
 Represents dependency resolution through an in-memory file map.
 
@@ -517,7 +517,7 @@ mutate the internal state of this record.
 
 ### TileDefinition
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TileDefinition.java#L29)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TileDefinition.java)
 
 Represents the definition of a tile in a tilemap. This class encapsulates the
 unique identifier of the tile, its properties, animation frames, and associated
@@ -579,7 +579,7 @@ element or end of input, and the supplied ID is not read again from XML.
 
 ### TiledImageMapLayer
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledImageMapLayer.java#L21)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledImageMapLayer.java)
 
 Represents a tiled image map layer in a map. This class extends the base functionality
 of the MapLayer class, providing additional capabilities to work with an image
@@ -649,7 +649,7 @@ elements are skipped and the reader remains open at the closing layer element.
 
 ### TiledImageMapLayerData
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledImageMapLayerData.java#L50)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledImageMapLayerData.java)
 
 Represents the CPU-side data for a Tiled image layer.
 
@@ -766,7 +766,7 @@ Releases the decoded image data for this layer when one is present.
 
 ### TiledMap
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMap.java#L85)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMap.java)
 
 ##### TiledMap
 
@@ -1325,7 +1325,7 @@ failures so one bad texture does not prevent later cleanup attempts.
 
 ### TiledMapData
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapData.java#L74)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapData.java)
 
 Represents the fully parsed, CPU-side data of a Tiled TMX map.
 
@@ -1586,7 +1586,7 @@ unloaded safely after the runtime no longer needs to build GPU resources from it
 
 ### TiledMapLoader
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapLoader.java#L32)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapLoader.java)
 
 Asset loader responsible for converting `TiledMapParameters` into `TiledMapData`.
 
@@ -1632,7 +1632,7 @@ as a file path or as raw bytes.
 
 ### TiledMapParameters
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapParameters.java#L66)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapParameters.java)
 
 Asset parameters used for loading a Tiled TMX map through Valthorne's asset system.
 
@@ -1804,7 +1804,7 @@ Returns the asset-manager cache key for this map.
 
 ### TiledMapSource
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapSource.java#L44)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapSource.java)
 
 Describes the primary source used to load a Tiled TMX map.
 
@@ -1841,7 +1841,7 @@ TiledMapSource sourceB = new TiledMapSource.BytesSource(bytes, "assets/maps/worl
 
 ### TiledMapSource.PathSource
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapSource.java#L59)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapSource.java)
 
 Represents a Tiled map source backed by a real file-system path.
 
@@ -1872,7 +1872,7 @@ Creates a new path-based map source.
 
 ### TiledMapSource.BytesSource
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapSource.java#L91)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledMapSource.java)
 
 Represents a Tiled map source backed by raw TMX bytes and a logical virtual path.
 
@@ -1922,7 +1922,7 @@ This prevents callers from mutating the internal byte array held by this source.
 
 ### TiledObject
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledObject.java#L35)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledObject.java)
 
 Represents an object within a Tiled map with a variety of properties.
 
@@ -1995,7 +1995,7 @@ during the parsing of an XML document.
 
 ### TiledObjectMapLayer
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledObjectMapLayer.java#L22)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledObjectMapLayer.java)
 
 Represents a map layer containing tiled objects.
 This class extends the functionality of the base MapLayer class
@@ -2066,7 +2066,7 @@ this layer's contents and any caller-owned list supplied to the constructor.
 
 ### TiledResolvers
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledResolvers.java#L32)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledResolvers.java)
 
 Factory utilities for creating `TiledDependencyResolver` instances from higher-level
 dependency source descriptions.
@@ -2109,7 +2109,7 @@ Creates a dependency resolver from the provided dependency source.
 
 ### TiledResolvers.InMemoryResolver
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledResolvers.java#L74)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledResolvers.java)
 
 Dependency resolver that loads Tiled dependencies from an in-memory file map.
 
@@ -2157,7 +2157,7 @@ to resolve the dependency path relative to the referencing file.
 
 ### TiledShapeType
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledShapeType.java#L14)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledShapeType.java)
 
 Represents different types of shapes in a Tiled map format.
 
@@ -2224,7 +2224,7 @@ Represents a textual object in the Tiled map format.
 
 ### TiledTileMapLayer
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledTileMapLayer.java#L21)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledTileMapLayer.java)
 
 Stores a TMX tile layer as either a finite row-major ID array or a collection
 of infinite-map chunks. Global IDs retain Tiled's flip bits; consumers decode
@@ -2334,7 +2334,7 @@ the map is not a snapshot and no synchronization is supplied.
 
 ### TiledXML
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledXML.java#L20)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TiledXML.java)
 
 Utility class for handling XML-related operations specific to Tiled map structures. This includes
 reading and resolving paths, extracting XML element contents, handling attributes, and processing
@@ -2500,7 +2500,7 @@ Retrieves the shared XMLInputFactory instance for creating XML parsers.
 
 ### TileSet
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TileSet.java#L77)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TileSet.java)
 
 Represents a runtime-ready Tiled tileset backed by a GPU `Texture`.
 
@@ -2894,7 +2894,7 @@ tileset can no longer be used for rendering.
 
 ### TileSetData
 
-[Source](../../src/main/java/valthorne/graphics/map/tiled/TileSetData.java#L92)
+[Source](../../src/main/java/valthorne/graphics/map/tiled/TileSetData.java)
 
 Represents the fully parsed, CPU-side data for a single Tiled tileset.
 

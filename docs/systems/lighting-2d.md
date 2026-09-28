@@ -201,7 +201,7 @@ The sections below explain each component and its declared public or protected o
 
 ### Lighting2D
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java#L45)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java)
 
 Batched XY-world lighting with cached polar shadows and a scaled HDR light map.
 Capture scene colors between beginScene and endScene; completion composites into
@@ -473,7 +473,7 @@ After successful disposal, repeated calls return immediately.
 
 ### Lighting2D.Entry — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java#L552)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java)
 
 Registration tying one borrowed light to a reserved atlas row and owned polar
 shadow cache. Revision markers control reconsideration when the light is visible.
@@ -483,7 +483,7 @@ Removal releases the row for a subsequent registration.
 
 ### Lighting2D.State — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java#L581)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java)
 
 Selected OpenGL snapshot extending shared render state with framebuffer bindings,
 viewport, clear color, write mask, scissor/sRGB enablement, and samplers zero/one.
@@ -509,7 +509,7 @@ Captured GPU objects must remain alive in the same current context.
 
 ### Occluder2D
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/Occluder2D.java#L28)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/Occluder2D.java)
 
 Closed polygon used to block light in the XY world plane. Supply a simple
 convex or concave boundary without holes; the final vertex connects back to
@@ -635,7 +635,7 @@ the polygon's local minimum and maximum coordinates.
 
 ### OccluderIndex2D — internal support type
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/OccluderIndex2D.java#L26)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/OccluderIndex2D.java)
 
 Broad-phase XY grid used to reduce candidate occluders for radial shadow maps.
 Fixed 256-world-unit cells contain borrowed polygon references based on their
@@ -656,7 +656,7 @@ and must not modify returned lists. This helper is not thread-safe or reentrant.
 
 ### PointLight2D
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/PointLight2D.java#L32)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/PointLight2D.java)
 
 Mutable point or cone light for the XY world plane used by `Lighting2D`.
 Position, influence radius and source radius use world units; cone direction
@@ -862,7 +862,7 @@ and -1 accepts all. Changes invalidate both revision counters.
 
 ### PolarShadow2D
 
-[Source](../../src/main/java/valthorne/graphics/lighting2d/PolarShadow2D.java#L34)
+[Source](../../src/main/java/valthorne/graphics/lighting2d/PolarShadow2D.java)
 
 CPU cache of nearest occluder distances around a 2D point light. The full
 circle is divided into equally sized angular bins, sampled at their centers
