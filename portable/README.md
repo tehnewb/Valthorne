@@ -14,9 +14,6 @@ Use JDK 25 and Node/npm. Install browser dependencies with `npm ci` in
 
 Export an application by supplying `-PapplicationMain`, `-PapplicationSources`,
 and optionally `-PapplicationResources` to `buildGame -Ptarget=web`.
-The separate examples repository supplies the FPS application:
-
-`node portable/fps.mjs build web`
 
 Serve the result with `node portable/web/serve.mjs`. Use `gradlew.bat` on Windows.
 The bundled test applications, default test launcher, and automated test runners
@@ -50,34 +47,6 @@ every declared case and its minimum assertion count to run; missing cases fail.
 CI runs these committed consumers on a fresh checkout. Native checks run on
 Windows, Linux and macOS; the separate renderer smoke job is manual because
 hosted runners do not guarantee an accelerated graphics context.
-
-### Full original FPS arena
-
-The separate `Valthorne-examples` repository's `valthorne.examples.fps.FpsArena` builds for
-both targets, with the same gameplay, downloaded model resources, Jolt physics,
-particle lights, and custom HUD. These commands select that full game instead
-of the smaller browser integration arena:
-
-```sh
-node portable/fps.mjs run web
-node portable/fps.mjs run desktop
-node portable/fps.mjs verify web
-node portable/fps.mjs verify desktop
-```
-
-Use `build web` to produce a static deployment in `portable/web/build/dist`.
-Clone `Valthorne-examples` alongside this repository first. Set
-`VALTHORNE_EXAMPLES_DIR` to use another location. The FPS launcher reads example
-sources and assets there; maintain runnable examples in that repository.
-CI pins [example revision d9c8ba4](https://github.com/tehnewb/Valthorne-examples/commit/d9c8ba498674686efc41f8e7ce0a343d95159e5e),
-whose own checks use [engine revision 256cde5](https://github.com/tehnewb/Valthorne/commit/256cde556a407f347e27644e9d0de9e744f8103e).
-Use these revisions to reproduce the shared FPS build; the portable APIs are
-development sources and are not included in the older published engine dependency.
-Set `PORT` to change the preview server's default port of 8095.
-The application uses `Canvas2D` for its custom HUD and `PlatformTools` for
-graphics diagnostics and test input; native bindings stay inside the engine.
-Other applications can select individual Java source files with the optional
-comma-separated `applicationIncludes` build property.
 
 Browser verification exercises movement, jumping, aiming, shooting, reload,
 grenades, flares, particle controls, pause, five restarts, and final resource
@@ -484,7 +453,7 @@ and currently supports one application per page.
 | Audio | Original SoundPlayer controls and attenuation; bounded WAV/MP3/Vorbis streams with seeking and teardown |
 | Storage | Java file streams, Reader.transferTo, random access and common Files operations backed by persistent IndexedDB; 16 MiB/file and 64 MiB resident file capacity |
 | Compute / path tracing | Original ComputeShader API through WebGPU; original PathTracer3D and PathTracer2D algorithms through WebGL2 float MRT passes |
-| Existing FPS game | Original arena source and model resources run on desktop and web, including enemies, grenades, particle lights and custom UI; use `node portable/fps.mjs run web` |
+| Existing FPS game | Historical arena source and model resources ran on desktop and web, including enemies, grenades, particle lights and custom UI |
 | Android / Raspberry Pi | Not validated or claimed supported by this pass |
 
 The requested compute/path-tracing, bounded audio, window/file and skeletal-animation
@@ -608,8 +577,7 @@ occlusion/LOD/streaming implementation.
 [`FirstPersonDemo`](fixtures/java/valthorne/portable/FirstPersonDemo.java) is a
 browser integration fixture compiled by TeaVM from `portable/fixtures/java`.
 Its gameplay code is excluded from the desktop and portable core library,
-sources and Javadoc artifacts. The original desktop `FpsArena` is a separate build selected
-with `node portable/fps.mjs run web` from the repository root.
+sources and Javadoc artifacts. The original desktop `FpsArena` was a separate build.
 It uses a rotation-locked rigid box for the player, not Jolt's full character
 controller. In particular, stairs/slopes and dynamic platforms need more work.
 

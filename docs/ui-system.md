@@ -1,12 +1,5 @@
 # UI system guide
 
-Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
-from that repository. Example source and resources are separate from the engine
-checkout and library artifacts.
-See the [example catalog](examples.md). Historical measurements retain their
-original commands and source revisions.
-
 Valthorne has one UI tree with texture and NanoVG rendering. Existing widget
 classes remain available; nodes can be nested across families without converting
 assets. See [mixed rendering](ui-rendering.md) for the drawing contract.
@@ -24,8 +17,7 @@ cross-renderer modals, text editing, a dropdown, light/dark themes, a 10,000-ite
 virtual grid, searchable/sortable table, collapsible sections, and an opt-in inspector.
 The smoke run creates an invisible window,
 captures seven pages into `build/ui-showcase`, checks OpenGL errors, and exits.
-Native tests and the smoke run require a working OpenGL/GLFW context. The
-companion project runs the showcase through its shared launcher. Engine tasks
+Native tests and the smoke run require a working OpenGL/GLFW context. Engine tasks
 such as `verifyUI` and `benchmarkUITable` belong to the Valthorne checkout and
 require its local regression/benchmark fixtures. See
 [performance methodology and results](ui-performance.md) for the forked JMH

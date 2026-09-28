@@ -1,14 +1,5 @@
 # UI performance: measured costs and regression checks
 
-Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
-from that repository. Example source and resources are separate from the engine
-checkout and library artifacts.
-See the [example catalog](examples.md). Historical measurements retain their
-original commands and source revisions. Engine `verify*` and benchmark tasks in
-those records still require their optional local test/benchmark sources; use the
-companion project's `build` and documented smoke tasks for current examples.
-
 This suite measures defined workloads, not a universal UI performance score.
 Minimizing allocations must not break painter order, Unicode boundaries, focus,
 capture or lifecycle. Correctness tests remain mandatory alongside benchmarks.
@@ -27,12 +18,6 @@ The last command runs all 16 parameterized benchmark cases (roughly five minutes
 on this host), writes `build/reports/ui-benchmark/results.json`, and checks allocation
 budgets. It is intentionally separate from `build`/`check`: timing/GL benchmarks
 should not silently burden every development build or require a display on CPU-only CI.
-
-Run the visual smoke check separately from the Valthorne-examples checkout:
-
-```powershell
-.\gradlew.bat runUIShowcase --args=--smoke
-```
 
 Run a benchmark subset from the Valthorne checkout without the complete-suite gate:
 

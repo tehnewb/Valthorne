@@ -162,25 +162,6 @@ the classpath under `src/main/resources`.
 The [complete system index](docs/systems/README.md) covers the engine's 473 Java
 source files and links each documented area back to its implementation.
 
-## Runnable examples
-
-Runnable applications are maintained in the separate
-[Valthorne-examples](https://github.com/tehnewb/Valthorne-examples) repository.
-It includes starter, audio, UI, physics, lighting, 3D scene, FPS, LDtk, and Tiled
-examples. The LDtk and Tiled viewers use matching 4096×1440 maps for direct
-format and renderer comparisons.
-
-Clone both repositories beside one another to test unpublished engine changes:
-
-```sh
-cd ../Valthorne-examples
-./gradlew -PvalthorneDir=../Valthorne build
-```
-
-On Windows, use `gradlew.bat`. The examples repository also provides documented
-launch tasks and standalone Windows packages. Example source and assets do not
-belong in this engine repository.
-
 ## Platform notes
 
 The standard desktop renderers require OpenGL 3.3 core. OpenGL 4.3 compute
@@ -219,9 +200,6 @@ See [contributing](CONTRIBUTING.md) and the
 - `portable` — shared-source desktop and TeaVM web compatibility tooling.
 - `gradle` — packaging validation, publication, and benchmark tasks.
 - `images` — project branding.
-
-The project website is maintained separately in
-[Valthorne-website](https://github.com/tehnewb/Valthorne-website).
 
 ## License and community
 

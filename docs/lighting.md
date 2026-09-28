@@ -1,12 +1,5 @@
 # Lighting and FPS
 
-Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
-from that repository. Example source and resources are separate from the engine
-checkout and library artifacts.
-See the [example catalog](examples.md). Historical measurements retain their
-original commands and source revisions.
-
 Valthorne now has separate 2D and 3D lighting implementations built for OpenGL 3.3.
 They do not depend on the old ray-handler meshes or radiance cascades. Existing lighting
 APIs remain available for compatibility; attach the new systems as shown below.

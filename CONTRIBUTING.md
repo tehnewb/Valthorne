@@ -6,7 +6,7 @@ Thanks for taking the time to contribute.
 
 Use JDK 25 and the checked-in Gradle wrapper (9.3.1). No native compiler, signing
 key or publication account is needed. See [setup](docs/getting-started.md),
-[platform requirements](docs/platforms.md), and the [public example catalog](docs/examples.md).
+[platform requirements](docs/platforms.md).
 
 Please search existing issues and pull requests before opening a new one. If you are not sure whether an idea belongs in an issue yet, start a discussion first.
 
@@ -44,29 +44,10 @@ The previous desktop, browser, and integration test suites have been removed.
 Record manual runtime verification separately; a successful build checks compilation
 and packaging, not rendering or interaction behavior.
 
-Public demos are maintained in the separate [examples project](https://github.com/tehnewb/Valthorne-examples).
-
 ## Repository ownership
 
 Keep engine code and runtime resources under `src/main`. Release packaging checks live in `gradle/release.gradle`;
 optional local benchmark configuration lives in `gradle/benchmarks.gradle`.
-
-Make runnable demo and demo-resource changes in
-[Valthorne-examples](https://github.com/tehnewb/Valthorne-examples), not the legacy
-`src/examples` directory. With both repositories cloned alongside each other, run
-the following from the examples repository to test unpublished engine changes:
-
-```sh
-./gradlew "-PvalthorneDir=../Valthorne" runMinimalExample --args="--smoke"
-```
-
-Use `./gradlew.bat` in PowerShell. Other launcher names are listed in the
-[example catalog](docs/examples.md). Keep example packages, documentation, and
-resource notices together in that repository.
-
-Make website changes in [Valthorne-website](https://github.com/tehnewb/Valthorne-website).
-Its Pages workflow deploys the site; this engine repository only retains a redirect
-for the former website address.
 
 Keep benchmark outputs produced during development under `build/`. Curated reports
 under `docs/benchmarks` retain their source hashes and measured-environment notes;

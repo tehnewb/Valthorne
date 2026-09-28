@@ -1,13 +1,5 @@
 # Engine performance program
 
-Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run demo launch tasks there; the engine's local
-`src/examples/` files remain ignored and excluded from library artifacts.
-See the [example catalog](examples.md). Historical measurements retain their
-original commands and source revisions. Engine `verify*` and benchmark tasks in
-those records still require their optional local test/benchmark sources; use the
-companion project's `build` and documented smoke tasks for current examples.
-
 This is an ongoing measurement program, not a claim that every subsystem has been optimized or that no further optimization exists. Latency, allocation, resident memory, throughput and code complexity can conflict. CPU instructions and GPU work are not inferred from elapsed time alone.
 
 ## Rules for each change

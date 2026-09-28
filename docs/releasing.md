@@ -1,8 +1,7 @@
 # Publishing Valthorne
 
 The stable version is `2.4.0` in `gradle.properties`. Normal builds and verification
-need no signing/upload secrets. Runnable examples live in the separate
-[companion project](https://github.com/tehnewb/Valthorne-examples).
+need no signing/upload secrets.
 
 ## Validate the release revision
 

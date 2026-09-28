@@ -176,7 +176,3 @@ Run `./gradlew verifyWidgets` for configuration, pointer, keyboard, stacking,
 cancellation, closing/reopening, clipping, and scaled-viewport tests. `./gradlew verifyUI` runs the wider
 UI regression suite. Rendered light/dark evidence is generated under
 `build/reports/widget-visuals/windows-light.png` and `windows-dark.png`.
-
-The sibling examples project's `runWidgetShowcase` task opens an interactive window
-demo with title editing and independent Dragging/Resizing toggles. See the
-[widget guide](ui-widgets.md) for the surrounding controls.

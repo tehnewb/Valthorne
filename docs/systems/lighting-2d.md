@@ -22,8 +22,7 @@ Lighting2D renders visible planar lights in a batch and uses polar shadow data f
 ### Stylized 2.5D forest
 
 The following describes a private local prototype retained for development. It is
-not a distributed demo or an engine Gradle task. For maintained runnable examples,
-see the [companion repository](https://github.com/tehnewb/Valthorne-examples).
+not a distributed demo or an engine Gradle task.
 
 The forest enables rounded procedural sprite shading, compact contact shadows,
 distance-softened projected shadows, raised path edging and foreground-tree transparency.

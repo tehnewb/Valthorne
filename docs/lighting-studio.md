@@ -1,20 +1,11 @@
 # Lighting Studio
 
-Runnable demos and assets are maintained in the public
-[examples project](https://github.com/tehnewb/Valthorne-examples). Run launcher commands
-from that repository. Example source and resources are separate from the engine
-checkout and library artifacts.
-See the [example catalog](examples.md). Historical measurements retain their
-original commands and source revisions.
-
 On Windows x64 the studio defaults to **Filament / real-time PBR**. Other supported
 OpenGL 4.3 desktop hosts use the path tracer and omit the Filament choice. See
 [Filament integration](filament.md) for its lighting contract and
 [platform requirements](platforms.md). This studio cannot run on macOS OpenGL;
 use `run3DExample` or `runPhysics3DExample` for the portable raster path.
 
-Run `./gradlew runLightingStudio`. The companion project launches a separate progressive
-path-tracing scene with `runPathTracingExample`; it no longer aliases this workbench.
 
 The workbench uses Valthorne's themed UI, including scrollable properties, dropdowns, keyboard-focusable buttons and sliders. It renders a material gallery with glass, gold, roughness samples and colored walls. The central viewport is separate from the UI, so UI input does not move the camera.
 
