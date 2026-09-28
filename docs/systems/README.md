@@ -2,13 +2,16 @@
 
 Author: Albert Beaupre
 
-This manual explains how to use every system represented in the current Java source tree. Each guide combines a practical workflow, feature purposes, ownership rules, behavior notes, component examples, and detailed operation contracts.
+This manual groups the current Java source tree by system and explains the
+main usage and ownership contracts. The linked source contains the exact API
+contracts for each revision.
 
 ## Start here
 
 First complete the [Gradle/Maven setup](../getting-started.md) and check
-[platform requirements](../platforms.md). This manual targets `2.3.0`;
-see [runnable examples](../examples.md) for launch commands.
+[platform requirements](../platforms.md). This manual targets the `2.4.0`
+source checkout. Some older operation references describe historical APIs;
+check the linked Java source when using an API in this revision.
 
 1. [Application lifecycle](runtime.md): launch the engine and place initialization, updates, drawing, and cleanup correctly.
 2. [Textures and batching](textures.md) or [3D models](models.md): establish a rendering path.
@@ -16,59 +19,62 @@ see [runnable examples](../examples.md) for launch commands.
 4. [Scenes](scenes.md), [assets](assets.md), and [audio](audio.md): organize application content and resource lifetimes.
 5. [UI foundations](ui-core.md): add controls, layout, themes, and routed input.
 
-The checkout targets Java 25. Run repository examples using the Gradle wrapper; on Windows use `gradlew.bat`. GPU/native systems require the compatible drivers and native dependencies described in their guides. The manual describes this checkout rather than promising that an older published artifact exposes identical APIs.
+The checkout targets Java 25. Build the library with the Gradle wrapper; on Windows use `gradlew.bat`. GPU/native systems require the compatible drivers and native dependencies described in their guides. The manual describes this checkout rather than promising that an older published artifact exposes identical APIs.
 
 ## Guides
 
-| System | Source files | Main components |
-| --- | ---: | --- |
-| [Application lifecycle and window management](runtime.md) | 5 | `Application`, `JGL`, `JGLConfiguration`, `SwapInterval`, `Window` |
-| [Keyboard, mouse, and cursor input](input.md) | 2 | `Keyboard`, `Mouse` |
-| [Events and listeners](events.md) | 23 | `Event`, `EventHandler`, `EventPublisher`, `KeyEvent`, `KeyPressEvent`, … |
-| [Scenes and game screens](scenes.md) | 6 | `GameScreen`, `Scene`, `SceneKeyListener`, `SceneMouseListener`, `SceneMouseScrollListener`, … |
-| [State machines and transitions](state-machines.md) | 8 | `Condition`, `Guard`, `State`, `StateContext`, `StateMachine`, … |
-| [Ticks and frame timing](timing.md) | 2 | `Tick`, `TimeUtility` |
-| [Asset loading and caching](assets.md) | 3 | `AssetLoader`, `AssetParameters`, `Assets` |
-| [Audio playback and ambient areas](audio.md) | 17 | `Audio`, `AudioFormat`, `Mp3SoundDecoder`, `Mp3SoundStream`, `OggSoundDecoder`, … |
-| [Textures, sprites, atlases, and batching](textures.md) | 24 | `Color`, `Drawable`, `DrawFunction`, `ImmediateTextureRenderer`, `Sprite`, … |
-| [Bitmap fonts and glyph styling](fonts.md) | 9 | `Font`, `FontData`, `FontLoader`, `FontParameters`, `FontSource`, … |
-| [Slug vector fonts](slug-fonts.md) | 6 | `SlugBatch`, `SlugCurve`, `SlugFont`, `SlugGlyph`, `SlugShader`, … |
-| [Frame and transform animation](animation.md) | 7 | `Animation`, `AnimationAdapter`, `AnimationFrame`, `AnimationListener`, `AnimationUtility`, … |
-| [Cameras and picking](cameras.md) | 7 | `Camera`, `Camera3D`, `OrbitCameraController`, `OrthographicCamera`, `OrthographicCamera3D`, … |
-| [Viewport scaling and coordinate conversion](viewports.md) | 6 | `FillViewport`, `FitViewport`, `PerspectiveViewport`, `ScreenViewport`, `StretchViewport`, … |
-| [Shaders and visual effects](shaders.md) | 16 | `Billboard3DShader`, `BlurShader`, `BurnShader`, `ComputeShader`, `DepthShader3D`, … |
-| [Raycast lighting and shape occlusion](raycast-lighting.md) | 15 | `ConeLight`, `DynamicMesh2D`, `Light`, `LightMapRenderer`, `LightMesh`, … |
-| [Batched 2D lighting](lighting-2d.md) | 5 | `Lighting2D`, `Occluder2D`, `OccluderIndex2D`, `PointLight2D`, `PolarShadow2D` |
-| [Raster 3D lighting and shadow maps](lighting-3d.md) | 4 | `LightGrid3D`, `Lighting3D`, `PointLight3D`, `ShadowMap3D` |
-| [Screen-space radiance cascades](radiance-cascades.md) | 6 | `RadianceCascadeLevel`, `RadianceCascades`, `RadianceCascadeSettings`, `RadianceRenderTarget`, `RadianceSceneBuffer`, … |
-| [Filament rendering](filament.md) | 2 | `FilamentRenderer3D`, `VertexCompaction3D` |
-| [2D and 3D path tracing](path-tracing.md) | 3 | `PathTracer2D`, `PathTracer3D`, `PathTracingScene` |
-| [3D models, materials, scenes, and billboards](models.md) | 23 | `BillboardBatch3D`, `BillboardMode3D`, `BillboardRenderable3D`, `BillboardSprite3D`, `Material3D`, … |
-| [Conservative 3D visibility and occlusion](culling.md) | 1 | `OcclusionCuller3D` |
-| [Jolt rigid-body physics](physics.md) | 11 | `BodySettings3D`, `CollisionLayers3D`, `CollisionShape3D`, `ContactEvent3D`, `DistanceJoint3D`, … |
-| [3D particles and physics integration](particles-3d.md) | 2 | `Particle3D`, `ParticleEmitter3D` |
-| [2D particles and spawn distributions](particles-2d.md) | 13 | `BoxSpawnDistributor`, `CircleSpawnDistributor`, `ConeSpawnDistributor`, `LineSpawnDistributor`, `Particle`, … |
-| [Tiled maps and tilesets](tiled-maps.md) | 24 | `FileSystemResolver`, `MapChunk`, `MapLayer`, `ResolvedTile`, `TileAnimationFrame`, … |
-| [UI roots, nodes, and input routing](ui-core.md) | 8 | `NanoUtility`, `NodeAction`, `UIConstants`, `UIContainer`, `UIInputEvent`, … |
-| [UI layout and alignment](ui-layout.md) | 13 | `Dimensional`, `Align`, `Alignment`, `FlexDirection`, `FlexWrap`, … |
-| [Standard UI controls](ui-controls.md) | 29 | `Button`, `Window`, `FileChooser`, `DirectoryTree`, `ColorPicker`, … |
-| [NanoVG UI controls](ui-nano.md) | 15 | `NanoButton`, `NanoCheckbox`, `NanoComboBox`, `NanoContainer`, `NanoGrid`, … |
-| [Virtual lists, tables, and selection](ui-data.md) | 6 | `RowHeightIndex`, `SelectionModel`, `TableModel`, `DataTable`, `TableColumn`, … |
-| [Shared UI behavior and editing models](ui-behavior.md) | 6 | `ActivationBehavior`, `ChangeSignal`, `RangeModel`, `ScrollBehavior`, `TextEditing`, … |
-| [Themes, styles, and design tokens](ui-themes.md) | 11 | `ProfessionalTheme`, `ResolvedStyle`, `StyleKey`, `StyleMap`, `StyleState`, … |
-| [Performance overlays and UI inspection](diagnostics.md) | 3 | `PerformanceOverlay`, `UIFrameStats`, `UIInspector` |
-| [Resizable and unordered arrays](arrays.md) | 16 | `Array`, `ByteArray`, `CharArray`, `DoubleArray`, `FloatArray`, … |
-| [Primitive and generic stacks](stacks.md) | 8 | `ByteFastStack`, `CharFastStack`, `DoubleFastStack`, `FastStack`, `FloatFastStack`, … |
-| [Bit fields and flags](bits.md) | 5 | `Bits`, `ByteBits`, `IntBits`, `LongBits`, `ShortBits` |
-| [ID reuse queues, string maps, and trees](data-structures.md) | 5 | `StringObjectMap`, `IntUUIDQueue`, `LongUUIDQueue`, `ShortUUIDQueue`, `IntBinaryTree` |
-| [Compression strategies](compression.md) | 7 | `BZIP2Strategy`, `CompressionStrategy`, `Deflate`, `GZIP`, `LZMAStrategy`, … |
-| [Encryption and hashing adapters](encryption.md) | 11 | `AES`, `AESGCM`, `Blowfish`, `ChaCha20Poly1305`, `ECC`, … |
-| [Binary buffers and byte order](buffers.md) | 2 | `ByteOrder`, `DynamicByteBuffer` |
-| [Classpath and filesystem utilities](files.md) | 4 | `ValthorneFileException`, `ValthorneFileNotFoundException`, `ValthorneFiles`, `FileUtility` |
-| [Object pooling](pooling.md) | 2 | `Pool`, `Poolable` |
-| [Math and 2D geometry](math.md) | 9 | `Area`, `Border`, `Circle`, `Polygon`, `Rectangle`, … |
-| [Plugin loading and lifecycle](plugins.md) | 3 | `Plugin`, `PluginLoader`, `PluginLoadingException` |
-| [Text, number, and reflection utilities](utilities.md) | 3 | `NumberUtility`, `ReflectionUtility`, `TextUtility` |
+| System | Main components |
+| --- | --- |
+| [Application lifecycle and window management](runtime.md) | `Application`, `JGL`, `JGLConfiguration`, `SwapInterval`, `Window` |
+| [Keyboard, mouse, and cursor input](input.md) | `Keyboard`, `Mouse` |
+| [Events and listeners](events.md) | `Event`, `EventHandler`, `EventPublisher`, `KeyEvent`, `KeyPressEvent`, … |
+| [Scenes and game screens](scenes.md) | `GameScreen`, `Scene`, `SceneKeyListener`, `SceneMouseListener`, `SceneMouseScrollListener`, … |
+| [State machines and transitions](state-machines.md) | `StateMachine`, `StateGraph`, `StateMachineManager`, `TransitionBuilder`, … |
+| [Ticks and frame timing](timing.md) | `Tick`, `TickManager`, `TickSchedule`, `TimeUtility`, … |
+| [Asset loading and caching](assets.md) | `AssetLoader`, `AssetParameters`, `Assets` |
+| [Audio playback and ambient areas](audio.md) | `Audio`, `AudioFormat`, `Mp3SoundDecoder`, `Mp3SoundStream`, `OggSoundDecoder`, … |
+| [Textures, sprites, atlases, and batching](textures.md) | `Color`, `Drawable`, `DrawFunction`, `ImmediateTextureRenderer`, `Sprite`, … |
+| [Bitmap fonts and glyph styling](fonts.md) | `Font`, `FontData`, `FontLoader`, `FontParameters`, `FontSource`, … |
+| [Slug vector fonts](slug-fonts.md) | `SlugBatch`, `SlugData`, `SlugFont`, `SlugLoader`, `SlugShader`, … |
+| [Frame and transform animation](animation.md) | `Animation`, `AnimationAdapter`, `AnimationFrame`, `AnimationListener`, `AnimationUtility`, … |
+| [Cameras and picking](cameras.md) | `Camera`, `Camera3D`, `OrbitCameraController`, `OrthographicCamera`, `OrthographicCamera3D`, … |
+| [Viewport scaling and coordinate conversion](viewports.md) | `FillViewport`, `FitViewport`, `PerspectiveViewport`, `ScreenViewport`, `StretchViewport`, … |
+| [Shaders and visual effects](shaders.md) | `Billboard3DShader`, `BlurShader`, `BurnShader`, `ComputeShader`, `DepthShader3D`, … |
+| [Raycast lighting and shape occlusion](raycast-lighting.md) | `ConeLight`, `DynamicMesh2D`, `Light`, `LightMapRenderer`, `LightMesh`, … |
+| [Batched 2D lighting](lighting-2d.md) | `Lighting2D`, `AlphaOccluder2D`, `SpriteGroundShadow2D`, `PointLight2D`, … |
+| [Raster 3D lighting and shadow maps](lighting-3d.md) | `LightGrid3D`, `Lighting3D`, `PointLight3D`, `ShadowMap3D` |
+| [Screen-space radiance cascades](radiance-cascades.md) | `RadianceCascadeLevel`, `RadianceCascades`, `RadianceCascadeSettings`, `RadianceRenderTarget`, `RadianceSceneBuffer`, … |
+| [Filament rendering](filament.md) | `FilamentRenderer3D`, `VertexCompaction3D` |
+| [2D and 3D path tracing](path-tracing.md) | `PathTracer2D`, `PathTracer3D`, `PathTracingScene` |
+| [3D models, materials, scenes, and billboards](models.md) | `BillboardBatch3D`, `BillboardMode3D`, `BillboardRenderable3D`, `BillboardSprite3D`, `Material3D`, … |
+| [Conservative 3D visibility and occlusion](culling.md) | `OcclusionCuller3D` |
+| [Jolt rigid-body physics](physics.md) | `BodySettings3D`, `CollisionLayers3D`, `CollisionShape3D`, `ContactEvent3D`, `DistanceJoint3D`, … |
+| [3D particles and physics integration](particles-3d.md) | `Particle3D`, `ParticleEmitter3D` |
+| [2D particles and spawn distributions](particles-2d.md) | `BoxSpawnDistributor`, `CircleSpawnDistributor`, `ConeSpawnDistributor`, `LineSpawnDistributor`, `Particle`, … |
+| [Tiled maps and tilesets](tiled-maps.md) | `FileSystemResolver`, `MapChunk`, `MapLayer`, `ResolvedTile`, `TileAnimationFrame`, … |
+| [LDtk projects and maps](ldtk-maps.md) | `LdtkLoader`, `LdtkProject`, `LdtkMap`, `LdtkLevel`, `LdtkLayer`, … |
+| [Persistent property sets](settings.md) | `PropertySet`, `PropertyValue`, `PropertySetIO`, `PropertySetTextIO`, `PropertyTextOptions` |
+| [Portable application services](portable-services.md) | `PlatformServices`, `FrameLoop`, `InteractiveScene`, `SceneBackend`, … |
+| [UI roots, nodes, and input routing](ui-core.md) | `NanoUtility`, `NodeAction`, `UIConstants`, `UIContainer`, `UIInputEvent`, … |
+| [UI layout and alignment](ui-layout.md) | `Dimensional`, `Align`, `Alignment`, `FlexDirection`, `FlexWrap`, … |
+| [Standard UI controls](ui-controls.md) | `Button`, `Window`, `FileChooser`, `DirectoryTree`, `ColorPicker`, … |
+| [NanoVG UI controls](ui-nano.md) | `NanoButton`, `NanoCheckbox`, `NanoComboBox`, `NanoContainer`, `NanoGrid`, … |
+| [Virtual lists, tables, and selection](ui-data.md) | `RowHeightIndex`, `SelectionModel`, `TableModel`, `DataTable`, `TableColumn`, … |
+| [Shared UI behavior and editing models](ui-behavior.md) | `ActivationBehavior`, `ChangeSignal`, `RangeModel`, `ScrollBehavior`, `TextEditing`, … |
+| [Themes, styles, and design tokens](ui-themes.md) | `ProfessionalTheme`, `ResolvedStyle`, `StyleKey`, `StyleMap`, `StyleState`, … |
+| [Performance overlays and UI inspection](diagnostics.md) | `PerformanceOverlay`, `UIFrameStats`, `UIInspector` |
+| [Resizable and unordered arrays](arrays.md) | `Array`, `ByteArray`, `CharArray`, `DoubleArray`, `FloatArray`, … |
+| [Primitive and generic stacks](stacks.md) | `ByteFastStack`, `CharFastStack`, `DoubleFastStack`, `FastStack`, `FloatFastStack`, … |
+| [Bit fields and flags](bits.md) | `Bits`, `ByteBits`, `IntBits`, `LongBits`, `ShortBits` |
+| [ID reuse queues, string maps, and trees](data-structures.md) | `StringObjectMap`, `IntUUIDQueue`, `LongUUIDQueue`, `ShortUUIDQueue`, `IntBinaryTree` |
+| [Compression strategies](compression.md) | `BZIP2Strategy`, `CompressionStrategy`, `Deflate`, `GZIP`, `LZMAStrategy`, … |
+| [Encryption and hashing adapters](encryption.md) | `AES`, `AESGCM`, `Blowfish`, `ChaCha20Poly1305`, `ECC`, … |
+| [Binary buffers and byte order](buffers.md) | `ByteOrder`, `DynamicByteBuffer` |
+| [Classpath and filesystem utilities](files.md) | `ValthorneFileException`, `ValthorneFileNotFoundException`, `ValthorneFiles`, `FileUtility` |
+| [Object pooling](pooling.md) | `Pool`, `Poolable` |
+| [Math and 2D geometry](math.md) | `Area`, `Border`, `Circle`, `Polygon`, `Rectangle`, … |
+| [Plugin loading and lifecycle](plugins.md) | `Plugin`, `PluginLoader`, `PluginLoadingException` |
+| [Text, number, and reflection utilities](utilities.md) | `NumberUtility`, `ReflectionUtility`, `TextUtility` |
 
 ## Using the operation references
 
@@ -78,9 +84,10 @@ Examples in component descriptions may be partial integration fragments rather t
 
 ## Source coverage
 
-The source index groups documented components by system. The new file, menu, and
-editing controls are explained in the [widget guide](../ui-widgets.md), with their
-source entries under standard UI controls. Related guides connect shared concepts.
+The source index groups Java files by their closest system guide. The new file,
+menu, and editing controls are explained in the [widget guide](../ui-widgets.md),
+with their source entries under standard or NanoVG UI controls. Related guides
+connect shared concepts.
 
 <details>
 <summary>Source-to-guide index</summary>
@@ -503,5 +510,89 @@ source entries under standard UI controls. Related guides connect shared concept
 | [viewport/StretchViewport.java](../../src/main/java/valthorne/viewport/StretchViewport.java) | [viewports](viewports.md) |
 | [viewport/Viewport.java](../../src/main/java/valthorne/viewport/Viewport.java) | [viewports](viewports.md) |
 | [Window.java](../../src/main/java/valthorne/Window.java) | [runtime](runtime.md) |
+
+| [PlatformTools.java](../../src/main/java/valthorne/PlatformTools.java) | [runtime](runtime.md) |
+| [FilamentPlatform.java](../../src/main/java/valthorne/graphics/FilamentPlatform.java) | [filament](filament.md) |
+| [GraphicsCapabilities.java](../../src/main/java/valthorne/graphics/GraphicsCapabilities.java) | [runtime](runtime.md) |
+| [SlugData.java](../../src/main/java/valthorne/graphics/font/slug/SlugData.java) | [slug-fonts](slug-fonts.md) |
+| [SlugLoader.java](../../src/main/java/valthorne/graphics/font/slug/SlugLoader.java) | [slug-fonts](slug-fonts.md) |
+| [SlugParameters.java](../../src/main/java/valthorne/graphics/font/slug/SlugParameters.java) | [slug-fonts](slug-fonts.md) |
+| [SlugSource.java](../../src/main/java/valthorne/graphics/font/slug/SlugSource.java) | [slug-fonts](slug-fonts.md) |
+| [AlphaOccluder2D.java](../../src/main/java/valthorne/graphics/lighting2d/AlphaOccluder2D.java) | [lighting-2d](lighting-2d.md) |
+| [AlphaShadowShape2D.java](../../src/main/java/valthorne/graphics/lighting2d/AlphaShadowShape2D.java) | [lighting-2d](lighting-2d.md) |
+| [GroundShadowRenderer2D.java](../../src/main/java/valthorne/graphics/lighting2d/GroundShadowRenderer2D.java) | [lighting-2d](lighting-2d.md) |
+| [SpriteGroundShadow2D.java](../../src/main/java/valthorne/graphics/lighting2d/SpriteGroundShadow2D.java) | [lighting-2d](lighting-2d.md) |
+| [SpriteOccluder2D.java](../../src/main/java/valthorne/graphics/lighting2d/SpriteOccluder2D.java) | [lighting-2d](lighting-2d.md) |
+| [SpriteVolumeRenderer2D.java](../../src/main/java/valthorne/graphics/lighting2d/SpriteVolumeRenderer2D.java) | [lighting-2d](lighting-2d.md) |
+| [LdtkBackground.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkBackground.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkDefinition.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkDefinition.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkDependencyResolver.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkDependencyResolver.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkDependencySource.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkDependencySource.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkEntity.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkEntity.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkField.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkField.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkLayer.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkLayer.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkLevel.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkLevel.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkLoader.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkLoader.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkMap.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkMap.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkParameters.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkParameters.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkProject.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkProject.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkResolvers.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkResolvers.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkSource.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkSource.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkTile.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkTile.java) | [ldtk-maps](ldtk-maps.md) |
+| [LdtkTileset.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkTileset.java) | [ldtk-maps](ldtk-maps.md) |
+| [SceneRenderer3D.java](../../src/main/java/valthorne/graphics/render/SceneRenderer3D.java) | [models](models.md) |
+| [AssetService.java](../../src/main/java/valthorne/portable/AssetService.java) | [portable-services](portable-services.md) |
+| [FrameLoop.java](../../src/main/java/valthorne/portable/FrameLoop.java) | [portable-services](portable-services.md) |
+| [InteractiveScene.java](../../src/main/java/valthorne/portable/InteractiveScene.java) | [portable-services](portable-services.md) |
+| [MediaService.java](../../src/main/java/valthorne/portable/MediaService.java) | [portable-services](portable-services.md) |
+| [ModelAsset.java](../../src/main/java/valthorne/portable/ModelAsset.java) | [portable-services](portable-services.md) |
+| [PhysicsBody.java](../../src/main/java/valthorne/portable/PhysicsBody.java) | [portable-services](portable-services.md) |
+| [PlatformServices.java](../../src/main/java/valthorne/portable/PlatformServices.java) | [portable-services](portable-services.md) |
+| [SceneBackend.java](../../src/main/java/valthorne/portable/SceneBackend.java) | [portable-services](portable-services.md) |
+| [StateControl.java](../../src/main/java/valthorne/state/StateControl.java) | [state-machines](state-machines.md) |
+| [StateDuration.java](../../src/main/java/valthorne/state/StateDuration.java) | [state-machines](state-machines.md) |
+| [StateGraph.java](../../src/main/java/valthorne/state/StateGraph.java) | [state-machines](state-machines.md) |
+| [StateMachineManager.java](../../src/main/java/valthorne/state/StateMachineManager.java) | [state-machines](state-machines.md) |
+| [StateNode.java](../../src/main/java/valthorne/state/StateNode.java) | [state-machines](state-machines.md) |
+| [StateSlot.java](../../src/main/java/valthorne/state/StateSlot.java) | [state-machines](state-machines.md) |
+| [StateUpdate.java](../../src/main/java/valthorne/state/StateUpdate.java) | [state-machines](state-machines.md) |
+| [TransitionBuilder.java](../../src/main/java/valthorne/state/TransitionBuilder.java) | [state-machines](state-machines.md) |
+| [ActionKind.java](../../src/main/java/valthorne/tick/ActionKind.java) | [timing](timing.md) |
+| [After.java](../../src/main/java/valthorne/tick/After.java) | [timing](timing.md) |
+| [DelayedAction.java](../../src/main/java/valthorne/tick/DelayedAction.java) | [timing](timing.md) |
+| [ScheduledAction.java](../../src/main/java/valthorne/tick/ScheduledAction.java) | [timing](timing.md) |
+| [State.java](../../src/main/java/valthorne/tick/State.java) | [timing](timing.md) |
+| [TickConditions.java](../../src/main/java/valthorne/tick/TickConditions.java) | [timing](timing.md) |
+| [TickManager.java](../../src/main/java/valthorne/tick/TickManager.java) | [timing](timing.md) |
+| [TickSchedule.java](../../src/main/java/valthorne/tick/TickSchedule.java) | [timing](timing.md) |
+| [Canvas2D.java](../../src/main/java/valthorne/ui/Canvas2D.java) | [ui-core](ui-core.md) |
+| [SlugRenderable.java](../../src/main/java/valthorne/ui/SlugRenderable.java) | [ui-core](ui-core.md) |
+| [DirectoryBrowserModel.java](../../src/main/java/valthorne/ui/behavior/DirectoryBrowserModel.java) | [ui-behavior](ui-behavior.md) |
+| [TextSelection.java](../../src/main/java/valthorne/ui/behavior/TextSelection.java) | [ui-behavior](ui-behavior.md) |
+| [ColorWheelImage.java](../../src/main/java/valthorne/ui/nodes/ColorWheelImage.java) | [ui-controls](ui-controls.md) |
+| [NanoBreadcrumbBar.java](../../src/main/java/valthorne/ui/nodes/nano/NanoBreadcrumbBar.java) | [ui-nano](ui-nano.md) |
+| [NanoCollapsibleSection.java](../../src/main/java/valthorne/ui/nodes/nano/NanoCollapsibleSection.java) | [ui-nano](ui-nano.md) |
+| [NanoColorPicker.java](../../src/main/java/valthorne/ui/nodes/nano/NanoColorPicker.java) | [ui-nano](ui-nano.md) |
+| [NanoDataTable.java](../../src/main/java/valthorne/ui/nodes/nano/NanoDataTable.java) | [ui-nano](ui-nano.md) |
+| [NanoDirectoryTree.java](../../src/main/java/valthorne/ui/nodes/nano/NanoDirectoryTree.java) | [ui-nano](ui-nano.md) |
+| [NanoFileChooser.java](../../src/main/java/valthorne/ui/nodes/nano/NanoFileChooser.java) | [ui-nano](ui-nano.md) |
+| [NanoFileExplorer.java](../../src/main/java/valthorne/ui/nodes/nano/NanoFileExplorer.java) | [ui-nano](ui-nano.md) |
+| [NanoFileIcon.java](../../src/main/java/valthorne/ui/nodes/nano/NanoFileIcon.java) | [ui-nano](ui-nano.md) |
+| [NanoImageHyperlink.java](../../src/main/java/valthorne/ui/nodes/nano/NanoImageHyperlink.java) | [ui-nano](ui-nano.md) |
+| [NanoMenuBar.java](../../src/main/java/valthorne/ui/nodes/nano/NanoMenuBar.java) | [ui-nano](ui-nano.md) |
+| [NanoNumberSpinner.java](../../src/main/java/valthorne/ui/nodes/nano/NanoNumberSpinner.java) | [ui-nano](ui-nano.md) |
+| [NanoPopupMenu.java](../../src/main/java/valthorne/ui/nodes/nano/NanoPopupMenu.java) | [ui-nano](ui-nano.md) |
+| [NanoRadioGroup.java](../../src/main/java/valthorne/ui/nodes/nano/NanoRadioGroup.java) | [ui-nano](ui-nano.md) |
+| [NanoSplitPane.java](../../src/main/java/valthorne/ui/nodes/nano/NanoSplitPane.java) | [ui-nano](ui-nano.md) |
+| [NanoTabbedPane.java](../../src/main/java/valthorne/ui/nodes/nano/NanoTabbedPane.java) | [ui-nano](ui-nano.md) |
+| [NanoTooltip.java](../../src/main/java/valthorne/ui/nodes/nano/NanoTooltip.java) | [ui-nano](ui-nano.md) |
+| [NanoVirtualList.java](../../src/main/java/valthorne/ui/nodes/nano/NanoVirtualList.java) | [ui-nano](ui-nano.md) |
+| [NanoWidgetSupport.java](../../src/main/java/valthorne/ui/nodes/nano/NanoWidgetSupport.java) | [ui-nano](ui-nano.md) |
+| [NanoWindow.java](../../src/main/java/valthorne/ui/nodes/nano/NanoWindow.java) | [ui-nano](ui-nano.md) |
+| [PropertySet.java](../../src/main/java/valthorne/utility/settings/PropertySet.java) | [settings](settings.md) |
+| [PropertySetIO.java](../../src/main/java/valthorne/utility/settings/PropertySetIO.java) | [settings](settings.md) |
+| [PropertySetTextIO.java](../../src/main/java/valthorne/utility/settings/PropertySetTextIO.java) | [settings](settings.md) |
+| [PropertyTextOptions.java](../../src/main/java/valthorne/utility/settings/PropertyTextOptions.java) | [settings](settings.md) |
+| [PropertyValue.java](../../src/main/java/valthorne/utility/settings/PropertyValue.java) | [settings](settings.md) |
 
 </details>

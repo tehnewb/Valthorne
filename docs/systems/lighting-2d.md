@@ -8,6 +8,15 @@ Author: Albert Beaupre
 
 Lighting2D renders visible planar lights in a batch and uses polar shadow data for occlusion. Separate light properties from occluder geometry, then let the renderer reuse results when the scene remains unchanged. This path suits many local lights without constructing a separate ray mesh for every visible contribution.
 
+For sprite silhouettes, `AlphaShadowShape2D` stores reusable alpha geometry and
+`AlphaOccluder2D` places an instance in world space. Its transform follows the
+sprite size, pivot, and clockwise-degree convention; a zero-sized instance
+blocks no light. `SpriteOccluder2D` follows sprite frames. Ground shadows are
+a separate projected effect: `GroundShadowRenderer2D` and
+`SpriteGroundShadow2D` draw shadows on the floor, while
+`SpriteVolumeRenderer2D` adds sprite volume shading. Keep planar occlusion
+and projected ground shadows conceptually separate when configuring a scene.
+
 ## Features and when to use them
 
 | Feature | Purpose |

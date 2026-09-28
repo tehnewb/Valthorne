@@ -4,6 +4,13 @@ Author: Albert Beaupre
 
 [System manual](README.md)
 
+`GraphicsCapabilities.current()` captures the active desktop OpenGL context's
+driver identity and support for raster, compute, path tracing, and Filament.
+Capture it on the thread with the context current and recapture after replacing
+the context. `PlatformTools` provides desktop diagnostics and input injection;
+its input methods target the installed engine callbacks and use the engine's
+bottom-left pointer coordinates.
+
 ## Purpose
 
 Start here when embedding Valthorne in a desktop application. `Application` supplies four callbacks; `JGL` establishes the engine and drives them. `Window` exposes the active native window, while `JGLConfiguration` supplies launch settings. Initialize graphics resources after the context exists, update simulation with elapsed seconds, and keep rendering separate from simulation.

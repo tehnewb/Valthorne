@@ -1,7 +1,7 @@
 # Valthorne documentation
 
-These guides describe the `2.1.0` release, not the older
-1.4.6 artifact already on Maven Central.
+These guides describe the `2.4.0` source checkout. Published artifacts may
+expose a different API revision.
 
 - [Start a Java project](getting-started.md): complete Gradle/Groovy, Kotlin and Maven setup.
 - [Platform matrix](platforms.md): supported desktop targets, native libraries and renderer limits.

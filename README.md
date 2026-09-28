@@ -153,13 +153,13 @@ the classpath under `src/main/resources`.
 | Application structure | [Assets](docs/systems/assets.md), [events](docs/systems/events.md), [scenes](docs/systems/scenes.md), [state machines](docs/systems/state-machines.md), [timing](docs/systems/timing.md) |
 | 2D graphics | [Textures](docs/systems/textures.md), [cameras](docs/systems/cameras.md), [shaders](docs/systems/shaders.md), [particles](docs/systems/particles-2d.md), [lighting](docs/systems/lighting-2d.md) |
 | Fonts and UI | [Bitmap fonts](docs/systems/fonts.md), [Slug fonts](docs/systems/slug-fonts.md), [UI foundations](docs/systems/ui-core.md), [controls](docs/systems/ui-controls.md), [widgets](docs/ui-widgets.md), [windows](docs/ui-windows.md), [themes](docs/systems/ui-themes.md) |
-| Maps | [Tiled maps](docs/systems/tiled-maps.md), [LDtk source package](src/main/java/valthorne/graphics/map/ldtk) |
+| Maps | [Tiled maps](docs/systems/tiled-maps.md), [LDtk maps](docs/systems/ldtk-maps.md) |
 | 3D graphics | [Models and scenes](docs/systems/models.md), [3D lighting](docs/systems/lighting-3d.md), [Filament](docs/systems/filament.md), [path tracing](docs/systems/path-tracing.md), [culling](docs/systems/culling.md) |
 | Physics and audio | [Jolt physics](docs/systems/physics.md), [audio](docs/systems/audio.md) |
-| Foundation APIs | [Collections](docs/systems/arrays.md), [buffers](docs/systems/buffers.md), [files](docs/systems/files.md), [compression](docs/systems/compression.md), [encryption](docs/systems/encryption.md), [utilities](docs/systems/utilities.md) |
+| Foundation APIs | [Collections](docs/systems/arrays.md), [buffers](docs/systems/buffers.md), [files](docs/systems/files.md), [settings](docs/systems/settings.md), [compression](docs/systems/compression.md), [encryption](docs/systems/encryption.md), [utilities](docs/systems/utilities.md) |
 | Browser target | [Portable desktop/web target](portable/README.md) |
 
-The [complete system index](docs/systems/README.md) covers the engine's 473 Java
+The [complete system index](docs/systems/README.md) covers the engine's 499 Java
 source files and links each documented area back to its implementation.
 
 ## Platform notes

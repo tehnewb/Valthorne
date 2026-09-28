@@ -8,6 +8,15 @@ Author: Albert Beaupre
 
 Use a state machine for behavior that has named modes and controlled transitions: idle/run/jump, menu states, or a multi-step interaction. The machine carries shared context, invokes state lifecycle callbacks, and evaluates guarded transitions. It is separate from scene replacement and does not manage graphics resources for you.
 
+For many actors with the same definitions, configure one `StateMachine`, then
+call `freeze()` to obtain a `StateGraph`. Call `graph.create(data)` for each
+independent stopped runtime. The graph shares callbacks, transitions, trigger
+names, and adjacency data; each runtime owns its user data, state, timer, and
+pending triggers. Freeze seals graph structure, not mutable objects captured by
+callbacks. `StateMachineManager` coordinates multiple machine updates. The
+`StateControl`, `StateDuration`, `StateNode`, `StateSlot`, `StateUpdate`, and
+`TransitionBuilder` types support the newer transition API.
+
 ## Features and when to use them
 
 | Feature | Purpose |

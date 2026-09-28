@@ -8,6 +8,11 @@ Author: Albert Beaupre
 
 Slug renders font outlines from curve and band textures rather than storing only a bitmap glyph image. `SlugFont` prepares shared curve data, `SlugBatch` submits glyph instances, and `SlugTextRun` retains laid-out glyph positions for text drawn repeatedly.
 
+`SlugSource` and `SlugParameters` select a font input for `SlugLoader`.
+The loader produces `SlugData` before graphics-thread upload, separating
+source decoding from GPU resource creation. `SlugRenderable` is the shared
+rendering contract used where a UI element accepts slug-backed text.
+
 ## Features and when to use them
 
 | Feature | Purpose |

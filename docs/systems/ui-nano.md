@@ -15,6 +15,11 @@ The [composite widget guide](../ui-widgets.md#nanovg-versions) also covers
 modal shells all use NanoVG. [NanoWindow](../ui-windows.md) adds movable, resizable
 tool windows with matching light/dark chrome and clipped Nano content.
 
+The current source also includes NanoVG versions of split panes, tabs, virtual
+lists, data tables, tooltips, collapsible sections, image links, and file icons.
+Choose the matching control for the UI tree rather than mixing painting
+contracts inside a control. `NanoWidgetSupport` holds shared widget behavior.
+
 ## Features and when to use them
 
 | Feature | Purpose |

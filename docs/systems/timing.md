@@ -8,6 +8,15 @@ Author: Albert Beaupre
 
 Valthorne's time helpers operate on values supplied by your game loop. `Tick` is a manually updated repeating callback, not a background scheduler. `TimeUtility` provides conversions, smoothing, frame-rate calculations, fixed-step accumulation, progress, and formatting.
 
+`TickManager` can update multiple registered ticks in registration order from
+one frame delta. Registration does not start a tick: call `start()` separately.
+Add dependencies before ticks that read their state. The manager is confined to
+one thread; ticks added during a callback begin on the next update, and removed
+ticks are skipped if their turn has not begun. Removing a tick does not stop it.
+Use `removeStopped()` to discard stopped registrations, and do not also update
+managed ticks directly. `TickSchedule`, `TickConditions`, `After`, and the
+action types support delayed or conditional actions.
+
 ## Features and when to use them
 
 | Feature | Purpose |

@@ -4,6 +4,10 @@ Author: Albert Beaupre
 
 [System manual](README.md)
 
+`Canvas2D` provides top-left-coordinate NanoVG drawing helpers for custom
+`NanoContainer` HUD content. Use the root's prepared NanoVG context and keep
+resource ownership with the surrounding UI system.
+
 ## Purpose
 
 UIRoot coordinates a tree of UINodes: layout, drawing, focus, pointer capture, keyboard/text routing, overlays, and modal scopes. UIContainer owns child relationships. Start here before using individual controls so the tree receives a coherent lifecycle and coordinate system.
