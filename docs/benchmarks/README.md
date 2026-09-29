@@ -6,8 +6,8 @@ New experiment output belongs under `build/reports`, and can be promoted here wi
 its measured revision, commands, environment, raw output and limitations.
 
 Do not treat a saved report's `build`/test counts, Java types, or launcher names as
-the current release procedure. Use [release checks](../releasing.md),
-[platform support](../platforms.md), and [current examples](../examples.md).
+the current release procedure. Use [release checks](../releasing.md) and
+[platform support](../platforms.md).
 The [performance ledger](../performance-program.md) explains the measurement programs.
 
 Historical source directories here are not source sets and are not compiled or
