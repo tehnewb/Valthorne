@@ -158,7 +158,6 @@ public final class Mouse {
      */
     public static final int CURSOR_DISABLED = GLFW_CURSOR_DISABLED;
 
-
     /**
      * Standard arrow cursor shape for general use.
      */
@@ -202,59 +201,72 @@ public final class Mouse {
     /**
      * Reusable mouse press event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0); // Reusable mouse press event instance
+    private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0);
+
     /**
      * Reusable mouse release event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0); // Reusable mouse release event instance
+    private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0);
+
     /**
      * Reusable mouse move event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0); // Reusable mouse move event instance
+    private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0);
+
     /**
      * Reusable mouse drag event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0); // Reusable mouse drag event instance
+    private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0);
+
     /**
      * Reusable mouse scroll event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0); // Reusable mouse scroll event instance
+    private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0);
+
     /**
      * GLFW callback used to track cursor movement.
      */
-    private static GLFWCursorPosCallback cursorPosCallback; // GLFW callback used to track cursor movement
+    private static GLFWCursorPosCallback cursorPosCallback;
+
     /**
      * GLFW callback used to track mouse button actions.
      */
-    private static GLFWMouseButtonCallback mouseButtonCallback; // GLFW callback used to track mouse button actions
+    private static GLFWMouseButtonCallback mouseButtonCallback;
+
     /**
      * GLFW callback used to track scroll wheel movement.
      */
-    private static GLFWScrollCallback scrollCallback; // GLFW callback used to track scroll wheel movement
+    private static GLFWScrollCallback scrollCallback;
+
     /**
      * Current raw GLFW cursor X position.
      */
-    private static short x; // Current raw GLFW cursor X position
+    private static short x;
+
     /**
      * Current raw GLFW cursor Y position.
      */
-    private static short y; // Current raw GLFW cursor Y position
+    private static short y;
+
     /**
      * Bitmask representing currently pressed mouse buttons.
      */
-    private static byte buttonState; // Bitmask representing currently pressed mouse buttons
+    private static byte buttonState;
+
     /**
      * Event-time modifier mask supplied by the last native mouse-button callback.
      */
-    private static byte modifierState; // Event-time modifiers for native button notifications.
+    private static byte modifierState;
+
     /**
      * Latest horizontal scroll delta.
      */
-    private static byte scrollX; // Latest horizontal scroll delta
+    private static byte scrollX;
+
     /**
      * Latest vertical scroll delta.
      */
-    private static byte scrollY; // Latest vertical scroll delta
+    private static byte scrollY;
 
     /**
      * Native GLFW cursor handle currently assigned to the window.
@@ -331,10 +343,7 @@ public final class Mouse {
             short fromY = y;
             x = (short) xpos;
             y = (short) ypos;
-            byte movementModifiers = (byte) ((Keyboard.isShiftDown() ? GLFW_MOD_SHIFT : 0)
-                    | (Keyboard.isCtrlDown() ? GLFW_MOD_CONTROL : 0)
-                    | (Keyboard.isAltDown() ? GLFW_MOD_ALT : 0)
-                    | (Keyboard.isSuperDown() ? GLFW_MOD_SUPER : 0));
+            byte movementModifiers = (byte) ((Keyboard.isShiftDown() ? GLFW_MOD_SHIFT : 0) | (Keyboard.isCtrlDown() ? GLFW_MOD_CONTROL : 0) | (Keyboard.isAltDown() ? GLFW_MOD_ALT : 0) | (Keyboard.isSuperDown() ? GLFW_MOD_SUPER : 0));
 
             if (buttonState != 0) {
                 // Drag payloads use the same button code as press/release, not the state mask.
@@ -416,36 +425,51 @@ public final class Mouse {
      * Temporarily displays a standard cursor while retaining the application's selected
      * standard or custom image cursor. Identical shapes reuse the native cursor; changing
      * owner transfers release responsibility without destroying the application cursor.
+     *
      * @param owner nonnull identity token used later to release this override
      * @param shape standard cursor shape such as CURSOR_HRESIZE or CURSOR_RESIZE_NWSE
      */
     public static void overrideCursor(Object owner, int shape) {
         java.util.Objects.requireNonNull(owner);
-        long win = Window.getAddress(); if (win == 0) return;
-        if (overrideCursor != 0 && overrideCursorShape == shape) { cursorOwner = owner; return; }
+        long win = Window.getAddress();
+        if (win == 0) return;
+        if (overrideCursor != 0 && overrideCursorShape == shape) {
+            cursorOwner = owner;
+            return;
+        }
         long next = glfwCreateStandardCursor(shape);
         if (next == 0) return;
         glfwSetCursor(win, next);
         if (overrideCursor != 0) glfwDestroyCursor(overrideCursor);
-        overrideCursor = next; overrideCursorShape = shape; cursorOwner = owner;
+        overrideCursor = next;
+        overrideCursorShape = shape;
+        cursorOwner = owner;
     }
 
     /**
      * Restores the application's latest cursor only when the supplied owner still owns
      * the override. Stale releases cannot clear a newer UI owner's cursor.
+     *
      * @param owner identity token supplied to overrideCursor
      */
     public static void clearCursorOverride(Object owner) {
         if (cursorOwner != owner || overrideCursor == 0) return;
-        long win = Window.getAddress(); if (win != 0) glfwSetCursor(win, currentCursor);
-        glfwDestroyCursor(overrideCursor); overrideCursor = 0; cursorOwner = null; overrideCursorShape = 0;
+        long win = Window.getAddress();
+        if (win != 0) glfwSetCursor(win, currentCursor);
+        glfwDestroyCursor(overrideCursor);
+        overrideCursor = 0;
+        cursorOwner = null;
+        overrideCursorShape = 0;
     }
 
     /**
      * Reads the selected standard cursor, including any temporary UI override.
+     *
      * @return standard CURSOR_* shape, or zero for an application custom image cursor
      */
-    public static int getCursorShape() { return overrideCursor != 0 ? overrideCursorShape : currentCursorShape; }
+    public static int getCursorShape() {
+        return overrideCursor != 0 ? overrideCursorShape : currentCursorShape;
+    }
 
     /**
      * <p>
@@ -656,20 +680,26 @@ public final class Mouse {
      */
     static void dispose() {
         if (overrideCursor != 0) {
-            glfwDestroyCursor(overrideCursor); overrideCursor = 0; cursorOwner = null; overrideCursorShape = 0;
+            glfwDestroyCursor(overrideCursor);
+            overrideCursor = 0;
+            cursorOwner = null;
+            overrideCursorShape = 0;
         }
         if (cursorPosCallback != null) {
-            if (Window.getAddress() != 0) glfwSetCursorPosCallback(Window.getAddress(), null);
+            if (Window.getAddress() != 0)
+                glfwSetCursorPosCallback(Window.getAddress(), null);
             cursorPosCallback.free();
             cursorPosCallback = null;
         }
         if (mouseButtonCallback != null) {
-            if (Window.getAddress() != 0) glfwSetMouseButtonCallback(Window.getAddress(), null);
+            if (Window.getAddress() != 0)
+                glfwSetMouseButtonCallback(Window.getAddress(), null);
             mouseButtonCallback.free();
             mouseButtonCallback = null;
         }
         if (scrollCallback != null) {
-            if (Window.getAddress() != 0) glfwSetScrollCallback(Window.getAddress(), null);
+            if (Window.getAddress() != 0)
+                glfwSetScrollCallback(Window.getAddress(), null);
             scrollCallback.free();
             scrollCallback = null;
         }
