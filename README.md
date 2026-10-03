@@ -184,14 +184,6 @@ These commands do not upload a release.
 Private editor and 3D prototypes are excluded from public artifacts. Follow
 [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) when changing code.
 
-## Repository organization
-
-- `src/main/java/valthorne` — engine implementation and public APIs.
-- `src/main/resources` — packaged shaders and licenses.
-- `src/test` — verification code.
-- `portable` — shared-source desktop compatibility tooling.
-- `gradle` — packaging, publication, and benchmark configuration.
-
 ## License and community
 
 Valthorne is distributed under the [Apache License 2.0](LICENSE). Third-party
