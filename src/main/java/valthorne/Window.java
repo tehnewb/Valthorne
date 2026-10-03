@@ -54,7 +54,7 @@ import valthorne.graphics.GraphicsCapabilities;
 public final class Window {
 
     /*
-     * Optional render-thread clear-color policy, borrowed only while a caller installs it.
+     * Optional render-thread clear-color policy, borrowed until restored or window shutdown.
      */
     private static UnaryOperator<Color> clearColorFilter;
 
@@ -430,6 +430,7 @@ public final class Window {
      * Installs a render-thread policy applied to subsequent framebuffer clears.
      * Callers must restore the returned policy in a finally block, in reverse
      * nesting order. The policy and colors remain borrowed; no resource is owned.
+     * Window shutdown releases the installed policy so a later runtime starts without it.
      *
      * @param filter color policy, or null to use the supplied color directly
      * @return previous policy, or null when none was installed
@@ -886,10 +887,15 @@ public final class Window {
 
     /**
      * Clears cached window and callback references and restores default flags,
-     * swap interval, and identity projection. Performs no native cleanup itself;
+     * swap interval, clear-color policy, and identity projection. Performs no native cleanup itself;
      * call only after owned resources have been released or during safe reset.
      */
     static void resetState() {
+        /*
+         * Release borrowed application callbacks so completed runtimes cannot retain
+         * their owners or alter framebuffer clears during the next initialization.
+         */
+        clearColorFilter = null;
         focusCallback = null;
         closeCallback = null;
         posCallback = null;
