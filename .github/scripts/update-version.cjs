@@ -1,5 +1,7 @@
 'use strict';
 
+const { syncDocumentation } = require('./sync-documentation-version.cjs');
+
 /** Selects one explicit version label; ambiguous labels fail before any write. */
 function bumpKind(pull) {
     const labels = new Set(pull.labels.map(label => label.name));
@@ -87,20 +89,29 @@ async function updateVersion({ github, context, core }) {
             if (Array.isArray(data) || data.encoding !== 'base64') throw new Error(`Cannot read ${path}.`);
             return Buffer.from(data.content, 'base64').toString('utf8');
         };
-        const [properties, stateText, pulls] = await Promise.all([
+        const [properties, stateText, pulls, treeResult] = await Promise.all([
             read('gradle.properties'),
             read('.github/version-state.json'),
-            github.paginate(github.rest.pulls.list, { ...repo, state: 'closed', base: 'main', per_page: 100 })
+            github.paginate(github.rest.pulls.list, { ...repo, state: 'closed', base: 'main', per_page: 100 }),
+            github.rest.git.getTree({ ...repo, tree_sha: parent, recursive: '1' })
         ]);
+        if (treeResult.data.truncated) throw new Error('Repository file listing was truncated.');
         const plan = planUpdate(properties, JSON.parse(stateText), pulls);
-        if (!plan.changed) {
-            core.info('No unprocessed merged pull requests.');
+        const paths = treeResult.data.tree.filter(entry => entry.type === 'blob' && entry.path.endsWith('.md')
+                && !entry.path.startsWith('.github/') && entry.path !== 'AGENTS.md').map(entry => entry.path);
+        const documentation = await Promise.all(paths.map(async path => {
+            const original = await read(path);
+            const content = syncDocumentation(original, plan.version);
+            return content === original ? null : { path, content };
+        }));
+        const updatedDocumentation = documentation.filter(Boolean);
+        if (!plan.changed && updatedDocumentation.length === 0) {
+            core.info('Version and repository documentation are up to date.');
             return;
         }
         const { data: parentCommit } = await github.rest.git.getCommit({ ...repo, commit_sha: parent });
-        const files = [
-            { path: '.github/version-state.json', content: JSON.stringify(plan.state, null, 2) + '\n' }
-        ];
+        const files = [...updatedDocumentation];
+        if (plan.changed) files.push({ path: '.github/version-state.json', content: JSON.stringify(plan.state, null, 2) + '\n' });
         if (plan.properties !== properties) files.push({ path: 'gradle.properties', content: plan.properties });
         if (plan.release) files.push({ path: '.github/release-request.json', content: JSON.stringify(plan.release, null, 2) + '\n' });
         const { data: tree } = await github.rest.git.createTree({
@@ -110,7 +121,7 @@ async function updateVersion({ github, context, core }) {
         });
         const message = plan.bumps.length
             ? `chore: bump version to ${plan.version}\n\nProcessed PRs: ${plan.bumps.map(number => `#${number}`).join(', ')}`
-            : 'chore: record merges without a version bump';
+            : `chore: synchronize version ${plan.version} and documentation`;
         const { data: commit } = await github.rest.git.createCommit({ ...repo, message, tree: tree.sha, parents: [parent] });
         try {
             await github.rest.git.updateRef({ ...repo, ref: 'heads/main', sha: commit.sha, force: false });

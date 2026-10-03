@@ -36,3 +36,32 @@ jobs:
           github-token: ${{ steps.app.outputs.token }}
           script: |
             await require('./.github/scripts/update-version.cjs').updateVersion({ github, context, core });
+      - name: Read the latest canonical version
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        shell: bash
+        run: gh api "repos/$GITHUB_REPOSITORY/contents/gradle.properties?ref=main" --jq '.content' | base64 --decode > gradle.properties
+      - name: Synchronize wiki version references
+        env:
+          VERSION_TOKEN: ${{ steps.app.outputs.token }}
+        shell: bash
+        run: |
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$VERSION_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_KEY_1=credential.helper
+          export GIT_CONFIG_VALUE_1=''
+          export GIT_TERMINAL_PROMPT=0
+          for attempt in 1 2 3; do
+            git clone "https://github.com/$GITHUB_REPOSITORY.wiki.git" "$RUNNER_TEMP/version-wiki-$attempt"
+            wiki="$RUNNER_TEMP/version-wiki-$attempt"
+            node .github/scripts/sync-documentation-version.cjs "$wiki"
+            if git -C "$wiki" diff --quiet; then exit 0; fi
+            git -C "$wiki" config user.name 'Valthorne Versioning'
+            git -C "$wiki" config user.email 'versioning@users.noreply.github.com'
+            git -C "$wiki" add -- '*.md'
+            git -C "$wiki" commit -m 'Synchronize Valthorne documentation version'
+            if git -C "$wiki" push origin HEAD; then exit 0; fi
+          done
+          echo 'Wiki push failed after three fresh-clone attempts.' >&2
+          exit 1

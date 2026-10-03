@@ -27,7 +27,11 @@ in merge-time order, with PR number breaking ties. Version and processing state
 are committed together, and competing pushes are retried without force pushing.
 Several pending PRs may be combined into one commit, with one bump per labeled PR.
 
-Routine merges update `gradle.properties` and the processing ledger only.
+Routine merges update `gradle.properties`, the processing ledger, and version
+references in repository Markdown. A subsequent step synchronizes wiki Markdown
+using the same version. `gradle.properties` is the canonical source for both.
+The workflow also repairs documentation drift when no version bump is needed.
+Version-scheme examples in this guide and test fixtures remain illustrative.
 For an urgent fix, add **`release:urgent`** alongside **one** version label before
 merging. That additional label requests automatic Maven Central publication.
 An urgent PR without a version label fails before any update. Ordinary hotfixes
@@ -42,8 +46,9 @@ not trigger another push workflow.
 
 Several pending merges can be included in a single publication of the resulting
 version. It includes all changes present in that snapshot, not just the urgent
-fix. The README's released dependency examples and GitHub release tags remain
-manually maintained. Do not include a manual version bump in a labeled PR,
+fix. README and wiki references show the current development version, including
+before publication. GitHub release tags remain historical release identifiers.
+Do not include a manual version bump in a labeled PR,
 or the automatic bump will be applied on top of it.
 
 ## One-time GitHub App setup
@@ -73,7 +78,8 @@ token cannot perform these updates.
 
 GitHub's bypass is a branch-level permission, not a file-specific permission.
 The App credential therefore technically permits updates to all files on `main`;
-this workflow limits its writes to the version, ledger, and release-request files. Protect the private key
+this workflow writes the version, ledger, release request, and repository
+documentation, and synchronizes the separate wiki Git repository. Protect the private key
 and review changes to this workflow as carefully as changes to repository access.
 No other collaborator receives merge or push permission through this setup.
 
@@ -99,11 +105,12 @@ may reflect publication still in progress. Never change an already published
 version's artifacts.
 
 Nothing is uploaded by local verification. This setup does not publish the
-current `1.0.0.0` automatically; the next eligible merge requests publication.
+current development version automatically; the next eligible merge requests publication.
 
 ## Verification
 
-Run `node --test .github/scripts/update-version.test.cjs .github/scripts/release-policy.test.cjs`. Tests cover component
+Run `node --test .github/scripts/*.test.cjs`. Tests cover component
 increments and resets, merge ordering, duplicate processing, unlabeled and
 ineligible PRs, invalid input, atomic commits, competing updates, automatic
-publication eligibility, and exact release snapshot validation.
+publication eligibility, exact release snapshot validation, and documentation
+synchronization that preserves unrelated Maven versions and IP addresses.

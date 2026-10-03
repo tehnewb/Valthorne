@@ -75,6 +75,7 @@ test('commits both files atomically and retries concurrent main updates', async 
                 path === 'gradle.properties' ? 'version=1.0.0.0\n' : JSON.stringify(state)
             ).toString('base64') } }) },
             git: {
+                getTree: async () => ({ data: { tree: [], truncated: false } }),
                 getRef: async () => ({ data: { object: { sha: attempts ? 'new-head' : 'head' } } }),
                 getCommit: async () => ({ data: { tree: { sha: 'tree' } } }),
                 createTree: async ({ tree }) => {
@@ -91,4 +92,31 @@ test('commits both files atomically and retries concurrent main updates', async 
     };
     await updateVersion({ github, context: { repo: { owner: 'owner', repo: 'repo' } }, core: { info() {} } });
     assert.equal(attempts, 2);
+});
+
+test('repairs stale documentation without bumping the version or processing a merge', async () => {
+    let writes = 0;
+    const contents = { 'gradle.properties': 'version=1.0.0.0\n', '.github/version-state.json': JSON.stringify(state),
+        'README.md': 'Valthorne 0.9.0.0\n' };
+    const github = {
+        paginate: async () => [],
+        rest: {
+            pulls: { list() {} },
+            repos: { getContent: async ({ path }) => ({ data: { encoding: 'base64',
+                content: Buffer.from(contents[path]).toString('base64') } }) },
+            git: {
+                getRef: async () => ({ data: { object: { sha: 'head' } } }),
+                getTree: async () => ({ data: { tree: [{ type: 'blob', path: 'README.md' }], truncated: false } }),
+                getCommit: async () => ({ data: { tree: { sha: 'tree' } } }),
+                createTree: async ({ tree }) => {
+                    assert.deepEqual(tree, [{ path: 'README.md', content: 'Valthorne 1.0.0.0\n', mode: '100644', type: 'blob' }]);
+                    return { data: { sha: 'new-tree' } };
+                },
+                createCommit: async () => ({ data: { sha: 'new-commit' } }),
+                updateRef: async () => { writes++; }
+            }
+        }
+    };
+    await updateVersion({ github, context: { repo: { owner: 'owner', repo: 'repo' } }, core: { info() {} } });
+    assert.equal(writes, 1);
 });

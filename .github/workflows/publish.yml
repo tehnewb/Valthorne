@@ -45,7 +45,7 @@ jobs:
         id: policy
         run: node .github/scripts/release-policy.cjs
       - name: Verify automation
-        run: node --test .github/scripts/update-version.test.cjs .github/scripts/release-policy.test.cjs
+        run: node --test .github/scripts/*.test.cjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

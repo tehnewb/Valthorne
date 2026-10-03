@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: '24'
       - name: Verify version automation
-        run: node --test .github/scripts/update-version.test.cjs .github/scripts/release-policy.test.cjs
+        run: node --test .github/scripts/*.test.cjs
       - name: Build and validate publication artifacts
         shell: bash
         run: bash ./gradlew verifyRelease --stacktrace --console=plain

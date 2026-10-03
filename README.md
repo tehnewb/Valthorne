@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 1.0.0.0" src="https://img.shields.io/badge/version-1.0.0.0-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.0.0.3" src="https://img.shields.io/badge/version-1.0.0.3-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -35,7 +35,7 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 
 ## Release version
 
-**Valthorne 1.0.0.0 is the official initial release.** Versions use four numbers:
+**Current Valthorne version: 1.0.0.3.** Versions use four numbers:
 
 | Position | Meaning |
 | --- | --- |
@@ -56,6 +56,9 @@ also requests publication; routine version bumps do not.
 
 ## Getting started
 
+The version references on this page and the wiki track `gradle.properties` on
+`main`. A development version may not yet be published to Maven Central.
+
 Install JDK 25 and add Valthorne to your application's build. The dependency
 includes its runtime native libraries transitively.
 
@@ -73,7 +76,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:1.0.0.0'
+    implementation 'io.github.tehnewb:Valthorne:1.0.0.3'
 }
 
 java {
@@ -105,7 +108,7 @@ sections. Maven Central is Maven's default repository:
     <dependency>
         <groupId>io.github.tehnewb</groupId>
         <artifactId>Valthorne</artifactId>
-        <version>1.0.0.0</version>
+        <version>1.0.0.3</version>
     </dependency>
 </dependencies>
 ```
