@@ -180,7 +180,11 @@ public final class Assets {
     /**
      * Asynchronously loads an asset of the specified type using the provided asset parameters.
      * This method first checks if the requested asset is already being loaded or cached. If so,
-     * it returns the cached future. Otherwise, it initiates a new asynchronous load operation.
+     * it shares the cached producing future. Otherwise, it initiates a new asynchronous load.
+     * Every request receives a dependent future that validates its requested output type.
+     * An incompatible result completes that request exceptionally with ClassCastException
+     * without changing the shared cache or other requests. Cancelling a dependent request
+     * does not cancel the shared producer. Null results remain valid under Class.cast.
      *
      * @param <P>        The type of the asset parameters, which must extend {@link AssetParameters}.
      * @param <T>        The type of the asset to be loaded.
@@ -197,16 +201,20 @@ public final class Assets {
 
         final String key = parameters.key();
 
-        // Use already cached future if present
-        return (CompletableFuture<T>) cache.computeIfAbsent(key, k ->
+        /*
+         * Cache the loader's result independently of any caller's requested type so
+         * a mismatched request cannot poison ownership of a valid shared asset.
+         */
+        CompletableFuture<?> future = cache.computeIfAbsent(key, k ->
                 CompletableFuture.supplyAsync(() -> {
                     AssetLoader loader = loaders.get(parameters.getClass());
                     if (loader == null)
                         throw new IllegalStateException("No loader for " + parameters.getClass().getName());
 
-                    return assetType.cast(loader.load(parameters));
+                    return loader.load(parameters);
                 }, ensureService())
         );
+        return future.thenApply(assetType::cast);
     }
 
     /**
