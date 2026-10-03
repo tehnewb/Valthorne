@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import valthorne.event.EventTypes;
 import valthorne.event.events.WindowResizeEvent;
+import valthorne.event.events.FramebufferResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
 import java.util.function.UnaryOperator;
@@ -47,6 +48,11 @@ import valthorne.graphics.GraphicsCapabilities;
  * <p>This class is a static utility. It owns the GLFW window handle, registers GLFW callbacks,
  * manages cached window state (size/position/fullscreen/etc.), and publishes engine events such as
  * {@link WindowResizeEvent} through {@link JGL}.</p>
+ * <p>Logical window dimensions drive layout and projection. The OpenGL viewport uses
+ * framebuffer pixels. Subscribe to {@link EventTypes#FRAMEBUFFER_RESIZE} for pixel-size
+ * changes, including monitor scaling without a logical resize. Events are reused;
+ * copy dimensions during delivery. A zero-sized framebuffer sets a zero-area viewport;
+ * render-target owners should defer allocation and rendering until both sizes are positive.</p>
  *
  * @author Albert Beaupre
  * @since October 17th, 2025
@@ -93,6 +99,22 @@ public final class Window {
      * Native logical-size callback reference that updates projection and publishes resize events.
      */
     private static GLFWWindowSizeCallback sizeCallback;
+    /*
+     * Owned pixel-size callback, independent of logical window layout changes.
+     */
+    private static GLFWFramebufferSizeCallback framebufferCallback;
+    /*
+     * Last framebuffer pixel width; zero when minimized or uninitialized.
+     */
+    private static int framebufferWidth;
+    /*
+     * Last framebuffer pixel height; zero when minimized or uninitialized.
+     */
+    private static int framebufferHeight;
+    /*
+     * Reused pixel-size notification; listeners must copy its values during delivery.
+     */
+    private static final FramebufferResizeEvent framebufferResizeEvent = new FramebufferResizeEvent();
 
     /**
      * Cached swap-interval preference, initially disabled.
@@ -276,7 +298,6 @@ public final class Window {
         config.applyWindowHints();
 
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
-
         int[][] versions = config.isAutomaticContext() ? new int[][]{{4, 3}, {4, 1}, {3, 3}}
                 : new int[][]{{config.getContextVersionMajor(), config.getContextVersionMinor()}};
         StringBuilder failures = new StringBuilder();
@@ -328,8 +349,6 @@ public final class Window {
             Window.width = newW;
             Window.height = newH;
 
-            glViewport(0, 0, newW, newH);
-
             updateDefaultProjectionMatrix();
 
             resizeEvent.setOldHeight(oldHeight);
@@ -339,6 +358,16 @@ public final class Window {
             JGL.publish(resizeEvent);
         });
         glfwSetWindowSizeCallback(address, sizeCallback);
+        framebufferCallback = GLFWFramebufferSizeCallback.create((win, newWidth, newHeight) -> {
+            int oldWidth = framebufferWidth;
+            int oldHeight = framebufferHeight;
+            framebufferWidth = newWidth;
+            framebufferHeight = newHeight;
+            glViewport(0, 0, newWidth, newHeight);
+            framebufferResizeEvent.set(oldWidth, oldHeight, newWidth, newHeight);
+            JGL.publish(framebufferResizeEvent);
+        });
+        glfwSetFramebufferSizeCallback(address, framebufferCallback);
 
         posCallback = GLFWWindowPosCallback.create((win, newX, newY) -> {
             Window.x = newX;
@@ -390,9 +419,12 @@ public final class Window {
             glfwGetWindowSize(address, w, h);
             Window.width = w.get(0);
             Window.height = h.get(0);
+            glfwGetFramebufferSize(address, w, h);
+            framebufferWidth = w.get(0);
+            framebufferHeight = h.get(0);
         }
 
-        glViewport(0, 0, Window.width, Window.height);
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -563,6 +595,30 @@ public final class Window {
             glfwGetFramebufferSize(address, w, h);
             return new int[]{w.get(0), h.get(0)};
         }
+    }
+
+    /**
+     * Returns the last native framebuffer width without allocating or querying GLFW.
+     *
+     * @return width in pixels, possibly zero when minimized; zero before initialization
+     */
+    public static int getFramebufferWidth() {
+        /*
+         * Callback-maintained primitive state allows allocation-free render-target sizing.
+         */
+        return framebufferWidth;
+    }
+
+    /**
+     * Returns the last native framebuffer height without allocating or querying GLFW.
+     *
+     * @return height in pixels, possibly zero when minimized; zero before initialization
+     */
+    public static int getFramebufferHeight() {
+        /*
+         * Dimensions become current when GLFW delivers framebuffer callbacks.
+         */
+        return framebufferHeight;
     }
 
     /**
@@ -833,6 +889,7 @@ public final class Window {
         failure = appendSuppressed(failure, runSafe(ImmediateTextureRenderer::dispose));
         long handle = address;
         if (handle != NULL) {
+            failure = appendSuppressed(failure, runSafe(() -> glfwSetFramebufferSizeCallback(handle, null)));
             failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowSizeCallback(handle, null)));
             failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowPosCallback(handle, null)));
             failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowFocusCallback(handle, null)));
@@ -841,6 +898,9 @@ public final class Window {
         }
 
         GLFWWindowSizeCallback windowSizeCallback = sizeCallback;
+        GLFWFramebufferSizeCallback pixelCallback = framebufferCallback;
+        framebufferCallback = null;
+        if (pixelCallback != null) failure = appendSuppressed(failure, runSafe(pixelCallback::free));
         sizeCallback = null;
         if (windowSizeCallback != null) {
             failure = appendSuppressed(failure, runSafe(windowSizeCallback::free));
@@ -895,6 +955,9 @@ public final class Window {
         posCallback = null;
         sizeCallback = null;
         address = NULL;
+        framebufferCallback = null;
+        framebufferWidth = 0;
+        framebufferHeight = 0;
         x = 0;
         y = 0;
         width = 0;
