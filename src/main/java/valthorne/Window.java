@@ -117,6 +117,22 @@ public final class Window {
      * Cached logical content width and height, rather than a separate framebuffer pixel size.
      */
     private static int width, height;
+    /*
+     * Saved windowed desktop X coordinate, independent of fullscreen callbacks.
+     */
+    private static int windowedX;
+    /*
+     * Saved windowed desktop Y coordinate, independent of fullscreen callbacks.
+     */
+    private static int windowedY;
+    /*
+     * Saved windowed content width; configured width is used for fullscreen startup.
+     */
+    private static int windowedWidth;
+    /*
+     * Saved windowed content height; configured height is used for fullscreen startup.
+     */
+    private static int windowedHeight;
     /**
      * Shared content-rectangle adapter; position setters move the window while origin getters return zero.
      */
@@ -268,6 +284,10 @@ public final class Window {
 
         Window.width = config.getWidth();
         Window.height = config.getHeight();
+        windowedX = 0;
+        windowedY = 0;
+        windowedWidth = config.getWidth();
+        windowedHeight = config.getHeight();
         Window.fullscreen = config.isFullscreen();
         Window.borderless = !config.isDecorated();
         Window.resizable = config.isResizable();
@@ -276,6 +296,19 @@ public final class Window {
         config.applyWindowHints();
 
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
+
+        if (config.isFullscreen()) {
+            GLFWVidMode desktop = glfwGetVideoMode(monitor);
+            if (desktop != null) {
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    IntBuffer monitorX = stack.mallocInt(1);
+                    IntBuffer monitorY = stack.mallocInt(1);
+                    glfwGetMonitorPos(monitor, monitorX, monitorY);
+                    windowedX = monitorX.get(0) + (desktop.width() - windowedWidth) / 2;
+                    windowedY = monitorY.get(0) + (desktop.height() - windowedHeight) / 2;
+                }
+            }
+        }
 
         int[][] versions = config.isAutomaticContext() ? new int[][]{{4, 3}, {4, 1}, {3, 3}}
                 : new int[][]{{config.getContextVersionMajor(), config.getContextVersionMinor()}};
@@ -618,23 +651,42 @@ public final class Window {
      * <p>When entering fullscreen, this sets the window monitor to the primary monitor and uses the monitor's
      * current video mode dimensions and refresh rate.</p>
      *
-     * <p>When leaving fullscreen, this restores the window to its cached position and size.</p>
+     * <p>When leaving fullscreen, this restores the native position and content size saved
+     * immediately before entry. Repeated requests for the current mode do nothing. A window
+     * initialized in fullscreen uses its configured size, centered on the primary monitor's
+     * desktop at initialization, for its first windowed bounds (origin zero if unavailable).
+     * Native callbacks continue to update the current bounds without altering the saved bounds.
+     * Call on the window-owning thread.</p>
      *
      * @param fullscreen true for fullscreen, false for windowed
      * @throws RuntimeException if the primary monitor video mode cannot be queried
      */
     public static void setFullscreen(boolean fullscreen) {
-        if (address == NULL) return;
-
-        GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        if (vid == null) throw new RuntimeException("Failed to get video mode");
-
-        Window.fullscreen = fullscreen;
-
+        /*
+         * Query native bounds only on entry so pending position/size callbacks cannot
+         * make the snapshot stale. Separate primitives survive fullscreen callbacks
+         * without allocating persistent rectangle objects.
+         */
+        if (address == NULL || Window.fullscreen == fullscreen) return;
         if (fullscreen) {
-            glfwSetWindowMonitor(address, glfwGetPrimaryMonitor(), 0, 0, vid.width(), vid.height(), vid.refreshRate());
+            long monitor = glfwGetPrimaryMonitor();
+            GLFWVidMode vid = glfwGetVideoMode(monitor);
+            if (vid == null) throw new RuntimeException("Failed to get video mode");
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                IntBuffer first = stack.mallocInt(1);
+                IntBuffer second = stack.mallocInt(1);
+                glfwGetWindowPos(address, first, second);
+                windowedX = first.get(0);
+                windowedY = second.get(0);
+                glfwGetWindowSize(address, first, second);
+                windowedWidth = first.get(0);
+                windowedHeight = second.get(0);
+            }
+            Window.fullscreen = true;
+            glfwSetWindowMonitor(address, monitor, 0, 0, vid.width(), vid.height(), vid.refreshRate());
         } else {
-            glfwSetWindowMonitor(address, NULL, getX(), getY(), getWidth(), getHeight(), vid.refreshRate());
+            Window.fullscreen = false;
+            glfwSetWindowMonitor(address, NULL, windowedX, windowedY, windowedWidth, windowedHeight, GLFW_DONT_CARE);
         }
     }
 
@@ -899,6 +951,10 @@ public final class Window {
         y = 0;
         width = 0;
         height = 0;
+        windowedX = 0;
+        windowedY = 0;
+        windowedWidth = 0;
+        windowedHeight = 0;
         fullscreen = false;
         borderless = false;
         resizable = true;
