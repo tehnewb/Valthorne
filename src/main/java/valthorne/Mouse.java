@@ -244,9 +244,9 @@ public final class Mouse {
      */
     private static byte buttonState; // Bitmask representing currently pressed mouse buttons
     /**
-     * Bitmask representing the current modifier key state.
+     * Event-time modifier mask supplied by the last native mouse-button callback.
      */
-    private static byte modifierState; // Bitmask representing the current modifier key state
+    private static byte modifierState; // Event-time modifiers for native button notifications.
     /**
      * Latest horizontal scroll delta.
      */
@@ -331,6 +331,10 @@ public final class Mouse {
             short fromY = y;
             x = (short) xpos;
             y = (short) ypos;
+            byte movementModifiers = (byte) ((Keyboard.isShiftDown() ? GLFW_MOD_SHIFT : 0)
+                    | (Keyboard.isCtrlDown() ? GLFW_MOD_CONTROL : 0)
+                    | (Keyboard.isAltDown() ? GLFW_MOD_ALT : 0)
+                    | (Keyboard.isSuperDown() ? GLFW_MOD_SUPER : 0));
 
             if (buttonState != 0) {
                 // Drag payloads use the same button code as press/release, not the state mask.
@@ -338,11 +342,11 @@ public final class Mouse {
                 int heldButtons = Byte.toUnsignedInt(buttonState);
                 for (int button = 0; button <= GLFW_MOUSE_BUTTON_LAST; button++) {
                     if ((heldButtons & (1 << button)) == 0) continue;
-                    dragEvent.set(button, modifierState, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
+                    dragEvent.set(button, movementModifiers, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
                     JGL.publish(dragEvent);
                 }
             } else {
-                moveEvent.set(-1, modifierState, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
+                moveEvent.set(-1, movementModifiers, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
                 JGL.publish(moveEvent);
             }
         });
@@ -788,44 +792,55 @@ public final class Mouse {
 
     /**
      * <p>
-     * Returns whether the Shift modifier key is currently active during mouse interaction.
+     * Returns whether the Shift modifier key is currently active in the keyboard callback state.
      * </p>
      *
      * <p>
-     * This method checks the cached modifier bitmask updated by GLFW mouse callbacks.
+     * This method reads the current keyboard callback state, including keyboard-only changes.
+     * Movement and drag events use that state; button events retain their native event-time mask.
+     * Held modifiers are cleared when window focus is lost.
      * </p>
      *
      * @return {@code true} if Shift is active
      */
-    public boolean isShiftDown() {
-        return (modifierState & GLFW_MOD_SHIFT) != 0;
+    public static boolean isShiftDown() {
+        /*
+         * Use keyboard callback state so a button event is not required to refresh modifiers.
+         */
+        return Keyboard.isShiftDown();
     }
 
     /**
      * <p>
-     * Returns whether the Control modifier key is currently active during mouse interaction.
+     * Returns whether the Control modifier key is currently active in the keyboard callback state.
      * </p>
      *
      * @return {@code true} if Control is active
      */
-    public boolean isCtrlDown() {
-        return (modifierState & GLFW_MOD_CONTROL) != 0;
+    public static boolean isCtrlDown() {
+        /*
+         * Use keyboard callback state so a button event is not required to refresh modifiers.
+         */
+        return Keyboard.isCtrlDown();
     }
 
     /**
      * <p>
-     * Returns whether the Alt modifier key is currently active during mouse interaction.
+     * Returns whether the Alt modifier key is currently active in the keyboard callback state.
      * </p>
      *
      * @return {@code true} if Alt is active
      */
-    public boolean isAltDown() {
-        return (modifierState & GLFW_MOD_ALT) != 0;
+    public static boolean isAltDown() {
+        /*
+         * Use keyboard callback state so a button event is not required to refresh modifiers.
+         */
+        return Keyboard.isAltDown();
     }
 
     /**
      * <p>
-     * Returns whether the Super modifier key is currently active during mouse interaction.
+     * Returns whether the Super modifier key is currently active in the keyboard callback state.
      * </p>
      *
      * <p>
@@ -834,7 +849,10 @@ public final class Mouse {
      *
      * @return {@code true} if Super is active
      */
-    public boolean isSuperDown() {
-        return (modifierState & GLFW_MOD_SUPER) != 0;
+    public static boolean isSuperDown() {
+        /*
+         * Use keyboard callback state so a button event is not required to refresh modifiers.
+         */
+        return Keyboard.isSuperDown();
     }
 }
