@@ -158,6 +158,7 @@ public final class Mouse {
      */
     public static final int CURSOR_DISABLED = GLFW_CURSOR_DISABLED;
 
+
     /**
      * Standard arrow cursor shape for general use.
      */
@@ -201,72 +202,59 @@ public final class Mouse {
     /**
      * Reusable mouse press event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0);
-
+    private static final MousePressEvent pressEvent = new MousePressEvent(0, 0, 0, 0); // Reusable mouse press event instance
     /**
      * Reusable mouse release event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0);
-
+    private static final MouseReleaseEvent releaseEvent = new MouseReleaseEvent(0, 0, 0, 0); // Reusable mouse release event instance
     /**
      * Reusable mouse move event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0);
-
+    private static final MouseMoveEvent moveEvent = new MouseMoveEvent(0, 0, 0, 0, 0, 0); // Reusable mouse move event instance
     /**
      * Reusable mouse drag event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0);
-
+    private static final MouseDragEvent dragEvent = new MouseDragEvent(0, 0, 0, 0, 0, 0); // Reusable mouse drag event instance
     /**
      * Reusable mouse scroll event instance. Consumers must copy values for a historical snapshot.
      */
-    private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0);
-
+    private static final MouseScrollEvent scrollEvent = new MouseScrollEvent(0, 0); // Reusable mouse scroll event instance
     /**
      * GLFW callback used to track cursor movement.
      */
-    private static GLFWCursorPosCallback cursorPosCallback;
-
+    private static GLFWCursorPosCallback cursorPosCallback; // GLFW callback used to track cursor movement
     /**
      * GLFW callback used to track mouse button actions.
      */
-    private static GLFWMouseButtonCallback mouseButtonCallback;
-
+    private static GLFWMouseButtonCallback mouseButtonCallback; // GLFW callback used to track mouse button actions
     /**
      * GLFW callback used to track scroll wheel movement.
      */
-    private static GLFWScrollCallback scrollCallback;
-
+    private static GLFWScrollCallback scrollCallback; // GLFW callback used to track scroll wheel movement
     /**
      * Current raw GLFW cursor X position.
      */
-    private static short x;
-
+    private static short x; // Current raw GLFW cursor X position
     /**
      * Current raw GLFW cursor Y position.
      */
-    private static short y;
-
+    private static short y; // Current raw GLFW cursor Y position
     /**
      * Bitmask representing currently pressed mouse buttons.
      */
-    private static byte buttonState;
-
+    private static byte buttonState; // Bitmask representing currently pressed mouse buttons
     /**
-     * Event-time modifier mask supplied by the last native mouse-button callback.
+     * Bitmask representing the current modifier key state.
      */
-    private static byte modifierState;
-
+    private static byte modifierState; // Bitmask representing the current modifier key state
     /**
      * Latest horizontal scroll delta.
      */
-    private static byte scrollX;
-
+    private static byte scrollX; // Latest horizontal scroll delta
     /**
      * Latest vertical scroll delta.
      */
-    private static byte scrollY;
+    private static byte scrollY; // Latest vertical scroll delta
 
     /**
      * Native GLFW cursor handle currently assigned to the window.
@@ -343,7 +331,6 @@ public final class Mouse {
             short fromY = y;
             x = (short) xpos;
             y = (short) ypos;
-            byte movementModifiers = (byte) ((Keyboard.isShiftDown() ? GLFW_MOD_SHIFT : 0) | (Keyboard.isCtrlDown() ? GLFW_MOD_CONTROL : 0) | (Keyboard.isAltDown() ? GLFW_MOD_ALT : 0) | (Keyboard.isSuperDown() ? GLFW_MOD_SUPER : 0));
 
             if (buttonState != 0) {
                 // Drag payloads use the same button code as press/release, not the state mask.
@@ -351,11 +338,11 @@ public final class Mouse {
                 int heldButtons = Byte.toUnsignedInt(buttonState);
                 for (int button = 0; button <= GLFW_MOUSE_BUTTON_LAST; button++) {
                     if ((heldButtons & (1 << button)) == 0) continue;
-                    dragEvent.set(button, movementModifiers, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
+                    dragEvent.set(button, modifierState, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
                     JGL.publish(dragEvent);
                 }
             } else {
-                moveEvent.set(-1, movementModifiers, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
+                moveEvent.set(-1, modifierState, fromX, Window.getHeight() - fromY, x, Window.getHeight() - y);
                 JGL.publish(moveEvent);
             }
         });
@@ -425,51 +412,36 @@ public final class Mouse {
      * Temporarily displays a standard cursor while retaining the application's selected
      * standard or custom image cursor. Identical shapes reuse the native cursor; changing
      * owner transfers release responsibility without destroying the application cursor.
-     *
      * @param owner nonnull identity token used later to release this override
      * @param shape standard cursor shape such as CURSOR_HRESIZE or CURSOR_RESIZE_NWSE
      */
     public static void overrideCursor(Object owner, int shape) {
         java.util.Objects.requireNonNull(owner);
-        long win = Window.getAddress();
-        if (win == 0) return;
-        if (overrideCursor != 0 && overrideCursorShape == shape) {
-            cursorOwner = owner;
-            return;
-        }
+        long win = Window.getAddress(); if (win == 0) return;
+        if (overrideCursor != 0 && overrideCursorShape == shape) { cursorOwner = owner; return; }
         long next = glfwCreateStandardCursor(shape);
         if (next == 0) return;
         glfwSetCursor(win, next);
         if (overrideCursor != 0) glfwDestroyCursor(overrideCursor);
-        overrideCursor = next;
-        overrideCursorShape = shape;
-        cursorOwner = owner;
+        overrideCursor = next; overrideCursorShape = shape; cursorOwner = owner;
     }
 
     /**
      * Restores the application's latest cursor only when the supplied owner still owns
      * the override. Stale releases cannot clear a newer UI owner's cursor.
-     *
      * @param owner identity token supplied to overrideCursor
      */
     public static void clearCursorOverride(Object owner) {
         if (cursorOwner != owner || overrideCursor == 0) return;
-        long win = Window.getAddress();
-        if (win != 0) glfwSetCursor(win, currentCursor);
-        glfwDestroyCursor(overrideCursor);
-        overrideCursor = 0;
-        cursorOwner = null;
-        overrideCursorShape = 0;
+        long win = Window.getAddress(); if (win != 0) glfwSetCursor(win, currentCursor);
+        glfwDestroyCursor(overrideCursor); overrideCursor = 0; cursorOwner = null; overrideCursorShape = 0;
     }
 
     /**
      * Reads the selected standard cursor, including any temporary UI override.
-     *
      * @return standard CURSOR_* shape, or zero for an application custom image cursor
      */
-    public static int getCursorShape() {
-        return overrideCursor != 0 ? overrideCursorShape : currentCursorShape;
-    }
+    public static int getCursorShape() { return overrideCursor != 0 ? overrideCursorShape : currentCursorShape; }
 
     /**
      * <p>
@@ -680,26 +652,20 @@ public final class Mouse {
      */
     static void dispose() {
         if (overrideCursor != 0) {
-            glfwDestroyCursor(overrideCursor);
-            overrideCursor = 0;
-            cursorOwner = null;
-            overrideCursorShape = 0;
+            glfwDestroyCursor(overrideCursor); overrideCursor = 0; cursorOwner = null; overrideCursorShape = 0;
         }
         if (cursorPosCallback != null) {
-            if (Window.getAddress() != 0)
-                glfwSetCursorPosCallback(Window.getAddress(), null);
+            if (Window.getAddress() != 0) glfwSetCursorPosCallback(Window.getAddress(), null);
             cursorPosCallback.free();
             cursorPosCallback = null;
         }
         if (mouseButtonCallback != null) {
-            if (Window.getAddress() != 0)
-                glfwSetMouseButtonCallback(Window.getAddress(), null);
+            if (Window.getAddress() != 0) glfwSetMouseButtonCallback(Window.getAddress(), null);
             mouseButtonCallback.free();
             mouseButtonCallback = null;
         }
         if (scrollCallback != null) {
-            if (Window.getAddress() != 0)
-                glfwSetScrollCallback(Window.getAddress(), null);
+            if (Window.getAddress() != 0) glfwSetScrollCallback(Window.getAddress(), null);
             scrollCallback.free();
             scrollCallback = null;
         }
@@ -822,55 +788,44 @@ public final class Mouse {
 
     /**
      * <p>
-     * Returns whether the Shift modifier key is currently active in the keyboard callback state.
+     * Returns whether the Shift modifier key is currently active during mouse interaction.
      * </p>
      *
      * <p>
-     * This method reads the current keyboard callback state, including keyboard-only changes.
-     * Movement and drag events use that state; button events retain their native event-time mask.
-     * Held modifiers are cleared when window focus is lost.
+     * This method checks the cached modifier bitmask updated by GLFW mouse callbacks.
      * </p>
      *
      * @return {@code true} if Shift is active
      */
-    public static boolean isShiftDown() {
-        /*
-         * Use keyboard callback state so a button event is not required to refresh modifiers.
-         */
-        return Keyboard.isShiftDown();
+    public boolean isShiftDown() {
+        return (modifierState & GLFW_MOD_SHIFT) != 0;
     }
 
     /**
      * <p>
-     * Returns whether the Control modifier key is currently active in the keyboard callback state.
+     * Returns whether the Control modifier key is currently active during mouse interaction.
      * </p>
      *
      * @return {@code true} if Control is active
      */
-    public static boolean isCtrlDown() {
-        /*
-         * Use keyboard callback state so a button event is not required to refresh modifiers.
-         */
-        return Keyboard.isCtrlDown();
+    public boolean isCtrlDown() {
+        return (modifierState & GLFW_MOD_CONTROL) != 0;
     }
 
     /**
      * <p>
-     * Returns whether the Alt modifier key is currently active in the keyboard callback state.
+     * Returns whether the Alt modifier key is currently active during mouse interaction.
      * </p>
      *
      * @return {@code true} if Alt is active
      */
-    public static boolean isAltDown() {
-        /*
-         * Use keyboard callback state so a button event is not required to refresh modifiers.
-         */
-        return Keyboard.isAltDown();
+    public boolean isAltDown() {
+        return (modifierState & GLFW_MOD_ALT) != 0;
     }
 
     /**
      * <p>
-     * Returns whether the Super modifier key is currently active in the keyboard callback state.
+     * Returns whether the Super modifier key is currently active during mouse interaction.
      * </p>
      *
      * <p>
@@ -879,10 +834,7 @@ public final class Mouse {
      *
      * @return {@code true} if Super is active
      */
-    public static boolean isSuperDown() {
-        /*
-         * Use keyboard callback state so a button event is not required to refresh modifiers.
-         */
-        return Keyboard.isSuperDown();
+    public boolean isSuperDown() {
+        return (modifierState & GLFW_MOD_SUPER) != 0;
     }
 }
