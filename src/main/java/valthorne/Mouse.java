@@ -779,10 +779,14 @@ public final class Mouse {
      * index. The method checks whether the requested bit is currently set.
      * </p>
      *
-     * @param button the mouse button index
+     * @param button the mouse button index; values outside 0 through GLFW_MOUSE_BUTTON_LAST return false
      * @return {@code true} if the specified button is currently down
      */
     public static boolean isButtonDown(int button) {
+        /*
+         * Validate before shifting because Java masks shift distances and sign-extends bytes.
+         */
+        if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST) return false;
         return (buttonState & (1 << button)) != 0;
     }
 
