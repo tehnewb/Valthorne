@@ -63,8 +63,9 @@ public class ComboBox<T> extends Button {
     public T getSelected() { return selected < 0 ? null : items.get(selected); }
 
     /**
-     * Sets selection silently, dismissing stale options. Formatting is validated before
-     * mutation so formatter failures preserve the old selection and label.
+     * Sets selection silently, dismissing options only when the index or formatted
+     * caption changes. Repeated live refresh preserves an open menu. Formatting is
+     * validated before mutation so failures preserve the old selection and label.
      * @param index -1 or a valid option index
      * @return this dropdown
      * @throws IndexOutOfBoundsException if index is outside the supported range
@@ -72,7 +73,11 @@ public class ComboBox<T> extends Button {
     public ComboBox<T> selectedIndex(int index) {
         if (index < -1 || index >= items.size()) throw new IndexOutOfBoundsException(index);
         String label = index < 0 ? "Select..." : Objects.requireNonNull(formatter.apply(items.get(index)));
-        popup.close(); selected = index; text(label); return this;
+        if (selected == index && label.equals(getText())) return this;
+        popup.close();
+        selected = index;
+        text(label);
+        return this;
     }
 
     /**
@@ -82,7 +87,9 @@ public class ComboBox<T> extends Button {
      */
     public void select(int index) {
         if (isDisabled()) return;
-        int before = selected; selectedIndex(index);
+        int before = selected;
+        selectedIndex(index);
+        popup.close();
         if (before != selected) change.accept(getSelected());
     }
 

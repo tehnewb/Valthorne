@@ -134,7 +134,7 @@ public class SplitPane extends Panel {
      * @param listener callback to subscribe
      * @return handle whose close operation removes the subscription
      */
-    public AutoCloseable onChange(Runnable listener) {return changes.subscribe(listener);}
+    public Runnable onChange(Runnable listener) {return changes.subscribe(listener);}
 
     /**
      * Clamps a finite requested fraction to zero through one. A changed value invalidates

@@ -1,5 +1,7 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.NanoText;
+
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NanoUtility;
@@ -16,10 +18,10 @@ public class NanoTooltip extends Tooltip implements NanoNode {
     public static final StyleKey<Color> TEXT_COLOR_KEY = StyleKey.of("nano.tooltip.textColor", Color.class, new Color(0xFFF1F3F4));
     public static final StyleKey<Float> PADDING_KEY = StyleKey.of("nano.tooltip.padding", Float.class, 6f);
     public static final StyleKey<Float> FONT_SIZE_KEY = StyleKey.of("nano.tooltip.fontSize", Float.class, 14f);
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.tooltip.cornerRadius", Float.class, 4f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.tooltip.cornerRadius", Float.class, 0f);
 
     private Color background = new Color(0xEE202124), border = new Color(0xFF55575C), foreground = new Color(0xFFF1F3F4);
-    private float padding = 6, fontSize = 14, cornerRadius = 4;
+    private float padding = 6, fontSize = 14, cornerRadius = 0f;
     private String fontName = "default";
 
     public NanoTooltip(String text) { super(text); }
@@ -35,8 +37,8 @@ public class NanoTooltip extends Tooltip implements NanoNode {
         String text = getText();
         if (text != null) {
             long vg = getRoot() == null ? 0 : getRoot().getNanoVGHandle();
-            getLayout().width(NanoUtility.measureTextWidth(vg, fontName, fontSize, text) + padding * 2)
-                    .height(NanoUtility.measureTextHeight(vg, fontName, fontSize) + padding * 2);
+            getLayout().width(NanoText.measureTextWidth(this, vg, fontName, fontSize, text) + padding * 2)
+                    .height(NanoText.measureTextHeight(this, vg, fontName, fontSize) + padding * 2);
         }
     }
 
@@ -56,6 +58,6 @@ public class NanoTooltip extends Tooltip implements NanoNode {
         if (text == null || text.isBlank()) return;
         nvgFontFace(vg, fontName); nvgFontSize(vg, fontSize); nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         nvgFillColor(vg, NanoUtility.color3(foreground));
-        nvgText(vg, x + padding, y + getHeight() * .5f, text);
+        NanoText.draw(this, vg, x + padding, y + getHeight() * .5f, text, fontSize, foreground, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
     }
 }

@@ -47,20 +47,12 @@ tasks.register('verifyReleaseArtifacts') {
             if (!artifact.isFile()) throw new GradleException("Missing publication: ${artifact}")
             new java.util.zip.ZipFile(artifact).withCloseable { zip ->
                 if (zip.size() < 2) throw new GradleException("Empty publication: ${artifact}")
-                def exampleEntry = zip.entries().find { entry ->
-                    entry.name.startsWith('valthorne/examples/') || entry.name.startsWith('valthorne/fps-arena/') ||
-                            entry.name.startsWith('valthorne/physics-studio/') ||
-                            // Include nested classes and class-use Javadoc pages for the browser fixture.
-                            entry.name ==~ /(?:.*\/)?valthorne\/portable\/(?:class-use\/)?FirstPersonDemo(?:[.$][^\/]*)/
-                }
-                if (exampleEntry != null) throw new GradleException("Example content leaked into ${artifact.name}: ${exampleEntry.name}")
                 if (classifier == '-javadoc' && zip.getEntry('index.html') == null)
                     throw new GradleException('Published Javadoc has no index.html')
                 if (classifier == '') {
                     ['valthorne/JGL.class', 'valthorne/shaders/core/shape.vert',
-                     'ui/AtkinsonHyperlegible-Regular.ttf', 'ui/OFL-AtkinsonHyperlegible.txt',
-                     'META-INF/LICENSE', 'META-INF/THIRD_PARTY_NOTICES.md',
-                     'META-INF/LICENSE'].each { resource ->
+                     'valthorne/graphics/font/SystemFonts.class',
+                     'META-INF/LICENSE', 'META-INF/THIRD_PARTY_NOTICES.md'].each { resource ->
                         if (zip.getEntry(resource) == null) throw new GradleException("Missing runtime resource: ${resource}")
                     }
                     def forbidden = zip.entries().find { entry -> entry.name.endsWith('.java') }
@@ -72,7 +64,7 @@ tasks.register('verifyReleaseArtifacts') {
         ['<artifactId>Valthorne</artifactId>', "<version>${releaseVersion}</version>",
          '<artifactId>joml</artifactId>', '<artifactId>lwjgl-bom</artifactId>',
          'natives-macos-arm64', 'natives-linux', 'natives-windows',
-         'jolt-jni-MacOSX_ARM64', 'jolt-jni-Linux64', 'jolt-jni-Windows64'].each { value ->
+         ].each { value ->
             if (!pom.contains(value)) throw new GradleException("Publication POM is missing ${value}")
         }
         logger.lifecycle('Verified library, sources, Javadoc, resources, licenses, and publication metadata.')
@@ -92,7 +84,7 @@ tasks.matching {
 }.configureEach {
     doFirst {
         if (!releaseSigning.get())
-            throw new GradleException('Maven Central publication requires -PreleaseSigning=true and signing credentials. See docs/releasing.md.')
+            throw new GradleException('Maven Central publication requires -PreleaseSigning=true and signing credentials. Configure signing credentials in the private Gradle user home.')
     }
 }
 

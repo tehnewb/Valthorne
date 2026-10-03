@@ -9,7 +9,6 @@ import java.util.Arrays;
  *
  * @param <E> the type of elements stored in the array
  * @author Albert Beaupre
- * @version 1.0
  * @since May 1st, 2024
  */
 public class SwapOnRemoveArray<E> {

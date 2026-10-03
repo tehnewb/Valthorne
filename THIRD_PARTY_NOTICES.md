@@ -7,6 +7,7 @@ binaries. Distribute the licenses accompanying those dependencies with your game
 | Component | Purpose | Upstream license / notices |
 | --- | --- | --- |
 | LWJGL and its native modules | OpenGL, GLFW, OpenAL, STB, Yoga, NanoVG | [LWJGL license and bundled native notices](https://www.lwjgl.org/license) |
+| bgfx through LWJGL | Batched 2D shapes and instanced 3D geometry | [BSD-2-Clause](https://github.com/bkaradzic/bgfx/blob/master/LICENSE); retain LWJGL's bundled native notices |
 | JOML and JOML Primitives | Public math API | [MIT](https://github.com/JOML-CI/JOML/blob/main/LICENSE) |
 | Jolt JNI / Jolt Physics | 3D physics | [Jolt JNI](https://github.com/stephengold/jolt-jni/blob/master/LICENSE) / [Jolt MIT license](https://github.com/jrouwe/JoltPhysics/blob/master/LICENSE) |
 | Filament / community FFM bindings | Windows x64 renderer | Apache-2.0; copies in `src/main/resources/META-INF/licenses/` |
@@ -22,5 +23,3 @@ binaries. Distribute the licenses accompanying those dependencies with your game
   `META-INF/licenses/filament-environment-CC0.html`; generation is documented in
 - Shader sources and Filament material sources/packages in this repository use
   the repository license unless an individual file states otherwise.
-
-JUnit and JMH are development dependencies and are not published as engine dependencies.

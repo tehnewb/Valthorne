@@ -42,6 +42,38 @@ import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
  */
 public class JGL {
 
+    /*
+     * Application callbacks used by the running loop; replaced only on its thread.
+     */
+    private static Application frameApplication;
+
+    /**
+     * Returns the current application frame callbacks.
+     *
+     * @return active callbacks, or null outside application execution
+     */
+    public static Application getFrameApplication() {
+        /*
+         * Expose the callback owner without introducing a tool dependency.
+         */
+        return frameApplication;
+    }
+
+    /**
+     * Replaces frame callbacks without initializing or disposing either owner.
+     * Call on the application thread; the original application retains shutdown ownership.
+     *
+     * @param application callbacks used for subsequent updates and rendering
+     */
+    public static void setFrameApplication(Application application) {
+        /*
+         * Frame decorators borrow the original lifecycle and must not duplicate cleanup.
+         */
+        if (application == null) throw new NullPointerException("Application cannot be null");
+        frameApplication = application;
+    }
+
+
     /**
      * Shared engine event registry cleared during lifecycle reset.
      */
@@ -81,10 +113,10 @@ public class JGL {
 
     /**
      * Initializes the application and its associated systems. This method sets up the
-     * necessary components for the application to run, including input devices, audio,
-     * and the rendering window. It also initializes the provided {@code Application}
-     * instance, starts the application's main loop, handles frame updates, and ensures
-     * proper cleanup upon exit.
+     * necessary components for the application to run, including input devices,
+     * optional audio, and the rendering window. It also initializes the provided
+     * {@code Application} instance, starts the application's main loop, handles frame
+     * updates, and ensures proper cleanup upon exit.
      *
      * @param application the {@code Application} instance containing the logic for the application.
      *                    It must implement the lifecycle methods defined in the {@code Application} interface.
@@ -114,13 +146,19 @@ public class JGL {
             glfwInitialized = true;
 
             Window.init(config);
-            Audio.init();
+            /*
+             * Silent applications can skip opening an OpenAL device while retaining
+             * the same window, input, rendering, and cleanup lifecycle.
+             */
+            if (config.isAudioEnabled())
+                Audio.init();
             Mouse.init();
             Keyboard.init();
 
             double fpsTime = 0;
             short frames = 0;
 
+            frameApplication = application;
             application.init();
             applicationInitialized = true;
             double lastTime = glfwGetTime();
@@ -134,8 +172,8 @@ public class JGL {
 
                 glfwPollEvents();
 
-                application.update(deltaTime);
-                application.render();
+                frameApplication.update(deltaTime);
+                frameApplication.render();
 
                 fpsTime += deltaTime;
                 frames++;
@@ -155,6 +193,7 @@ public class JGL {
         } finally {
             Throwable cleanupFailure = null;
 
+            frameApplication = null;
             if (applicationInitialized) {
                 cleanupFailure = appendSuppressed(cleanupFailure, disposeApplication(application));
             }

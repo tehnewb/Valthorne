@@ -59,6 +59,7 @@ final class BgfxPrimitives2D implements AutoCloseable {
      * @return true when handled, including invisible or degenerate fills
      */
     boolean draw(Shape shape, BgfxShapeRenderer renderer, boolean circles) {
+        if (shape.getRotation() != 0) return false;
         Class<?> type = shape.getClass();
         if (type != Rectangle.class && (type != Circle.class || !circles)) return false;
         Border border = shape.getBorder();

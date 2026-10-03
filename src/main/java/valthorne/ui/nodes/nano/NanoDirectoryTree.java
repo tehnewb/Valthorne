@@ -123,7 +123,7 @@ public class NanoDirectoryTree extends NanoPanel {
             }
         }
         rebuild();
-        for (int i = 0; i < visible.size(); i++) if (visible.get(i).path().equals(selected)) { list.scrollToIndex(i); break; }
+        for (int i = 0; i < visible.size(); i++) if (visible.get(i).path().equals(selected)) { list.revealIndex(i); break; }
     }
 
     /**
@@ -205,7 +205,7 @@ public class NanoDirectoryTree extends NanoPanel {
             case Keyboard.END -> at = visible.size() - 1;
             default -> { return; }
         }
-        context.consume(); list.scrollToIndex(at);
+        context.consume(); list.revealIndex(at);
         if (getRoot() != null) { getRoot().layout(); getRoot().setFocusTo(list.getItemNode(at)); }
     }
 }

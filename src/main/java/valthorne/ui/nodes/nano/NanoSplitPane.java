@@ -36,7 +36,7 @@ public class NanoSplitPane extends NanoPanel {
     public NanoButton getDivider() { return divider; }
     public float getRatio() { return ratio; }
     public float getEffectiveRatio() { return available <= 0 ? 0 : firstSize / available; }
-    public AutoCloseable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
 
     public NanoSplitPane ratio(float value) {
         if (!Float.isFinite(value)) throw new IllegalArgumentException("Nonfinite ratio");

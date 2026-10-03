@@ -41,6 +41,7 @@ public class Particle implements Poolable {
     private final Color endColor = new Color(1f, 1f, 1f, 0f);   // Color at death time (t = 1).
     private final Color color = new Color(1f, 1f, 1f, 1f);      // Current interpolated color used for rendering.
     private boolean active;                                    // Whether this particle is currently alive and should be updated/drawn.
+    private long generation; // Pool recycle counter distinguishing successive lives of this state object.
     private float x, y;                                        // Current world-space particle position.
     private float velX, velY;                                  // Current world-space particle velocity (units per second).
     private float age;                                         // Current age in seconds since spawn.
@@ -50,6 +51,8 @@ public class Particle implements Poolable {
     private float startScale;                                  // Scale at spawn time (t = 0).
     private float endScale;                                    // Scale at death time (t = 1).
     private float scale;                                       // Current interpolated scale.
+    private float baseWidth;                                   // Width captured from the emitter when this particle spawned.
+    private float baseHeight;                                  // Height captured from the emitter when this particle spawned.
 
     /**
      * Resets this particle to deterministic defaults so it can be reused by a pool.
@@ -67,6 +70,7 @@ public class Particle implements Poolable {
      */
     @Override
     public void reset() {
+        generation++;
         active = false;
 
         x = y = 0f;
@@ -81,6 +85,8 @@ public class Particle implements Poolable {
         startScale = 1f;
         endScale = 0f;
         scale = 1f;
+        baseWidth = 1f;
+        baseHeight = 1f;
 
         startColor.set(1f, 1f, 1f, 1f);
         endColor.set(1f, 1f, 1f, 0f);
@@ -95,6 +101,14 @@ public class Particle implements Poolable {
     public boolean isActive() {
         return active;
     }
+
+    /**
+     * Identifies the current pooled lifetime without allocating a spawn token.
+     * The value changes whenever reset returns this state to the pool.
+     *
+     * @return recycle generation for identity-sensitive external owners
+     */
+    public long getGeneration() {return generation;}
 
     /**
      * Sets whether this particle is currently active (alive).
@@ -175,6 +189,44 @@ public class Particle implements Poolable {
      */
     public void setVelY(float velY) {
         this.velY = velY;
+    }
+
+    /**
+     * Returns the unscaled point-sprite width captured at spawn time.
+     *
+     * @return base width in render pixels
+     */
+    public float getBaseWidth() {
+        return baseWidth;
+    }
+
+    /**
+     * Stores the unscaled point-sprite width for this particle independently of
+     * later changes to the emitter configuration.
+     *
+     * @param baseWidth width in render pixels
+     */
+    public void setBaseWidth(float baseWidth) {
+        this.baseWidth = baseWidth;
+    }
+
+    /**
+     * Returns the unscaled point-sprite height captured at spawn time.
+     *
+     * @return base height in render pixels
+     */
+    public float getBaseHeight() {
+        return baseHeight;
+    }
+
+    /**
+     * Stores the unscaled point-sprite height for this particle independently of
+     * later changes to the emitter configuration.
+     *
+     * @param baseHeight height in render pixels
+     */
+    public void setBaseHeight(float baseHeight) {
+        this.baseHeight = baseHeight;
     }
 
     /**

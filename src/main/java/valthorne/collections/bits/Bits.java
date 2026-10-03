@@ -5,7 +5,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 /**
- * <h1>Bits</h1>
+ * <h2>Bits</h2>
  *
  * <p>
  * {@code Bits} is a dynamic bit container backed by a {@code long[]} where each
@@ -78,7 +78,6 @@ import java.util.Arrays;
  * }</pre>
  *
  * @author Albert Beaupre
- * @version 1.0
  * @since May 1st, 2024
  */
 public class Bits {

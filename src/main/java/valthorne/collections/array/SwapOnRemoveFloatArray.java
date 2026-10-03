@@ -8,7 +8,6 @@ import java.util.Arrays;
  * array continuity and improve removal performance.
  *
  * @author Albert Beaupre
- * @version 1.0
  * @since May 1st, 2024
  */
 public class SwapOnRemoveFloatArray {

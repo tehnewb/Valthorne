@@ -5,8 +5,7 @@ Thanks for taking the time to contribute.
 ## Getting Started
 
 Use JDK 25 and the checked-in Gradle wrapper (9.3.1). No native compiler, signing
-key or publication account is needed. See [setup](docs/getting-started.md),
-[platform requirements](docs/platforms.md).
+key or publication account is needed. See [README.md](README.md) for build commands.
 
 Please search existing issues and pull requests before opening a new one. If you are not sure whether an idea belongs in an issue yet, start a discussion first.
 
@@ -34,24 +33,23 @@ Pull requests are the fastest way to get improvements merged. A good PR usually:
 Before opening a pull request, please run:
 
 ```bash
-./gradlew build
-./gradlew verifyRelease
+./gradlew -Pprototype3d=false -PeditorPrototype=false build
+./gradlew -Pprototype3d=false -PeditorPrototype=false verifyRelease verifySlugTextureBatch
 ```
 
 Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources,
 and Javadoc; `verifyRelease` additionally checks publication artifacts and metadata.
-The previous desktop, browser, and integration test suites have been removed.
-Record manual runtime verification separately; a successful build checks compilation
-and packaging, not rendering or interaction behavior.
+The native Slug check verifies rendering in a hidden graphics context. Record
+manual runtime verification separately; packaging checks alone do not establish
+rendering or interaction correctness.
 
 ## Repository ownership
 
 Keep engine code and runtime resources under `src/main`. Release packaging checks live in `gradle/release.gradle`;
 optional local benchmark configuration lives in `gradle/benchmarks.gradle`.
 
-Keep benchmark outputs produced during development under `build/`. Curated reports
-under `docs/benchmarks` retain their source hashes and measured-environment notes;
-do not rewrite historical results to describe an unmeasured revision.
+Keep benchmark outputs produced during development under `build/`. Record the
+measured revision and environment alongside each result.
 
 ## Reviews
 

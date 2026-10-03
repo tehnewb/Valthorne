@@ -3,6 +3,7 @@ package valthorne.ui.nodes.nano;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * NanoVG variant. Horizontal row of named command menus using the root's modal popup routing.
@@ -15,12 +16,13 @@ import java.util.Objects;
  * root.add(bar);
  * }</pre>
  * Heading and command callbacks execute on the UI thread. Removing the bar closes
- * all its overlays. Application shortcuts and nested submenu trees remain separate.
+ * all its overlays. Nested items use NanoPopupMenu's shared modal flyouts.
  * @author Albert Beaupre
  */
 public class NanoMenuBar extends NanoContainer {
     private final List<NanoPopupMenu> menus = new ArrayList<>(); // Owned command popups parallel to heading buttons.
     private final List<NanoButton> headings = new ArrayList<>(); // Owned, ordered menu-heading controls.
+    private final List<Supplier<List<NanoPopupMenu.Item>>> providers = new ArrayList<>();
 
     /**
      * Creates an empty horizontal bar with a fixed default height of 36 layout units.
@@ -35,18 +37,27 @@ public class NanoMenuBar extends NanoContainer {
      * @return this bar
      */
     public NanoMenuBar addMenu(String text, List<NanoPopupMenu.Item> items) {
+        List<NanoPopupMenu.Item> snapshot = List.copyOf(items);
+        return addMenu(text, () -> snapshot);
+    }
+
+    /** Appends a menu whose command snapshot is refreshed on every opening. */
+    public NanoMenuBar addMenu(String text, Supplier<List<NanoPopupMenu.Item>> items) {
         Objects.requireNonNull(text);
-        NanoPopupMenu menu = new NanoPopupMenu().items(items);
+        Objects.requireNonNull(items);
+        NanoPopupMenu menu = new NanoPopupMenu().items(items.get());
         int index = menus.size();
         menu.horizontalNavigation(direction -> switchMenu(index, direction));
         menu.outsidePress(this::switchOnHeadingPress);
         NanoButton heading = new NanoButton(text).action(button -> {
             boolean wasOpen = menu.isOpen(); closeMenus();
-            if (!wasOpen) menu.showBelow(button);
+            if (!wasOpen) { refreshMenu(index); menu.showBelow(button); }
         });
         heading.getLayout().minWidth(64).heightPercent(100).padding(8).noShrink();
-        menus.add(menu); headings.add(heading); add(heading); return this;
+        menus.add(menu); headings.add(heading); providers.add(items); add(heading); return this;
     }
+
+    private void refreshMenu(int index) { menus.get(index).items(providers.get(index).get()); }
 
     /**
      * Borrows a heading for theme, focus, or disabled-state configuration.
@@ -75,6 +86,7 @@ public class NanoMenuBar extends NanoContainer {
     private void switchMenu(int from, int direction) {
         for (int offset = 1; offset <= menus.size(); offset++) {
             int index = Math.floorMod(from + direction * offset, menus.size());
+            refreshMenu(index);
             if (headings.get(index).isEnabled() && !menus.get(index).getItems().isEmpty()) {
                 closeMenus(); menus.get(index).showBelow(headings.get(index)); return;
             }
@@ -86,9 +98,10 @@ public class NanoMenuBar extends NanoContainer {
         for (int i = 0; i < headings.size(); i++) {
             NanoButton heading = headings.get(i);
             if (!heading.contains(press.getX(), press.getY())) continue;
-            boolean canOpen = heading.isEnabled() && !menus.get(i).getItems().isEmpty();
             boolean alreadyOpen = menus.get(i).isOpen();
             closeMenus();
+            if (!alreadyOpen) refreshMenu(i);
+            boolean canOpen = heading.isEnabled() && !menus.get(i).getItems().isEmpty();
             if (canOpen && !alreadyOpen) menus.get(i).showBelow(heading);
             return true;
         }

@@ -84,7 +84,7 @@ public class TabbedPane extends Panel {
      * @param listener callback invoked after state changes
      * @return subscription handle
      */
-    public AutoCloseable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
     /**
      * Adds a header and retains its page factory. If no tab is selected, selects index
      * zero immediately. Other page factories are deferred until selection; failures

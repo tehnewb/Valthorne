@@ -1,28 +1,38 @@
 package valthorne.ui;
 
-import valthorne.graphics.font.slug.SlugBatch;
+import org.joml.Vector2f;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.yoga.Yoga;
+import valthorne.JGL;
 import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.Window;
+import valthorne.event.Event;
+import valthorne.event.EventHandler;
+import valthorne.event.EventTypes;
 import valthorne.event.events.*;
 import valthorne.event.listeners.KeyListener;
 import valthorne.event.listeners.MouseListener;
 import valthorne.event.listeners.MouseScrollListener;
 import valthorne.event.listeners.WindowResizeListener;
+import valthorne.graphics.font.SystemFonts;
+import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.texture.TextureBatch;
-import org.joml.Vector2f;
+import valthorne.ui.behavior.TextEditing;
+import valthorne.ui.nodes.Label;
 import valthorne.ui.nodes.Panel;
 import valthorne.ui.nodes.Tooltip;
+import valthorne.ui.nodes.nano.NanoContainer;
+import valthorne.ui.nodes.nano.NanoImage;
+import valthorne.ui.nodes.nano.NanoLabel;
+import valthorne.ui.nodes.nano.NanoPanel;
+import valthorne.ui.theme.ThemeData;
+import valthorne.ui.theme.ThemeDataChangeEvent;
 import valthorne.viewport.Viewport;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.function.Consumer;
 
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
 import static org.lwjgl.nanovg.NanoVG.nvgCreateFont;
@@ -30,19 +40,6 @@ import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
-import java.util.function.Consumer;
-import org.lwjgl.opengl.GL11;
-import valthorne.JGL;
-import valthorne.event.Event;
-import valthorne.event.EventHandler;
-import valthorne.event.EventTypes;
-import valthorne.ui.behavior.TextEditing;
-import valthorne.ui.nodes.nano.NanoContainer;
-import valthorne.ui.nodes.nano.NanoImage;
-import valthorne.ui.nodes.nano.NanoLabel;
-import valthorne.ui.nodes.nano.NanoPanel;
-import valthorne.ui.theme.ThemeData;
-import valthorne.ui.theme.ThemeDataChangeEvent;
 
 /**
  * <p>
@@ -157,33 +154,34 @@ import valthorne.ui.theme.ThemeDataChangeEvent;
  */
 public class UIRoot extends UIContainer {
 
-    /**
-     * System property naming an optional filesystem override for the default NanoVG font.
-     */
-    private static final String DEFAULT_NANO_FONT_PROPERTY = "valthorne.ui.defaultFont";
-    /**
-     * Bundled default-font candidates tried in order when no valid override file exists.
-     */
-    private static final String[] DEFAULT_NANO_FONT_RESOURCES = {"ui/AtkinsonHyperlegible-Regular.ttf", "ui/font.otf"};
     private final EventHandler<ThemeDataChangeEvent> themeListener = event -> refreshTheme(this, event.getData()); // Persistent listener invalidating nodes that use changed theme data.
     private final UIInspector inspector = new UIInspector(); // Root-owned optional draw inspection controller.
     private final List<FocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
-    private SlugBatch slugBatch; // Lazily created shared curve-text renderer.
+    private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
+    private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
-    private final List<Path> extractedNanoFonts = new ArrayList<>(); // Temporary font files extracted from bundled resources when NanoVG requires a filesystem path.
+    private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
+    private Set<UINode> externallyPresentedNodes; // Top-level nodes painted and picked by an external editor; allocated only when needed.
     private final RootKeyListener keyListener = new RootKeyListener(); // Root-level keyboard listener instance
     private final RootMouseListener mouseListener = new RootMouseListener(); // Root-level mouse listener instance
     private final RootScrollListener scrollListener = new RootScrollListener(); // Root-level scroll listener instance
     private final RootWindowListener windowListener = new RootWindowListener(); // Root-level window resize listener instance
     private long nanoVGHandle; // Stored NanoVG context deleted by this root on disposal, or zero when unavailable.
+    private UIRotationShader rotationShader; // Lazily created texture shader owned by this root for rotated UI scopes.
     private UIRenderContext renderContext; // Borrowed active mixed-backend drawing context, null outside drawing.
     private boolean disposed; // Whether root resource disposal has been requested.
+    private boolean blockLowerInput, pointerOwned;
+    private int inputPriority; // Priority of this root's keyboard, pointer, scroll, and text subscriptions.
     private UIFrameStats frameStats = new UIFrameStats(0, 0, 0, 0, 0, 0, 0); // Latest immutable drawing and layout statistics.
     private long pendingLayoutPasses, pendingLayoutNanos; // Layout work accumulated until the next recorded draw.
     private UINode focused; // Node that currently owns keyboard focus
-    private final EventHandler<TextInputEvent> textListener = event -> route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false); // Persistent committed-text listener targeting the current focus.
+    private final EventHandler<TextInputEvent> textListener = event -> {
+        boolean active = blockLowerInput && getFocused() != null;
+        route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false);
+        if (active) event.consume();
+    }; // Persistent committed-text listener targeting the current focus.
     private UINode pressed; // Node currently being pressed by the mouse
     private int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
     private final ArrayList<NanoLabel> selectionLabels = new ArrayList<>();
@@ -193,8 +191,7 @@ public class UIRoot extends UIContainer {
 
     private void collectSelectableText(UINode node) {
         if (!isNodeInteractiveNow(node)) return;
-        if (node instanceof NanoLabel label && label.isSelectable())
-            selectionLabels.add(label);
+        if (node instanceof NanoLabel label && label.isSelectable()) selectionLabels.add(label);
         if (node instanceof UIContainer container)
             for (UINode child : container.getChildren()) collectSelectableText(child);
     }
@@ -212,12 +209,13 @@ public class UIRoot extends UIContainer {
             var label = selectionLabels.get(i);
             if (!isNodeFocusableNow(label) || !label.isSelectable()) continue;
             var point = label.screenToLayout(x, y);
-            float dx = Math.max(0, Math.max(label.getAbsoluteX() - point.x(),
-                    point.x() - label.getAbsoluteX() - label.getWidth()));
-            float dy = Math.max(0, Math.max(label.getAbsoluteY() - point.y(),
-                    point.y() - label.getAbsoluteY() - label.getHeight()));
+            float dx = Math.max(0, Math.max(label.getAbsoluteX() - point.x(), point.x() - label.getAbsoluteX() - label.getWidth()));
+            float dy = Math.max(0, Math.max(label.getAbsoluteY() - point.y(), point.y() - label.getAbsoluteY() - label.getHeight()));
             float score = dx * dx + dy * dy;
-            if (score < distance) { best = i; distance = score; }
+            if (score < distance) {
+                best = i;
+                distance = score;
+            }
         }
         return best;
     }
@@ -241,7 +239,8 @@ public class UIRoot extends UIContainer {
         for (int i = 0; i < selectionLabels.size(); i++) {
             var label = selectionLabels.get(i);
             if (!isNodeFocusableNow(label) || !label.isSelectable() || i < low || i > high) {
-                label.documentSelection(0, 0); continue;
+                label.documentSelection(0, 0);
+                continue;
             }
             int start = i == low ? (forward ? textAnchorOffset : endOffset) : 0;
             int end = i == high ? (forward ? endOffset : textAnchorOffset) : label.selectionTextLength();
@@ -250,8 +249,16 @@ public class UIRoot extends UIContainer {
         event.consume();
         return true;
     }
+
     private UINode hovered; // Node currently being hovered by the mouse
     private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
+    private boolean presentationEnabled = true; // Whether this root paints or accepts input in the active scene view.
+    private boolean clipToViewport; // Whether this root clips every child to its viewport's local UI bounds.
+    private boolean customViewportClip; // Whether a parent viewport further restricts this root's clip.
+    private float viewportClipX; // Left edge of the active viewport-local UI clip.
+    private float viewportClipY; // Bottom edge of the active viewport-local UI clip.
+    private float viewportClipWidth; // Width of the active viewport-local UI clip.
+    private float viewportClipHeight; // Height of the active viewport-local UI clip.
     private float hoverTime; // Time accumulated while hovering the current node
     private Tooltip activeTooltip; // Tooltip currently being displayed in the overlay layer
     private final EventHandler<WindowFocusEvent> focusListener = event -> {
@@ -270,7 +277,13 @@ public class UIRoot extends UIContainer {
      * does not participate in interaction and exists purely for top-level floating UI.
      * </p>
      */
-    public UIRoot() {
+    public UIRoot() {this(0);}
+
+    /**
+     * Creates a UI root whose input is delivered before lower-priority application listeners.
+     */
+    public UIRoot(int inputPriority) {
+        this.inputPriority = inputPriority;
         this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
         if (nanoVGHandle != 0L) {
             registerDefaultNanoFont();
@@ -281,6 +294,11 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigSetUseWebDefaults(yogaConfig, true);
         attachToRoot(yogaConfig);
         setRoot(this);
+        if (nanoVGHandle != 0L) {
+            ThemeData defaults = new ThemeData();
+            defaults.setToken(Label.FONT_KEY, getDefaultFont());
+            setTheme(defaults);
+        }
 
         setSize(Window.getWidth(), Window.getHeight());
 
@@ -290,20 +308,67 @@ public class UIRoot extends UIContainer {
         overlayLayer.setScrollable(false);
         super.add(overlayLayer);
 
-        Keyboard.addKeyListener(keyListener);
-        Mouse.addMouseListener(mouseListener);
-        Mouse.addScrollListener(scrollListener);
+        JGL.subscribe(EventTypes.KEY_PRESS, inputPriority, keyListener);
+        JGL.subscribe(EventTypes.KEY_RELEASE, inputPriority, keyListener);
+        JGL.subscribe(EventTypes.MOUSE_MOVE, inputPriority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_DRAG, inputPriority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_PRESS, inputPriority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_RELEASE, inputPriority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_SCROLL, inputPriority, scrollListener);
         Window.addWindowResizeListener(windowListener);
         JGL.subscribe(EventTypes.WINDOW_FOCUS, focusListener);
-        JGL.subscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.subscribe(EventTypes.TEXT_INPUT, inputPriority, textListener);
         JGL.subscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
+    }
+
+    /**
+     * Consumes input handled by this root so underlying controls cannot activate through an overlay.
+     */
+    public UIRoot blockLowerInput(boolean enabled) {
+        blockLowerInput = enabled;
+        if (!enabled) pointerOwned = false;
+        return this;
+    }
+
+    /**
+     * Changes input routing priority without rebuilding the UI tree. Larger
+     * values receive shared events before lower roots, allowing viewport-local
+     * controls to follow the same front-to-back order as viewport painting.
+     * Existing focus and pointer capture stay with this root.
+     *
+     * @param priority larger values route first
+     */
+    public void setInputPriority(int priority) {
+        if (inputPriority == priority) return;
+        JGL.unsubscribe(EventTypes.KEY_PRESS, keyListener);
+        JGL.unsubscribe(EventTypes.KEY_RELEASE, keyListener);
+        JGL.unsubscribe(EventTypes.MOUSE_MOVE, mouseListener);
+        JGL.unsubscribe(EventTypes.MOUSE_DRAG, mouseListener);
+        JGL.unsubscribe(EventTypes.MOUSE_PRESS, mouseListener);
+        JGL.unsubscribe(EventTypes.MOUSE_RELEASE, mouseListener);
+        JGL.unsubscribe(EventTypes.MOUSE_SCROLL, scrollListener);
+        JGL.unsubscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.subscribe(EventTypes.KEY_PRESS, priority, keyListener);
+        JGL.subscribe(EventTypes.KEY_RELEASE, priority, keyListener);
+        JGL.subscribe(EventTypes.MOUSE_MOVE, priority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_DRAG, priority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_PRESS, priority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_RELEASE, priority, mouseListener);
+        JGL.subscribe(EventTypes.MOUSE_SCROLL, priority, scrollListener);
+        JGL.subscribe(EventTypes.TEXT_INPUT, priority, textListener);
+        inputPriority = priority;
+    }
+
+    private boolean hasUiAt(float x, float y) {
+        UINode hit = findNodeAt(x, y, UINode.CLICKABLE_BIT);
+        return hit != null && hit != this && hit.blocksLowerInput();
     }
 
     /**
      * Tests identity ancestry, including the node itself. A null node is outside
      * every scope.
      *
-     * @param node candidate descendant
+     * @param node     candidate descendant
      * @param ancestor scope root to match
      * @return true if ancestor occurs in the parent chain
      */
@@ -412,6 +477,51 @@ public class UIRoot extends UIContainer {
             setSize(Window.getWidth(), Window.getHeight());
             layout();
         }
+    }
+
+    /**
+     * Restricts all texture and NanoVG children to the viewport's logical
+     * rectangle. Scene-owned viewport UI roots use this so overflowing child
+     * content cannot paint into another viewport.
+     *
+     * @param clipToViewport true to clip the whole UI tree to its viewport
+     */
+    public void setClipToViewport(boolean clipToViewport) {
+        this.clipToViewport = clipToViewport;
+    }
+
+    /**
+     * Enables or suppresses rendering and input for this complete UI root.
+     * Disabling also releases captured and focused state so an invisible root
+     * cannot continue handling keys or pointer drags.
+     *
+     * @param enabled true to present and interact with this root
+     */
+    public void setPresentationEnabled(boolean enabled) {
+        if (presentationEnabled == enabled) return;
+        presentationEnabled = enabled;
+        if (!enabled) cancelInput();
+    }
+
+    /**
+     * Narrows this root's viewport clip to a local rectangle. A scene uses the
+     * intersection of nested viewport bounds so a child viewport cannot paint
+     * outside its parent. The rectangle is expressed in bottom-left UI units.
+     *
+     * @param x      left edge within the root viewport
+     * @param y      bottom edge within the root viewport
+     * @param width  visible horizontal extent
+     * @param height visible vertical extent
+     */
+    public void setViewportClip(float x, float y, float width, float height) {
+        if (width < 0f || height < 0f)
+            throw new IllegalArgumentException("Viewport clip dimensions cannot be negative");
+        viewportClipX = x;
+        viewportClipY = y;
+        viewportClipWidth = width;
+        viewportClipHeight = height;
+        customViewportClip = true;
+        clipToViewport = true;
     }
 
     /**
@@ -610,11 +720,13 @@ public class UIRoot extends UIContainer {
      * <p>
      * If a viewport is assigned, the viewport is bound before drawing and unbound
      * afterward. Otherwise drawing is performed directly without viewport wrapping.
-     * In both cases, the batch is begun, the tree is drawn, and the batch is ended.
+     * In both cases, the batch is begun, the tree is drawn, the active dragged
+     * item is repainted above overlays and scroll clips, and the batch is ended.
      * </p>
      */
     public void draw() {
         if (disposed) throw new IllegalStateException("UIRoot has been disposed.");
+        if (!presentationEnabled) return;
         if (renderContext != null) throw new IllegalStateException("UIRoot is already drawing.");
         refreshStyles(this);
         if (isLayoutDirty() || Yoga.YGNodeIsDirty(getYogaMemoryAddress())) layout(false);
@@ -625,14 +737,22 @@ public class UIRoot extends UIContainer {
         try {
             batch.begin();
             try {
+                if (clipToViewport) {
+                    if (customViewportClip)
+                        batch.beginScissor(viewportClipX, viewportClipY, viewportClipWidth, viewportClipHeight);
+                    else
+                        batch.beginScissor(0f, 0f, getWidth(), getHeight());
+                }
                 if (nanoVGHandle != 0L) beginNanoFrame(nanoVGHandle);
                 renderContext = new UIRenderContext(batch, nanoVGHandle, this);
                 draw(batch);
                 overlayLayer.render(batch);
+                dragPreview.draw(renderContext);
                 renderContext.drawInspection();
             } finally {
                 UIRenderContext completed = renderContext;
                 renderContext = null;
+                if (clipToViewport) batch.endScissor();
                 batch.end();
                 if (completed != null) {
                     frameStats = new UIFrameStats(pendingLayoutPasses, pendingLayoutNanos, System.nanoTime() - renderStarted, completed.getNodesDrawn(), completed.getBackendSwitches(), completed.getNanoFlushes(), batch.getTotalDrawCalls() - textureCallsBefore);
@@ -659,7 +779,7 @@ public class UIRoot extends UIContainer {
             return;
         }
         for (UINode child : getChildren())
-            if (child != overlayLayer && child.isVisible()) child.render(batch);
+            if (child != overlayLayer && child.isVisible() && !skipsExternalPresentation(child)) child.render(batch);
     }
 
     /**
@@ -670,6 +790,85 @@ public class UIRoot extends UIContainer {
      * @return active context, or null outside draw
      */
     public UIRenderContext getRenderContext() {return renderContext;}
+
+    /**
+     * Lazily creates the root-owned shader for textured content inside a rotated
+     * UI subtree. Called only with the root's graphics context current.
+     *
+     * @return reusable UI rotation shader
+     */
+    UIRotationShader rotationShader() {
+        if (rotationShader == null) rotationShader = new UIRotationShader();
+        return rotationShader;
+    }
+
+    /**
+     * Lifts an attached list or tree item into the final rendering pass. The
+     * press position preserves the point where the pointer first grabbed it.
+     *
+     * @param node   item to paint above the normal UI tree
+     * @param pressX original pointer X in screen coordinates
+     * @param pressY original pointer Y in screen coordinates
+     */
+    public void beginItemDrag(UINode node, float pressX, float pressY) {
+        dragPreview.begin(this, node, pressX, pressY);
+    }
+
+    /**
+     * Moves the active lifted item with the pointer without changing layout.
+     */
+    public void moveItemDrag(float pointerX, float pointerY) {
+        dragPreview.move(this, pointerX, pointerY);
+    }
+
+    /**
+     * Ends a drag only when the supplied item owns the active preview.
+     */
+    public void endItemDrag(UINode node) {
+        dragPreview.end(node);
+    }
+
+    /**
+     * Tells normal rendering to leave the active item's original slot empty.
+     */
+    boolean skipsDragPreviewSource(UINode node) {
+        return dragPreview.skips(node);
+    }
+
+    /**
+     * Chooses whether a top-level UI node is rendered and hit-tested by this
+     * root. An editor can present the same live node through its own viewport
+     * while this root continues to own its layout and updates. Restoring the
+     * node reenables normal game-window presentation.
+     *
+     * @param node    top-level UI node owned by this root
+     * @param enabled true to use normal root presentation
+     */
+    public void setNodePresentationEnabled(UINode node, boolean enabled) {
+        if (node == null) throw new NullPointerException("node");
+        if (enabled) {
+            if (externallyPresentedNodes != null) externallyPresentedNodes.remove(node);
+        } else {
+            if (externallyPresentedNodes == null)
+                externallyPresentedNodes = Collections.newSetFromMap(new IdentityHashMap<>());
+            externallyPresentedNodes.add(node);
+        }
+    }
+
+    /**
+     * Checks whether the editor owns presentation of this UI subtree.
+     *
+     * @param node candidate root child or descendant
+     * @return true when normal root rendering and input must skip it
+     */
+    boolean skipsExternalPresentation(UINode node) {
+        return externallyPresentedNodes != null && externallyPresentedNodes.contains(node);
+    }
+
+    @Override
+    protected boolean acceptsHitChild(UINode child) {
+        return !skipsExternalPresentation(child);
+    }
 
     /**
      * Begins NanoVG with root/viewport world dimensions and a pixel ratio derived
@@ -712,14 +911,22 @@ public class UIRoot extends UIContainer {
         JGL.unsubscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
         cancelInput();
         focusScopes.clear();
+        if (externallyPresentedNodes != null) externallyPresentedNodes.clear();
 
         detachFromRoot();
         Yoga.YGConfigFree(yogaConfig);
         batch.dispose();
-        if (slugBatch != null) slugBatch.dispose();
+        if (rotationShader != null) rotationShader.dispose();
+        if (nanoSlugFont != null) {
+            nanoSlugFont.dispose();
+            nanoSlugFont = null;
+        }
+        if (nanoSlugCodeFont != null) {
+            nanoSlugCodeFont.dispose();
+            nanoSlugCodeFont = null;
+        }
         if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
         nanoVGHandle = 0L;
-        cleanupExtractedNanoFonts();
     }
 
     /**
@@ -734,15 +941,19 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * Returns the root-owned shared Slug renderer, creating it on first use. Keeping
-     * this package-private prevents callers from disturbing its managed draw scope.
+     * Returns a shared smooth default font once this root has a graphics context.
      *
-     * @return live shared renderer
+     * @param code true for the monospace editing face
+     * @return borrowed root-owned font, or null before graphics initialization
      */
-    SlugBatch getOrCreateSlugBatch() {
-        if (disposed) throw new IllegalStateException("UIRoot has been disposed.");
-        if (slugBatch == null) slugBatch = new SlugBatch(4096);
-        return slugBatch;
+    SlugFont getNanoTextFont(boolean code) {
+        if (disposed || nanoVGHandle == 0) return null;
+        SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
+        if (current != null) return current;
+        current = SlugFont.load(SystemFonts.find(code).toString(), 32, 224);
+        if (code) nanoSlugCodeFont = current;
+        else nanoSlugFont = current;
+        return current;
     }
 
     /**
@@ -803,12 +1014,15 @@ public class UIRoot extends UIContainer {
      */
     @Override
     public UINode findNodeAt(float x, float y, int requiredBit) {
+        if (!presentationEnabled) return null;
         if (viewport != null) {
             Vector2f world = viewport.screenToWorld(x, y);
             if (world == null) return null;
             x = world.x();
             y = world.y();
         }
+        if (clipToViewport && customViewportClip && (x < viewportClipX || y < viewportClipY
+                || x > viewportClipX + viewportClipWidth || y > viewportClipY + viewportClipHeight)) return null;
 
         UINode scope = activeFocusScope();
         if (scope != this)
@@ -850,7 +1064,7 @@ public class UIRoot extends UIContainer {
      * Synchronizes each node's layout settings into Yoga before calculation.
      * Recurses through all container children in stored order.
      *
-     * @param node subtree to synchronize
+     * @param node  subtree to synchronize
      * @param force whether to reapply clean layout settings
      */
     private void syncTree(UINode node, boolean force) {
@@ -891,7 +1105,7 @@ public class UIRoot extends UIContainer {
      * Appends focusable nodes in depth-first child order, skipping entire subtrees
      * whose nodes or ancestors are hidden, disabled, or detached from this root.
      *
-     * @param node subtree candidate
+     * @param node  subtree candidate
      * @param nodes mutable traversal list
      */
     private void collectFocus(UINode node, List<UINode> nodes) {
@@ -942,6 +1156,7 @@ public class UIRoot extends UIContainer {
      */
     public void cancelInput() {
         cancelPointer();
+        dragPreview.clear();
         if (hovered != null) hovered.setHovered(false);
         hovered = null;
         Mouse.clearCursorOverride(this);
@@ -964,10 +1179,12 @@ public class UIRoot extends UIContainer {
      * Clears capture, focus, hover, and tooltip state owned by a particular subtree.
      * Other controls retain their input state. Useful when a reusable UI window closes
      * without detaching; passing null has no effect. No release or click is synthesized.
+     *
      * @param node subtree whose interactions are being abandoned
      */
     public void cancelInput(UINode node) {
         if (node == null) return;
+        if (dragPreview.belongsTo(node)) dragPreview.clear();
         if (within(pressed, node)) cancelPointer();
         if (within(focused, node)) setFocusTo(null);
         if (within(hovered, node)) {
@@ -986,7 +1203,8 @@ public class UIRoot extends UIContainer {
     private void updateCursor() {
         UINode target = pressed != null ? pressed : hovered;
         int shape = isNodeInteractiveNow(target) && within(target, activeFocusScope()) ? target.getCursorShape() : 0;
-        if (shape == 0) Mouse.clearCursorOverride(this); else Mouse.overrideCursor(this, shape);
+        if (shape == 0) Mouse.clearCursorOverride(this);
+        else Mouse.overrideCursor(this, shape);
     }
 
     /**
@@ -1023,11 +1241,11 @@ public class UIRoot extends UIContainer {
      * bubble hooks then run outward until consumption. Rechecks interactivity while
      * bubbling so detached/disabled targets stop delivery.
      *
-     * @param target candidate input recipient
-     * @param event shared consumable event
-     * @param x event X coordinate, or NaN for nonpointer input
-     * @param y event Y coordinate, or NaN for nonpointer input
-     * @param handler event-specific node callback
+     * @param target         candidate input recipient
+     * @param event          shared consumable event
+     * @param x              event X coordinate, or NaN for nonpointer input
+     * @param y              event Y coordinate, or NaN for nonpointer input
+     * @param handler        event-specific node callback
      * @param bubbleHandlers whether ancestor event-specific handlers also run
      * @return true if delivery reached the target phase, even if its callback consumes the event
      */
@@ -1073,9 +1291,9 @@ public class UIRoot extends UIContainer {
      * @return whether attachment and ancestor state permit interaction
      */
     private boolean isNodeInteractiveNow(UINode node) {
-        if (node == null || node.getRoot() != this) return false;
+        if (!presentationEnabled || node == null || node.getRoot() != this) return false;
         for (UINode ancestor = node; ancestor != null; ancestor = ancestor.getParent()) {
-            if (!ancestor.isVisible() || !ancestor.isEnabled()) return false;
+            if (!ancestor.isVisible() || !ancestor.isEnabled() || skipsExternalPresentation(ancestor)) return false;
         }
         return true;
     }
@@ -1172,27 +1390,29 @@ public class UIRoot extends UIContainer {
         hideActiveTooltip();
         if (!isNodeFocusableNow(focused)) setFocusTo(null);
         if (focused instanceof NanoLabel && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.A) {
-            clearDocumentSelection(); collectSelectableText(activeFocusScope());
+            clearDocumentSelection();
+            collectSelectableText(activeFocusScope());
             for (var label : selectionLabels) label.documentSelection(0, label.selectionTextLength());
-            textDragActive = !selectionLabels.isEmpty(); textAnchorLabel = 0; textAnchorOffset = 0;
-            event.consume(); return;
+            textDragActive = !selectionLabels.isEmpty();
+            textAnchorLabel = 0;
+            textAnchorOffset = 0;
+            event.consume();
+            return;
         }
-        if (textDragActive && focused instanceof NanoLabel
-                && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.C) {
+        if (textDragActive && focused instanceof NanoLabel && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.C) {
             StringBuilder text = new StringBuilder();
             for (var label : selectionLabels) {
                 if (!isNodeFocusableNow(label) || !label.isSelectable()) continue;
                 String selected = label.getSelectedText();
                 if (selected.isEmpty()) continue;
-                if (text.length() > 0) text.append('\n');
+                if (!text.isEmpty()) text.append('\n');
                 text.append(selected);
             }
             TextEditing.copyText(text.toString());
             event.consume();
             return;
         }
-        if (textDragActive && (event.getKey() == Keyboard.TAB
-                || event.getKey() == Keyboard.A && (event.isCtrlDown() || event.isSuperDown())))
+        if (textDragActive && (event.getKey() == Keyboard.TAB || event.getKey() == Keyboard.A && (event.isCtrlDown() || event.isSuperDown())))
             clearDocumentSelection();
 
         if (event.getKey() == Keyboard.TAB) {
@@ -1244,17 +1464,15 @@ public class UIRoot extends UIContainer {
         if (event.getButton() == Mouse.LEFT && event.isShiftDown() && textDragActive) {
             textDragPending = true;
             extendDocumentSelection(new MouseDragEvent(Mouse.LEFT, 0, (int) textPressX, (int) textPressY, event.getX(), event.getY()));
-            event.consume(); return;
+            event.consume();
+            return;
         }
         clearDocumentSelection();
-        boolean textSurface = target == this
-                || target instanceof NanoLabel label && label.isSelectable()
-                || target != null && (target.getClass() == NanoPanel.class
-                    || target.getClass() == NanoContainer.class
-                    || target.getClass() == NanoImage.class);
+        boolean textSurface = target == this || target instanceof NanoLabel label && label.isSelectable() || target != null && (target.getClass() == NanoPanel.class || target.getClass() == NanoContainer.class || target.getClass() == NanoImage.class);
         if (event.getButton() == Mouse.LEFT && textSurface) {
             collectSelectableText(activeFocusScope());
-            textPressX = event.getX(); textPressY = event.getY();
+            textPressX = event.getX();
+            textPressY = event.getY();
             textDragPending = !selectionLabels.isEmpty();
         }
 
@@ -1292,8 +1510,12 @@ public class UIRoot extends UIContainer {
         if (event.getButton() == Mouse.LEFT) {
             textDragPending = false;
             if (textDragActive) {
-                if (pressed != null) { pressed.setPressed(false); pressed.onPointerCancel(); }
-                pressed = null; pressedButton = -1;
+                if (pressed != null) {
+                    pressed.setPressed(false);
+                    pressed.onPointerCancel();
+                }
+                pressed = null;
+                pressedButton = -1;
                 event.consume();
                 return;
             }
@@ -1306,7 +1528,8 @@ public class UIRoot extends UIContainer {
             route(target, event, event.getX(), event.getY(), node -> node.onMouseRelease(event), false);
             UINode nextHover = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
             if (hovered != nextHover) {
-                hideActiveTooltip(); hoverTime = 0f;
+                hideActiveTooltip();
+                hoverTime = 0f;
                 if (hovered != null) hovered.setHovered(false);
                 hovered = nextHover;
                 if (hovered != null) hovered.setHovered(true);
@@ -1474,92 +1697,24 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * Registers the default NanoVG font from a valid override path, otherwise tries
-     * bundled resources in order. A valid override path prevents fallback even if
-     * registration fails. Logs a diagnostic when all bundled candidates fail.
+     * Registers installed proportional and monospace fonts in the root's context.
+     * Both renderers share the same filesystem selection and override settings.
      */
     private void registerDefaultNanoFont() {
-        try {
-            Path overridePath = getOverrideNanoFontPath();
-            if (overridePath != null) {
-                registerNanoFont("default", overridePath.toString());
-                return;
-            }
-            for (String resource : DEFAULT_NANO_FONT_RESOURCES) {
-                Path fontPath = extractBundledNanoFont(resource);
-                if (fontPath == null) continue;
-                if (registerNanoFont("default", fontPath.toString())) return;
-            }
-            // Browser ports may provide a vector font through their Nano bridge.
-        } catch (Throwable ignored) {
-            // Browser ports provide their own vector-font bridge; filesystem
-            // extraction is unavailable there and must not abort application startup.
-        }
+        Path proportional = SystemFonts.find(false);
+        Path monospace = SystemFonts.find(true);
+        if (nvgCreateFont(nanoVGHandle, "default", proportional.toString()) == -1)
+            throw new IllegalStateException("NanoVG could not load installed UI font: " + proportional);
+        if (nvgCreateFont(nanoVGHandle, "code", monospace.toString()) == -1)
+            throw new IllegalStateException("NanoVG could not load installed code font: " + monospace);
     }
 
     /**
-     * Reads the default-font system property and resolves a nonblank value to a
-     * normalized absolute path, accepting only an existing regular file.
+     * Returns a shared root-owned installed font for regular UI controls.
      *
-     * @return override path, or null when unset, blank, or not a regular file
+     * @return borrowed proportional font, or null before graphics initialization
      */
-    private Path getOverrideNanoFontPath() {
-        String override = System.getProperty(DEFAULT_NANO_FONT_PROPERTY);
-        if (override == null || override.isBlank()) return null;
-
-        Path path = Path.of(override).toAbsolutePath().normalize();
-        return Files.isRegularFile(path) ? path : null;
-    }
-
-    /**
-     * Registers a filesystem font under a NanoVG name in the current stored context.
-     *
-     * @param name NanoVG font name
-     * @param path readable font file
-     * @return whether NanoVG returned a valid font identifier
-     */
-    private boolean registerNanoFont(String name, String path) {
-        return nvgCreateFont(nanoVGHandle, name, path) != -1;
-    }
-
-    /**
-     * Copies a classpath font to a temporary file for NanoVG's path-based loader.
-     * Tracks successful extractions for cleanup and also schedules deletion on JVM
-     * exit. Missing resources or I/O failures return null; failures are logged.
-     *
-     * @param resourcePath classpath resource name
-     * @return extracted file path, or null
-     */
-    private Path extractBundledNanoFont(String resourcePath) {
-        try (InputStream stream = UIRoot.class.getClassLoader().getResourceAsStream(resourcePath)) {
-            if (stream == null) return null;
-
-            String suffix = resourcePath.contains(".") ? resourcePath.substring(resourcePath.lastIndexOf('.')) : ".ttf";
-            Path tempFile = Files.createTempFile("valthorne-nano-font-", suffix);
-            Files.copy(stream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-            tempFile.toFile().deleteOnExit();
-            extractedNanoFonts.add(tempFile);
-            return tempFile;
-        } catch (IOException ex) {
-            System.err.println("Failed to extract bundled NanoVG font resource '" + resourcePath + "': " + ex.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Attempts to delete each tracked temporary font and clears the list.
-     * Deletion failures are ignored; successfully extracted files also have JVM-exit
-     * deletion registered.
-     */
-    private void cleanupExtractedNanoFonts() {
-        for (Path extractedNanoFont : extractedNanoFonts) {
-            try {
-                Files.deleteIfExists(extractedNanoFont);
-            } catch (IOException ignored) {
-            }
-        }
-        extractedNanoFonts.clear();
-    }
+    public SlugFont getDefaultFont() {return getNanoTextFont(false);}
 
     /**
      * One modal input boundary and the focus target that preceded it. Both nodes
@@ -1568,7 +1723,7 @@ public class UIRoot extends UIContainer {
      * <p>The stack of these entries constrains routing to the active modal subtree. Removing
      * a scope may restore its previous focus only if that node is still attached and eligible.</p>
      *
-     * @param node modal subtree root
+     * @param node     modal subtree root
      * @param previous focus target to restore, possibly null
      * @author Albert Beaupre
      */
@@ -1595,7 +1750,9 @@ public class UIRoot extends UIContainer {
          */
         @Override
         public void keyPressed(KeyPressEvent event) {
+            boolean active = blockLowerInput && getFocused() != null;
             handleKeyPressed(event);
+            if (active || blockLowerInput && getFocused() != null) event.consume();
         }
 
         /**
@@ -1607,7 +1764,9 @@ public class UIRoot extends UIContainer {
          */
         @Override
         public void keyReleased(KeyReleaseEvent event) {
+            boolean active = blockLowerInput && getFocused() != null;
             handleKeyReleased(event);
+            if (active) event.consume();
         }
     }
 
@@ -1631,7 +1790,12 @@ public class UIRoot extends UIContainer {
          */
         @Override
         public void mousePressed(MousePressEvent event) {
+            boolean onUi = blockLowerInput && hasUiAt(event.getX(), event.getY());
             handleMousePressed(event);
+            if (onUi) {
+                pointerOwned = true;
+                event.consume();
+            }
         }
 
         /**
@@ -1643,7 +1807,13 @@ public class UIRoot extends UIContainer {
          */
         @Override
         public void mouseReleased(MouseReleaseEvent event) {
+            boolean owned = pointerOwned && event.getButton() == pressedButton;
+            if (pointerOwned && pressedButton < 0) owned = true;
             handleMouseReleased(event);
+            if (owned) {
+                pointerOwned = false;
+                event.consume();
+            }
         }
 
         /**
@@ -1656,6 +1826,7 @@ public class UIRoot extends UIContainer {
         @Override
         public void mouseDragged(MouseDragEvent event) {
             handleMouseDragged(event);
+            if (pointerOwned) event.consume();
         }
 
         /**
@@ -1668,6 +1839,7 @@ public class UIRoot extends UIContainer {
         @Override
         public void mouseMoved(MouseMoveEvent event) {
             handleMouseMoved(event);
+            if (blockLowerInput && hasUiAt(event.getToX(), event.getToY())) event.consume();
         }
     }
 
@@ -1691,7 +1863,9 @@ public class UIRoot extends UIContainer {
          */
         @Override
         public void mouseScrolled(MouseScrollEvent event) {
+            boolean onUi = blockLowerInput && hasUiAt(Mouse.getX(), Mouse.getY());
             handleMouseScrolled(event);
+            if (onUi) event.consume();
         }
     }
 

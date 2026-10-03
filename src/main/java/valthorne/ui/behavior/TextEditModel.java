@@ -1,13 +1,13 @@
 package valthorne.ui.behavior;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.Arrays;
 
 /**
- * Single-line editing independent of fonts, rendering and native input.
+ * Single-line editing independent of fonts, rendering, and native input.
  * Indices are UTF-16 offsets snapped to extended grapheme boundaries. Maximum length
  * is measured in Unicode code points, while movement and deletion preserve graphemes.
  * Validation reports acceptability but does not veto edits. Changes are synchronous
@@ -31,19 +31,52 @@ import java.util.Arrays;
  * @author Albert Beaupre
  */
 public final class TextEditModel {
-    /**
+    /*
      * Extended grapheme matcher used to build UTF-16 cursor boundaries for non-ASCII text.
      */
     private static final Pattern GRAPHEME = Pattern.compile("\\X");
-    private final ArrayDeque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>(); // Snapshots used by undo and redo, newest at the tail.
+    private final ArrayDeque<TextEditState> undo = new ArrayDeque<>(); // Undo snapshots, newest at the tail.
+    private final ArrayDeque<TextEditState> redo = new ArrayDeque<>(); // Redo snapshots, newest at the tail.
     private final ChangeSignal changes = new ChangeSignal(); // Shared synchronous text/selection/validation notifications.
-    private String text = ""; // Current sanitized single-line text.
-    private int anchor, caret; // Selection anchor and active end as UTF-16 offsets.
+    private String text = ""; // Current sanitized text; line breaks are opt-in.
+    private int anchor; // Fixed selection endpoint in UTF-16 units.
+    private int caret; // Active selection endpoint in UTF-16 units.
     private int[] boundaries; // Reusable non-ASCII grapheme-boundary storage.
     private int boundaryCount; // Number of valid entries in the boundary array.
     private boolean ascii = true; // Enables direct index movement when all characters are ASCII.
     private int maxLength = Integer.MAX_VALUE; // Code-point limit applied to growth during insertion.
     private Predicate<String> validator = value -> true; // Validity query predicate; does not reject edits.
+    private boolean multiline; // Whether line breaks and tabs are retained.
+
+    /**
+     * Allows line breaks and tabs for multi-line editors; single-line remains the default.
+     */
+    public TextEditModel multiline(boolean enabled) {
+        multiline = enabled;
+        if (!enabled) text(text);
+        return this;
+    }
+
+    /**
+     * Sanitizes external text while preserving line breaks in multiline mode.
+     *
+     * @param value text to sanitize, or null for empty text
+     * @return normalized text without unsupported controls or isolated surrogates
+     */
+    private String clean(String value) {
+        if (!multiline) return sanitize(value);
+        if (value == null) return "";
+        String normalized = value.replace("\r\n", "\n").replace('\r', '\n');
+        StringBuilder result = new StringBuilder(normalized.length());
+        for (int offset = 0; offset < normalized.length(); ) {
+            int codepoint = normalized.codePointAt(offset);
+            offset += Character.charCount(codepoint);
+            if (codepoint >= 0xD800 && codepoint <= 0xDFFF) continue;
+            if (Character.isISOControl(codepoint) && codepoint != '\n' && codepoint != '\t') continue;
+            result.appendCodePoint(codepoint);
+        }
+        return result.toString();
+    }
 
     /**
      * Removes unpaired surrogate code points and replaces ISO control characters with
@@ -161,9 +194,9 @@ public final class TextEditModel {
      * run synchronously; registration itself does not fire the callback.
      *
      * @param listener change callback
-     * @return subscription handle that removes the listener when closed
+     * @return action that removes the listener when run
      */
-    public AutoCloseable onChange(Runnable listener) {
+    public Runnable onChange(Runnable listener) {
         return changes.subscribe(listener);
     }
 
@@ -181,7 +214,7 @@ public final class TextEditModel {
      * @param value replacement text, or null for empty text
      */
     public void text(String value) {
-        text = sanitize(value);
+        text = clean(value);
         rebuild();
         caret = boundary(Math.min(caret, text.length()));
         anchor = caret;
@@ -218,7 +251,7 @@ public final class TextEditModel {
      *
      * @return new history snapshot
      */
-    private State state() {return new State(text, anchor, caret);}
+    private TextEditState state() {return new TextEditState(text, anchor, caret);}
 
     /**
      * Restores a history snapshot, rebuilds grapheme boundaries, and notifies listeners.
@@ -226,10 +259,10 @@ public final class TextEditModel {
      *
      * @param state previously captured text and endpoints
      */
-    private void restore(State state) {
-        text = state.text;
-        anchor = state.anchor;
-        caret = state.caret;
+    private void restore(TextEditState state) {
+        text = state.text();
+        anchor = state.anchor();
+        caret = state.caret();
         rebuild();
         notifyListeners();
     }
@@ -274,18 +307,18 @@ public final class TextEditModel {
      * at most 100 undo snapshots, clear redo, rebuild boundaries, and snap the new caret
      * backward to a grapheme boundary.
      *
-     * @param value text to sanitize and insert
+     * @param value      text to sanitize and insert
      * @param undoAnchor anchor saved before a temporary deletion selection
-     * @param undoCaret caret saved before a temporary deletion selection
+     * @param undoCaret  caret saved before a temporary deletion selection
      * @return whether text changed
      */
     private boolean insert(String value, int undoAnchor, int undoCaret) {
-        value = sanitize(value);
+        value = clean(value);
         String next = text.substring(0, start()) + value + text.substring(end());
         int nextLength = next.codePointCount(0, next.length());
         if (next.equals(text) || (nextLength > maxLength && nextLength > text.codePointCount(0, text.length())))
             return false;
-        undo.addLast(new State(text, undoAnchor, undoCaret));
+        undo.addLast(new TextEditState(text, undoAnchor, undoCaret));
         if (undo.size() > 100) undo.removeFirst();
         redo.clear();
         int nextCaret = start() + value.length();
@@ -356,9 +389,9 @@ public final class TextEditModel {
      * existing selection collapses to the endpoint in the requested direction. Other
      * moves start from the active caret and follow the normal move notification path.
      *
-     * @param right true to move forward, false backward
+     * @param right  true to move forward, false backward
      * @param extend whether to preserve the selection anchor
-     * @param word whether to use word segmentation
+     * @param word   whether to use word segmentation
      */
     public void moveHorizontal(boolean right, boolean extend, boolean word) {
         if (!extend && hasSelection() && !word) {
@@ -472,18 +505,4 @@ public final class TextEditModel {
         }
     }
 
-    /**
-     * Immutable edit-history snapshot sharing the immutable text string. Endpoints
-     * represent the selection before an edit and are restored without revalidation.
-     *
-     * <p>Snapshots carry text and selection together so undo and redo restore a coherent editing
-     * position. They contain no widget rendering state, clipboard handle, or callback.</p>
-     *
-     * @param text text at snapshot time
-     * @param anchor fixed selection endpoint in UTF-16 units
-     * @param caret active selection endpoint in UTF-16 units
-     * @author Albert Beaupre
-     */
-    private record State(String text, int anchor, int caret) {
-    }
 }

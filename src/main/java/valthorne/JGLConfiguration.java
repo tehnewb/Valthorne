@@ -19,9 +19,9 @@ import static org.lwjgl.glfw.GLFW.*;
  * forcing callers to pass a very large constructor argument list, it exposes a large
  * collection of small fluent setter methods such as {@link #title(String)},
  * {@link #size(int, int)}, {@link #samples(int)}, {@link #contextVersion(int, int)},
- * and {@link #swapInterval(SwapInterval)}. Each of these methods mutates the current
- * configuration and returns the same instance so configuration code remains readable
- * and chainable.
+ * {@link #swapInterval(SwapInterval)}, and {@link #audioEnabled(boolean)}. Each method
+ * mutates the current configuration and returns the same instance so configuration
+ * code remains readable and chainable.
  * </p>
  *
  * <p>
@@ -34,6 +34,7 @@ import static org.lwjgl.glfw.GLFW.*;
  *     <li>OpenGL context settings such as version, profile, debug flags, and robustness behavior</li>
  *     <li>platform-specific string hints for Cocoa and X11</li>
  *     <li>swap interval preferences through {@link SwapInterval}</li>
+ *     <li>whether application startup initializes an audio device</li>
  *     <li>arbitrary extra GLFW hints stored in {@link #extraHints}</li>
  * </ul>
  *
@@ -99,10 +100,11 @@ public final class JGLConfiguration {
     private boolean floating = false; // Whether the window should float above normal windows
     private boolean transparentFramebuffer = false; // Whether the framebuffer should support transparency
     private boolean scaleToMonitor = false; // Whether the window content should scale to the monitor
-    private boolean srgbCapable = false; // Whether an sRGB-capable framebuffer should be requested
+    private boolean srgbCapable = true; // Requests encoded display storage for gamma-correct text blending; does not enable global sRGB writes.
     private boolean cocoaRetinaFramebuffer = true; // Whether Retina framebuffers should be enabled on macOS
     private int refreshRate = GLFW_DONT_CARE; // Requested monitor refresh rate or GLFW_DONT_CARE
     private SwapInterval swapInterval = SwapInterval.VSYNC; // Preferred swap interval behavior after context creation
+    private boolean audioEnabled = true; // Whether JGL opens an audio device during application startup.
     private int redBits = GLFW_DONT_CARE; // Requested red channel precision in bits
     private int greenBits = GLFW_DONT_CARE; // Requested green channel precision in bits
     private int blueBits = GLFW_DONT_CARE; // Requested blue channel precision in bits
@@ -334,7 +336,8 @@ public final class JGLConfiguration {
 
     /**
      * <p>
-     * Returns whether an sRGB-capable framebuffer is requested.
+     * Returns whether an sRGB-capable framebuffer is requested, true by default.
+     * This requests encoded display storage; it does not enable global sRGB writes.
      * </p>
      *
      * @return {@code true} if sRGB capability is requested
@@ -374,6 +377,17 @@ public final class JGLConfiguration {
      */
     public SwapInterval getSwapInterval() {
         return swapInterval;
+    }
+
+    /**
+     * Returns whether JGL should initialize the audio subsystem before the application starts.
+     * Audio initialization is enabled by default; disabling it permits applications that never
+     * use audio to run without opening an audio device.
+     *
+     * @return {@code true} when audio should start with the application
+     */
+    public boolean isAudioEnabled() {
+        return audioEnabled;
     }
 
     /**
@@ -854,7 +868,9 @@ public final class JGLConfiguration {
 
     /**
      * <p>
-     * Sets whether an sRGB-capable framebuffer should be requested.
+     * Sets whether an sRGB-capable framebuffer should be requested. The default
+     * is true, allowing Slug to blend text edges in linear light. Disabling the
+     * capability retains legacy text blending on linear default surfaces.
      * </p>
      *
      * @param srgbCapable whether sRGB framebuffer capability should be requested
@@ -901,6 +917,19 @@ public final class JGLConfiguration {
      */
     public JGLConfiguration swapInterval(SwapInterval swapInterval) {
         this.swapInterval = swapInterval;
+        return this;
+    }
+
+    /**
+     * Controls whether JGL initializes the audio subsystem during startup. The default is
+     * {@code true}, preserving normal sound playback. Disable it for a silent application
+     * that does not call the audio API.
+     *
+     * @param enabled whether to initialize an audio device before application initialization
+     * @return this configuration instance
+     */
+    public JGLConfiguration audioEnabled(boolean enabled) {
+        this.audioEnabled = enabled;
         return this;
     }
 

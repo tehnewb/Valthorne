@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 2.4.0" src="https://img.shields.io/badge/version-2.4.0-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 1.0.0.0" src="https://img.shields.io/badge/version-1.0.0.0-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -18,64 +18,56 @@
 
 # Valthorne
 
-Valthorne is a Java game-development library built on LWJGL, JOML, Jolt Physics,
-OpenAL, NanoVG, Yoga, and an optional Filament renderer. It provides the runtime,
-rendering, content, physics, audio, UI, and utility systems needed to build a game
-without hiding the underlying desktop APIs.
+A Java 25 desktop 2D game library built on LWJGL and JOML, with OpenAL audio,
+NanoVG drawing, Yoga layout, and Artemis ECS integration.
 
-The current release is **2.4.0** and requires **JDK 25**. Valthorne is licensed
-under [Apache-2.0](LICENSE).
+## Features
 
-## What is included
+- Application lifecycle, scenes, input events, state machines, and fixed-rate ticks.
+- Textures, sprites, atlases, batching, shaders, cameras, viewports, animation,
+  particles, and batched 2D lighting.
+- Bitmap fonts and live Slug curve fonts. Regular UI uses Slug; Nano controls
+  use NanoVG. Default fonts are loaded from installed system fonts.
+- Retained UI trees, layout, themes, tables, trees, virtual lists, and text editing.
+- Tiled and LDtk maps, asset loading, primitive collections, pooling, geometry,
+  serialization, compression, and file dialogs.
+- Buffered and streaming WAV, OGG, and MP3 audio.
 
-- **Application runtime:** configurable GLFW windows and OpenGL contexts, frame
-  lifecycle, input, typed events, scenes, state machines, fixed-rate ticks, and
-  timing utilities.
-- **2D rendering:** textures, sprites, atlases, batching, shaders, cameras,
-  viewports, animation, particles, raycast lighting, batched lighting, radiance
-  cascades, and 2D path tracing.
-- **Fonts and UI:** bitmap fonts, GPU-rendered Slug curve fonts, asset loaders,
-  retained UI trees, Yoga layout, texture and NanoVG controls, themes, tables,
-  virtual lists, text editing, diagnostics, and performance overlays.
-- **Maps:** Tiled TMX maps and tilesets, plus LDtk projects with embedded or
-  external levels, tiles, IntGrid data, entities, custom fields, backgrounds,
-  definitions, and direct `TextureBatch` rendering.
-- **3D rendering:** OBJ models, materials, scene graphs, raster and Filament
-  renderers, billboards, picking, shadow maps, lighting grids, culling, particles,
-  skeletal and morph animation support, and path tracing.
-- **Physics and audio:** Jolt rigid bodies, collision shapes, queries, contacts,
-  joints, WAV/OGG/MP3 decoding, buffered and streaming playback, and spatial
-  sound areas.
-- **Assets and utilities:** asynchronous asset loading and caching, primitive
-  collections, pools, geometry, dynamic byte buffers, file helpers, plugins,
-  compression, encryption, hashing, and typed property sets with binary and
-  human-readable text persistence.
-- **Portable target:** a development TeaVM browser backend for supported shared
-  application code, including WebGL2/WebGPU adapters and browser-specific file,
-  audio, and window behavior.
+## Release version
 
-The [system manual](docs/systems/README.md) maps the public engine systems to the
-current Java source. Platform-specific capabilities and limitations are documented
-in the [platform matrix](docs/platforms.md).
+**Valthorne 1.0.0.0 is the official initial release.** Versions use four numbers:
 
-## Add Valthorne to a project
+| Position | Meaning |
+| --- | --- |
+| First | Massive updates, major migrations, or architectural changes |
+| Second | Big feature changes |
+| Third | Bug fixes, glitch fixes, and small feature changes |
+| Fourth | Quick fixes and hotfixes |
 
-Valthorne 2.4.0 is available from Maven Central:
+When a number increases, the numbers to its right reset to zero.
+
+## Getting started
+
+Install JDK 25 and add Valthorne to your application's build. The dependency
+includes its runtime native libraries transitively.
+
+### Gradle
+
+Add this to `build.gradle`. The application plugin also provides a `run` task:
 
 ```groovy
+plugins {
+    id 'application'
+}
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:2.4.0'
+    implementation 'io.github.tehnewb:Valthorne:1.0.0.0'
 }
-```
 
-Use the Java 25 toolchain and configure application launchers with the native-access
-and JOML access options used by Valthorne itself:
-
-```groovy
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
@@ -83,128 +75,127 @@ java {
 }
 
 application {
-    mainClass = 'game.Main'
-    applicationDefaultJvmArgs = [
-        '--enable-native-access=ALL-UNNAMED',
-        '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED'
-    ]
-    if (System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('mac')) {
-        applicationDefaultJvmArgs += '-XstartOnFirstThread'
+    mainClass = 'MyGame'
+    if (System.getProperty('os.name').startsWith('Mac')) {
+        applicationDefaultJvmArgs = ['-XstartOnFirstThread']
     }
 }
 ```
 
-Runtime native dependencies are selected transitively; consumers do not need a
-native compiler or manually selected LWJGL/Jolt classifiers. See the
-[integration guide](docs/getting-started.md) for Gradle Kotlin DSL, Maven, IDE,
-local-publication, and distribution setup.
+### Maven
 
-## Minimal application
+Add the following inside your `pom.xml` project's `properties` and `dependencies`
+sections. Maven Central is Maven's default repository:
+
+```xml
+<properties>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+</properties>
+
+<dependencies>
+    <dependency>
+        <groupId>io.github.tehnewb</groupId>
+        <artifactId>Valthorne</artifactId>
+        <version>1.0.0.0</version>
+    </dependency>
+</dependencies>
+```
+
+Use JDK 25. Native applications require compatible graphics and audio drivers.
+On macOS, launch graphics applications with `-XstartOnFirstThread`.
+
+### Create your first application
+
+Save this as `src/main/java/MyGame.java` in your application project:
 
 ```java
-package game;
-
 import valthorne.Application;
 import valthorne.JGL;
-import valthorne.Keyboard;
 import valthorne.Window;
 import valthorne.graphics.Color;
 
-public final class Main implements Application {
-    private final Color background = new Color(0.055f, 0.075f, 0.12f, 1.0f);
-
+/**
+ * Opens a desktop window and clears it each frame.
+ */
+public final class MyGame implements Application {
+    /**
+     * Starts the window and runs the application until it closes.
+     *
+     * @param args unused command-line arguments
+     */
     public static void main(String[] args) {
-        JGL.init(new Main(), "My Game", 1280, 720);
+        /*
+         * JGL manages the window and invokes the application lifecycle callbacks.
+         */
+        JGL.init(new MyGame(), "My Valthorne Game", 1280, 720);
     }
 
     @Override
     public void init() {
-        // Load assets and create graphics resources on the context thread.
+        // Create rendering resources and load assets here.
     }
 
     @Override
-    public void update(float deltaSeconds) {
-        if (Keyboard.isKeyDown(Keyboard.ESCAPE)) {
-            Window.requestClose();
-        }
+    public void update(float delta) {
+        // Advance game state; delta is elapsed time in seconds.
     }
 
     @Override
     public void render() {
-        Window.clear(background);
+        Window.clear(Color.BLACK);
     }
 
     @Override
     public void dispose() {
-        // Dispose application-owned resources before the context closes.
+        // Release resources created by this application here.
     }
 }
 ```
 
-`JGL.init` owns the synchronous application loop. Create and dispose GPU resources
-on the context thread, treat `deltaSeconds` as seconds, and keep packaged assets on
-the classpath under `src/main/resources`.
+With the Gradle configuration above, launch it using `./gradlew run`
+(`gradlew.bat run` on Windows). With Maven, compile using `mvn compile`, then run
+`MyGame.main` from your IDE with the project's runtime dependencies on its
+classpath. Add `-XstartOnFirstThread` to the IDE's VM options on macOS.
 
-## Documentation
+`JGL.init` runs the game loop and returns when the window closes. It calls `init`
+once, then `update` followed by `render` each frame, and `dispose` during shutdown.
+Create GPU and audio resources in `init`, after the native systems are ready,
+and release the resources you own in `dispose`.
 
-| Topic | Reference |
-| --- | --- |
-| Setup and runtime | [Getting started](docs/getting-started.md), [lifecycle](docs/systems/runtime.md), [platform support](docs/platforms.md), [graphics capabilities](docs/graphics-capabilities.md) |
-| Application structure | [Assets](docs/systems/assets.md), [events](docs/systems/events.md), [scenes](docs/systems/scenes.md), [state machines](docs/systems/state-machines.md), [timing](docs/systems/timing.md) |
-| 2D graphics | [Textures](docs/systems/textures.md), [cameras](docs/systems/cameras.md), [shaders](docs/systems/shaders.md), [particles](docs/systems/particles-2d.md), [lighting](docs/systems/lighting-2d.md) |
-| Fonts and UI | [Bitmap fonts](docs/systems/fonts.md), [Slug fonts](docs/systems/slug-fonts.md), [UI foundations](docs/systems/ui-core.md), [controls](docs/systems/ui-controls.md), [widgets](docs/ui-widgets.md), [windows](docs/ui-windows.md), [themes](docs/systems/ui-themes.md) |
-| Maps | [Tiled maps](docs/systems/tiled-maps.md), [LDtk maps](docs/systems/ldtk-maps.md) |
-| Foundation APIs | [Collections](docs/systems/arrays.md), [buffers](docs/systems/buffers.md), [files](docs/systems/files.md), [settings](docs/systems/settings.md), [compression](docs/systems/compression.md), [encryption](docs/systems/encryption.md), [utilities](docs/systems/utilities.md) |
-| Browser target | [Portable desktop/web target](portable/README.md) |
+For larger games, use `GameScreen` with a `Scene` to organize levels, a
+`TextureBatch` to batch sprite rendering, and retained UI nodes for menus and
+controls. The source Javadocs describe their APIs and resource lifetimes.
 
-The [complete system index](docs/systems/README.md) covers the engine's 499 Java
-source files and links each documented area back to its implementation.
-
-## Platform notes
-
-The standard desktop renderers require OpenGL 3.3 core. OpenGL 4.3 compute
-features, including compute-based path tracing and radiance cascades, are not
-available on macOS. Filament has a direct Windows x64 sharing path and transfer
-paths for supported Linux and macOS ARM64 runtimes; consult the platform matrix
-before selecting it for distribution.
-
-Desktop artifacts include native dependencies for the supported Windows, Linux,
-and macOS targets listed in [platform support](docs/platforms.md). Native artifact
-availability does not guarantee that a particular driver or machine supports every
-renderer. Android, iOS, Windows x86, and other Unix systems are not desktop targets.
-
-## Build and verify
+## Build and verification
 
 Use the included Gradle wrapper:
 
 ```sh
-./gradlew build
-./gradlew verifyRelease
+./gradlew -Pprototype3d=false -PeditorPrototype=false build
+./gradlew -Pprototype3d=false -PeditorPrototype=false verifyRelease verifySlugTextureBatch
 ```
 
-- `build` compiles the library and creates the binary, source, and Javadoc archives.
-- `verifyRelease` checks release packaging, runtime resources, licenses, and metadata.
+On Windows, use `gradlew.bat`. `build` creates the library, sources, and Javadoc
+archives. `verifyRelease` validates artifacts, licenses, resources, and metadata
+in a local Maven repository. `verifySlugTextureBatch` checks GPU-rendered text.
+These commands do not upload a release.
 
-The previous automated test suites and their runners have been removed. Builds
-do not provide runtime regression coverage. Optional local benchmarks remain.
-See [contributing](CONTRIBUTING.md) and the
-[release procedure](docs/releasing.md) before submitting or publishing changes.
+Private editor and 3D prototypes are excluded from public artifacts. Follow
+[AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) when changing code.
 
 ## Repository organization
 
 - `src/main/java/valthorne` — engine implementation and public APIs.
-- `src/main/resources` — packaged shaders, Filament materials, fonts, and licenses.
-- `docs` — integration guides, subsystem contracts, and performance records.
-- `portable` — shared-source desktop and TeaVM web compatibility tooling.
-- `gradle` — packaging validation, publication, and benchmark tasks.
-- `images` — project branding.
+- `src/main/resources` — packaged shaders and licenses.
+- `src/test` — verification code.
+- `portable` — shared-source desktop compatibility tooling.
+- `gradle` — packaging, publication, and benchmark configuration.
 
 ## License and community
 
-Valthorne is distributed under the [Apache License 2.0](LICENSE). Bundled fonts,
-native libraries, and other third-party components retain their own terms; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Valthorne is distributed under the [Apache License 2.0](LICENSE). Third-party
+components retain their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Use [GitHub issues](https://github.com/tehnewb/Valthorne/issues) for reproducible
-bugs and feature requests. Community discussion is available on
-[Discord](https://discord.gg/APqcDzppDv).
+Report reproducible bugs through [GitHub issues](https://github.com/tehnewb/Valthorne/issues).
+Community discussion is available on [Discord](https://discord.gg/APqcDzppDv).

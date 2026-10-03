@@ -103,6 +103,7 @@ public class Sprite implements Poolable, Drawable {
     protected float scaleY = 1f; // Vertical scale factor
     protected Color color = new Color(1, 1, 1, 1); // Tint color used when drawing the sprite
     protected boolean ownsTexture; // Whether this sprite should dispose its backing texture when released
+    private boolean visible = true; // Whether this drawable participates in rendering and animation updates.
     protected boolean disposed; // Whether this sprite has already released its owned resources
 
     /**
@@ -492,6 +493,18 @@ public class Sprite implements Poolable, Drawable {
     }
 
     /**
+     * Draws this sprite at its stored position and size, honoring visibility and
+     * stored scale, origin, flips, rotation and tint through the batch's existing
+     * sprite API.
+     *
+     * @param batch active destination batch
+     */
+    public void draw(TextureBatch batch) {
+        if (!visible || region == null) return;
+        batch.draw(this);
+    }
+
+    /**
      * Draws the full region at explicit bounds using the sprite's scale, origin,
      * rotation, flips, and tint. Stored position and dimensions remain unchanged.
      * A missing region is skipped.
@@ -504,6 +517,7 @@ public class Sprite implements Poolable, Drawable {
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height) {
+        if (!visible) return;
         TextureRegion spriteRegion = this.region;
         if (spriteRegion == null) return;
 
@@ -524,6 +538,7 @@ public class Sprite implements Poolable, Drawable {
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, Color tint) {
+        if (!visible) return;
         TextureRegion spriteRegion = this.region;
         if (spriteRegion == null) return;
 
@@ -547,6 +562,7 @@ public class Sprite implements Poolable, Drawable {
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float originX, float originY, float rotation, Color tint) {
+        if (!visible) return;
         TextureRegion spriteRegion = this.region;
         if (spriteRegion == null) return;
 
@@ -570,6 +586,7 @@ public class Sprite implements Poolable, Drawable {
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight) {
+        if (!visible) return;
         draw(batch, x, y, width, height, regionX, regionY, regionWidth, regionHeight, 0f, 0f, 0f, null);
     }
 
@@ -596,6 +613,7 @@ public class Sprite implements Poolable, Drawable {
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        if (!visible) return;
         TextureRegion spriteRegion = this.region;
         if (spriteRegion == null) return;
 
@@ -972,6 +990,7 @@ public class Sprite implements Poolable, Drawable {
      * </p>
      */
     public void draw() {
+        if (!visible) return;
         if (region == null) return;
         if (vertexBuffer == null || uvBuffer == null) return;
 
@@ -1037,4 +1056,18 @@ public class Sprite implements Poolable, Drawable {
         updateUVBuffer();
         updateVertexBuffer();
     }
+    /**
+     * Reports whether this object participates in rendering and animation updates.
+     *
+     * @return current visibility
+     */
+    public boolean isVisible() {return visible;}
+
+    /**
+     * Changes visibility without releasing resources or changing the object's
+     * position, frame, or timing state. Hidden objects can be shown again.
+     *
+     * @param visible whether rendering and animation updates are enabled
+     */
+    public void setVisible(boolean visible) {this.visible = visible;}
 }

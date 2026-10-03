@@ -62,6 +62,6 @@ public final class SpriteCulling {
             outside &= mask;
             if (outside == 0) return true;
         }
-        return outside == 0;
+        return false;
     }
 }

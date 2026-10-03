@@ -3,7 +3,9 @@ package valthorne.ui.nodes.nano;
 import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.event.events.KeyPressEvent;
+import valthorne.event.events.MouseDragEvent;
 import valthorne.event.events.MousePressEvent;
+import valthorne.event.events.MouseReleaseEvent;
 import valthorne.ui.UIInputEvent;
 import valthorne.ui.UINode;
 import valthorne.ui.behavior.RowHeightIndex;
@@ -13,6 +15,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.IntFunction;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 
 /** NanoVG scroll-panel variant of the virtualized list/grid component. */
 public class NanoVirtualList extends NanoScrollPanel {
@@ -23,6 +27,23 @@ public class NanoVirtualList extends NanoScrollPanel {
     private float rowHeight = 40, gap = 4, lastWidth = -1, pendingScroll = Float.NaN;
     private RowHeightIndex heights;
     private SelectionModel selection;
+    private float contentWidth;
+    private BiConsumer<Integer, Integer> dropped;
+    private BiPredicate<Integer, Integer> canDrop = (source, target) -> true;
+    private int dragIndex = -1, dropIndex = -1;
+    private float dragStartX, dragStartY;
+    private boolean draggingItem;
+
+    /**
+     * Sets an optional minimum content width, allowing horizontal scrolling of wide rows.
+     */
+    public NanoVirtualList contentWidth(float width) {
+        if (!Float.isFinite(width) || width < 0) throw new IllegalArgumentException("Invalid content width");
+        if (contentWidth != width) {
+            contentWidth = width; rows.getLayout().minWidth(width); invalidateItems();
+        }
+        return this;
+    }
 
     public NanoVirtualList(int itemCount, IntFunction<? extends UINode> factory) {
         this.factory = Objects.requireNonNull(factory);
@@ -42,6 +63,24 @@ public class NanoVirtualList extends NanoScrollPanel {
     public int getLiveItemCount() { return live.size(); }
     public SelectionModel getSelection() { return selection; }
     public UINode getItemNode(int index) { return live.get(index); }
+    /**
+     * Receives source and target indices after a valid drop. While dragging, the
+     * source follows the pointer above scroll clipping and leaves a gap in its
+     * original slot. The callback owns any collection reorder or data update.
+     */
+    public NanoVirtualList onDrop(BiConsumer<Integer, Integer> listener) {
+        dropped = Objects.requireNonNull(listener); return this;
+    }
+    /**
+     * Restricts valid drop targets.
+     */
+    public NanoVirtualList canDrop(BiPredicate<Integer, Integer> predicate) {
+        canDrop = Objects.requireNonNull(predicate); return this;
+    }
+    /**
+     * Current target index during a drag, or -1 outside an allowed item.
+     */
+    public int getDropIndex() { return dropIndex; }
     public int getColumns() { return columns; }
     public boolean hasVariableHeights() { return heights != null; }
 
@@ -56,10 +95,59 @@ public class NanoVirtualList extends NanoScrollPanel {
 
     @Override public void onInputPreview(UIInputEvent context) {
         super.onInputPreview(context);
-        if (selection == null || !(context.event() instanceof MousePressEvent press) || press.getButton() != Mouse.LEFT) return;
-        for (var entry : live.entrySet()) if (contains(entry.getValue(), context.target())) {
-            selection.select(entry.getKey(), press.isShiftDown(), press.isCtrlDown() || press.isSuperDown()); return;
+        if (context.event() instanceof MousePressEvent press && press.getButton() == Mouse.LEFT) {
+            clearDrag();
+            for (var entry : live.entrySet()) if (contains(entry.getValue(), context.target())) {
+                if (selection != null)
+                    selection.select(entry.getKey(), press.isShiftDown(), press.isCtrlDown() || press.isSuperDown());
+                if (dropped != null) {
+                    dragIndex = entry.getKey(); dragStartX = press.getX(); dragStartY = press.getY();
+                }
+                return;
+            }
+        } else if (context.event() instanceof MouseDragEvent drag && drag.getButton() == Mouse.LEFT && dragIndex >= 0) {
+            float dx = drag.getToX() - dragStartX, dy = drag.getToY() - dragStartY;
+            if (!draggingItem && dx * dx + dy * dy < 25) return;
+            UINode source = live.get(dragIndex);
+            if (!draggingItem) {
+                draggingItem = true;
+                if (source != null) {
+                    source.setDragging(true);
+                    getRoot().beginItemDrag(source, dragStartX, dragStartY);
+                }
+            }
+            getRoot().moveItemDrag(drag.getToX(), drag.getToY());
+            dropIndex = targetIndex(drag.getToX(), drag.getToY());
+            context.consume();
+        } else if (context.event() instanceof MouseReleaseEvent release && release.getButton() == Mouse.LEFT) {
+            if (dragIndex < 0) return;
+            int source = dragIndex, target = draggingItem ? targetIndex(release.getX(), release.getY()) : -1;
+            boolean wasDragging = draggingItem;
+            clearDrag();
+            if (wasDragging) {
+                if (target >= 0) dropped.accept(source, target);
+                context.consume();
+            }
         }
+    }
+
+    private int targetIndex(float x, float y) {
+        if (getRoot() == null) return -1;
+        UINode hit = getRoot().findNodeAt(x, y, UINode.CLICKABLE_BIT);
+        for (var entry : live.entrySet())
+            if (entry.getKey() != dragIndex && contains(entry.getValue(), hit)
+                    && canDrop.test(dragIndex, entry.getKey())) return entry.getKey();
+        return -1;
+    }
+
+    private void clearDrag() {
+        UINode source = live.get(dragIndex);
+        if (source != null) {
+            if (getRoot() != null) getRoot().endItemDrag(source);
+            source.setDragging(false);
+        }
+        dragIndex = dropIndex = -1;
+        draggingItem = false;
     }
 
     @Override public void onKeyPress(KeyPressEvent event) {
@@ -76,7 +164,7 @@ public class NanoVirtualList extends NanoScrollPanel {
         else if (key == Keyboard.LEFT && columns > 1) next = Math.max(0, index - 1);
         else return;
         selection.select(next, event.isShiftDown(), control && event.isShiftDown());
-        scrollToIndex(next);
+        revealIndex(next);
         if (getRoot() != null) getRoot().setFocusTo(this);
         event.consume();
     }
@@ -119,13 +207,9 @@ public class NanoVirtualList extends NanoScrollPanel {
     }
 
     public void refreshItems() {
-        if (getRoot() != null && (owns(getRoot().getFocused()) || owns(getRoot().getCaptured()))) getRoot().cancelInput();
+        clearDrag();
+        if (getRoot() != null) getRoot().cancelInput(rows);
         rows.clear(); live.clear(); invalidateItems();
-    }
-
-    private boolean owns(UINode node) {
-        for (; node != null; node = node.getParent()) if (node == rows) return true;
-        return false;
     }
 
     private void invalidateItems() { first = last = -1; updateExtent(); markLayoutDirty(); }
@@ -167,6 +251,21 @@ public class NanoVirtualList extends NanoScrollPanel {
         synchronizeRows();
     }
 
+    /**
+     * Reveals a row only when it lies outside the current vertical viewport.
+     */
+    public void revealIndex(int index) {
+        if (index < 0 || index >= itemCount) throw new IndexOutOfBoundsException(index);
+        if (getRoot() != null && isLayoutDirty()) getRoot().layout();
+        float top = (float) (heights == null ? (index / columns) * (double) (rowHeight + gap) : heights.offset(index));
+        float bottom = top + getItemHeight(index);
+        float visibleTop = getScrollY();
+        float visibleBottom = visibleTop + getHeight();
+        if (top < visibleTop) scrollY(top);
+        else if (bottom > visibleBottom) scrollY(bottom - getHeight());
+        synchronizeRows();
+    }
+
     @Override public void update(float delta) { synchronizeRows(); super.update(delta); }
 
     @Override protected void afterLayout() {
@@ -181,7 +280,7 @@ public class NanoVirtualList extends NanoScrollPanel {
         long endRow = heights == null ? (long) Math.ceil(((double) getScrollY() + getHeight()) / (rowHeight + gap)) : (long) heights.indexAt((double) getScrollY() + getHeight()) + 1;
         int nextFirst = (int) Math.min(itemCount, Math.max(0, startRow - overscan) * columns);
         int nextLast = (int) Math.min(itemCount, (Math.min(itemCount, endRow) + overscan) * columns);
-        float width = Math.max(0, getWidth() - (getMaxScrollY() > 0 ? getVerticalBarWidth() : 0));
+        float width = Math.max(contentWidth, getWidth() - (getMaxScrollY() > 0 ? getVerticalBarWidth() : 0));
         boolean extra = live.size() > nextLast - nextFirst;
         if (first == nextFirst && last == nextLast && lastWidth == width && !extra) return;
         first = nextFirst; last = nextLast; lastWidth = width;

@@ -1,5 +1,7 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.NanoText;
+
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Color;
@@ -352,7 +354,7 @@ public class NanoHyperlink extends UINode implements NanoNode {
         nvgFontFace(vg, fontName);
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         nvgFillColor(vg, NanoUtility.color1(drawColor));
-        nvgText(vg, x, textY, text);
+        NanoText.draw(this, vg, x, textY, text, fontSize, drawColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
         float[] bounds = new float[4];
         nvgTextBounds(vg, x, textY, text == null ? "" : text, bounds);

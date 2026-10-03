@@ -1,6 +1,7 @@
 package valthorne.graphics.font.slug;
 
 import valthorne.graphics.Color;
+import valthorne.graphics.texture.TextureBatch;
 
 import java.util.Arrays;
 
@@ -14,7 +15,7 @@ import java.util.Arrays;
  * <pre>{@code
  * SlugTextRun run = font.createRun("The quick brown fox", 36f);
  *
- * batch.begin(projection, width, height);
+ * batch.begin(); // The ordinary TextureBatch owns the live curve renderer.
  * run.draw(batch, 40f, 180f, Color.WHITE);
  * batch.end();
  * }</pre>
@@ -24,7 +25,7 @@ import java.util.Arrays;
  */
 public final class SlugTextRun {
 
-    private SlugFont font; // Font that owns the glyph data.
+    private final SlugFont font; // Font that owns the glyph data.
     private SlugGlyph[] glyphs; // Drawable glyphs in draw order.
     private float[] xOffsets; // Baseline x offsets in world units.
     private float[] yOffsets; // Baseline y offsets in world units.
@@ -33,7 +34,10 @@ public final class SlugTextRun {
     private float size; // World units per em.
     private float width; // Measured width.
     private float height; // Measured height.
-    private float minX, minY, maxX, maxY; // Drawable outline bounds relative to the run baseline, used for whole-run rejection.
+    private float minX; // Minimum outline X relative to the run baseline.
+    private float minY; // Minimum outline Y relative to the run baseline.
+    private float maxX; // Maximum outline X relative to the run baseline.
+    private float maxY; // Maximum outline Y relative to the run baseline.
 
     /**
      * Creates a reusable layout for the supplied font and immediately builds its
@@ -46,9 +50,8 @@ public final class SlugTextRun {
      * @throws NullPointerException if font is null
      */
     SlugTextRun(SlugFont font, String text, float size) {
-        if (font == null) {
+        if (font == null)
             throw new NullPointerException("font");
-        }
         this.font = font;
         rebuild(text, size);
     }
@@ -163,28 +166,18 @@ public final class SlugTextRun {
     }
 
     /**
-     * Draws this pre-laid-out run.
+     * Queues this retained layout in an ordinary texture batch. Glyphs remain
+     * resolution independent and inherit batch translation, clipping and opacity.
+     * Reuses layout arrays without allocating per-frame scratch or raster atlases.
      *
-     * @param batch batch that receives glyph instances
-     * @param x     baseline x position
-     * @param y     baseline y position
-     * @param color text color
+     * @param batch active destination texture batch
+     * @param x baseline X before batch translation
+     * @param y baseline Y before batch translation
+     * @param color copied tint, or null for the batch color
      */
-    public void draw(SlugBatch batch, float x, float y, Color color) {
-        if (batch == null) {
-            throw new NullPointerException("batch");
-        }
-        if (color == null || color.a() <= 0f || size == 0f) {
-            return;
-        }
-        batch.requireDrawing();
-        if (font.curveTexture() == 0) throw new IllegalStateException("Slug font is disposed");
-        if (count == 0 || !batch.intersects(x + minX, y + minY, x + maxX, y + maxY)) return;
-        int r = SlugBatch.toByte(color.r()), g = SlugBatch.toByte(color.g());
-        int b = SlugBatch.toByte(color.b()), a = SlugBatch.toByte(color.a());
-        for (int i = 0; i < count; i++) {
-            batch.drawGlyph(font, glyphs[i], x + xOffsets[i], y + yOffsets[i], size, r, g, b, a);
-        }
+    public void draw(TextureBatch batch, float x, float y, Color color) {
+        if (batch == null) throw new NullPointerException("batch");
+        batch.draw(this, x, y, color);
     }
 
     /**
@@ -230,5 +223,51 @@ public final class SlugTextRun {
      */
     public int glyphCount() {
         return count;
+    }
+
+    /**
+     * Returns the borrowed font whose GPU outlines must outlive queued draws.
+     *
+     * @return layout font
+     */
+    public SlugFont font() { return font; }
+
+    /**
+     * Returns one drawable glyph in retained submission order.
+     *
+     * @param index glyph index from zero through glyphCount minus one
+     * @return immutable outline metadata
+     */
+    public SlugGlyph glyph(int index) { return glyphs[index]; }
+
+    /**
+     * Returns a glyph's horizontal baseline offset from the run origin.
+     *
+     * @param index glyph index from zero through glyphCount minus one
+     * @return offset in world units
+     */
+    public float xOffset(int index) { return xOffsets[index]; }
+
+    /**
+     * Returns a glyph's vertical baseline offset, including line spacing.
+     *
+     * @param index glyph index from zero through glyphCount minus one
+     * @return offset in world units
+     */
+    public float yOffset(int index) { return yOffsets[index]; }
+
+    /**
+     * Tests retained ink bounds against a rectangle without iterating glyphs.
+     *
+     * @param x translated baseline X
+     * @param y translated baseline Y
+     * @param left rectangle minimum X
+     * @param bottom rectangle minimum Y
+     * @param right rectangle maximum X
+     * @param top rectangle maximum Y
+     * @return whether a nonempty run overlaps the rectangle
+     */
+    public boolean intersects(float x, float y, float left, float bottom, float right, float top) {
+        return count != 0 && x + maxX > left && y + maxY > bottom && x + minX < right && y + minY < top;
     }
 }

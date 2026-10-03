@@ -1,5 +1,7 @@
 package valthorne.graphics.font.slug;
 
+import java.nio.ByteBuffer;
+
 /**
  * Metadata needed to draw one Slug glyph.
  *
@@ -107,5 +109,60 @@ public final class SlugGlyph {
      */
     public float height() {
         return y1 - y0;
+    }
+
+    /**
+     * Returns the left outline bound relative to the baseline.
+     *
+     * @return minimum X in em units
+     */
+    public float minX() { return x0; }
+
+    /**
+     * Returns the lower outline bound relative to the baseline.
+     *
+     * @return minimum Y in em units
+     */
+    public float minY() { return y0; }
+
+    /**
+     * Returns the right outline bound relative to the baseline.
+     *
+     * @return maximum X in em units
+     */
+    public float maxX() { return x1; }
+
+    /**
+     * Returns the upper outline bound relative to the baseline.
+     *
+     * @return maximum Y in em units
+     */
+    public float maxY() { return y1; }
+
+    /**
+     * Appends this glyph's 64-byte GPU instance to caller-owned native storage.
+     * TextureBatch supplies the clipped rectangle and coverage scale; immutable
+     * glyph metadata supplies the packed outline and band references. No temporary
+     * objects are created. The caller must provide enough remaining capacity.
+     *
+     * @param target native-order instance storage
+     * @param x0 rectangle minimum world X
+     * @param y0 rectangle minimum world Y
+     * @param x1 rectangle maximum world X
+     * @param y1 rectangle maximum world Y
+     * @param tx0 rectangle minimum outline X in em units
+     * @param ty0 rectangle minimum outline Y in em units
+     * @param tx1 rectangle maximum outline X in em units
+     * @param ty1 rectangle maximum outline Y in em units
+     * @param pixelsPerEm positive uniform scale, or negative for derivative coverage
+     * @param rgba packed normalized color bytes in RGBA order
+     */
+    public void writeInstance(ByteBuffer target, float x0, float y0, float x1, float y1, float tx0, float ty0, float tx1, float ty1, float pixelsPerEm, int rgba) {
+        target.putFloat(x0).putFloat(y0).putFloat(x1).putFloat(y1);
+        target.putFloat(tx0).putFloat(ty0).putFloat(tx1).putFloat(ty1);
+        target.putInt(glyphPack).putInt(glyphInfoPack);
+        target.putFloat(bandScaleX).putFloat(bandScaleY).putFloat(bandOffsetX).putFloat(bandOffsetY);
+        target.putFloat(pixelsPerEm);
+        target.put((byte) (rgba >>> 24)).put((byte) (rgba >>> 16)).put((byte) (rgba >>> 8)).put((byte) rgba);
     }
 }

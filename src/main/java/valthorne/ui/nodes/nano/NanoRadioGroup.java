@@ -3,6 +3,7 @@ package valthorne.ui.nodes.nano;
 import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.ui.UIInputEvent;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.function.IntConsumer;
@@ -17,6 +18,7 @@ import java.util.function.IntConsumer;
  * }</pre>
  * An empty group has no selection. A nonempty group initially selects its first
  * option; index -1 explicitly clears it. Labels are immutable snapshots.
+ *
  * @author Albert Beaupre
  */
 public class NanoRadioGroup extends NanoContainer {
@@ -27,33 +29,39 @@ public class NanoRadioGroup extends NanoContainer {
 
     /**
      * Copies nonnull labels and creates one selectable button per option.
+     *
      * @param labels nonnull labels, including an empty list
      */
     public NanoRadioGroup(List<String> labels) {
-        this.labels = List.copyOf(labels); getLayout().column();
+        this.labels = List.copyOf(labels);
+        getLayout().column();
         for (int i = 0; i < labels.size(); i++) {
             int index = i;
             NanoButton button = new NanoButton(labels.get(i)).action(b -> select(index));
             button.getLayout().height(32).widthPercent(100).noShrink();
-            buttons.add(button); add(button);
+            buttons.add(button);
+            add(button);
         }
         selectedIndex(labels.isEmpty() ? -1 : 0);
     }
 
     /**
      * Reads the selected option without changing focus.
+     *
      * @return index or -1 when no option is selected
      */
-    public int getSelectedIndex() { return selected; }
+    public int getSelectedIndex() {return selected;}
 
     /**
      * Returns the immutable label snapshot, independent of the original list.
+     *
      * @return labels in display order
      */
-    public List<String> getLabels() { return labels; }
+    public List<String> getLabels() {return labels;}
 
     /**
      * Silently updates all selected states after validating the index.
+     *
      * @param index valid option index or -1
      * @return this group
      * @throws IndexOutOfBoundsException if index is invalid
@@ -68,27 +76,35 @@ public class NanoRadioGroup extends NanoContainer {
     /**
      * Applies a user selection, moving focus to that choice when attached. Duplicate
      * choices do not notify; disabled groups ignore the request.
+     *
      * @param index valid index or -1 to clear
      */
     public void select(int index) {
         if (isDisabled()) return;
-        int previous = selected; selectedIndex(index);
+        int previous = selected;
+        selectedIndex(index);
         if (getRoot() != null && index >= 0) getRoot().setFocusTo(buttons.get(index));
         if (previous != selected) change.accept(selected);
     }
 
     /**
      * Replaces the synchronous user-selection callback without emitting an event.
+     *
      * @param listener nonnull callback
      * @return this group
      */
-    public NanoRadioGroup onChange(IntConsumer listener) { change = Objects.requireNonNull(listener); return this; }
+    public NanoRadioGroup onChange(IntConsumer listener) {
+        change = Objects.requireNonNull(listener);
+        return this;
+    }
 
     /**
      * Wraps arrow navigation among choices while leaving activation keys to buttons.
+     *
      * @param context routed preview event
      */
-    @Override public void onInputPreview(UIInputEvent context) {
+    @Override
+    public void onInputPreview(UIInputEvent context) {
         if (isDisabled() || buttons.isEmpty() || !(context.event() instanceof KeyPressEvent key)) return;
         int direction = switch (key.getKey()) {
             case Keyboard.RIGHT, Keyboard.DOWN -> 1;

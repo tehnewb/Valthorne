@@ -13,8 +13,8 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * Wrapping NanoVG container with uniform optional cell constraints and state-aware
  * background/border painting. Point-valued cell sizes determine the grid's own
  * fixed extent from the configured column count and child count. Percentage or
- * auto cell dimensions leave the corresponding grid dimension automatic, so
- * actual wrapping remains subject to the layout solver and parent constraints.
+ * auto cell dimensions retain application sizing unless replacing a previously
+ * computed fixed extent. Wrapping remains subject to parent constraints.
  *
  * <p>Non-auto cell sizes overwrite child width/height constraints and disable
  * grow/shrink. Switching a cell dimension back to auto skips those assignments
@@ -68,9 +68,9 @@ public class NanoGrid extends NanoContainer {
     public static final StyleKey<Color> DISABLED_BORDER_COLOR_KEY = StyleKey.of("nano.grid.disabledBorderColor", Color.class, new Color(0xFF242424));
 
     /**
-     * Theme corner radius in UI units, defaulting to six.
+     * Theme corner radius in UI units, defaulting to zero.
      */
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.grid.cornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.grid.cornerRadius", Float.class, 0f);
     /**
      * Theme border stroke width in UI units, defaulting to one.
      */
@@ -79,20 +79,22 @@ public class NanoGrid extends NanoContainer {
     private int columns = 1; // Configured column count used for row count and point-based extents.
     private LayoutValue cellWidth = LayoutValue.auto(); // Immutable cell-width specification applied during layout.
     private LayoutValue cellHeight = LayoutValue.auto(); // Immutable cell-height specification applied during layout.
+    private boolean computedWidth; // Whether fixed cell geometry supplied the current width constraints.
+    private boolean computedHeight; // Whether fixed cell geometry supplied the current height constraints.
 
     private Color backgroundColor = new Color(0xFF242424); // Borrowed normal background fill color used when that state wins precedence.
-    private Color hoverBackgroundColor = new Color(0xFF242424); // Borrowed hovered background fill color used when that state wins precedence.
-    private Color focusedBackgroundColor = new Color(0xFF242424); // Borrowed focused background fill color used when that state wins precedence.
-    private Color pressedBackgroundColor = new Color(0xFF242424); // Borrowed pressed background fill color used when that state wins precedence.
-    private Color disabledBackgroundColor = new Color(0xFF242424); // Borrowed disabled background fill color used when that state wins precedence.
+    private Color hoverBackgroundColor; // Optional explicit state color; null retains the normal panel color.
+    private Color focusedBackgroundColor; // Optional explicit state color; null retains the normal panel color.
+    private Color pressedBackgroundColor; // Optional explicit state color; null retains the normal panel color.
+    private Color disabledBackgroundColor; // Optional explicit state color; null retains the normal panel color.
 
     private Color borderColor = new Color(0xFF242424); // Borrowed normal border stroke color used when that state wins precedence.
-    private Color hoverBorderColor = new Color(0xFF242424); // Borrowed hovered border stroke color used when that state wins precedence.
-    private Color focusedBorderColor = new Color(0xFF242424); // Borrowed focused border stroke color used when that state wins precedence.
-    private Color pressedBorderColor = new Color(0xFF242424); // Borrowed pressed border stroke color used when that state wins precedence.
-    private Color disabledBorderColor = new Color(0xFF242424); // Borrowed disabled border stroke color used when that state wins precedence.
+    private Color hoverBorderColor; // Optional explicit state color; null retains the normal panel color.
+    private Color focusedBorderColor; // Optional explicit state color; null retains the normal panel color.
+    private Color pressedBorderColor; // Optional explicit state color; null retains the normal panel color.
+    private Color disabledBorderColor; // Optional explicit state color; null retains the normal panel color.
 
-    private float cornerRadius = 6f; // Rounded background radius in UI units.
+    private float cornerRadius = 0f; // Rounded background radius in UI units.
     private float borderWidth = 1f; // Inset stroke width in UI units; zero disables the border.
 
     /**
@@ -424,7 +426,8 @@ public class NanoGrid extends NanoContainer {
     /**
      * Applies resolved paint settings, constrains each child for non-auto cell sizes,
      * and computes fixed point-based grid extents including gaps. Non-point grid
-     * dimensions are reset to auto. Counts all children, including invisible entries,
+     * dimensions retain application constraints; previously derived fixed extents
+     * are reset to auto. Counts all children, including invisible entries,
      * and then delegates normal container layout.
      */
     @Override
@@ -511,11 +514,13 @@ public class NanoGrid extends NanoContainer {
                     .width(totalWidth)
                     .minWidth(totalWidth)
                     .maxWidth(totalWidth);
-        } else {
+            computedWidth = true;
+        } else if (computedWidth) {
             getLayout()
                     .widthAuto()
                     .minWidthAuto()
                     .maxWidthAuto();
+            computedWidth = false;
         }
 
         if (!cellHeight.isAuto() && cellHeight.isPoints()) {
@@ -524,11 +529,13 @@ public class NanoGrid extends NanoContainer {
                     .height(totalHeight)
                     .minHeight(totalHeight)
                     .maxHeight(totalHeight);
-        } else {
+            computedHeight = true;
+        } else if (computedHeight) {
             getLayout()
                     .heightAuto()
                     .minHeightAuto()
                     .maxHeightAuto();
+            computedHeight = false;
         }
 
         super.applyLayout();
@@ -547,17 +554,17 @@ public class NanoGrid extends NanoContainer {
         Color drawBorder = borderColor;
 
         if (!isEnabled()) {
-            drawBackground = disabledBackgroundColor;
-            drawBorder = disabledBorderColor;
+            drawBackground = disabledBackgroundColor == null ? backgroundColor : disabledBackgroundColor;
+            drawBorder = disabledBorderColor == null ? borderColor : disabledBorderColor;
         } else if (isPressed()) {
-            drawBackground = pressedBackgroundColor;
-            drawBorder = pressedBorderColor;
+            drawBackground = pressedBackgroundColor == null ? backgroundColor : pressedBackgroundColor;
+            drawBorder = pressedBorderColor == null ? borderColor : pressedBorderColor;
         } else if (isFocused()) {
-            drawBackground = focusedBackgroundColor;
-            drawBorder = focusedBorderColor;
+            drawBackground = focusedBackgroundColor == null ? backgroundColor : focusedBackgroundColor;
+            drawBorder = focusedBorderColor == null ? borderColor : focusedBorderColor;
         } else if (isHovered()) {
-            drawBackground = hoverBackgroundColor;
-            drawBorder = hoverBorderColor;
+            drawBackground = hoverBackgroundColor == null ? backgroundColor : hoverBackgroundColor;
+            drawBorder = hoverBorderColor == null ? borderColor : hoverBorderColor;
         }
 
         float x = getAbsoluteX();

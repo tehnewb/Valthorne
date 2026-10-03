@@ -32,12 +32,11 @@ import java.util.logging.Logger;
  * <pre>
  * PluginLoader loader = new PluginLoader(4); // Use 4 threads
  * loader.loadFromFolder(new File("plugins"));
- * List<Plugin> plugins = loader.getLoadedPlugins();
+ * List&lt;Plugin&gt; plugins = loader.getLoadedPlugins();
  * loader.shutdown();
  * </pre>
  *
  * @author Albert Beaupre
- * @version 2.0
  * @since May 1st, 2024
  */
 public class PluginLoader {

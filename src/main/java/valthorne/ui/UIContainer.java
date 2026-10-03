@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.RandomAccess;
 
 /**
- * <h1>UIContainer</h1>
+ * <h2>UIContainer</h2>
  *
  * <p>
  * {@code UIContainer} is a specialized {@link UINode} that can contain and manage
@@ -111,13 +111,15 @@ public abstract class UIContainer extends UINode {
      */
     public UINode findNodeAt(float x, float y, int requiredBit) {
         if (!isVisible() || !isEnabled()) return null;
-        float childX = transformChildHitX(x);
-        float childY = transformChildHitY(y);
+        float canonicalX = inverseRotationX(x, y);
+        float canonicalY = inverseRotationY(x, y);
+        float childX = transformChildHitX(canonicalX);
+        float childY = transformChildHitY(canonicalY);
 
         for (int i = size() - 1; i >= 0; i--) {
             UINode child = get(i);
 
-            if (child == null || !child.isVisible() || !child.isEnabled()) continue;
+            if (child == null || !child.isVisible() || !child.isEnabled() || !acceptsHitChild(child)) continue;
 
             if (child instanceof UIContainer container) {
                 UINode hit = container.findNodeAt(childX, childY, requiredBit);
@@ -131,6 +133,17 @@ public abstract class UIContainer extends UINode {
         if (contains(x, y) && (requiredBit < 0 || getBit(requiredBit))) return this;
 
         return null;
+    }
+
+    /**
+     * Allows a specialized container to omit a child from pointer hit testing
+     * without changing that child's layout, visibility, or update state.
+     *
+     * @param child attached candidate child
+     * @return true when the candidate may receive pointer input
+     */
+    protected boolean acceptsHitChild(UINode child) {
+        return true;
     }
 
     /**
@@ -332,16 +345,35 @@ public abstract class UIContainer extends UINode {
      * @throws IllegalArgumentException if the supplied node is not a direct child
      */
     public void bringToFront(UINode child) {
+        moveChild(child, size - 1);
+    }
+
+    /**
+     * Reorders a direct child without detaching its root, focus, or pointer state.
+     * The final index applies to both drawing and Yoga layout after the move.
+     *
+     * @param child direct child to reorder
+     * @param destinationIndex child's final zero-based index
+     * @throws IllegalArgumentException if the child is not attached here
+     * @throws IndexOutOfBoundsException if the destination is outside the child range
+     */
+    public void moveChild(UINode child, int destinationIndex) {
         int index = -1;
         for (int i = 0; i < size; i++) if (children[i] == child) { index = i; break; }
         if (index < 0) throw new IllegalArgumentException("Node is not a child of this container");
-        if (index == size - 1) return;
+        if (destinationIndex < 0 || destinationIndex >= size)
+            throw new IndexOutOfBoundsException(destinationIndex);
+        if (index == destinationIndex) return;
         if (getYogaMemoryAddress() != UIConstants.NULL && child.getYogaMemoryAddress() != UIConstants.NULL) {
             Yoga.YGNodeRemoveChild(getYogaMemoryAddress(), child.getYogaMemoryAddress());
-            Yoga.YGNodeInsertChild(getYogaMemoryAddress(), child.getYogaMemoryAddress(), size - 1);
+            Yoga.YGNodeInsertChild(getYogaMemoryAddress(), child.getYogaMemoryAddress(), destinationIndex);
         }
-        System.arraycopy(children, index + 1, children, index, size - index - 1);
-        children[size - 1] = child; markLayoutDirty();
+        if (index < destinationIndex)
+            System.arraycopy(children, index + 1, children, index, destinationIndex - index);
+        else
+            System.arraycopy(children, destinationIndex, children, destinationIndex + 1, index - destinationIndex);
+        children[destinationIndex] = child;
+        markLayoutDirty();
     }
 
     /**

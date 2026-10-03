@@ -12,7 +12,7 @@ import valthorne.viewport.ScreenViewport;
 import valthorne.viewport.Viewport;
 
 /**
- * <h1>Scene</h1>
+ * <h2>Scene</h2>
  *
  * <p>
  * {@code Scene} is the abstract runtime foundation for a single active state in the engine, such as
@@ -57,7 +57,7 @@ import valthorne.viewport.Viewport;
  *
  * <h2>Pause behavior</h2>
  * <p>
- * {@link #updateScene(float)} respects the scene's paused flag. When paused, update logic is skipped,
+ * {@link #updateScene(float)} respects the scene's paused flag. When paused, world update logic is skipped,
  * but rendering can still continue. This is useful for pause menus, overlays, and frozen gameplay
  * states where the scene should remain visible but not simulate.
  * </p>
@@ -99,12 +99,22 @@ public abstract class Scene {
     protected TextureBatch batch; // The shared texture batch used to render this scene.
     private boolean paused; // Whether this scene is currently paused.
 
+    private GameScreen screen; // Controller that can replace this scene after an editor rebuild.
     private SceneWindowResizeListener windowResizeListener; // The registered resize listener that forwards events into this scene.
     private SceneKeyListener keyListener; // The registered keyboard listener that forwards events into this scene.
     private SceneMouseListener mouseListener; // The registered mouse listener that forwards press, release, drag, and move events into this scene.
     private SceneMouseScrollListener mouseScrollListener; // The registered mouse scroll listener that forwards wheel events into this scene.
     private boolean initialized; // Whether the shared scene infrastructure has already been initialized.
     private boolean infrastructureDisposed; // Whether the shared scene infrastructure has already been disposed.
+
+    /**
+     * Constructs a new Scene instance controlled by the specified game screen.
+     *
+     * @param screen the game screen that will control this scene, or null if no controlling screen is assigned
+     */
+    public Scene(GameScreen screen) {
+        this.screen = screen;
+    }
 
     /**
      * Initializes the common runtime fields used by all scenes.
@@ -168,10 +178,13 @@ public abstract class Scene {
             return;
 
         viewport.bind();
-        batch.begin();
-        draw(batch);
-        batch.end();
-        viewport.unbind();
+        try {
+            batch.begin();
+            draw(batch);
+            batch.end();
+        } finally {
+            viewport.unbind();
+        }
 
         if (ui != null)
             ui.draw();
@@ -181,22 +194,15 @@ public abstract class Scene {
      * Updates the scene while respecting the paused state.
      *
      * <p>
-     * If the scene is paused, this method returns immediately and does not call the subclass update
-     * method. If the scene is not paused, the provided delta time is forwarded to
-     * {@link #update(float)}.
+     * If the scene is paused, world simulation and the subclass update are skipped.
+     * UI always receives unscaled elapsed time so editor controls remain usable.
      * </p>
      *
      * @param delta the elapsed time in seconds since the last update
      */
     protected void updateScene(float delta) {
-        if (paused) {
-            return;
-        }
-
-        update(delta);
-
-        if (ui != null)
-            ui.update(delta);
+        if (!paused) update(delta);
+        if (ui != null) ui.update(delta);
     }
 
     /**
@@ -510,5 +516,23 @@ public abstract class Scene {
      */
     public boolean isInitialized() {
         return initialized;
+    }
+
+    /**
+     * Returns the game screen controlling this scene, when one is assigned.
+     *
+     * @return owning screen or null
+     */
+    public final GameScreen getGameScreen() {
+        return screen;
+    }
+
+    /**
+     * Sets the current game screen to the specified screen.
+     *
+     * @param screen the GameScreen instance to be set as the current screen
+     */
+    public void setGameScreen(GameScreen screen) {
+        this.screen = screen;
     }
 }

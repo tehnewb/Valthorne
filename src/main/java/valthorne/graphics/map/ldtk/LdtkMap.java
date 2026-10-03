@@ -3,7 +3,7 @@ package valthorne.graphics.map.ldtk;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.graphics.texture.TextureRegion;
+import valthorne.math.geometry.Rectangle;
 
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +27,19 @@ public final class LdtkMap {
     private final LdtkProject project; // CPU-side project represented by this renderer.
     private final Map<Integer, Texture> textures = new HashMap<>(); // Tilesets by definition UID.
     private final Map<String, Texture> backgrounds = new HashMap<>(); // Backgrounds by level IID.
+    private final float nativeMinX; // Lowest horizontal coordinate among project levels.
+    private final float nativeMinY; // Lowest bottom-up vertical coordinate among project levels.
+    private final float nativeWidth; // Combined project width before editor scaling.
+    private final float nativeHeight; // Combined project height before editor scaling.
+    private float originX; // Rendered map's horizontal world origin.
+    private float rotation; // Counterclockwise world orientation around the project center.
+    private float rotationCosine = 1f; // Cached cosine refreshed only when the map angle changes.
+    private float rotationSine; // Cached sine used by the existing per-quad rotation API.
+    private float originY; // Rendered map's vertical world origin.
+    private float scaleX = 1f; // Horizontal ratio from project pixels to world units.
+    private float scaleY = 1f; // Vertical ratio from project pixels to world units.
+    private boolean visible = true; // Whether this drawable participates in rendering and animation updates.
+    private final Color tileTint = new Color(1f, 1f, 1f, 1f); // Reused white tint for per-tile opacity without temporary colors.
     private boolean disposed; // Whether owned GPU textures have already been released.
 
     /**
@@ -38,6 +51,20 @@ public final class LdtkMap {
      */
     public LdtkMap(LdtkProject project) {
         this.project = Objects.requireNonNull(project, "project");
+        float minX = Float.POSITIVE_INFINITY;
+        float minY = Float.POSITIVE_INFINITY;
+        float maxX = Float.NEGATIVE_INFINITY;
+        float maxY = Float.NEGATIVE_INFINITY;
+        for (LdtkLevel level : project.levels()) {
+            minX = Math.min(minX, level.worldX());
+            minY = Math.min(minY, -level.worldY());
+            maxX = Math.max(maxX, level.worldX() + level.width());
+            maxY = Math.max(maxY, -level.worldY() + level.height());
+        }
+        nativeMinX = Float.isFinite(minX) ? minX : 0f;
+        nativeMinY = Float.isFinite(minY) ? minY : 0f;
+        nativeWidth = Math.max(1f, Float.isFinite(maxX) ? maxX - nativeMinX : project.defaultLevelWidth());
+        nativeHeight = Math.max(1f, Float.isFinite(maxY) ? maxY - nativeMinY : project.defaultLevelHeight());
         for (LdtkTileset tileset : project.tilesets().values())
             if (tileset.textureData() != null) textures.put(tileset.uid(), new Texture(tileset.textureData()));
         for (LdtkLevel level : project.levels())
@@ -52,6 +79,89 @@ public final class LdtkMap {
      */
     public LdtkProject project() {
         return project;
+    }
+
+    /**
+     * Returns the unscaled width of all project levels combined.
+     *
+     * @return native width in LDtk pixels
+     */
+    public float getNativeWidth() {
+        return nativeWidth;
+    }
+
+    /**
+     * Returns the unscaled height of all project levels combined.
+     *
+     * @return native height in LDtk pixels
+     */
+    public float getNativeHeight() {
+        return nativeHeight;
+    }
+
+    /**
+     * Returns the original left coordinate of the combined level bounds.
+     *
+     * @return minimum project X
+     */
+    public float getNativeMinX() {
+        return nativeMinX;
+    }
+
+    /**
+     * Returns the original bottom coordinate of the combined level bounds.
+     *
+     * @return minimum bottom-up project Y
+     */
+    public float getNativeMinY() {
+        return nativeMinY;
+    }
+
+    /**
+     * Moves and scales all levels together without changing the parsed project.
+     *
+     * @param x rendered left edge in world units
+     * @param y rendered bottom edge in world units
+     * @param width positive rendered width
+     * @param height positive rendered height
+     */
+    public void setBounds(float x, float y, float width, float height) {
+        if (width <= 0f || height <= 0f)
+            throw new IllegalArgumentException("Map bounds must have positive width and height");
+        originX = x;
+        originY = y;
+        scaleX = width / nativeWidth;
+        scaleY = height / nativeHeight;
+    }
+
+    /**
+     * Returns the currently rendered world rectangle across all levels.
+     *
+     * @return current bounds in world units
+     */
+    public Rectangle getBounds() {
+        return new Rectangle(originX, originY, nativeWidth * scaleX, nativeHeight * scaleY);
+    }
+
+    /**
+     * Returns the project's counterclockwise visual orientation.
+     *
+     * @return degrees about the map center
+     */
+    public float getRotation() {return rotation;}
+
+    /**
+     * Rotates rendered tiles and backgrounds without rewriting project metadata.
+     *
+     * @param degrees finite counterclockwise angle
+     */
+    public void setRotation(float degrees) {
+        if (!Float.isFinite(degrees)) throw new IllegalArgumentException("Map rotation must be finite");
+        if (rotation == degrees) return;
+        rotation = degrees;
+        double radians = Math.toRadians(degrees);
+        rotationCosine = (float) Math.cos(radians);
+        rotationSine = (float) Math.sin(radians);
     }
 
     /**
@@ -71,6 +181,7 @@ public final class LdtkMap {
      * @throws NullPointerException if {@code batch} is null
      */
     public void render(TextureBatch batch) {
+        if (!visible) return;
         for (LdtkLevel level : project.levels()) render(batch, level);
     }
 
@@ -82,6 +193,7 @@ public final class LdtkMap {
      * @throws NullPointerException if {@code batch} is null and a level is found
      */
     public void render(TextureBatch batch, String levelIdentifier) {
+        if (!visible) return;
         LdtkLevel level = project.level(levelIdentifier);
         if (level != null) render(batch, level);
     }
@@ -94,6 +206,7 @@ public final class LdtkMap {
      * @throws NullPointerException if either argument is null
      */
     public void render(TextureBatch batch, LdtkLevel level) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         Objects.requireNonNull(level, "level");
         renderBackground(batch, level);
@@ -110,13 +223,19 @@ public final class LdtkMap {
      * @throws NullPointerException if {@code level} is null
      */
     public void renderBackground(TextureBatch batch, LdtkLevel level) {
+        if (!visible) return;
         LdtkBackground bg = level.background();
         Texture texture = backgrounds.get(level.iid());
         if (bg == null || texture == null) return;
         int cropWidth = bg.cropWidth() > 0 ? bg.cropWidth() : texture.getWidth(), cropHeight = bg.cropHeight() > 0 ? bg.cropHeight() : texture.getHeight();
         float scaleX = bg.scaleX() == 0 ? 1 : bg.scaleX(), scaleY = bg.scaleY() == 0 ? scaleX : bg.scaleY();
-        float x = level.worldX() + bg.topLeftX(), y = -level.worldY() + level.height() - bg.topLeftY() - cropHeight * scaleY;
-        batch.draw(texture, x, y, cropWidth * scaleX, cropHeight * scaleY, bg.cropX(), bg.cropY(), cropWidth, cropHeight);
+        float x = originX + (level.worldX() + bg.topLeftX() - nativeMinX) * this.scaleX;
+        float y = originY + (-level.worldY() + level.height() - bg.topLeftY() - cropHeight * scaleY - nativeMinY) * this.scaleY;
+        float pivotX = originX + nativeWidth * this.scaleX * .5f;
+        float pivotY = originY + nativeHeight * this.scaleY * .5f;
+        float textureWidth = texture.getWidth();
+        float textureHeight = texture.getHeight();
+        batch.drawUV(texture, x, y, cropWidth * scaleX * this.scaleX, cropHeight * scaleY * this.scaleY, bg.cropX() / textureWidth, bg.cropY() / textureHeight, (bg.cropX() + cropWidth) / textureWidth, (bg.cropY() + cropHeight) / textureHeight, rotation == 0 ? 0 : pivotX - x, rotation == 0 ? 0 : pivotY - y, rotationSine, rotationCosine, null);
     }
 
     /**
@@ -128,6 +247,7 @@ public final class LdtkMap {
      * @throws NullPointerException if {@code level} is null
      */
     public void renderLayer(TextureBatch batch, LdtkLevel level, String layerIdentifier) {
+        if (!visible) return;
         LdtkLayer layer = level.layer(layerIdentifier);
         if (layer != null) renderLayer(batch, level, layer);
     }
@@ -142,6 +262,7 @@ public final class LdtkMap {
      * @throws NullPointerException if {@code batch}, {@code level}, or {@code layer} is null
      */
     public void renderLayer(TextureBatch batch, LdtkLevel level, LdtkLayer layer) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         if (!layer.visible()) return;
         Texture texture = textures.get(layer.tilesetUid());
@@ -151,19 +272,23 @@ public final class LdtkMap {
     }
 
     /**
-     * Emits draw calls for tile placements, applying flips and combined opacity.
+     * Emits tile placements under the prepared map orientation.
      *
-     * @param batch active texture batch
-     * @param level level providing world placement
-     * @param layer layer providing offsets, tile size, and opacity
-     * @param texture uploaded tileset texture
-     * @param tiles placements to draw in iteration order
+     * @param batch active destination batch
+     * @param level placement origin
+     * @param layer tile offsets and opacity
+     * @param texture borrowed tileset
+     * @param tiles canonical placements
      */
     private void drawTiles(TextureBatch batch, LdtkLevel level, LdtkLayer layer, Texture texture, List<LdtkTile> tiles) {
         int size = layer.gridSize();
+        float pivotX = originX + nativeWidth * scaleX * .5f;
+        float pivotY = originY + nativeHeight * scaleY * .5f;
+        float textureWidth = texture.getWidth();
+        float textureHeight = texture.getHeight();
         for (LdtkTile tile : tiles) {
-            float x = level.worldX() + layer.pixelOffsetX() + tile.x();
-            float y = -(level.worldY()) + level.height() - layer.pixelOffsetY() - tile.y() - size;
+            float x = originX + (level.worldX() + layer.pixelOffsetX() + tile.x() - nativeMinX) * scaleX;
+            float y = originY + (-level.worldY() + level.height() - layer.pixelOffsetY() - tile.y() - size - nativeMinY) * scaleY;
             float sx = tile.sourceX(), sy = tile.sourceY(), sw = size, sh = size;
             if (tile.flipX()) {
                 sx += size;
@@ -174,7 +299,8 @@ public final class LdtkMap {
                 sh = -size;
             }
             float alpha = Math.max(0, Math.min(1, tile.alpha() * layer.opacity()));
-            batch.draw(new TextureRegion(texture, sx, sy, sw, sh), x, y, size, size, Color.WHITE.withAlpha(alpha));
+            tileTint.a(alpha);
+            batch.drawUV(texture, x, y, size * scaleX, size * scaleY, sx / textureWidth, sy / textureHeight, (sx + sw) / textureWidth, (sy + sh) / textureHeight, rotation == 0 ? 0 : pivotX - x, rotation == 0 ? 0 : pivotY - y, rotationSine, rotationCosine, tileTint);
         }
     }
 
@@ -191,4 +317,18 @@ public final class LdtkMap {
         backgrounds.clear();
         disposed = true;
     }
+    /**
+     * Reports whether this object participates in rendering and animation updates.
+     *
+     * @return current visibility
+     */
+    public boolean isVisible() {return visible;}
+
+    /**
+     * Changes visibility without releasing resources or changing the object's
+     * position, frame, or timing state. Hidden objects can be shown again.
+     *
+     * @param visible whether rendering and animation updates are enabled
+     */
+    public void setVisible(boolean visible) {this.visible = visible;}
 }

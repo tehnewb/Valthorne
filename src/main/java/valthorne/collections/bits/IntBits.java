@@ -1,7 +1,7 @@
 package valthorne.collections.bits;
 
 /**
- * <h1>IntBits</h1>
+ * <h2>IntBits</h2>
  *
  * <p>
  * {@code IntBits} is a compact bit container backed by a single {@code int}. It exposes a readable

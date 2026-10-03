@@ -24,18 +24,16 @@ public final class SlugLoader implements AssetLoader<SlugParameters, SlugData> {
     @Override
     public SlugData load(SlugParameters parameters) {
         if (parameters == null) throw new NullPointerException("parameters");
-        SlugSource source = parameters.source();
         byte[] bytes;
-        if (source instanceof SlugSource.PathSource(String path)) {
+        String path = parameters.path();
+        if (path != null) {
             try {
                 bytes = Files.readAllBytes(Path.of(path));
             } catch (IOException exception) {
                 throw new IllegalStateException("Unable to read Slug font: " + path, exception);
             }
-        } else if (source instanceof SlugSource.BytesSource(byte[] sourceBytes)) {
-            bytes = sourceBytes;
         } else {
-            throw new IllegalStateException("Unknown SlugSource: " + source.getClass().getName());
+            bytes = parameters.bytes();
         }
         return new SlugData(bytes, parameters.firstCodepoint(), parameters.characterCount());
     }

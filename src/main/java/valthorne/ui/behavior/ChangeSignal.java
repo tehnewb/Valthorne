@@ -10,14 +10,14 @@ import java.util.Objects;
  * The signal carries no event payload; listeners read the owning model's state.
  *
  * <p>Dispatch captures the current registration array without copying it.
- * Subscribing or closing a subscription replaces that array, leaving an ongoing
+ * Subscribing or removing a subscription replaces that array, leaving an ongoing
  * dispatch unchanged. A listener removed by an earlier callback therefore still
  * runs in the current dispatch. A newly added listener first participates in a
  * subsequent call to fire, including a recursive call made by a callback.</p>
  *
  * <p>Dispatch itself allocates no objects, excluding work performed by callbacks.
  * Registration and removal copy arrays and are linear in the listener count.
- * Callbacks are held strongly while registered; retain and close their handles
+ * Callbacks are held strongly while registered; retain and run their removal actions
  * when the listening UI object no longer needs notifications. Registering the
  * same callback twice creates two independently removable registrations.</p>
  *
@@ -29,27 +29,27 @@ import java.util.Objects;
  * @author Albert Beaupre
  */
 public final class ChangeSignal {
-    /**
+    /*
      * Shared empty registration snapshot, reused initially and when the final
      * listener is removed. Published registration arrays are never modified.
      */
-    private static final Entry[] EMPTY = new Entry[0];
-    private Entry[] entries = EMPTY; // Current ordered registrations, replaced whenever subscriptions change.
+    private static final ChangeSubscription[] EMPTY = new ChangeSubscription[0];
+    private ChangeSubscription[] entries = EMPTY; // Current ordered registrations, replaced whenever subscriptions change.
 
     /**
      * Appends a listener without invoking it and returns a handle for removing
-     * only this registration. Duplicate callback instances are allowed. Closing
+     * only this registration. Duplicate callback instances are allowed. Running
      * the handle repeatedly is harmless and does not affect other registrations.
      * An ongoing dispatch retains its original snapshot and does not see this
      * addition; any later dispatch captures the updated array.
      *
      * @param callback the nonnull action to invoke synchronously on each change
-     * @return an independently closeable subscription handle
+     * @return an independently removable subscription action
      * @throws NullPointerException if callback is null
      */
-    public AutoCloseable subscribe(Runnable callback) {
-        Entry entry = new Entry(Objects.requireNonNull(callback));
-        Entry[] next = Arrays.copyOf(entries, entries.length + 1);
+    public Runnable subscribe(Runnable callback) {
+        ChangeSubscription entry = new ChangeSubscription(this, Objects.requireNonNull(callback));
+        ChangeSubscription[] next = Arrays.copyOf(entries, entries.length + 1);
         next[entries.length] = entry;
         entries = next;
         return entry;
@@ -66,50 +66,23 @@ public final class ChangeSignal {
      * callbacks, and subscription changes already made are not rolled back.</p>
      */
     public void fire() {
-        Entry[] snapshot = entries;
-        for (Entry entry : snapshot) entry.callback.run();
+        ChangeSubscription[] snapshot = entries;
+        for (ChangeSubscription entry : snapshot) entry.callback.run();
     }
 
     /**
-     * Identity-based registration and removal handle tied to its enclosing
-     * signal. The closed flag makes removal idempotent but is deliberately not
-     * consulted during dispatch, allowing already captured snapshots to finish
-     * invoking their original members. The callback remains held by this handle
-     * even after removal, so callers should release unused closed handles as well.
+     * Removes the matching registration without modifying an active dispatch snapshot.
      *
-     * @author Albert Beaupre
+     * @param subscription registration to remove by identity
      */
-    private final class Entry implements AutoCloseable {
-        private final Runnable callback; // Strongly retained action belonging to this single registration.
-        private boolean closed; // Whether removal has already been requested for this handle.
-
-        /**
-         * Captures the callback for a new, initially open subscription. The outer
-         * subscribe operation validates the callback and publishes this entry.
-         *
-         * @param callback the previously validated listener action
-         */
-        private Entry(Runnable callback) {this.callback = callback;}
-
-        /**
-         * Removes this entry by identity while preserving the order of remaining
-         * registrations. The final removal restores the shared empty snapshot;
-         * other removals allocate a replacement array. An already closed handle
-         * returns immediately. Existing dispatch snapshots remain valid and may
-         * still invoke this entry after close returns.
-         */
-        @Override
-        public void close() {
-            if (closed) return;
-            closed = true;
-            for (int i = 0; i < entries.length; i++) {
-                if (entries[i] != this) continue;
-                Entry[] next = entries.length == 1 ? EMPTY : new Entry[entries.length - 1];
-                System.arraycopy(entries, 0, next, 0, i);
-                System.arraycopy(entries, i + 1, next, i, next.length - i);
-                entries = next;
-                return;
-            }
+    void remove(ChangeSubscription subscription) {
+        for (int i = 0; i < entries.length; i++) {
+            if (entries[i] != subscription) continue;
+            ChangeSubscription[] next = entries.length == 1 ? EMPTY : new ChangeSubscription[entries.length - 1];
+            System.arraycopy(entries, 0, next, 0, i);
+            System.arraycopy(entries, i + 1, next, i, next.length - i);
+            entries = next;
+            return;
         }
     }
 }

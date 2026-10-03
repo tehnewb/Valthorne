@@ -1,5 +1,7 @@
 package valthorne.ui.nodes;
 
+import valthorne.graphics.texture.TextureBatch;
+
 import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.event.events.KeyPressEvent;
@@ -441,6 +443,11 @@ public class Window extends Panel {
          * @param vertical vertical resize direction or zero
          */
         private Grip(int horizontal, int vertical) { this.horizontal = horizontal; this.vertical = vertical; }
+
+        @Override
+        public void draw(TextureBatch batch) {
+            if (horizontal == 0 && vertical == 0) super.draw(batch);
+        }
 
         /**
          * Checks the enclosing window policy rather than treating hidden grips as active.

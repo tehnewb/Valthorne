@@ -2,11 +2,12 @@ package valthorne.graphics.map.tiled;
 
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureRegion;
+import valthorne.math.geometry.Rectangle;
 
 import java.util.*;
 
 /**
- * <h1>TiledMap</h1>
+ * <h2>TiledMap</h2>
  *
  * <p>
  * {@code TiledMap} is the runtime renderable representation of a map exported from the Tiled map editor.
@@ -105,6 +106,14 @@ public final class TiledMap {
     private final List<TileSet> tileSets; // Runtime tilesets used for tile resolution and rendering.
     private final List<MapLayer> mapLayers; // All layers contained in the map, including non-tile layers.
     private float animationTimeSeconds; // Accumulated animation time used when resolving animated tiles.
+    private float originX; // Horizontal world offset applied to every rendered tile.
+    private float rotation; // Counterclockwise world orientation around the map center.
+    private float rotationCosine = 1f; // Cached cosine refreshed only when the map angle changes.
+    private float rotationSine; // Cached sine used by the existing per-quad rotation API.
+    private float originY; // Vertical world offset applied to every rendered tile.
+    private float scaleX = 1f; // Horizontal scale of the map's native pixel extent.
+    private float scaleY = 1f; // Vertical scale of the map's native pixel extent.
+    private boolean visible = true; // Whether this drawable participates in rendering and animation updates.
     private boolean disposed; // Whether this runtime map has already released its owned resources.
 
     /**
@@ -156,7 +165,67 @@ public final class TiledMap {
      * @param delta the elapsed time in seconds since the previous update call
      */
     public void update(float delta) {
+        if (!visible) return;
         animationTimeSeconds += delta;
+    }
+
+    /**
+     * Places and sizes the full map as one editable world rectangle.
+     *
+     * @param x world-space left edge
+     * @param y world-space bottom edge
+     * @param width positive rendered width
+     * @param height positive rendered height
+     */
+    public void setBounds(float x, float y, float width, float height) {
+        if (width <= 0f || height <= 0f)
+            throw new IllegalArgumentException("Map bounds must have positive width and height");
+        originX = x;
+        originY = y;
+        scaleX = width / Math.max(1, this.width * tileWidth);
+        scaleY = height / Math.max(1, this.height * tileHeight);
+    }
+
+    /**
+     * Returns the currently rendered world rectangle, including map scaling.
+     *
+     * @return current bounds in world units
+     */
+    public Rectangle getBounds() {
+        return new Rectangle(originX, originY, Math.max(1, width * tileWidth) * scaleX,
+                Math.max(1, height * tileHeight) * scaleY);
+    }
+
+    /**
+     * Returns the map's counterclockwise visual orientation.
+     *
+     * @return degrees about the map center
+     */
+    public float getRotation() {return rotation;}
+
+    /**
+     * Rotates rendered layers without rewriting their canonical tile coordinates.
+     *
+     * @param degrees finite counterclockwise angle
+     */
+    public void setRotation(float degrees) {
+        if (!Float.isFinite(degrees)) throw new IllegalArgumentException("Map rotation must be finite");
+        if (rotation == degrees) return;
+        rotation = degrees;
+        double radians = Math.toRadians(degrees);
+        rotationCosine = (float) Math.cos(radians);
+        rotationSine = (float) Math.sin(radians);
+    }
+
+    /**
+     * Returns the current animation clock used to resolve animated tiles.
+     * Editors rendering the live map through another graphics backend can use
+     * this value to display the same animation frame as the game renderer.
+     *
+     * @return elapsed tile animation time in seconds
+     */
+    public float getAnimationTimeSeconds() {
+        return animationTimeSeconds;
     }
 
     /**
@@ -165,6 +234,7 @@ public final class TiledMap {
      * @param batch the texture batch to be rendered; must not be null
      */
     public void render(TextureBatch batch) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         render(batch, 0, 0, width - 1, height - 1);
     }
@@ -180,6 +250,7 @@ public final class TiledMap {
      * @throws NullPointerException if the batch is null
      */
     public void render(TextureBatch batch, int minTileX, int minTileY, int maxTileX, int maxTileY) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
 
         for (MapLayer mapLayer : mapLayers) {
@@ -200,6 +271,7 @@ public final class TiledMap {
      * @throws NullPointerException if {@code batch} is null.
      */
     public void render(TextureBatch batch, int centerTileX, int centerTileY, int radiusTiles) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
 
         int minTileX = centerTileX - radiusTiles;
@@ -217,6 +289,7 @@ public final class TiledMap {
      * @param layerIndices the indices of the map layers to render; can be empty or null
      */
     public void renderLayers(TextureBatch batch, int... layerIndices) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         if (layerIndices == null) return;
 
@@ -239,6 +312,7 @@ public final class TiledMap {
      * @param layerIndices the indices of the layers to be rendered; can be empty or null
      */
     public void renderLayers(TextureBatch batch, int minTileX, int minTileY, int maxTileX, int maxTileY, int... layerIndices) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         if (layerIndices == null) return;
 
@@ -260,6 +334,7 @@ public final class TiledMap {
      * @param layerIndices the indices of the layers to be rendered
      */
     public void renderLayers(TextureBatch batch, int centerTileX, int centerTileY, int radiusTiles, int... layerIndices) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
 
         int minTileX = centerTileX - radiusTiles;
@@ -277,6 +352,7 @@ public final class TiledMap {
      * @param layerNames the names of the layers to be rendered; can be null
      */
     public void renderLayers(TextureBatch batch, String... layerNames) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         if (layerNames == null) return;
 
@@ -299,6 +375,7 @@ public final class TiledMap {
      * @param layerNames the names of the layers to be rendered; if null, no layers are rendered
      */
     public void renderLayers(TextureBatch batch, int minTileX, int minTileY, int maxTileX, int maxTileY, String... layerNames) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         if (layerNames == null) return;
 
@@ -320,6 +397,7 @@ public final class TiledMap {
      * @param layerNames  the names of the layers to be rendered
      */
     public void renderLayers(TextureBatch batch, int centerTileX, int centerTileY, int radiusTiles, String... layerNames) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
 
         int minTileX = centerTileX - radiusTiles;
@@ -331,14 +409,14 @@ public final class TiledMap {
     }
 
     /**
-     * Renders the specified tile layer using the provided texture batch within a defined tile range.
+     * Emits one tile layer under the prepared map transform.
      *
-     * @param batch    the {@code TextureBatch} used to render the tile graphics
-     * @param layer    the {@code TiledTileMapLayer} to be rendered
-     * @param minTileX the minimum x coordinate of the tile range to render
-     * @param minTileY the minimum y coordinate of the tile range to render
-     * @param maxTileX the maximum x coordinate of the tile range to render
-     * @param maxTileY the maximum y coordinate of the tile range to render
+     * @param batch active destination batch
+     * @param layer tile placements
+     * @param minTileX first column
+     * @param minTileY first row
+     * @param maxTileX final column
+     * @param maxTileY final row
      */
     private void renderTileLayer(TextureBatch batch, TiledTileMapLayer layer, int minTileX, int minTileY, int maxTileX, int maxTileY) {
         if (!layer.isVisible()) {
@@ -378,6 +456,7 @@ public final class TiledMap {
      * @param radiusTiles The radius, in tiles, around the center tile to be rendered.
      */
     public void renderLayer(TextureBatch batch, String layerName, int centerTileX, int centerTileY, int radiusTiles) {
+        if (!visible) return;
         renderLayer(batch, layerName, centerTileX - radiusTiles, centerTileY - radiusTiles, centerTileX + radiusTiles, centerTileY + radiusTiles);
     }
 
@@ -393,6 +472,7 @@ public final class TiledMap {
      * @throws NullPointerException if {@code batch} or {@code layerName} is null
      */
     public void renderLayer(TextureBatch batch, String layerName, int minTileX, int minTileY, int maxTileX, int maxTileY) {
+        if (!visible) return;
         Objects.requireNonNull(batch, "batch");
         Objects.requireNonNull(layerName, "layerName");
 
@@ -420,8 +500,10 @@ public final class TiledMap {
      * @param maxTileY      the maximum visible tile index in the Y axis
      */
     private void drawGrid(TextureBatch batch, int widthTiles, int heightTiles, int[] globalTileIDs, int offsetXTiles, int offsetYTiles, int minTileX, int minTileY, int maxTileX, int maxTileY) {
-        final int tilePixelWidth = this.tileWidth;
-        final int tilePixelHeight = this.tileHeight;
+        final float tilePixelWidth = this.tileWidth * scaleX;
+        final float tilePixelHeight = this.tileHeight * scaleY;
+        final float pivotX = originX + Math.max(1, width * tileWidth) * scaleX * .5f;
+        final float pivotY = originY + Math.max(1, height * tileHeight) * scaleY * .5f;
 
         int startLocalX = Math.max(0, minTileX - offsetXTiles);
         int endLocalX = Math.min(widthTiles - 1, maxTileX - offsetXTiles);
@@ -461,10 +543,11 @@ public final class TiledMap {
                     continue;
                 }
 
-                float worldX = (offsetXTiles + localTileX) * (float) tilePixelWidth;
-                float worldY = worldTileY * (float) tilePixelHeight;
+                float worldX = originX + (offsetXTiles + localTileX) * tilePixelWidth;
+                float worldY = originY + worldTileY * tilePixelHeight;
 
-                batch.draw(region, worldX, worldY, tilePixelWidth, tilePixelHeight);
+                if (rotation == 0) batch.draw(region, worldX, worldY, tilePixelWidth, tilePixelHeight);
+                else batch.drawUV(region.getTexture(), worldX, worldY, tilePixelWidth, tilePixelHeight, region.getU(), region.getV(), region.getU2(), region.getV2(), pivotX - worldX, pivotY - worldY, rotationSine, rotationCosine, null);
             }
         }
     }
@@ -807,4 +890,18 @@ public final class TiledMap {
         }
         disposed = true;
     }
+    /**
+     * Reports whether this object participates in rendering and animation updates.
+     *
+     * @return current visibility
+     */
+    public boolean isVisible() {return visible;}
+
+    /**
+     * Changes visibility without releasing resources or changing the object's
+     * position, frame, or timing state. Hidden objects can be shown again.
+     *
+     * @param visible whether rendering and animation updates are enabled
+     */
+    public void setVisible(boolean visible) {this.visible = visible;}
 }

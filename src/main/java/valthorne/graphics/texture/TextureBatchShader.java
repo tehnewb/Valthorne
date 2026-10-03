@@ -3,7 +3,7 @@ package valthorne.graphics.texture;
 import valthorne.graphics.shader.Shader;
 
 /**
- * <h1>TextureBatchShader</h1>
+ * <h2>TextureBatchShader</h2>
  *
  * <p>
  * {@code TextureBatchShader} is a specialized {@link Shader} implementation designed to work directly

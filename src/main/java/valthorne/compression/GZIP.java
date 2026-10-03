@@ -16,7 +16,6 @@ import java.util.zip.GZIPOutputStream;
  * to perform compression and decompression, respectively.
  *
  * @author Albert Beaupre
- * @version 1.0
  * @see GZIPOutputStream
  * @see GZIPInputStream
  * @since May 10th, 2025

@@ -116,6 +116,34 @@ public final class SoundArea {
     }
 
     /**
+     * Returns the zone center's horizontal coordinate.
+     *
+     * @return center X in world units
+     */
+    public float getX() { return (float) x; }
+
+    /**
+     * Returns the zone center's vertical coordinate.
+     *
+     * @return center Y in world units
+     */
+    public float getY() { return (float) y; }
+
+    /**
+     * Returns the radius of a circular or spherical zone.
+     *
+     * @return full-gain radius, or zero for a rectangular zone
+     */
+    public float getRadius() { return round ? (float) a : 0f; }
+
+    /**
+     * Returns the distance over which gain fades outside the zone.
+     *
+     * @return nonnegative fade distance in world units
+     */
+    public float getFade() { return (float) fade; }
+
+    /**
      * Evaluates full gain inside or on the boundary and smoothstep falloff outside.
      * Returns zero once outside distance reaches fade. With zero fade, boundary
      * points still receive full gain and every outside point receives zero. Uses

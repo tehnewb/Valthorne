@@ -18,15 +18,28 @@ import static org.lwjgl.opengl.GL33.*;
  * Honors sprite transforms/UVs, but not TextureBatch-local clipping or translation.
  */
 public final class SpriteVolumeRenderer2D implements AutoCloseable {
-    private final Shader shader;
-    private final int vao, vbo;
-    private final FloatBuffer vertices = BufferUtils.createFloatBuffer(24);
-    private boolean closed;
+    private final Shader shader; // Owned shader for this rendering pass.
+    private final int vao; // Owned vertex array describing pass geometry.
+    private final int vbo; // Owned streaming vertex buffer.
+    private final FloatBuffer vertices = BufferUtils.createFloatBuffer(24); // Reusable world/UV/card quad staging.
+    private boolean closed; // Whether the owned GL resources were released.
+    /*
+     * Cached position/radius uniform names for the five supported light slots.
+     */
     private static final String[] LIGHT_NAMES = {"u_lights[0]", "u_lights[1]", "u_lights[2]", "u_lights[3]", "u_lights[4]"};
+    /*
+     * Cached intensity uniform names paired with the position/radius slots.
+     */
     private static final String[] ENERGY_NAMES = {"u_energy[0]", "u_energy[1]", "u_energy[2]", "u_energy[3]", "u_energy[4]"};
 
+    /**
+     * Creates the shader and streaming quad resources on the current GL context,
+     * restoring the caller's selected bindings afterward. Close on the same
+     * graphics thread after the final pass.
+     */
     public SpriteVolumeRenderer2D() {
-        try (var state = new OpenGLStateSnapshot()) {
+        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+        try {
             shader = new Shader(ShaderSources.load("lighting2d/sprite-volume.vert"), ShaderSources.load("lighting2d/sprite-volume.frag"));
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
@@ -37,9 +50,23 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
                 glEnableVertexAttribArray(i);
                 glVertexAttribPointer(i, 2, GL_FLOAT, false, 24, i * 8L);
             }
+        } finally {
+            state.restore();
         }
     }
 
+    /**
+     * Shades one borrowed sprite card using a dominant light and up to four fills.
+     * Flushes the active batch, draws one quad, and restores selected GL state.
+     *
+     * @param batch active scene batch
+     * @param card borrowed sprite card and authored volume anchors
+     * @param overhead borrowed dominant light
+     * @param fills supplementary lights, or null for none
+     * @param opacity finite opacity between zero and one
+     * @throws IllegalArgumentException if opacity is outside its valid range
+     * @throws IllegalStateException if the renderer has been closed
+     */
     public void draw(TextureBatch batch, SpriteGroundShadow2D card, PointLight2D overhead, PointLight2D[] fills, float opacity) {
         if (closed) throw new IllegalStateException("Volume renderer is closed");
         PointLight2D.nonnegative(opacity);
@@ -50,7 +77,8 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
         float baseX = quad.get(0) + card.anchorU * (quad.get(2) - quad.get(0)) + card.anchorV * (quad.get(6) - quad.get(0));
         float baseY = quad.get(1) + card.anchorU * (quad.get(3) - quad.get(1)) + card.anchorV * (quad.get(7) - quad.get(1));
         batch.flush();
-        try (var state = new OpenGLStateSnapshot()) {
+        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+        try {
             glDisable(GL_DEPTH_TEST);
             glDepthMask(false);
             glDisable(GL_CULL_FACE);
@@ -86,14 +114,23 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0, vertices);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        } finally {
+            state.restore();
         }
     }
 
+    /**
+     * Uploads one borrowed light into a preselected shader slot.
+     *
+     * @param index validated slot between zero and four
+     * @param light borrowed light; disabled lights upload zero intensity
+     */
     private void setLight(int index, PointLight2D light) {
         shader.setUniform4f(LIGHT_NAMES[index], light.x, light.y, light.elevation, light.radius);
         shader.setUniform1f(ENERGY_NAMES[index], light.enabled ? light.intensity : 0);
     }
 
+    @Override
     public void close() {
         if (closed) return;
         closed = true;

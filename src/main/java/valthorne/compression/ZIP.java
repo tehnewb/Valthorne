@@ -23,7 +23,6 @@ import java.util.zip.ZipOutputStream;
  * identifier for the compressed data in the ZIP format.
  *
  * @author Albert Beaupre
- * @version 1.0
  * @see ZipOutputStream
  * @see ZipInputStream
  * @since May 10th, 2025

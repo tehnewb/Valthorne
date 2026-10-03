@@ -104,11 +104,11 @@ public final class EventTypes {
      */
     public static final EventType<ThemeDataChangeEvent> THEME_DATA_CHANGE = new EventType<>(10, "theme-data-change");
 
-    /**
-     * Number of slots needed for built-in route IDs zero through twelve. This
+    /*
+     * Number of slots needed for built-in route IDs zero through thirteen. This
      * exclusive upper bound must be updated when a new built-in ID is added.
      */
-    public static final int COUNT = 13;
+    public static final int COUNT = 14;
 
     /**
      * Window focus-change route used to distinguish focus gain and loss, including
@@ -121,6 +121,11 @@ public final class EventTypes {
      * longer strings. This is separate from physical key commands.
      */
     public static final EventType<TextInputEvent> TEXT_INPUT = new EventType<>(12, "text-input");
+
+    /*
+     * Desktop path drops with owned filenames and window-relative coordinates.
+     */
+    public static final EventType<FileDropEvent> FILE_DROP = new EventType<>(13, "file-drop");
 
     /**
      * Prevents instances of the static route registry. The assertion also rejects

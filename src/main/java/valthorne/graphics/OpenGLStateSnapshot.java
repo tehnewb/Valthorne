@@ -4,13 +4,16 @@ import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Captures a selected set of OpenGL state for restoration around rendering passes.
- * Construction reads the current context immediately; {@link #close()} writes
+ * Construction reads the current context immediately; {@link #restore()} writes
  * the captured values back. Use both operations on the same thread with the same
- * OpenGL context current, and close nested snapshots in reverse order.
+ * OpenGL context current, and restore nested snapshots in reverse order.
  *
  * <pre>{@code
- * try (OpenGLStateSnapshot state = new OpenGLStateSnapshot()) {
+ * OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+ * try {
  *     // Issue rendering commands that modify the state covered by this snapshot.
+ * } finally {
+ *     state.restore();
  * }
  * }</pre>
  *
@@ -27,27 +30,39 @@ import static org.lwjgl.opengl.GL33.*;
  *
  * @author Albert Beaupre
  */
-public final class OpenGLStateSnapshot implements AutoCloseable {
-    private final boolean depth = glIsEnabled(GL_DEPTH_TEST), blend = glIsEnabled(GL_BLEND), cull = glIsEnabled(GL_CULL_FACE); // Captured depth-test, blend and face-culling enablement.
+public final class OpenGLStateSnapshot {
+    private final boolean depth = glIsEnabled(GL_DEPTH_TEST); // Captured depth-test enablement.
+    private final boolean blend = glIsEnabled(GL_BLEND); // Captured blending enablement.
+    private final boolean cull = glIsEnabled(GL_CULL_FACE); // Captured face-culling enablement.
     private final boolean srgb = glIsEnabled(GL_FRAMEBUFFER_SRGB); // Captured framebuffer sRGB conversion enablement.
-    private final boolean depthWrite = glGetBoolean(GL_DEPTH_WRITEMASK); // Captured depth-buffer write permission.
-    private final int depthFunc = glGetInteger(GL_DEPTH_FUNC), cullMode = glGetInteger(GL_CULL_FACE_MODE); // Captured depth comparison and culled-face selection.
+    private final boolean depthWrite = glGetBoolean(GL_DEPTH_WRITEMASK); // Captured depth-test enablement.
+    private final int depthFunc = glGetInteger(GL_DEPTH_FUNC); // Captured depth comparison function.
+    private final int cullMode = glGetInteger(GL_CULL_FACE_MODE); // Captured culled-face selection.
     private final int frontFace = glGetInteger(GL_FRONT_FACE); // Captured front-face winding convention.
-    private final int srcRgb = glGetInteger(GL_BLEND_SRC_RGB), dstRgb = glGetInteger(GL_BLEND_DST_RGB); // RGB source and destination blend factors.
-    private final int srcAlpha = glGetInteger(GL_BLEND_SRC_ALPHA), dstAlpha = glGetInteger(GL_BLEND_DST_ALPHA); // Alpha source and destination blend factors.
-    private final int equationRgb = glGetInteger(GL_BLEND_EQUATION_RGB), equationAlpha = glGetInteger(GL_BLEND_EQUATION_ALPHA); // Independent RGB and alpha blend equations.
-    private final int program = glGetInteger(GL_CURRENT_PROGRAM), vao = glGetInteger(GL_VERTEX_ARRAY_BINDING); // Borrowed program and vertex-array names.
-    private final int buffer = glGetInteger(GL_ARRAY_BUFFER_BINDING), activeTexture = glGetInteger(GL_ACTIVE_TEXTURE); // Array-buffer name and active texture-unit selector.
-    private final int texture0, texture1, texture2, bufferTexture3, bufferTexture4; // Captured 2D bindings on units 0-2 and buffer textures on units 3-4.
+    private final int srcRgb = glGetInteger(GL_BLEND_SRC_RGB); // Captured RGB source blend factor.
+    private final int dstRgb = glGetInteger(GL_BLEND_DST_RGB); // Captured RGB destination blend factor.
+    private final int srcAlpha = glGetInteger(GL_BLEND_SRC_ALPHA); // Captured alpha source blend factor.
+    private final int dstAlpha = glGetInteger(GL_BLEND_DST_ALPHA); // Captured alpha destination blend factor.
+    private final int equationRgb = glGetInteger(GL_BLEND_EQUATION_RGB); // Captured RGB blend equation.
+    private final int equationAlpha = glGetInteger(GL_BLEND_EQUATION_ALPHA); // Captured alpha blend equation.
+    private final int program = glGetInteger(GL_CURRENT_PROGRAM); // Borrowed shader-program identifier.
+    private final int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING); // Borrowed vertex-array identifier.
+    private final int buffer = glGetInteger(GL_ARRAY_BUFFER_BINDING); // Borrowed array-buffer identifier.
+    private final int activeTexture = glGetInteger(GL_ACTIVE_TEXTURE); // Captured active texture-unit selector.
+    private final int texture0; // Captured 2D texture binding on unit zero.
+    private final int texture1; // Captured 2D texture binding on unit one.
+    private final int texture2; // Captured 2D texture binding on unit two.
+    private final int bufferTexture3; // Captured buffer texture binding on unit three.
+    private final int bufferTexture4; // Captured buffer texture binding on unit four.
     private final int arrayTexture5; // Shadow depth array binding on unit five.
-    private final int bufferTexture6; // Shadow matrix buffer texture on unit six.
+    private final int bufferTexture6; // Borrowed array-buffer identifier.
     private final int sampler5; // Comparison sampler on unit five.
     private final int sampler2; // Sampler binding captured specifically for texture unit two.
 
     /**
      * Captures current state through field initializers and queries the selected
      * per-unit texture and sampler bindings. Temporarily selects units zero
-     * through four, then returns to the original active texture unit.
+     * through six, then returns to the original active texture unit.
      *
      * <p>A compatible OpenGL context must already be current. Construction does
      * not create GPU objects or perform drawing, and there is no deferred capture.</p>
@@ -90,14 +105,13 @@ public final class OpenGLStateSnapshot implements AutoCloseable {
     /**
      * Restores every captured setting and binding, finishing with the original
      * active texture selector. Uncaptured state is untouched. This method does
-     * not dispose the referenced GPU objects or mark the snapshot as closed.
+     * not dispose the referenced GPU objects or invalidate the snapshot.
      *
-     * <p>Each call reapplies the original values, so a second close can overwrite
-     * changes made since the first. Keep the original context current and captured
+     * <p>Each call reapplies the original values, so a second restoration can overwrite
+     * changes made since the first restoration. Keep the original context current and captured
      * resources alive for every restoration.</p>
      */
-    @Override
-    public void close() {
+    public void restore() {
         enable(GL_DEPTH_TEST, depth);
         enable(GL_BLEND, blend);
         enable(GL_CULL_FACE, cull);

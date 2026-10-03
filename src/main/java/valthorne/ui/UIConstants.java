@@ -3,7 +3,7 @@ package valthorne.ui;
 import org.lwjgl.util.yoga.Yoga;
 
 /**
- * <h1>UIConstants</h1>
+ * <h2>UIConstants</h2>
  *
  * <p>
  * {@code UIConstants} is a utility class responsible for translating the engine's

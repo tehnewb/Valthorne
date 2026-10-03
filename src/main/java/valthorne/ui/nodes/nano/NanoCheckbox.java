@@ -59,7 +59,7 @@ public class NanoCheckbox extends UINode implements NanoNode {
     /**
      * Theme rounded-box corner radius in UI units.
      */
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.checkbox.cornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.checkbox.cornerRadius", Float.class, 0f);
     /**
      * Theme border stroke width in UI units; zero omits the border.
      */
@@ -87,7 +87,7 @@ public class NanoCheckbox extends UINode implements NanoNode {
     private Color focusedBorderColor = new Color(0xFF7AA2FF); // Borrowed focused border color.
     private Color checkmarkColor = new Color(0xFFFFFFFF); // Borrowed checkmark color.
 
-    private float cornerRadius = 6f; // Corner radius in UI units.
+    private float cornerRadius = 0f; // Corner radius in UI units.
     private float borderWidth = 1f; // Border stroke width in UI units.
     private float checkmarkScale = 0.5f; // Checkmark width/height fraction in fractions of node dimensions.
     private float checkmarkThickness = 2.5f; // Checkmark stroke thickness in UI units.

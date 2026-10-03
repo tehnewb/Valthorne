@@ -1,7 +1,7 @@
 package valthorne.collections.bits;
 
 /**
- * <h1>ShortBits</h1>
+ * <h2>ShortBits</h2>
  *
  * <p>
  * {@code ShortBits} is a compact bit container backed by a single {@code short}. It allows you to

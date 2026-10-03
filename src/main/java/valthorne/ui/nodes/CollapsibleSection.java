@@ -4,6 +4,7 @@ import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.ui.UINode;
 import valthorne.ui.behavior.ChangeSignal;
+import valthorne.ui.nodes.nano.NanoDisclosureIndicator;
 import java.util.Objects;
 
 /**
@@ -36,7 +37,7 @@ public class CollapsibleSection extends Panel {
         this.title = Objects.requireNonNull(title);
         Objects.requireNonNull(content);
         if (content.getParent() != null) throw new IllegalArgumentException("Content already has a parent");
-        header = new Button("[-] " + title) {
+        header = new Button(title) {
             /**
              * Collapses on Left and expands on Right, consuming either key even if the
              * state was already requested. Disabled headers ignore keys; other keys use
@@ -51,6 +52,8 @@ public class CollapsibleSection extends Panel {
                 } else super.onKeyPress(event);
             }
         }.action(b -> expanded(!expanded));
+        header.getLayout().itemsStart().paddingLeft(24);
+        header.add(new NanoDisclosureIndicator(this::isExpanded));
         getLayout().column().noShrink();
         header.getLayout().height(36).widthPercent(100).noShrink();
         body.getLayout().widthPercent(100).minHeight(0).noShrink();
@@ -65,7 +68,7 @@ public class CollapsibleSection extends Panel {
     public boolean isExpanded() { return expanded; }
     /**
      * Exposes the live header for focus, styling, or application configuration.
-     * Its text is rewritten by later disclosure changes to include the state marker.
+     * Its label stays unchanged while a separate vector triangle shows state.
      *
      * @return internally owned header button
      */
@@ -78,7 +81,7 @@ public class CollapsibleSection extends Panel {
      * @return handle whose close removes this subscription
      * @throws NullPointerException if listener is null
      */
-    public AutoCloseable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
     /**
      * Applies a new disclosure state and fires change listeners after visibility,
      * height, and header text are updated. On collapse, focus within the body moves
@@ -98,7 +101,6 @@ public class CollapsibleSection extends Panel {
         expanded = value;
         body.setVisible(value);
         if (value) body.getLayout().heightAuto(); else body.getLayout().height(0);
-        header.text((value ? "[-] " : "[+] ") + title);
         changes.fire(); return this;
     }
     /**

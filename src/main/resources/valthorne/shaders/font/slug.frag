@@ -5,12 +5,16 @@ const int BAND_TEXTURE_WIDTH = 1 << BAND_TEXTURE_WIDTH_LOG2;
 
 uniform sampler2D u_curveTexture;
 uniform usampler2D u_bandTexture;
+uniform bool u_linearColor;
 
 in vec4 v_color;
 in vec2 v_texCoord;
 flat in vec4 v_banding;
 flat in ivec4 v_glyph;
 flat in float v_pixelsPerEm;
+in vec2 v_world;
+flat in vec4 v_clipRect;
+flat in float v_clipEnabled;
 
 out vec4 fragColor;
 
@@ -147,10 +151,19 @@ float slugRender(vec2 renderCoord, vec4 bandTransform, ivec4 glyphData) {
 }
 
 void main() {
+    // Evaluate derivatives before clipping makes neighboring fragments diverge.
     float coverage = slugRender(v_texCoord, v_banding, v_glyph);
+    if (v_clipEnabled > 0.5 && (v_world.x < v_clipRect.x || v_world.y < v_clipRect.y ||
+        v_world.x > v_clipRect.x + v_clipRect.z || v_world.y > v_clipRect.y + v_clipRect.w)) {
+        discard;
+    }
     if (coverage <= 0.001) {
         discard;
     }
     float alpha = v_color.a * coverage;
-    fragColor = vec4(v_color.rgb * alpha, alpha);
+    vec3 color = v_color.rgb;
+    if (u_linearColor) {
+        color = mix(color / 12.92, pow((color + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), color));
+    }
+    fragColor = vec4(color * alpha, alpha);
 }

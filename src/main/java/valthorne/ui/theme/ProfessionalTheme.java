@@ -3,21 +3,20 @@ package valthorne.ui.theme;
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.Font;
-import valthorne.graphics.font.FontData;
+import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.texture.NinePatchTexture;
 import valthorne.graphics.texture.TextureData;
 import valthorne.ui.nodes.*;
 import valthorne.ui.nodes.nano.*;
 
-import java.io.IOException;
+import valthorne.graphics.font.SystemFonts;
 import java.util.ArrayList;
 import java.util.List;
 import valthorne.graphics.texture.NinePatchDrawable;
 
 /**
  * Builds a density-scaled light or dark skin for texture and NanoVG UI controls.
- * The theme owns its bundled font and all nine-patch textures allocated by
+ * The theme owns its installed font and all nine-patch textures allocated by
  * {@link #create()}. Theme data shares these resources and palette colors, so keep
  * this object alive while any styled root uses them. Create and close it on the
  * graphics thread, detaching or disposing dependent roots before closing.
@@ -33,28 +32,38 @@ import valthorne.graphics.texture.NinePatchDrawable;
  * @author Albert Beaupre
  */
 public final class ProfessionalTheme implements Theme, AutoCloseable {
-    public final Color surface, raised, hover, text, muted, accent, border, disabled; // Mutable colors shared with generated styles.
+    public final Color surface; // Shared base surface color.
+    public final Color raised; // Shared raised surface color.
+    public final Color hover; // Shared hovered surface color.
+    public final Color text; // Shared primary text color.
+    public final Color muted; // Shared secondary text color.
+    public final Color accent; // Shared accent color.
+    public final Color border; // Shared border color.
+    public final Color disabled; // Shared disabled surface color.
     public final Color error = new Color(0xFFF87171); // Shared validation-error accent color.
-    private final FontData fontData; // Owned rasterized data for the bundled UI font.
-    private final Font font; // Owned font shared by all generated texture-control styles.
+    private final SlugFont font; // Owned font shared by all generated texture-control styles.
     private final List<NinePatchTexture> skins = new ArrayList<>(); // Owned skins accumulated across create calls.
     private final float density; // Scale applied to logical control, spacing, and font dimensions.
+    private final boolean lightPalette; // Original palette choice for derived window chrome colors.
+    private boolean squareCorners = true; // Use square nine-patch skins for texture-backed controls by default.
     private boolean closed; // Prevents repeated resource release and further style creation.
 
     /**
-     * Selects a palette and loads the bundled Atkinson Hyperlegible font at a
-     * rounded pixel size of {@code 16 * density}. Nine-patch skins are deferred
+     * Selects a palette and loads installed UI live outlines independent
+     * of pixel size. The regular UI uses an em size
+     * of {@code 16 * density}. Nine-patch skins are deferred
      * until {@link #create()}; the font is allocated immediately.
      *
      * @param light   true for the light palette, false for the dark palette
      * @param density finite size multiplier in the inclusive range 0.5 to 3
      * @throws IllegalArgumentException if density is outside the supported range
-     * @throws IllegalStateException    if the bundled font is missing or cannot be read
+     * @throws IllegalStateException    if the installed font is missing or cannot be read
      */
     public ProfessionalTheme(boolean light, float density) {
         if (!Float.isFinite(density) || density < .5f || density > 3)
             throw new IllegalArgumentException("Density must be between 0.5 and 3");
         this.density = density;
+        this.lightPalette = light;
         surface = new Color(light ? 0xFFF4F6FA : 0xFF121823);
         raised = new Color(light ? 0xFFFFFFFF : 0xFF1C2533);
         hover = new Color(light ? 0xFFE4EAF5 : 0xFF29374B);
@@ -63,11 +72,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         accent = new Color(light ? 0xFF285DCE : 0xFF76A5FF);
         border = new Color(light ? 0xFFBCC9DA : 0xFF3E506A);
         disabled = new Color(light ? 0xFFDDE3EC : 0xFF27303D);
-        try (var stream = ProfessionalTheme.class.getResourceAsStream("/ui/AtkinsonHyperlegible-Regular.ttf")) {
-            if (stream == null) throw new IllegalStateException("Bundled UI font is missing");
-            fontData = FontData.load(stream.readAllBytes(), Math.round(16 * density), 32, 224);
-            font = new Font(fontData);
-        } catch (IOException ex) {throw new IllegalStateException("Cannot load UI font", ex);}
+        font = SlugFont.load(SystemFonts.find(false).toString(), 32, 224);
     }
 
     /**
@@ -76,6 +81,18 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * configurable constructor.
      */
     public ProfessionalTheme() {this(false, 1);}
+
+    /**
+     * Selects square skins for texture-backed controls created by subsequent calls.
+     *
+     * @param squareCorners whether subsequent skins use square corners
+     * @return this theme
+     */
+    public ProfessionalTheme squareCorners(boolean squareCorners) {
+        if (closed) throw new IllegalStateException("Theme has been closed");
+        this.squareCorners = squareCorners;
+        return this;
+    }
 
     /**
      * Stores a shared color under a typed {@code nano.<name>.<key>} style key.
@@ -96,7 +113,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      *
      * @return the shared font reference
      */
-    public Font getFont() {return font;}
+    public SlugFont getFont() {return font;}
 
     /**
      * Builds a new style collection with semantic tokens and state-specific rules
@@ -121,7 +138,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         ThemeData data = new ThemeData();
         data.setToken(UITokens.CONTROL_HEIGHT, 36 * density);
         data.setToken(UITokens.SPACING, 8 * density);
-        data.setToken(UITokens.RADIUS, 6 * density);
+        data.setToken(UITokens.RADIUS, 0f);
         data.setToken(UITokens.FONT_SIZE, 16 * density);
         data.setToken(UITokens.SURFACE, surface);
         data.setToken(UITokens.TEXT, text);
@@ -152,9 +169,9 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         data.rule(Button.class, "window-close", StyleState.PRESSED).set(Button.BACKGROUND_KEY, skin(error, accent));
         Drawable clearGrip = squareSkin(new Color(0x00000000), new Color(0x00000000));
         data.rule(Button.class, "window-grip").set(Button.BACKGROUND_KEY, clearGrip);
-        data.rule(Button.class, "window-grip", StyleState.HOVERED).set(Button.BACKGROUND_KEY, fill);
-        data.rule(Button.class, "window-grip", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, fill);
-        data.rule(Button.class, "window-grip", StyleState.PRESSED).set(Button.BACKGROUND_KEY, fill);
+        data.rule(Button.class, "window-grip", StyleState.HOVERED).set(Button.BACKGROUND_KEY, clearGrip);
+        data.rule(Button.class, "window-grip", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, clearGrip);
+        data.rule(Button.class, "window-grip", StyleState.PRESSED).set(Button.BACKGROUND_KEY, clearGrip);
         Drawable pane = squareSkin(raised, raised), chrome = squareSkin(surface, border);
         Drawable flat = squareSkin(surface, surface), rowHover = squareSkin(hover, hover);
         Drawable rowSelected = squareSkin(hover, accent), editor = squareSkin(raised, border);
@@ -195,7 +212,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 .set(ScrollPanel.HORIZONTAL_BAR_BACKGROUND_KEY, track).set(ScrollPanel.HORIZONTAL_BAR_FOREGROUND_KEY, focus);
         data.rule(Modal.class).set(Modal.BACKGROUND_KEY, skin(new Color(0xAA070C15), new Color(0xAA070C15)))
                 .set(Modal.DIALOG_BACKGROUND_KEY, normal);
-        nano(data.rule(NanoPanel.class), "panel");
+        nanoPanel(data.rule(NanoPanel.class), raised, border, 1f);
         nano(data.rule(NanoButton.class), "button");
         data.rule(NanoButton.class, StyleState.SELECTED)
                 .set(NanoButton.BORDER_COLOR_KEY, accent)
@@ -208,6 +225,12 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         nano(data.rule(NanoProgressBar.class), "progressbar");
         nano(data.rule(NanoScrollPanel.class), "scrollpanel");
         nano(data.rule(NanoGrid.class), "grid");
+        for (Class<?> panelType : List.of(NanoScrollPanel.class, NanoGrid.class)) {
+            String namespace = panelType == NanoScrollPanel.class ? "scrollpanel" : "grid";
+            for (String key : List.of("backgroundColor", "hoverBackgroundColor", "focusedBackgroundColor", "pressedBackgroundColor", "disabledBackgroundColor",
+                    "borderColor", "hoverBorderColor", "focusedBorderColor", "pressedBorderColor", "disabledBorderColor"))
+                color(data.rule(panelType), namespace, key, key.endsWith("BorderColor") || key.equals("borderColor") ? border : raised);
+        }
         nano(data.rule(NanoComboBox.class), "combobox");
         data.rule(NanoLabel.class).set(NanoLabel.COLOR_KEY, text).set(NanoLabel.FONT_SIZE_KEY, 16 * density);
         data.rule(NanoSlider.class).set(NanoSlider.TRACK_HEIGHT_KEY, 6 * density).set(NanoSlider.THUMB_SIZE_KEY, 18 * density);
@@ -234,21 +257,33 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 .set(NanoScrollPanel.BORDER_WIDTH_KEY, 0f);
         nanoPanel(data.rule(NanoPanel.class, "surface"), raised, border, 1);
         nanoPanel(data.rule(NanoPanel.class, "window-frame"), raised, border, 1);
+        data.rule(NanoPanel.class, "window-frame").set(NanoPanel.CORNER_RADIUS_KEY, 0f);
+        Color windowHeader = new Color(lightPalette ? 0xFFF2F5FA : 0xFF222D3C);
+        Color windowHeaderHover = new Color(lightPalette ? 0xFFE8EDF5 : 0xFF2B384B);
+        Color windowDivider = new Color(lightPalette ? 0xFFDFE5EE : 0xFF354357);
+        nanoPanel(data.rule(NanoPanel.class, "window-divider"), windowDivider, windowDivider, 0);
+        data.rule(NanoLabel.class, "window-caption").set(NanoLabel.FONT_SIZE_KEY, 14f * density)
+                .set(NanoLabel.COLOR_KEY, text);
         nanoPanel(data.rule(NanoPanel.class, "chooser-pane"), raised, raised, 0);
         nanoPanel(data.rule(NanoPanel.class, "chooser-chrome"), surface, border, 1);
         for (String name : List.of("chooser-pane", "chooser-chrome"))
             data.rule(NanoPanel.class, name).set(NanoPanel.CORNER_RADIUS_KEY, 0f);
 
-        nanoButton(data.rule(NanoButton.class, "window-title"), hover, border);
-        nanoButton(data.rule(NanoButton.class, "window-close"), hover, border);
+        nanoButton(data.rule(NanoButton.class, "window-title"), windowHeader, windowHeader);
+        data.rule(NanoButton.class, "window-title")
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, windowHeader)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, windowHeader)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, windowHeader);
+        nanoButton(data.rule(NanoButton.class, "window-close"), windowHeader, windowHeader);
         data.rule(NanoButton.class, "window-close").set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, error)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, windowHeaderHover)
                 .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, error);
         nanoButton(data.rule(NanoButton.class, "window-grip"), clear, clear);
         data.rule(NanoButton.class, "window-grip").set(NanoButton.BORDER_WIDTH_KEY, 0f)
                 .set(NanoButton.CORNER_RADIUS_KEY, 0f)
-                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, accent)
-                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, accent)
-                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, accent);
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, clear);
         for (String name : List.of("chooser-row", "chooser-tool", "chooser-heading", "chooser-divider", "chooser-action", "chooser-primary")) {
             nanoButton(data.rule(NanoButton.class, name), name.equals("chooser-row") || name.equals("chooser-heading") ? raised : surface, border);
             data.rule(NanoButton.class, name).set(NanoButton.CORNER_RADIUS_KEY, 0f)
@@ -265,7 +300,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         data.rule(NanoScrollPanel.class, "menu-surface")
                 .set(NanoScrollPanel.BACKGROUND_COLOR_KEY, raised)
                 .set(NanoScrollPanel.BORDER_COLOR_KEY, border)
-                .set(NanoScrollPanel.CORNER_RADIUS_KEY, 4f * density);
+                .set(NanoScrollPanel.CORNER_RADIUS_KEY, 0f);
         data.rule(NanoButton.class, "menu-item")
                 .set(NanoButton.BACKGROUND_COLOR_KEY, raised)
                 .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, hover)
@@ -322,7 +357,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         color(rule, name, "trackColor", surface);
         color(rule, name, "selectionColor", new Color(0x665B8DEF));
         rule.set(StyleKey.of("nano." + name + ".fontSize", Float.class), 16 * density);
-        rule.set(StyleKey.of("nano." + name + ".cornerRadius", Float.class), 6 * density);
+        rule.set(StyleKey.of("nano." + name + ".cornerRadius", Float.class), 0f);
     }
 
     /**
@@ -335,6 +370,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * @return a drawable backed by a newly allocated owned nine-patch texture
      */
     private Drawable skin(Color fill, Color edge) {
+        if (squareCorners) return squareSkin(fill, edge);
         // Small antialiased nine-patch: texture controls retain their native rendering path.
         int size = 20, radius = 6;
         var pixels = BufferUtils.createByteBuffer(size * size * 4);
@@ -370,11 +406,11 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         }
         pixels.flip();
         var texture = new NinePatchTexture(new TextureData(pixels, size, size), 1, 1, 1, 1); skins.add(texture);
-        return new valthorne.graphics.texture.NinePatchDrawable(texture);
+        return new NinePatchDrawable(texture);
     }
 
     /**
-     * Releases every generated skin, then the font and its data. Repeated calls
+     * Releases every generated skin, then the shared outline font. Repeated calls
      * return immediately. Call on the graphics thread after dependent UI roots
      * have been detached or disposed; existing style collections retain references
      * to the released resources and must no longer be rendered.
@@ -386,6 +422,5 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         for (var skin : skins) skin.dispose();
         skins.clear();
         font.dispose();
-        fontData.dispose();
     }
 }

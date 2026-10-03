@@ -1,7 +1,7 @@
 package valthorne.graphics.texture;
 
-import valthorne.graphics.Color;
 import org.joml.Vector2f;
+import valthorne.graphics.Color;
 
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -19,6 +19,7 @@ import java.util.*;
  * Texture splitting creates borrowed views without copying pixels or owning the
  * source texture.
  * </p>
+ *
  * @author Albert Beaupre
  */
 public class TextureUtility {
@@ -30,7 +31,7 @@ public class TextureUtility {
      * does not repeat its closing point and is simplified with 0.75-pixel tolerance.
      *
      * @param texture source with optional retained CPU data
-     * @param ignore exact colors to exclude; null array or entries have no effect
+     * @param ignore  exact colors to exclude; null array or entries have no effect
      * @return independent pixel-edge points, or an empty array for absent data, nonpositive dimensions, or no boundary
      * @throws NullPointerException if texture is null
      */
@@ -80,9 +81,9 @@ public class TextureUtility {
      * a UV flip; the closing point is omitted.
      *
      * @param textureRegion source region with valid bounds inside retained pixel data
-     * @param ignore exact RGBA colors to exclude in addition to transparent pixels
+     * @param ignore        exact RGBA colors to exclude in addition to transparent pixels
      * @return simplified region-local boundary, or empty when data or contour is absent
-     * @throws NullPointerException if textureRegion is null
+     * @throws NullPointerException      if textureRegion is null
      * @throws IndexOutOfBoundsException if region bounds exceed readable source data
      */
     public static Vector2f[] trace(TextureRegion textureRegion, Color... ignore) {
@@ -132,11 +133,11 @@ public class TextureUtility {
      * Copies a rectangular RGBA byte range using absolute accesses, preserving the
      * source buffer position. Does not clamp or validate the requested rectangle.
      *
-     * @param buffer readable tightly packed RGBA source
-     * @param x first source column
-     * @param y first source row
-     * @param width copied columns
-     * @param height copied rows
+     * @param buffer       readable tightly packed RGBA source
+     * @param x            first source column
+     * @param y            first source row
+     * @param width        copied columns
+     * @param height       copied rows
      * @param textureWidth source row width in pixels
      * @return heap buffer containing tightly packed region pixels
      * @throws IndexOutOfBoundsException if a source access is outside the buffer limit
@@ -161,7 +162,7 @@ public class TextureUtility {
      * entries use a nonmatching sentinel.
      *
      * @param buffer readable tightly packed RGBA pixels
-     * @param width pixel columns
+     * @param width  pixel columns
      * @param height pixel rows
      * @param ignore exact colors to exclude
      * @return mask indexed by X then Y
@@ -290,8 +291,8 @@ public class TextureUtility {
      * space or the image boundary. Orientations are consistent around each pixel
      * so matching endpoints can be stitched.
      *
-     * @param solid X-major component mask
-     * @param width pixel columns
+     * @param solid  X-major component mask
+     * @param width  pixel columns
      * @param height pixel rows
      * @return newly allocated boundary edges
      */
@@ -466,7 +467,7 @@ public class TextureUtility {
      * duplicates that endpoint for recursive distance simplification. Removes the
      * duplicate afterward and runs a final collinear pass.
      *
-     * @param points cyclic vertices without a required closing duplicate
+     * @param points  cyclic vertices without a required closing duplicate
      * @param epsilon perpendicular-distance tolerance in pixels
      * @return simplified cyclic polygon
      */
@@ -501,11 +502,11 @@ public class TextureUtility {
      * endpoint line exceeds epsilon; otherwise retains only endpoints. Appends to
      * a shared output while removing duplicate recursion junctions.
      *
-     * @param points ordered input path
-     * @param start inclusive first point
-     * @param end inclusive last point
+     * @param points  ordered input path
+     * @param start   inclusive first point
+     * @param end     inclusive last point
      * @param epsilon distance tolerance
-     * @param out mutable simplified output
+     * @param out     mutable simplified output
      */
     private static void rdp(List<Point> points, int start, int end, float epsilon, List<Point> out) {
         if (end <= start + 1) {
@@ -588,10 +589,10 @@ public class TextureUtility {
      * at the low-Y edge. Too many rows or columns can produce zero-sized regions.
      *
      * @param texture nonnull source texture
-     * @param rows positive row count
+     * @param rows    positive row count
      * @param columns positive column count
      * @return independent region grid sharing the source texture
-     * @throws NullPointerException if texture is null
+     * @throws NullPointerException     if texture is null
      * @throws IllegalArgumentException if rows or columns are nonpositive
      */
     public static TextureRegion[][] split(Texture texture, int rows, int columns) {
@@ -615,6 +616,45 @@ public class TextureUtility {
             }
         }
 
+        return regions;
+    }
+
+    /**
+     * Splits a sheet into top-to-bottom, left-to-right frames with symmetric outer
+     * margins and spacing between cells. Remaining fractional pixels are discarded.
+     *
+     * @param texture  source texture
+     * @param rows     positive row count
+     * @param columns  positive column count
+     * @param marginX  horizontal outer margin in pixels
+     * @param marginY  vertical outer margin in pixels
+     * @param paddingX horizontal gap in pixels
+     * @param paddingY vertical gap in pixels
+     * @return region grid sharing the source texture
+     * @throws IllegalArgumentException if the grid has invalid or empty cells
+     */
+    public static TextureRegion[][] split(Texture texture, int rows, int columns, int marginX, int marginY, int paddingX, int paddingY) {
+        /*
+         * Long arithmetic prevents user-supplied spacing from overflowing during
+         * validation. Coordinates use the same top-first convention as split.
+         */
+        if (texture == null) throw new NullPointerException("Texture cannot be null");
+        if (rows < 1 || columns < 1 || marginX < 0 || marginY < 0 || paddingX < 0 || paddingY < 0)
+            throw new IllegalArgumentException("Invalid grid counts, margins or padding.");
+        long availableWidth = texture.getWidth() - 2L * marginX - (columns - 1L) * paddingX;
+        long availableHeight = texture.getHeight() - 2L * marginY - (rows - 1L) * paddingY;
+        if (availableWidth < columns || availableHeight < rows)
+            throw new IllegalArgumentException("Each frame must contain at least one image pixel.");
+        int width = (int) (availableWidth / columns);
+        int height = (int) (availableHeight / rows);
+        TextureRegion[][] regions = new TextureRegion[rows][columns];
+        for (int row = 0; row < rows; row++) {
+            for (int column = 0; column < columns; column++) {
+                int x = marginX + column * (width + paddingX);
+                int y = texture.getHeight() - marginY - row * (height + paddingY) - height;
+                regions[row][column] = new TextureRegion(texture, x, y, width, height);
+            }
+        }
         return regions;
     }
 

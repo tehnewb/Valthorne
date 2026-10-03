@@ -4,8 +4,11 @@ import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.Sprite;
+import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.shader.Shader;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
 import java.util.Objects;
@@ -17,6 +20,7 @@ import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
+import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
 import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
@@ -28,6 +32,19 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * still supporting several advanced rendering features such as color tinting, sprite
  * scaling, sprite rotation, nine-patch rendering, nested clipping, translation stacks,
  * shader overrides, and rendering into a {@link FrameBuffer}.
+ * </p>
+ * <p>
+ * Slug fonts and retained text runs use live outline coverage within this same
+ * begin/end scope. The batch lazily creates a curve shader, groups consecutive text
+ * submissions, and flushes at sprite/text boundaries to preserve painter order.
+ * Glyphs share sprite staging storage, quad geometry and the instance VBO.
+ * An internal component owns glyph implementation state and is allocated only
+ * when text is used; callers keep one batch and the same drawing lifecycle.
+ * Text inherits translation, clipping, tint and opacity. Its dedicated curve shader
+ * uses the current window projection and physical GL viewport; custom sprite shaders
+ * do not affect glyphs. Flush before changing projection, viewport or external GL
+ * state. Fonts are borrowed and must remain alive until queued text is flushed.
+ * No raster atlas or per-draw scratch allocation is used by the text path.
  * </p>
  *
  * <p>
@@ -93,8 +110,11 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  */
 public final class TextureBatch {
 
-    private final FloatBuffer instanceBuffer; // Buffer holding queued per-instance sprite data before upload
+    private final ByteBuffer instanceBytes; // Shared native staging storage for sprite and glyph segments.
+    private final FloatBuffer instanceBuffer; // Float view of shared staging storage used for sprite instances.
     private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
+    private TextureBatchGlyphs glyphs; // Lazily owned live-outline implementation sharing the sprite buffers.
+    private float opacityMultiplier = 1f; // Multiplies final per-sprite alpha for temporary translucent rendering.
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
@@ -135,7 +155,7 @@ public final class TextureBatch {
     private float clipH; // Active clip rectangle height
 
     private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
-    private long totalDrawCalls; // Cumulative nonempty instanced draw count.
+    private long totalDrawCalls; // Cumulative nonempty sprite draw count, combined with glyph counts by the getter.
     private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
     private long totalSubmittedSprites, totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
 
@@ -197,7 +217,8 @@ public final class TextureBatch {
         this.textureIDs = new int[this.textureUnitCapacity];
         Arrays.fill(this.textureIDs, -1);
 
-        this.instanceBuffer = BufferUtils.createFloatBuffer(this.maxSprites * TextureBatchContract.INST_FLOATS);
+        this.instanceBytes = BufferUtils.createByteBuffer(Math.multiplyExact(this.maxSprites, TextureBatchContract.INST_STRIDE_BYTES));
+        this.instanceBuffer = instanceBytes.asFloatBuffer();
 
         this.defaultShader = new Shader(TextureBatchContract.defaultVertexShader(), TextureBatchContract.buildDefaultFragmentShader(this.maxTextureUnits));
         TextureBatchContract.bindAttributes(this.defaultShader);
@@ -443,6 +464,29 @@ public final class TextureBatch {
     }
 
     /**
+     * Returns the current multiplier applied to every queued sprite's final
+     * alpha, including sprites with their own tint.
+     *
+     * @return alpha multiplier between zero and one
+     */
+    public float getOpacityMultiplier() {
+        return opacityMultiplier;
+    }
+
+    /**
+     * Sets a temporary alpha multiplier for both default and explicit tints.
+     * Callers that change it during a draw must restore the previous value after
+     * their content is submitted; already queued sprites retain their alpha.
+     *
+     * @param multiplier finite alpha multiplier between zero and one
+     */
+    public void setOpacityMultiplier(float multiplier) {
+        if (!Float.isFinite(multiplier) || multiplier < 0f || multiplier > 1f)
+            throw new IllegalArgumentException("Opacity multiplier must be between 0 and 1.");
+        opacityMultiplier = multiplier;
+    }
+
+    /**
      * <p>
      * Pushes the current translation state onto the translation stack and applies an
      * additional translation offset.
@@ -580,7 +624,7 @@ public final class TextureBatch {
      */
     public void resumeAfterExternalDraw() {
         if (!drawing) throw new IllegalStateException("The batch is not drawing.");
-        if (instanceCount != 0) throw new IllegalStateException("Flush before switching renderers.");
+        if (instanceCount != 0 || glyphs != null && glyphs.isDrawing()) throw new IllegalStateException("Flush before switching renderers.");
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDisable(GL_DEPTH_TEST);
@@ -747,6 +791,7 @@ public final class TextureBatch {
         translationDepth = 0;
         translationX = 0f;
         translationY = 0f;
+        if (glyphs != null) glyphs.resetTransform();
         drawing = true;
 
         usingFBO = fbo != null;
@@ -1613,6 +1658,7 @@ public final class TextureBatch {
             return;
         }
 
+        finishGlyphs();
         if (instanceCount >= maxSprites) {
             flush();
         }
@@ -1641,6 +1687,8 @@ public final class TextureBatch {
         x += translationX;
         y += translationY;
 
+        a *= opacityMultiplier;
+
         instanceBuffer.put(x).put(y).put(w).put(h);
         instanceBuffer.put(r).put(g).put(b).put(a);
         instanceBuffer.put((float) texUnit);
@@ -1657,6 +1705,130 @@ public final class TextureBatch {
         }
 
         instanceCount++;
+    }
+
+    /**
+     * Queues live Slug outlines at a baseline origin in the normal batch scope.
+     * Consecutive text calls share a glyph queue; switching to sprites preserves
+     * submission order. Null tint selects the batch color. Translation, logical
+     * clipping and opacity apply exactly once when glyphs are submitted.
+     *
+     * @param font borrowed live font, kept alive through flush
+     * @param text UTF-16 text; null or empty submits nothing
+     * @param x baseline X in world units before batch translation
+     * @param y baseline Y in world units before batch translation
+     * @param size finite nonnegative world units per em
+     * @param tint copied tint, or null for the batch color
+     * @throws IllegalStateException if the batch is not drawing or the font is disposed
+     * @throws IllegalArgumentException if size is negative or nonfinite
+     */
+    public void draw(SlugFont font, String text, float x, float y, float size, Color tint) {
+        if (!drawing) throw new IllegalStateException("Call begin() before draw().");
+        Objects.requireNonNull(font, "font");
+        if (!Float.isFinite(size) || size < 0f)
+            throw new IllegalArgumentException("Size must be finite and nonnegative.");
+        if (text == null || text.isEmpty() || size == 0f || opacityMultiplier == 0f) return;
+        Color selected = tint == null ? color : tint;
+        if (selected.a() <= 0f) return;
+        if (font.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
+        prepareGlyphs(selected).draw(font, text, x + translationX, y + translationY, size);
+    }
+
+    /**
+     * Queues a retained layout using live curves without repeating text layout.
+     * The run and its font are borrowed; the font must outlive queued draws.
+     *
+     * @param run precomputed glyph positions and size
+     * @param x baseline X before batch translation
+     * @param y baseline Y before batch translation
+     * @param tint copied tint, or null for the batch color
+     * @throws IllegalStateException if the batch is not drawing or the font is disposed
+     */
+    public void draw(SlugTextRun run, float x, float y, Color tint) {
+        if (!drawing) throw new IllegalStateException("Call begin() before draw().");
+        Objects.requireNonNull(run, "run");
+        if (run.glyphCount() == 0 || run.size() == 0f || opacityMultiplier == 0f) return;
+        Color selected = tint == null ? color : tint;
+        if (selected.a() <= 0f) return;
+        SlugFont font = run.font();
+        if (font.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
+        prepareGlyphs(selected).draw(run, x + translationX, y + translationY);
+    }
+
+    /**
+     * Coordinates exclusive use of shared staging and prepares text submission.
+     * GPU state and glyph layout remain owned by the internal glyph component.
+     *
+     * @param tint validated nonnull text tint
+     * @return prepared glyph component with the sprite queue flushed
+     */
+    private TextureBatchGlyphs prepareGlyphs(Color tint) {
+        TextureBatchGlyphs glyphs = getGlyphs();
+        if (!glyphs.isDrawing()) flush();
+        glyphs.prepare(tint, opacityMultiplier, clipEnabled, clipX, clipY, clipW, clipH);
+        return glyphs;
+    }
+
+    /**
+     * Lazily creates glyph implementation state while borrowing existing storage.
+     * Sprite-only batches allocate no glyph component or associated matrices.
+     *
+     * @return this batch's reusable glyph component
+     */
+    private TextureBatchGlyphs getGlyphs() {
+        if (glyphs == null) glyphs = new TextureBatchGlyphs(instanceBytes, quadVBO, instanceVBO, maxSprites);
+        return glyphs;
+    }
+
+    /**
+     * Applies a rigid world transform to text, matching a caller's custom sprite
+     * transform. UI scopes use this for composed node rotations. Previously queued
+     * work is flushed before the transform changes; begin resets it to identity.
+     *
+     * @param cosine finite rotation cosine
+     * @param sine finite rotation sine
+     * @param x finite horizontal transform offset
+     * @param y finite vertical transform offset
+     */
+    public void setTextTransform(float cosine, float sine, float x, float y) {
+        if (!drawing) throw new IllegalStateException("Call begin() before setTextTransform().");
+        if (!Float.isFinite(cosine) || !Float.isFinite(sine) || !Float.isFinite(x) || !Float.isFinite(y))
+            throw new IllegalArgumentException("Text transform must be finite.");
+        if (glyphs == null && cosine == 1f && sine == 0f && x == 0f && y == 0f) return;
+        TextureBatchGlyphs glyphs = getGlyphs();
+        if (glyphs.matchesTransform(cosine, sine, x, y)) return;
+        flush();
+        glyphs.setTransform(cosine, sine, x, y);
+    }
+
+    /**
+     * Aligns a text baseline to the nearest physical pixel boundary when the
+     * combined camera/text projection is axis-aligned and uniformly scaled.
+     * Begins a glyph segment so subsequent text reuses its projection/viewport
+     * snapshot. Rotated or nonuniform projections retain the supplied baseline.
+     *
+     * @param baseline finite Y coordinate before batch translation
+     * @return aligned baseline in the same local world coordinates
+     */
+    public float alignTextBaseline(float baseline) {
+        if (!drawing) throw new IllegalStateException("Call begin() before alignTextBaseline().");
+        if (!Float.isFinite(baseline)) throw new IllegalArgumentException("Baseline must be finite.");
+        TextureBatchGlyphs glyphs = getGlyphs();
+        if (!glyphs.isDrawing()) flush();
+        return glyphs.alignBaseline(baseline, translationY);
+    }
+
+    /**
+     * Finishes exclusive glyph use and restores the sprite view of shared storage,
+     * including when a disposed queued font causes glyph submission to fail.
+     */
+    private void finishGlyphs() {
+        if (glyphs == null || !glyphs.isDrawing()) return;
+        try {
+            glyphs.finish();
+        } finally {
+            instanceBuffer.clear();
+        }
     }
 
     /**
@@ -1748,20 +1920,23 @@ public final class TextureBatch {
     public long getTotalCulledSprites() {return totalCulledSprites;}
 
     /**
-     * Returns the cumulative count of nonempty instanced draws issued by flush.
+     * Returns the cumulative count of nonempty sprite and glyph draws, including
+     * glyph capacity/font flushes within a currently active text segment.
      *
      * @return lifetime draw-call count
      */
-    public long getTotalDrawCalls() {return totalDrawCalls;}
+    public long getTotalDrawCalls() {return totalDrawCalls + (glyphs == null ? 0L : glyphs.getTotalDrawCalls());}
 
     /**
-     * Uploads queued instances after applying the active projection, orphans the
+     * Finishes any live glyph segment and restores the sprite pipeline, then
+     * uploads queued sprite instances after applying the active projection, orphans the
      * stream buffer, and issues one instanced draw. Clears CPU instance/texture-slot
      * bookkeeping afterward while retaining the drawing scope. Empty queues return
      * immediately. Call within an active batch scope with its GL state intact;
      * this method does not establish or restore the full scope itself.
      */
     public void flush() {
+        finishGlyphs();
         if (instanceCount == 0) {
             return;
         }
@@ -1792,11 +1967,13 @@ public final class TextureBatch {
      * </p>
      *
      * <p>
-     * This disposes the internally owned default shader and deletes the quad and
-     * instance VBOs. After this method is called, the batch should no longer be used.
+     * This disposes the internally owned default shader, any lazily created curve
+     * shader, and the quad and instance VBOs. Pending text is discarded; borrowed
+     * fonts remain alive. After this method is called, the batch should no longer be used.
      * </p>
      */
     public void dispose() {
+        if (glyphs != null) glyphs.dispose();
         defaultShader.dispose();
         glDeleteVertexArrays(vao);
         glDeleteBuffers(quadVBO);

@@ -51,6 +51,16 @@ public final class PointLight2D {
     }
 
     /**
+     * Returns an opaque display color for editors and UI controls. Emission
+     * channels above one are clamped to the picker's representable range.
+     *
+     * @return current display color
+     */
+    public Color getColor() {
+        return new Color(Math.clamp(r, 0f, 1f), Math.clamp(g, 0f, 1f), Math.clamp(b, 0f, 1f), 1f);
+    }
+
+    /**
      * Whether occluder shadows are enabled for this light.
      */
     public boolean isCastsShadows() {
@@ -126,6 +136,41 @@ public final class PointLight2D {
     public float getRadius() {
         return radius;
     }
+
+    /**
+     * Reads the source radius controlling shadow softness in world units.
+     *
+     * @return nonnegative emitter radius
+     */
+    public float getSourceRadius() {return sourceRadius;}
+
+    /**
+     * Reads the cone's emitted-ray direction in the XY plane.
+     *
+     * @return direction in radians
+     */
+    public float getDirection() {return direction;}
+
+    /**
+     * Reads the full-strength cone half-angle.
+     *
+     * @return inner half-angle in radians
+     */
+    public float getInnerAngle() {return inner;}
+
+    /**
+     * Reads the zero-strength cone half-angle; PI describes point lighting.
+     *
+     * @return outer half-angle in radians
+     */
+    public float getOuterAngle() {return outer;}
+
+    /**
+     * Reads the accepted occluder categories without changing shadow caches.
+     *
+     * @return category bitmask; -1 accepts every category
+     */
+    public int getOcclusionMask() {return mask;}
 
     /**
      * Changes the light's influence radius. A changed radius advances both
@@ -278,6 +323,13 @@ public final class PointLight2D {
         }
         return this;
     }
+
+    /**
+     * Reports whether this light participates in scene lighting.
+     *
+     * @return current enabled state
+     */
+    public boolean isEnabled() {return enabled;}
 
     /**
      * Selects occluder categories by bit intersection. An occluder participates

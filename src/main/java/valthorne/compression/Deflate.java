@@ -14,7 +14,6 @@ import java.util.zip.Inflater;
  * and decompression, respectively.
  *
  * @author Albert Beaupre
- * @version 1.0
  * @see Deflater
  * @see Inflater
  * @since May 10th, 2025

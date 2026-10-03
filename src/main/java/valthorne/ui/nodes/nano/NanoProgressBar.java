@@ -1,5 +1,7 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.NanoText;
+
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
@@ -54,7 +56,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
     /**
      * Theme corner radius in UI units.
      */
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.progressbar.cornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.progressbar.cornerRadius", Float.class, 0f);
     /**
      * Theme border width and fill inset in UI units.
      */
@@ -87,7 +89,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
 
     private String fontName = "default"; // Borrowed NanoVG font registration name.
     private float fontSize = 16f; // Percentage font size in UI units.
-    private float cornerRadius = 6f; // Rounded-corner radius in UI units.
+    private float cornerRadius = 0f; // Rounded-corner radius in UI units.
     private float borderWidth = 1f; // Border width and fill inset in UI units.
     private float textPaddingX = 8f; // Horizontal percentage padding in UI units.
     private NodeAction<NanoProgressBar> progressAction; // Optional synchronous displayed-value callback.
@@ -121,8 +123,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
     public NanoProgressBar progress(float progress) {
         float clamped = MathUtils.clamp(progress, min, max);
 
-        if (this.progress == clamped)
-            return this;
+        if (this.progress == clamped) return this;
 
         this.progress = clamped;
         this.animationStartProgress = displayedProgress;
@@ -135,8 +136,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
             this.animationTargetProgress = clamped;
             this.animationElapsed = 0f;
 
-            if (progressAction != null)
-                progressAction.perform(this);
+            if (progressAction != null) progressAction.perform(this);
         }
 
         return this;
@@ -402,8 +402,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
      */
     @Override
     public void update(float delta) {
-        if (displayedProgress == progress)
-            return;
+        if (displayedProgress == progress) return;
 
         float previousDisplayedProgress = displayedProgress;
 
@@ -424,8 +423,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
             }
         }
 
-        if (previousDisplayedProgress != displayedProgress && progressAction != null)
-            progressAction.perform(this);
+        if (previousDisplayedProgress != displayedProgress && progressAction != null) progressAction.perform(this);
     }
 
     /**
@@ -536,7 +534,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
 
         if (displayPercentage) {
             String text = String.format("%.2f%%", percentage * 100f);
-            float textWidth = NanoUtility.measureTextWidth(vg, fontName, fontSize, text);
+            float textWidth = NanoText.measureTextWidth(this, vg, fontName, fontSize, text);
             float textY = NanoUtility.getTextCenterY(vg, fontName, fontSize, y, height);
 
             float textX = x + (width - textWidth) * 0.5f;
@@ -547,7 +545,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
             nvgFontFace(vg, fontName);
             nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
             nvgFillColor(vg, NanoUtility.color1(textColor));
-            nvgText(vg, textX, textY, text);
+            NanoText.draw(this, vg, textX, textY, text, fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
         }
     }
 

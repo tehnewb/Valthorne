@@ -5,6 +5,7 @@ import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
+import valthorne.math.geometry.Rectangle;
 
 /**
  * A lightweight, time-driven frame animation player.
@@ -96,8 +97,11 @@ public class Animation implements Drawable {
      */
     private static final byte FINISHED = 3;
 
+    private boolean visible = true; // Whether this drawable participates in rendering and animation updates.
     private final ByteBits bits = new ByteBits();         // Packed flags: paused/looping/returning/finished.
-    private final AnimationFrame[] frames;                // Ordered list of frames played by this animation.
+    private AnimationFrame[] frames;                      // Ordered list of frames played by this animation.
+    private Rectangle bounds; // Optional instance placement; null retains caller-supplied drawing bounds.
+    private float rotation; // Clockwise visual rotation around the placed frame center in degrees.
 
     private PlaybackMode playbackMode;                    // Current playback mode (forward/reverse/bidirectional).
     private short currentIndex;                           // Current frame index into {@link #frames}.
@@ -137,6 +141,68 @@ public class Animation implements Drawable {
         }
     }
 
+    /**
+     * Replaces frame data without replacing this animation's identity. Restarts
+     * its timeline while preserving playback mode, speed, looping and pause.
+     * The caller retains ownership of frame drawables and their textures.
+     *
+     * @param frames borrowed frame array, or null for an empty animation
+     * @return this animation
+     */
+    public Animation setFrames(AnimationFrame... frames) {
+        if (frames != null && frames.length > Short.MAX_VALUE)
+            throw new IllegalArgumentException("Too many animation frames.");
+        this.frames = frames;
+        totalDuration = 0f;
+        if (frames != null) {
+            for (AnimationFrame frame : frames)
+                if (frame != null) totalDuration += Math.max(0f, frame.duration());
+        }
+        reset();
+        return this;
+    }
+
+    /**
+     * Assigns optional world placement for every draw call on this instance.
+     * Null restores caller-supplied coordinates. Copies the rectangle so caller
+     * mutations cannot change placement; textures and frames remain unaffected.
+     *
+     * @param bounds finite nonnegative-sized placement, or null to clear
+     */
+    public void setBounds(Rectangle bounds) {
+        if (bounds == null) {
+            this.bounds = null;
+            return;
+        }
+        setBounds(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+    }
+
+    /**
+     * Updates world placement, reusing its rectangle after the first assignment.
+     *
+     * @param x world left
+     * @param y world bottom
+     * @param width nonnegative world width
+     * @param height nonnegative world height
+     */
+    public void setBounds(float x, float y, float width, float height) {
+        if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(width) || !Float.isFinite(height) || width < 0f || height < 0f)
+            throw new IllegalArgumentException("Animation bounds must be finite with nonnegative dimensions.");
+        if (bounds == null) bounds = new Rectangle(x, y, width, height);
+        else {
+            bounds.setPosition(x, y);
+            bounds.setSize(width, height);
+        }
+    }
+
+    /**
+     * Returns instance placement. Treat the returned rectangle as read-only and
+     * use setBounds to validate changes. Unpositioned animations return null.
+     *
+     * @return borrowed world bounds or null
+     */
+    public Rectangle getBounds() {return bounds;}
+
 
     /**
      * Draws the current animation frame using the specified parameters.
@@ -157,11 +223,33 @@ public class Animation implements Drawable {
      */
     @Override
     public void draw(TextureBatch batch, float x, float y, float width, float height, float regionX, float regionY, float regionWidth, float regionHeight, float originX, float originY, float rotation, Color tint) {
+        if (!visible) return;
         AnimationFrame currentFrame = getCurrentFrame();
         if (currentFrame == null) return;
         if (currentFrame.drawable() == null) return;
 
-        currentFrame.drawable().draw(batch, x, y, width, height, regionX, regionY, regionWidth, regionHeight, originX, originY, rotation, tint);
+        float frameWidth = bounds == null ? width : bounds.getWidth();
+        float frameHeight = bounds == null ? height : bounds.getHeight();
+        currentFrame.drawable().draw(batch, bounds == null ? x : bounds.getX(), bounds == null ? y : bounds.getY(),
+                bounds == null ? width : bounds.getWidth(), bounds == null ? height : bounds.getHeight(),
+                regionX, regionY, regionWidth, regionHeight, this.rotation == 0 ? originX : frameWidth * .5f, this.rotation == 0 ? originY : frameHeight * .5f, rotation + this.rotation, tint);
+    }
+
+    /**
+     * Returns the instance's visual rotation.
+     *
+     * @return clockwise angle in degrees
+     */
+    public float getRotation() {return rotation;}
+
+    /**
+     * Sets a finite visual angle around the current frame's placement center.
+     *
+     * @param degrees clockwise degrees
+     */
+    public void setRotation(float degrees) {
+        if (!Float.isFinite(degrees)) throw new IllegalArgumentException("Animation rotation must be finite");
+        rotation = degrees;
     }
 
     /**
@@ -202,6 +290,7 @@ public class Animation implements Drawable {
      *     <li>Time is scaled by {@link #speed}.</li>
      *     <li>Large deltas can advance across multiple frames in one call.</li>
      *     <li>0-duration frames are skipped without getting stuck in an infinite loop.</li>
+     *     <li>A single frame remains static for every playback direction.</li>
      *     <li>If {@link #isPaused()} or {@link #isFinished()} is true, this method does nothing.</li>
      * </ul>
      *
@@ -214,8 +303,10 @@ public class Animation implements Drawable {
      * @param delta elapsed seconds since last update
      */
     public void update(float delta) {
+        if (!visible) return;
         if (frames == null || frames.length == 0) return;
         if (bits.get(PAUSED) || bits.get(FINISHED)) return;
+        if (frames.length == 1) return;
 
         float scaled = delta * speed;
         if (scaled <= 0f) return;
@@ -448,7 +539,7 @@ public class Animation implements Drawable {
     /**
      * Returns the total duration of one forward pass (sum of all frame durations).
      *
-     * <p>This is precomputed during construction from the provided frames.</p>
+     * <p>This is precomputed during construction and after {@link #setFrames(AnimationFrame...)}.</p>
      *
      * @return total duration in seconds
      */
@@ -839,4 +930,18 @@ public class Animation implements Drawable {
         currentIndex = 0;
         elapsedTime = 0f;
     }
+    /**
+     * Reports whether this object participates in rendering and animation updates.
+     *
+     * @return current visibility
+     */
+    public boolean isVisible() {return visible;}
+
+    /**
+     * Changes visibility without releasing resources or changing the object's
+     * position, frame, or timing state. Hidden objects can be shown again.
+     *
+     * @param visible whether rendering and animation updates are enabled
+     */
+    public void setVisible(boolean visible) {this.visible = visible;}
 }

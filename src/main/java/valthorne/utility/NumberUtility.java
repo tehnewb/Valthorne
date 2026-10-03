@@ -8,7 +8,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
- * <h1>NumberUtility</h1>
+ * <h2>NumberUtility</h2>
  *
  * <p>
  * {@code NumberUtility} is a mutable, chainable numeric helper built around a single internal

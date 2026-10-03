@@ -21,7 +21,7 @@ import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.ui.nodes.nano.NanoTextField;
 
 /**
- * <h1>UINode</h1>
+ * <h2>UINode</h2>
  *
  * <p>
  * {@code UINode} is the abstract foundation for every UI object in the Valthorne UI system.
@@ -190,6 +190,9 @@ public abstract class UINode implements Dimensional {
     private static final Vector2f ZERO_VECTOR = new Vector2f();
     private final ShortBits bits = new ShortBits(); // Compact bitset holding node interaction and state flags.
     private final Rectangle bounds = new Rectangle(); // Cached bounds built from Yoga layout results.
+    private float rotation; // Counterclockwise visual angle around the laid-out center, in degrees.
+    private float rotationCosine = 1; // Cached orientation cosine for allocation-free hit testing.
+    private float rotationSine; // Cached orientation sine for allocation-free hit testing.
     private Tooltip tooltip; // Optional tooltip displayed for this node.
 
     private UIContainer parent; // Parent container that owns this node.
@@ -229,6 +232,9 @@ public abstract class UINode implements Dimensional {
     private static void transformContentPoint(UIContainer container, Vector2f point) {
         if (container == null) return;
         transformContentPoint(container.getParent(), point);
+        float x = container.inverseRotationX(point.x(), point.y());
+        float y = container.inverseRotationY(point.x(), point.y());
+        point.set(x, y);
         point.set(container.transformChildHitX(point.x()), container.transformChildHitY(point.y()));
     }
 
@@ -579,6 +585,17 @@ public abstract class UINode implements Dimensional {
      */
     public boolean isClickable() {
         return bits.get(CLICKABLE_BIT);
+    }
+
+    /**
+     * Determines whether this clickable hit blocks lower-priority game input when
+     * its root enables input blocking. Nodes returning false still receive UI
+     * events and may consume individual events that they handle.
+     *
+     * @return true for ordinary UI controls that reserve their hit area
+     */
+    public boolean blocksLowerInput() {
+        return true;
     }
 
     /**
@@ -1360,7 +1377,139 @@ public abstract class UINode implements Dimensional {
      * @return true if the point lies inside the node bounds
      */
     public boolean contains(float px, float py) {
-        return bounds.contains(px, py);
+        return bounds.contains(inverseRotationX(px, py), inverseRotationY(px, py));
+    }
+
+    /**
+     * Reads the counterclockwise visual angle without changing Yoga layout.
+     *
+     * @return angle in degrees
+     */
+    public final float getRotation() {return rotation;}
+
+    /**
+     * Supplies the cached orientation to the root's rendering context.
+     *
+     * @return counterclockwise rotation cosine
+     */
+    final float rotationCosine() {return rotationCosine;}
+
+    /**
+     * Supplies the cached orientation to the root's rendering context.
+     *
+     * @return counterclockwise rotation sine
+     */
+    final float rotationSine() {return rotationSine;}
+
+    /**
+     * Resolves the rotated visual envelope in top-down layout coordinates, including
+     * ancestor rotations. Canonical Yoga dimensions remain unchanged.
+     *
+     * @param output caller-owned array with at least four entries for x, y, width and height
+     */
+    public final void getVisualBounds(float[] output) {
+        if (output == null || output.length < 4) throw new IllegalArgumentException("Visual bounds need four output entries");
+        float cx = getAbsoluteX() + getWidth() * .5f;
+        float cy = getAbsoluteY() + getHeight() * .5f;
+        float c = rotationCosine;
+        float s = rotationSine;
+        for (UINode ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
+            if (ancestor.rotation == 0) continue;
+            float px = ancestor.getAbsoluteX() + ancestor.getWidth() * .5f;
+            float py = ancestor.getAbsoluteY() + ancestor.getHeight() * .5f;
+            float dx = cx - px;
+            float dy = cy - py;
+            cx = px + ancestor.rotationCosine * dx + ancestor.rotationSine * dy;
+            cy = py - ancestor.rotationSine * dx + ancestor.rotationCosine * dy;
+            float nextCosine = ancestor.rotationCosine * c - ancestor.rotationSine * s;
+            s = ancestor.rotationSine * c + ancestor.rotationCosine * s;
+            c = nextCosine;
+        }
+        output[2] = Math.abs(c) * getWidth() + Math.abs(s) * getHeight();
+        output[3] = Math.abs(s) * getWidth() + Math.abs(c) * getHeight();
+        output[0] = cx - output[2] * .5f;
+        output[1] = cy - output[3] * .5f;
+    }
+
+    /**
+     * Converts a top-down visual point to this node's parent's canonical layout
+     * space without allocating a vector. Parent rotations are inverted in root
+     * order so nested orientation scopes match rendering.
+     *
+     * @param x visual X
+     * @param y visual Y
+     * @param output caller-owned two-entry point storage
+     */
+    public final void parentLayoutPoint(float x, float y, float[] output) {
+        if (output == null || output.length < 2) throw new IllegalArgumentException("Point output needs two entries");
+        output[0] = x;
+        output[1] = y;
+        inverseAncestorPoint(parent, output);
+    }
+
+    /**
+     * Inverts nested visual rotations from the outermost parent inward.
+     *
+     * @param ancestor deepest parent
+     * @param point reusable top-down point
+     */
+    private static void inverseAncestorPoint(UINode ancestor, float[] point) {
+        /*
+         * Recursion follows the UI's existing layout ancestry and avoids a
+         * temporary parent stack or vector allocation during pointer gestures.
+         */
+        if (ancestor == null) return;
+        inverseAncestorPoint(ancestor.getParent(), point);
+        if (ancestor.rotation == 0) return;
+        float cx = ancestor.getAbsoluteX() + ancestor.getWidth() * .5f;
+        float cy = ancestor.getAbsoluteY() + ancestor.getHeight() * .5f;
+        float x = point[0] - cx;
+        float y = point[1] - cy;
+        point[0] = cx + ancestor.rotationCosine * x - ancestor.rotationSine * y;
+        point[1] = cy + ancestor.rotationSine * x + ancestor.rotationCosine * y;
+    }
+
+    /**
+     * Rotates this node and its descendants around its layout center. Layout
+     * dimensions and constraints remain canonical; rendering and pointer mapping
+     * use the same cached orientation.
+     *
+     * @param degrees finite counterclockwise angle
+     */
+    public final void setRotation(float degrees) {
+        if (!Float.isFinite(degrees)) throw new IllegalArgumentException("UI rotation must be finite");
+        rotation = degrees;
+        float radians = (float) Math.toRadians(degrees);
+        rotationCosine = (float) Math.cos(radians);
+        rotationSine = (float) Math.sin(radians);
+    }
+
+    /**
+     * Maps a rendered point back to this node's unrotated horizontal coordinate.
+     *
+     * @param x bottom-origin input X
+     * @param y bottom-origin input Y
+     * @return canonical X
+     */
+    protected final float inverseRotationX(float x, float y) {
+        if (rotation == 0) return x;
+        float cx = bounds.getX() + bounds.getWidth() * .5f;
+        float cy = bounds.getY() + bounds.getHeight() * .5f;
+        return cx + rotationCosine * (x - cx) + rotationSine * (y - cy);
+    }
+
+    /**
+     * Maps a rendered point back to this node's unrotated vertical coordinate.
+     *
+     * @param x bottom-origin input X
+     * @param y bottom-origin input Y
+     * @return canonical Y
+     */
+    protected final float inverseRotationY(float x, float y) {
+        if (rotation == 0) return y;
+        float cx = bounds.getX() + bounds.getWidth() * .5f;
+        float cy = bounds.getY() + bounds.getHeight() * .5f;
+        return cy - rotationSine * (x - cx) + rotationCosine * (y - cy);
     }
 
     /**
@@ -1408,6 +1557,9 @@ public abstract class UINode implements Dimensional {
     public final Vector2f screenToContent(float x, float y) {
         Vector2f point = screenToWorld(x, y);
         transformContentPoint(parent, point);
+        float px = inverseRotationX(point.x(), point.y());
+        float py = inverseRotationY(point.x(), point.y());
+        point.set(px, py);
         return point;
     }
 

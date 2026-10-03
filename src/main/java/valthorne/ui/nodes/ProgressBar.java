@@ -1,11 +1,13 @@
 package valthorne.ui.nodes;
 
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.Font;
+import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 import valthorne.graphics.Color;
 
 /**
@@ -67,7 +69,7 @@ import valthorne.graphics.Color;
  * float current = bar.getProgress();
  * boolean vertical = bar.isVertical();
  * boolean showingPercent = bar.isDisplayPercentage();
- * Font font = bar.getFont();
+ * SlugFont font = bar.getFont();
  *
  * root.add(bar);
  * // The root's normal update and draw lifecycle visits the progress bar.
@@ -84,20 +86,25 @@ import valthorne.graphics.Color;
  */
 public class ProgressBar extends Panel {
 
-    /**
+    /*
      * Style key used to resolve the background drawable for the full progress bar area.
      */
     public static final StyleKey<Drawable> BACKGROUND_KEY = StyleKey.of("background", Drawable.class);
 
-    /**
+    /*
      * Style key used to resolve the foreground drawable for the filled portion of the bar.
      */
     public static final StyleKey<Drawable> FOREGROUND_KEY = StyleKey.of("foreground", Drawable.class);
 
-    /**
+    /*
      * Style key used to resolve the font used for percentage text rendering.
      */
-    public static final StyleKey<Font> FONT_KEY = StyleKey.of("font", Font.class);
+    public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
+
+    /*
+     * Em scale shared by all regular UI text controls through the semantic size token.
+     */
+    public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
 
     private final float min; // Minimum logical progress value supported by this bar
     private final float max; // Maximum logical progress value supported by this bar
@@ -110,7 +117,9 @@ public class ProgressBar extends Panel {
     private Drawable background; // Resolved background drawable from the active style
     private Drawable foreground; // Resolved foreground drawable from the active style
     private String displayText = "0%"; // Cached formatted percentage drawn without changing the font's text during painting.
-    private Font font; // Resolved font used for percentage text rendering
+    private SlugFont font; // Resolved font used for percentage text rendering
+    private SlugTextRun run; // Retained percentage layout; rebuilds only when content, font or size changes.
+    private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
 
     /**
      * <p>
@@ -200,8 +209,8 @@ public class ProgressBar extends Panel {
      *
      * <p>
      * With a font available, enabling refreshes the cached percentage string.
-     * Disabling instead clears the font's legacy text property, which can affect
-     * another user of that shared Font. No layout invalidation is performed.
+     * Disabling clears only this control's cached text. The shared font state is
+     * never changed. No layout invalidation is performed.
      * </p>
      *
      * @param displayPercentage whether percentage text should be shown
@@ -214,7 +223,7 @@ public class ProgressBar extends Panel {
             if (displayPercentage)
                 displayText = String.format("%.2f%%", getPercentage() * 100f);
             else
-                font.setText("");
+                displayText = "";
         }
         return this;
     }
@@ -280,7 +289,7 @@ public class ProgressBar extends Panel {
      *
      * @return the resolved font, or {@code null} if none is available
      */
-    public Font getFont() {
+    public SlugFont getFont() {
         return font;
     }
 
@@ -292,7 +301,7 @@ public class ProgressBar extends Panel {
      * <p>
      * The current style is resolved and used to update the background drawable,
      * foreground drawable, and optional font. With percentage display enabled,
-     * the cached string is refreshed; otherwise a present font's legacy text is
+     * the cached string is refreshed; otherwise this control's cached text is
      * cleared. If no style exists,
      * all resolved visual references are cleared.
      * </p>
@@ -305,12 +314,15 @@ public class ProgressBar extends Panel {
             background = style.get(BACKGROUND_KEY);
             foreground = style.get(FOREGROUND_KEY);
             font = style.get(FONT_KEY);
+            if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
+            fontSize = style.get(FONT_SIZE_KEY);
+            if (!Float.isFinite(fontSize) || fontSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
 
             if (font != null) {
                 if (displayPercentage)
                     displayText = String.format("%.2f%%", getPercentage() * 100f);
                 else
-                    font.setText("");
+                    displayText = "";
             }
         } else {
             background = null;
@@ -333,7 +345,7 @@ public class ProgressBar extends Panel {
      * rendered on top of the bar.
      * Horizontal fill grows from the left; vertical fill grows from the bottom
      * in render coordinates. Label.COLOR_KEY supplies text color when present,
-     * otherwise white is used. The cached percentage is passed directly to Font.draw.
+     * otherwise white is used. The cached percentage uses a retained SlugTextRun at the resolved em size.
      * This method does not call Panel.draw or render children, and it relies on
      * the root for visibility checks and a prepared batch.
      * </p>
@@ -358,9 +370,11 @@ public class ProgressBar extends Panel {
         }
 
         if (displayPercentage && font != null) {
-            float textX = getRenderX() + (getWidth() - font.getWidth(displayText)) * 0.5f;
-            float textY = getRenderY() + (getHeight() - font.getHeight(displayText)) * 0.5f;
-            font.draw(batch, displayText, textX, textY, getStyle() != null && getStyle().get(Label.COLOR_KEY) != null
+            if (run == null || run.font() != font) run = font.createRun(displayText, fontSize);
+            else run.rebuild(displayText, fontSize);
+            float textX = getRenderX() + (getWidth() - run.width()) * 0.5f;
+            float textY = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
+            run.draw(batch, textX, textY, getStyle() != null && getStyle().get(Label.COLOR_KEY) != null
                     ? getStyle().get(Label.COLOR_KEY) : Color.WHITE);
         }
     }

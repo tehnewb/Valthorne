@@ -1,5 +1,7 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.NanoText;
+
 import org.lwjgl.nanovg.NVGColor;
 import valthorne.Keyboard;
 import valthorne.event.events.*;
@@ -106,7 +108,7 @@ public class NanoTextField extends UINode implements NanoNode {
     /**
      * Theme corner radius used by text-field layout and painting.
      */
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.textfield.cornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.textfield.cornerRadius", Float.class, 0f);
     /**
      * Theme border width used by text-field layout and painting.
      */
@@ -148,7 +150,7 @@ public class NanoTextField extends UINode implements NanoNode {
     private float blinkInterval = 0.5f; // Seconds between caret visibility toggles.
 
     private float padding = 10f; // Content inset on each side in UI units.
-    private float cornerRadius = 6f; // Rounded-box radius in UI units.
+    private float cornerRadius = 0f; // Rounded-box radius in UI units.
     private float borderWidth = 1f; // Border stroke width in UI units.
     private float caretWidth = 2f; // Requested caret stroke width, drawn at least one UI unit wide.
     private float caretPadY = 8f; // Vertical inset for caret and selection geometry.
@@ -747,7 +749,7 @@ public class NanoTextField extends UINode implements NanoNode {
             String measured = getDisplayText();
             String fallback = placeholder == null ? "" : placeholder;
             float measuredWidth = Math.max(measureTextWidth(measured), measureTextWidth(fallback)) + padding * 2f;
-            float measuredHeight = NanoUtility.measureTextHeight(this.getRoot().getNanoVGHandle(), fontName, fontSize) + padding * 2f;
+            float measuredHeight = NanoText.measureTextHeight(this, this.getRoot().getNanoVGHandle(), fontName, fontSize) + padding * 2f;
 
             if (getLayout().getWidth().isAuto())
                 getLayout().width(measuredWidth);
@@ -837,7 +839,7 @@ public class NanoTextField extends UINode implements NanoNode {
         }
 
         nvgFillColor(vg, fg);
-        nvgText(vg, drawX, drawY, drawText);
+        NanoText.draw(this, vg, drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
         if (isFocused() && caretVisible) {
             float caretX = drawX + measureTextWidth(visibleText, 0, Math.min(caretIndex, visibleText.length()));
@@ -902,6 +904,19 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     private float getEventX(MousePressEvent event) {
         return getEventPosition(event.getX(), event.getY()).x();
+    }
+
+    /**
+     * Finds the raw text offset beneath a screen-space pointer without moving
+     * the caret or changing selection. Inspector controls use this to choose
+     * which coordinate of a compound numeric value a drag should adjust.
+     *
+     * @param screenX pointer horizontal coordinate
+     * @param screenY pointer vertical coordinate
+     * @return UTF-16 offset at the pointer, clamped to the displayed text
+     */
+    public int textIvdexAt(float screenX, float screenY) {
+        return getIndexAtMouseX(getEventPosition(screenX, screenY).x());
     }
 
     /**
@@ -1189,22 +1204,21 @@ public class NanoTextField extends UINode implements NanoNode {
     private float measureTextWidth(String value) {
         long vg = getRoot() == null ? 0L : getRoot().getNanoVGHandle();
         if (vg == 0L) return 0f;
-        return NanoUtility.measureTextWidth(vg, fontName, fontSize, value);
+        return NanoText.measureTextWidth(this, vg, fontName, fontSize, value);
     }
 
     /**
-     * Measures a clamped UTF-16 substring through NanoUtility. Requires a root; a
+     * Measures a clamped UTF-16 substring through NanoUtility. A detached field or
      * zero handle then uses the utility's half-font-size-per-unit estimate.
      *
      * @param value source text
      * @param start inclusive requested UTF-16 index
      * @param end exclusive requested UTF-16 index
      * @return measured or estimated substring width
-     * @throws NullPointerException if the field is detached
      */
     private float measureTextWidth(String value, int start, int end) {
-        long vg = this.getRoot().getNanoVGHandle();
-        return NanoUtility.measureTextWidth(vg, fontName, fontSize, value, start, end);
+        long vg = getRoot() == null ? 0 : getRoot().getNanoVGHandle();
+        return NanoText.measureTextWidth(this, vg, fontName, fontSize, value, start, end);
     }
 
     /**

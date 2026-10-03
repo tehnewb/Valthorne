@@ -81,13 +81,13 @@ public final class TableModel<T> {
     /**
      * Registers a synchronous listener for every successful rebuild, including
      * refreshes that preserve identical membership. The listener observes committed
-     * state; close the returned handle to remove this registration.
+     * state; run the returned action to remove this registration.
      *
      * @param listener non-null callback
      * @return independent removal handle
      * @throws NullPointerException if listener is null
      */
-    public AutoCloseable onChange(Runnable listener) {
+    public Runnable onChange(Runnable listener) {
         return changes.subscribe(listener);
     }
 

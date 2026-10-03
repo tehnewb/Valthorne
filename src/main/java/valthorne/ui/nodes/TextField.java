@@ -5,7 +5,8 @@ import valthorne.Keyboard;
 import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.Font;
+import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
@@ -14,6 +15,7 @@ import org.joml.Vector2f;
 import valthorne.ui.NodeAction;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 
 import java.nio.ByteBuffer;
 import valthorne.Mouse;
@@ -122,62 +124,67 @@ import valthorne.ui.behavior.TextEditing;
  */
 public class TextField extends Panel {
 
-    /**
+    /*
      * Style key used to resolve the normal background drawable.
      */
     public static final StyleKey<Drawable> BACKGROUND_KEY = StyleKey.of("background", Drawable.class);
 
-    /**
+    /*
      * Style key used to resolve the hovered background drawable.
      */
     public static final StyleKey<Drawable> HOVER_BACKGROUND_KEY = StyleKey.of("hoverBackground", Drawable.class);
 
-    /**
+    /*
      * Style key used to resolve the focused background drawable.
      */
     public static final StyleKey<Drawable> FOCUSED_BACKGROUND_KEY = StyleKey.of("focusedBackground", Drawable.class);
 
-    /**
+    /*
      * Style key used to resolve the text field font.
      */
-    public static final StyleKey<Font> FONT_KEY = StyleKey.of("font", Font.class);
+    public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
 
-    /**
+    /*
+     * Em scale shared by all regular UI text controls through the semantic size token.
+     */
+    public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
+
+    /*
      * Style key used to resolve the normal text color.
      */
     public static final StyleKey<Color> COLOR_KEY = StyleKey.of("color", Color.class);
 
-    /**
+    /*
      * Style key used to resolve the placeholder text color.
      */
     public static final StyleKey<Color> PLACEHOLDER_COLOR_KEY = StyleKey.of("placeholderColor", Color.class);
 
-    /**
+    /*
      * Style key used to resolve the caret color.
      */
     public static final StyleKey<Color> CARET_COLOR_KEY = StyleKey.of("caretColor", Color.class);
 
-    /**
+    /*
      * Style key used to resolve the selection highlight color.
      */
     public static final StyleKey<Color> SELECTION_COLOR_KEY = StyleKey.of("selectionColor", Color.class);
 
-    /**
+    /*
      * Style key used to resolve horizontal text padding.
      */
     public static final StyleKey<Float> PADDING_KEY = StyleKey.of("padding", Float.class, 10f);
 
-    /**
+    /*
      * Style key used to resolve caret width.
      */
     public static final StyleKey<Float> CARET_WIDTH_KEY = StyleKey.of("caretWidth", Float.class, 2f);
 
-    /**
+    /*
      * Style key used to resolve vertical caret padding.
      */
     public static final StyleKey<Float> CARET_PADDING_Y_KEY = StyleKey.of("caretPaddingY", Float.class, 8f);
 
-    /**
+    /*
      * Style key used to resolve a small scissor expansion value.
      */
     public static final StyleKey<Float> SCISSOR_FUDGE_KEY = StyleKey.of("scissorFudge", Float.class, 4f);
@@ -187,7 +194,7 @@ public class TextField extends Panel {
      */
     public static final StyleKey<NodeAction<TextField>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<TextField>>) (Class<?>) NodeAction.class);
 
-    /**
+    /*
      * Style key used to resolve the default selection color when no explicit selection color exists.
      */
     public static final StyleKey<Color> DEFAULT_SELECTION_COLOR_KEY = StyleKey.of("defaultSelectionColor", Color.class, new Color(1f, 1f, 1f, 0.35f));
@@ -229,7 +236,10 @@ public class TextField extends Panel {
     private Drawable background; // Resolved normal background drawable
     private Drawable hoverBackground; // Resolved hovered background drawable
     private Drawable focusedBackground; // Resolved focused background drawable
-    private Font font; // Resolved font used for rendering text
+    private SlugFont font; // Resolved font used for rendering text
+    private SlugTextRun textRun; // Reusable visible or masked text layout borrowing the resolved font.
+    private SlugTextRun placeholderRun; // Reusable placeholder layout independent of editable text.
+    private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
     private Color textColor; // Resolved text color
     private Color placeholderColor; // Resolved placeholder text color
     private Color caretColor; // Resolved caret color
@@ -656,6 +666,9 @@ public class TextField extends Panel {
             hoverBackground = style.get(HOVER_BACKGROUND_KEY);
             focusedBackground = style.get(FOCUSED_BACKGROUND_KEY);
             font = style.get(FONT_KEY);
+            if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
+            fontSize = style.get(FONT_SIZE_KEY);
+            if (!Float.isFinite(fontSize) || fontSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
             textColor = style.get(COLOR_KEY);
             placeholderColor = style.get(PLACEHOLDER_COLOR_KEY);
             caretColor = style.get(CARET_COLOR_KEY);
@@ -681,8 +694,8 @@ public class TextField extends Panel {
             if (font != null) {
                 String measured = getDisplayText();
                 String fallback = placeholder == null ? "" : placeholder;
-                float measuredWidth = Math.max(font.getWidth(measured), font.getWidth(fallback)) + padding * 2f;
-                float measuredHeight = font.getHeight("Ay") + padding * 2f;
+                float measuredWidth = Math.max(font.getWidth(measured, fontSize), font.getWidth(fallback, fontSize)) + padding * 2f;
+                float measuredHeight = font.getHeight("Ay", fontSize) + padding * 2f;
 
                 if (getLayout().getWidth().isAuto())
                     getLayout().width(measuredWidth);
@@ -736,13 +749,13 @@ public class TextField extends Panel {
 
         batch.beginScissor(scissorX + batch.getTranslationX(), getRenderY() + batch.getTranslationY(), scissorW, getHeight());
 
-        if (isFocused() && hasSelection())
-            drawSelection(batch);
-
-        drawText(batch);
-        drawCaret(batch);
-
-        batch.endScissor();
+        try {
+            if (isFocused() && hasSelection()) drawSelection(batch);
+            drawText(batch);
+            drawCaret(batch);
+        } finally {
+            batch.endScissor();
+        }
     }
 
     /**
@@ -787,19 +800,19 @@ public class TextField extends Panel {
         boolean empty = visibleText.isEmpty();
 
         float drawX = getRenderX() + padding + textOffsetX;
-        float drawY = getRenderY() + (getHeight() - font.getHeight("Ay")) * 0.5f;
-
+        float drawY = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
         if (empty) {
             if (!placeholder.isEmpty()) {
-                if (placeholderColor != null)
-                    font.draw(batch, placeholder, getRenderX() + padding, drawY, placeholderColor);
-                else font.draw(batch, placeholder, getRenderX() + padding, drawY);
+                if (placeholderRun == null || placeholderRun.font() != font)
+                    placeholderRun = font.createRun(placeholder, fontSize);
+                else placeholderRun.rebuild(placeholder, fontSize);
+                placeholderRun.draw(batch, getRenderX() + padding, drawY, placeholderColor);
             }
             return;
         }
-
-        if (textColor != null) font.draw(batch, visibleText, drawX, drawY, textColor);
-        else font.draw(batch, visibleText, drawX, drawY);
+        if (textRun == null || textRun.font() != font) textRun = font.createRun(visibleText, fontSize);
+        else textRun.rebuild(visibleText, fontSize);
+        textRun.draw(batch, drawX, drawY, textColor);
     }
 
     /**
@@ -1125,7 +1138,7 @@ public class TextField extends Panel {
         if (font == null || index <= 0) return 0f;
 
         String visibleText = getDisplayText();
-        return font.getWidth(visibleText, 0, Math.min(index, visibleText.length()));
+        return font.getWidth(visibleText, 0, Math.min(index, visibleText.length()), fontSize);
     }
 
     /**
@@ -1152,7 +1165,7 @@ public class TextField extends Panel {
         int length = visibleText.length();
 
         for (int i = editor.next(0); i <= length && i > 0; i = i == length ? length + 1 : editor.next(i)) {
-            if (font.getWidth(visibleText, 0, i) >= local) return i;
+            if (font.getWidth(visibleText, 0, i, fontSize) >= local) return i;
         }
 
         return length;
@@ -1212,7 +1225,7 @@ public class TextField extends Panel {
             return;
         }
 
-        float textWidth = font.getWidth(getDisplayText());
+        float textWidth = font.getWidth(getDisplayText(), fontSize);
         float caretX = getTextWidthUpTo(caretIndex);
 
         if (textWidth <= available) {

@@ -5,7 +5,7 @@ import valthorne.event.events.KeyReleaseEvent;
 import valthorne.event.listeners.KeyListener;
 
 /**
- * <h1>SceneKeyListener</h1>
+ * <h2>SceneKeyListener</h2>
  *
  * <p>
  * {@code SceneKeyListener} is a small forwarding adapter that connects the engine's global key input

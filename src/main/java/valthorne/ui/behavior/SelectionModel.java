@@ -128,14 +128,14 @@ public final class SelectionModel {
     /**
      * Registers a synchronous observer of selection and configuration changes.
      * The listener receives no payload and should read the current model state.
-     * Registration does not invoke it; close the returned handle to unsubscribe.
+     * Registration does not invoke it; run the returned action to unsubscribe.
      * Dispatch ordering and subscription changes follow {@link ChangeSignal}.
      *
      * @param listener the nonnull change callback
      * @return an independently removable subscription
      * @throws NullPointerException if listener is null
      */
-    public AutoCloseable onChange(Runnable listener) {
+    public Runnable onChange(Runnable listener) {
         return changes.subscribe(listener);
     }
 

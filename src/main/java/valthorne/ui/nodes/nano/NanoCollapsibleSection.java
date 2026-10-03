@@ -19,7 +19,7 @@ public class NanoCollapsibleSection extends NanoPanel {
         this.title = Objects.requireNonNull(title);
         Objects.requireNonNull(content);
         if (content.getParent() != null) throw new IllegalArgumentException("Content already has a parent");
-        header = new NanoButton("[-] " + title) {
+        header = new NanoButton(title) {
             @Override public void onKeyPress(KeyPressEvent event) {
                 if (isDisabled()) return;
                 if (event.getKey() == Keyboard.LEFT || event.getKey() == Keyboard.RIGHT) {
@@ -28,6 +28,9 @@ public class NanoCollapsibleSection extends NanoPanel {
                 } else super.onKeyPress(event);
             }
         }.action(button -> expanded(!expanded));
+        header.leftAligned(true);
+        header.setStyle(NanoButton.PADDING_X_KEY, 24f);
+        header.add(new NanoDisclosureIndicator(this::isExpanded));
         getLayout().column().noShrink();
         header.getLayout().height(36).widthPercent(100).noShrink();
         body.getLayout().widthPercent(100).minHeight(0).noShrink();
@@ -39,7 +42,7 @@ public class NanoCollapsibleSection extends NanoPanel {
 
     public boolean isExpanded() { return expanded; }
     public NanoButton getHeader() { return header; }
-    public AutoCloseable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
 
     public NanoCollapsibleSection expanded(boolean value) {
         if (value == expanded) return this;
@@ -51,7 +54,6 @@ public class NanoCollapsibleSection extends NanoPanel {
         expanded = value;
         body.setVisible(value);
         if (value) body.getLayout().heightAuto(); else body.getLayout().height(0);
-        header.text((value ? "[-] " : "[+] ") + title);
         changes.fire();
         return this;
     }

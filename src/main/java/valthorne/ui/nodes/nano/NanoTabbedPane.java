@@ -28,7 +28,7 @@ public class NanoTabbedPane extends NanoPanel {
     public int getSelectedIndex() { return selected; }
     public UINode getPage(int index) { return tabs.get(index).page; }
     public NanoButton getHeader(int index) { return tabs.get(index).button; }
-    public AutoCloseable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
 
     public NanoTabbedPane addTab(String title, Supplier<? extends UINode> factory) {
         Tab tab = new Tab(Objects.requireNonNull(title), Objects.requireNonNull(factory));

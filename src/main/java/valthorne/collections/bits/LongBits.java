@@ -1,7 +1,7 @@
 package valthorne.collections.bits;
 
 /**
- * <h1>LongBits</h1>
+ * <h2>LongBits</h2>
  *
  * <p>
  * {@code LongBits} is a compact bit container backed by a single {@code long}. It allows you to

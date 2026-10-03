@@ -42,7 +42,7 @@ final class BgfxPolygonTessellator {
      * @throws IllegalArgumentException for non-finite or untessellatable geometry
      */
     void draw(Shape shape, BgfxShapeRenderer renderer) {
-        Vector2f[] points = shape.points();
+        Vector2f[] points = shape.getRotatedPoints();
         if (points == null || points.length < 3) return;
         ensureCapacity(points.length);
         count = 0;

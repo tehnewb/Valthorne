@@ -4,7 +4,7 @@ import valthorne.event.events.MouseScrollEvent;
 import valthorne.event.listeners.MouseScrollListener;
 
 /**
- * <h1>SceneMouseScrollListener</h1>
+ * <h2>SceneMouseScrollListener</h2>
  *
  * <p>
  * {@code SceneMouseScrollListener} is a simple forwarding wrapper that routes mouse wheel events

@@ -22,7 +22,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * }</pre>
  */
 public class NanoImageHyperlink extends NanoHyperlink {
-    private final TextureData texture; // Owned CPU-side pixels used for lazy uploads.
+    private TextureData texture; // Owned CPU-side pixels used for lazy uploads.
     private int imageHandle = -1; // Current NanoVG image handle, or -1 when absent.
     private long imageContext; // NanoVG context that owns the current image handle.
 
@@ -38,6 +38,30 @@ public class NanoImageHyperlink extends NanoHyperlink {
         super(label, url);
         if (texture == null) throw new IllegalArgumentException("texture must not be null");
         this.texture = texture;
+    }
+
+    /**
+     * Returns the source pixels currently owned by this hyperlink.
+     *
+     * @return active image data
+     */
+    public TextureData getTexture() {
+        return texture;
+    }
+
+    /**
+     * Replaces the owned image and releases the previous source after
+     * invalidating its NanoVG upload.
+     *
+     * @param replacement newly owned source pixels
+     */
+    public void texture(TextureData replacement) {
+        if (replacement == null) throw new IllegalArgumentException("replacement must not be null");
+        if (replacement == texture) return;
+        deleteImage();
+        TextureData previous = texture;
+        texture = replacement;
+        previous.dispose();
     }
 
     /**
@@ -58,12 +82,15 @@ public class NanoImageHyperlink extends NanoHyperlink {
         float x = getAbsoluteX() + (getWidth() - width) * .5f;
         float y = getAbsoluteY() + (getHeight() - height) * .5f;
         float opacity = isEnabled() ? (isPressed() ? .72f : 1f) : .45f;
-        try (NVGPaint paint = NVGPaint.calloc()) {
+        NVGPaint paint = NVGPaint.calloc();
+        try {
             nvgImagePattern(vg, x, y, width, height, 0, imageHandle, opacity, paint);
             nvgBeginPath(vg);
             nvgRect(vg, x, y, width, height);
             nvgFillPaint(vg, paint);
             nvgFill(vg);
+        } finally {
+            paint.free();
         }
     }
 

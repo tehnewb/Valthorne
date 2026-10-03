@@ -1,40 +1,25 @@
 package valthorne.portable;
 
 /**
- * Owned browser-portable image and sampled-sound assets. Callbacks run on the application thread.
+ * Asynchronous image and sampled-sound loading. Terminal callbacks run on the
+ * application thread and transfer ownership of successfully decoded resources.
  */
 public interface MediaService {
-    interface Listener<T> {
-        void loaded(T asset);
+    /**
+     * Requests an owned image resource.
+     *
+     * @param uri image location supported by the platform
+     * @param listener completion callback receiving image ownership
+     * @return cancellation action
+     */
+    AssetRequest loadImage(String uri, MediaListener<MediaImage> listener);
 
-        void failed(String reason);
-    }
-
-    interface Image extends AutoCloseable {
-        int width();
-
-        int height();
-
-        /**
-         * Draws a full image to the current 2D overlay, in CSS pixels.
-         */
-        void draw(float x, float y, float width, float height, float alpha);
-
-        @Override
-        void close();
-    }
-
-    interface Sound extends AutoCloseable {
-        /**
-         * Returns false if audio is locked or the voice budget is exhausted.
-         */
-        boolean play(float volume, float pan);
-
-        @Override
-        void close();
-    }
-
-    AssetService.Request loadImage(String uri, Listener<Image> listener);
-
-    AssetService.Request loadSound(String uri, Listener<Sound> listener);
+    /**
+     * Requests an owned sampled audio resource.
+     *
+     * @param uri audio location supported by the platform
+     * @param listener completion callback receiving sound ownership
+     * @return cancellation action
+     */
+    AssetRequest loadSound(String uri, MediaListener<MediaSound> listener);
 }

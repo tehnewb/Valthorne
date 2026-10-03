@@ -15,6 +15,11 @@ repositories {
 
 def lwjglVersion = "3.4.3"
 def joltVersion = "6.0.0"
+// Enable private prototypes only in checkouts that contain their ignored setup.
+def prototype3d = providers.gradleProperty('prototype3d').map { it.toBoolean() }
+        .getOrElse(file('.prototype3d/prototype.gradle').isFile())
+if (prototype3d && !file('.prototype3d/prototype.gradle').isFile())
+    throw new GradleException('The local 3D prototype is not installed.')
 
 // If you want more modules, add them to both lists below.
 def lwjglModules = [
@@ -25,7 +30,8 @@ def lwjglModules = [
         "lwjgl-stb",
         "lwjgl-openal",
         "lwjgl-yoga",
-        "lwjgl-nanovg"
+        "lwjgl-nanovg",
+        "lwjgl-tinyfd"
 ]
 
 // “All natives” set (common targets).
@@ -40,6 +46,7 @@ def lwjglNativeClassifiers = [
 ]
 
 dependencies {
+    api 'net.onedaybeard.artemis:artemis-odb:2.3.0'
     api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
 
     api 'org.joml:joml:1.10.9'
@@ -54,7 +61,7 @@ dependencies {
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
     implementation "org.apache.commons:commons-compress:1.28.0"
     implementation "com.fasterxml.jackson.core:jackson-databind:2.18.2"
-    // Shared Jolt native runtime supports constrained 2D simulation too.
+    // Jolt remains shared with constrained 2D physics.
     implementation "com.github.stephengold:jolt-jni-Windows64:$joltVersion"
     ['Windows64', 'Windows_ARM64', 'Linux64', 'Linux_ARM64', 'Linux_ARM32hf', 'MacOSX64', 'MacOSX_ARM64'].each { platform ->
         runtimeOnly "com.github.stephengold:jolt-jni-${platform}:$joltVersion:ReleaseSp"
@@ -75,11 +82,57 @@ java {
     }
 
     withSourcesJar()
-    withJavadocJar()
 }
 
 apply from: 'gradle/benchmarks.gradle'
 apply from: 'gradle/bgfx.gradle'
+if (prototype3d) apply from: '.prototype3d/prototype.gradle'
+else {
+    sourceSets.main.java.exclude 'valthorne/threed/**'
+    sourceSets.test.java.exclude 'valthorne/threed/**', 'valthorne/graphics/bgfx/**', 'valthorne/graphics/lighting3d/**'
+}
+if (!prototype3d) {
+    tasks.withType(Jar).configureEach {
+        exclude 'valthorne/threed/**', 'valthorne/filament/**',
+                'valthorne/shaders/model3d/**', 'valthorne/shaders/pathtrace/**',
+                'META-INF/licenses/*filament*'
+    }
+}
+// Ignored prototype code and native dependencies must never enter a publication.
+tasks.matching { it.name.startsWith('publish') }.configureEach {
+    doFirst {
+        if (prototype3d) throw new GradleException('Publish with -Pprototype3d=false to exclude the local prototype.')
+    }
+}
+tasks.register('verifySlugTextureBatch', JavaExec) {
+    group = 'verification'
+    description = 'Verifies direct and retained Slug curves, mixed sprites and batching in a hidden OpenGL context.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'valthorne.graphics.font.slug.SlugTextureBatchVerification'
+}
+
+
+// The editor is installed locally and is never part of a public checkout.
+def editorPrototype = providers.gradleProperty('editorPrototype').map { it.toBoolean() }
+        .getOrElse(file('.prototype-editor/editor.gradle').isFile())
+if (editorPrototype) {
+    if (!file('.prototype-editor/editor.gradle').isFile()) throw new GradleException('The local editor prototype is not installed.')
+    apply from: '.prototype-editor/editor.gradle'
+} else {
+    sourceSets.main.java.exclude 'valthorne/ui/engine/**'
+    sourceSets.test.java.exclude 'valthorne/ui/engine/**'
+    sourceSets.main.resources.exclude 'ui/icons/**', 'ui/scene-selection.png'
+    tasks.withType(Jar).configureEach { exclude 'valthorne/ui/engine/**', 'ui/icons/**', 'ui/scene-selection.png' }
+}
+tasks.matching { it.name.startsWith('publish') }.configureEach {
+    doFirst {
+        if (editorPrototype) throw new GradleException('Publish with -PeditorPrototype=false to exclude the local editor.')
+    }
+}
+
+apply from: 'gradle/editor-boundary.gradle'
+tasks.named('test', Test) { failOnNoDiscoveredTests = false }
 
 mavenPublishing {
     publishToMavenCentral()
@@ -126,28 +179,10 @@ mavenPublishing {
     }
 }
 
-
-// The editor is installed locally and is never part of a public checkout.
-def editorPrototype = providers.gradleProperty('editorPrototype').map { it.toBoolean() }
-        .getOrElse(file('.prototype-editor/editor.gradle').isFile())
-if (editorPrototype) {
-    if (!file('.prototype-editor/editor.gradle').isFile()) throw new GradleException('The local editor prototype is not installed.')
-    apply from: '.prototype-editor/editor.gradle'
-} else {
-    sourceSets.main.java.exclude 'valthorne/ui/engine/**'
-    sourceSets.test.java.exclude 'valthorne/ui/engine/**'
-    sourceSets.main.resources.exclude 'ui/icons/**', 'ui/scene-selection.png'
-    tasks.withType(Jar).configureEach { exclude 'valthorne/ui/engine/**', 'ui/icons/**', 'ui/scene-selection.png' }
-}
-tasks.matching { it.name.startsWith('publish') }.configureEach {
-    doFirst {
-        if (editorPrototype) throw new GradleException('Publish with -PeditorPrototype=false to exclude the local editor.')
-    }
-}
-
-apply from: 'gradle/editor-boundary.gradle'
-
 apply from: 'gradle/release.gradle'
 
 // Shared-source desktop/web application entry point.
 apply from: 'portable/desktop.gradle'
+
+// The publishing plugin owns the single Javadoc archive producer.
+tasks.named('assemble') { dependsOn tasks.matching { it.name == 'plainJavadocJar' } }

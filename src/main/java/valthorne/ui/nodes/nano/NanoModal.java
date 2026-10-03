@@ -79,7 +79,7 @@ public class NanoModal extends NanoPanel {
     /**
      * Theme corner radius for the inner dialog, separate from overlay painting.
      */
-    public static final StyleKey<Float> DIALOG_CORNER_RADIUS_KEY = StyleKey.of("nano.modal.dialogCornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> DIALOG_CORNER_RADIUS_KEY = StyleKey.of("nano.modal.dialogCornerRadius", Float.class, 0f);
     /**
      * Theme border width for the inner dialog, separate from overlay painting.
      */

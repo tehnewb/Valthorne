@@ -1,14 +1,12 @@
 package valthorne.ui;
 
-import org.joml.Matrix4f;
 import valthorne.Window;
-import valthorne.graphics.font.slug.SlugBatch;
+import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.texture.TextureBatch;
+import valthorne.graphics.shader.Shader;
 import valthorne.ui.nodes.nano.NanoNode;
 
 import static org.lwjgl.nanovg.NanoVG.*;
-import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
-import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import valthorne.graphics.Color;
 
 /**
@@ -27,10 +25,13 @@ import valthorne.graphics.Color;
  * }</pre>
  * <p>A container can use {@link #drawChildren(UIContainer, UINode)} to retain
  * compatible sibling painting state without changing traversal order. Scoped
- * translations and clips can be balanced with try-with-resources:</p>
+ * translations and clips can be balanced with try/finally:</p>
  * <pre>{@code
- * try (UIRenderContext.Scope offset = context.translate(12, 8)) {
+ * UIRenderScope offset = context.translate(12, 8);
+ * try {
  *     context.drawChildren(container, null);
+ * } finally {
+ *     offset.restore();
  * }
  * }</pre>
  *
@@ -41,6 +42,13 @@ import valthorne.graphics.Color;
  * converts the clip rectangle using the render-space height, and applies the
  * batch translation with its Y component negated. NanoVG state is saved before
  * the callback and restored afterward, including when that callback throws.</p>
+ *
+ * <h2>Rotation</h2>
+ * <p>This context composes cached node rotations around layout centers. Previous
+ * transforms live in traversal locals rather than a batch stack. NanoVG and Slug
+ * receive the same transform; textured nodes use a root-owned rotation shader.
+ * Entering or leaving a rotated subtree flushes texture work before changing
+ * shader state. Visibility and rotation remain responsibilities of the UI.</p>
  *
  * <h2>Lifecycle</h2>
  * <p>{@link UIRoot#draw()} creates a fresh context after beginning its batch and
@@ -60,6 +68,10 @@ import valthorne.graphics.Color;
  * @see NanoNode
  */
 public final class UIRenderContext {
+    /*
+     * Preview opacity that keeps content visible while exposing items beneath it.
+     */
+    private static final float DRAG_OPACITY = 0.82f;
     private final TextureBatch batch; // Borrowed active batch supplying shared translation and clip state.
     private final long vg; // Borrowed NanoVG context handle; zero means NanoVG is unavailable.
     private final float height; // Captured render-space height used to convert bottom-left Y coordinates.
@@ -67,11 +79,12 @@ public final class UIRenderContext {
     private final float cameraY; // Captured vertical camera offset in NanoVG's coordinate orientation.
     private final float zoom; // Captured camera scale, or one when the root has no viewport camera.
     private final UIRoot root; // Owning root supplying inspection settings and per-draw snapshots.
+    private float transformCosine = 1f; // Accumulated UI rotation cosine shared by all rendering backends.
+    private float transformSine; // Accumulated UI rotation sine; parents compose once per rotated node.
+    private float transformX; // Accumulated rigid transform translation in world coordinates.
+    private float transformY; // Accumulated rigid transform translation in world coordinates.
     private boolean nanoActive; // True while NanoVG is selected; false while texture painting is selected.
-    private SlugBatch activeSlugBatch; // Active curve-text renderer, or null while another backend is selected.
-    private final Matrix4f slugProjection = new Matrix4f(); // Per-draw projection captured when Slug is first selected.
-    private final int[] slugViewport = new int[4]; // Per-draw framebuffer viewport captured once for Slug rendering.
-    private boolean slugViewportCaptured; // Whether projection and viewport were captured during this draw.
+    private float dragOpacity = 1f; // Opacity applied only while painting the lifted item.
     private int nodesDrawn, backendSwitches, nanoFlushes; // Node attempts, backend transitions, and NanoVG submissions for this draw.
 
     /**
@@ -135,6 +148,42 @@ public final class UIRenderContext {
     public TextureBatch getBatch() {return batch;}
 
     /**
+     * Paints curve glyphs within a Nano control while retaining backend order.
+     * Coordinates use the same top-left logical space as the Nano callback;
+     * clipping intersects the control and its current ancestor clip.
+     *
+     * @param node owning Nano control
+     * @param font borrowed curve font
+     * @param text line contents
+     * @param x left pen coordinate
+     * @param baseline top-down baseline coordinate
+     * @param size logical em size
+     * @param color borrowed tint
+     */
+    public void drawNanoSlug(UINode node, SlugFont font, String text, float x, float baseline, float size, Color color) {
+        selectBackend(false);
+        float tx = batch.getTranslationX();
+        float ty = batch.getTranslationY();
+        float left = node.getAbsoluteX() + tx;
+        float bottom = height - node.getAbsoluteY() - node.getHeight() + ty;
+        float right = left + node.getWidth();
+        float top = bottom + node.getHeight();
+        if (batch.isClipEnabled()) {
+            left = Math.max(left, batch.getClipX());
+            bottom = Math.max(bottom, batch.getClipY());
+            right = Math.min(right, batch.getClipX() + batch.getClipWidth());
+            top = Math.min(top, batch.getClipY() + batch.getClipHeight());
+        }
+        batch.beginScissor(left, bottom, Math.max(0f, right - left), Math.max(0f, top - bottom));
+        try {
+            font.draw(batch, text, x, batch.alignTextBaseline(height - baseline), size, color);
+        } finally {
+            batch.endScissor();
+            selectBackend(true);
+        }
+    }
+
+    /**
      * Dispatches one visible node to its supported painting backend. Null or
      * invisible nodes produce no drawing or backend transitions. Nodes implementing
      * {@link NanoNode} receive the NanoVG handle; all other nodes receive the batch.
@@ -154,6 +203,26 @@ public final class UIRenderContext {
     public void draw(UINode node) {drawNode(node, true);}
 
     /**
+     * Paints a lifted item without a separate background. NanoVG and texture
+     * content share the same slight transparency, which is restored before
+     * ordinary UI painting resumes, even if the widget throws while drawing.
+     *
+     * @param node the existing list or tree item following the pointer
+     */
+    void drawDragPreview(UINode node) {
+        float previousDragOpacity = dragOpacity;
+        float previousBatchOpacity = batch.getOpacityMultiplier();
+        dragOpacity = DRAG_OPACITY;
+        batch.setOpacityMultiplier(previousBatchOpacity * DRAG_OPACITY);
+        try {
+            draw(node);
+        } finally {
+            dragOpacity = previousDragOpacity;
+            batch.setOpacityMultiplier(previousBatchOpacity);
+        }
+    }
+
+    /**
      * Performs node dispatch, counting and optional inspection for a visible node.
      * NanoVG callbacks receive saved drawing state and the mapped batch clip and
      * translation. Texture callbacks receive the shared active batch directly.
@@ -169,26 +238,64 @@ public final class UIRenderContext {
      * @throws IllegalStateException if a visible NanoVG node has no available context
      */
     private void drawNode(UINode node, boolean restoreBackend) {
-        if (node == null || !node.isVisible()) return;
+        if (node == null || !node.isVisible() || root.skipsDragPreviewSource(node) || root.skipsExternalPresentation(node)) return;
+        if (node.getRotation() == 0) {
+            drawNodeContents(node, restoreBackend);
+            return;
+        }
+
+        boolean previousNano = nanoActive;
+        Shader previousShader = batch.getShader();
+        float previousCosine = transformCosine;
+        float previousSine = transformSine;
+        float previousX = transformX;
+        float previousY = transformY;
+        selectBackend(false);
+        batch.flush();
+        UIRotationShader shader = root.rotationShader();
+        batch.setShader(shader);
+        float cosine = node.rotationCosine();
+        float sine = node.rotationSine();
+        float x = node.getAbsoluteX() + node.getWidth() * .5f + batch.getTranslationX();
+        float y = height - node.getAbsoluteY() - node.getHeight() * .5f + batch.getTranslationY();
+        float tx = x - cosine * x + sine * y;
+        float ty = y - sine * x - cosine * y;
+        transformX += previousCosine * tx - previousSine * ty;
+        transformY += previousSine * tx + previousCosine * ty;
+        transformCosine = previousCosine * cosine - previousSine * sine;
+        transformSine = previousSine * cosine + previousCosine * sine;
+        shader.transform(transformCosine, transformSine, transformX, transformY);
+        batch.setTextTransform(transformCosine, transformSine, transformX, transformY);
+        try {
+            drawNodeContents(node, restoreBackend);
+        } finally {
+            try {
+                selectBackend(false);
+            } finally {
+                transformCosine = previousCosine;
+                transformSine = previousSine;
+                transformX = previousX;
+                transformY = previousY;
+                batch.setTextTransform(previousCosine, previousSine, previousX, previousY);
+                batch.setShader(previousShader);
+                if (previousShader instanceof UIRotationShader previousRotation)
+                    previousRotation.transform(previousCosine, previousSine, previousX, previousY);
+                if (previousNano) selectBackend(true);
+            }
+        }
+    }
+
+    /**
+     * Dispatches a visible node under its already prepared transform scope.
+     *
+     * @param node visible node
+     * @param restoreBackend whether the previous painter must be restored
+     */
+    private void drawNodeContents(UINode node, boolean restoreBackend) {
         nodesDrawn++;
         root.getInspector().record(node, root);
         boolean previousBackend = nanoActive;
-        if (node instanceof SlugRenderable slug && slug.usesSlugBackend()) {
-            boolean previousNano = nanoActive;
-            SlugBatch previousSlug = activeSlugBatch;
-            SlugBatch requested = slug.getSlugBatch();
-            if (requested == null) requested = root.getOrCreateSlugBatch();
-            selectSlugBackend(requested);
-            try {
-                slug.drawSlug(requested, batch);
-            } finally {
-                if (restoreBackend) {
-                    if (previousSlug != null) selectSlugBackend(previousSlug);
-                    else leaveSlugBackend();
-                    if (previousNano) selectBackend(true);
-                }
-            }
-        } else if (node instanceof NanoNode nano) {
+        if (node instanceof NanoNode nano) {
             if (vg == 0L) throw new IllegalStateException("NanoVG context is unavailable.");
             selectBackend(true);
             nvgSave(vg);
@@ -201,7 +308,11 @@ public final class UIRenderContext {
                 if (batch.isClipEnabled()) {
                     nvgScissor(vg, batch.getClipX(), height - batch.getClipY() - batch.getClipHeight(), batch.getClipWidth(), batch.getClipHeight());
                 }
+                float c = transformCosine;
+                float s = transformSine;
+                nvgTransform(vg, c, -s, s, c, transformX - s * height, height * (1 - c) - transformY);
                 nvgTranslate(vg, batch.getTranslationX(), -batch.getTranslationY());
+                if (dragOpacity != 1f) nvgGlobalAlpha(vg, dragOpacity);
                 nano.draw(vg);
             } finally {
                 nvgRestore(vg);
@@ -234,15 +345,12 @@ public final class UIRenderContext {
      */
     public void drawChildren(UIContainer container, UINode excluded) {
         boolean parentBackend = nanoActive;
-        SlugBatch parentSlug = activeSlugBatch;
         try {
             for (int i = 0; i < container.size(); i++) {
                 UINode child = container.get(i);
                 if (child != excluded) drawNode(child, false);
             }
         } finally {
-            if (parentSlug != null) selectSlugBackend(parentSlug);
-            else leaveSlugBackend();
             selectBackend(parentBackend);
         }
     }
@@ -254,12 +362,12 @@ public final class UIRenderContext {
      *
      * @param x additional horizontal displacement in layout units
      * @param y additional downward displacement in layout units
-     * @return a scope that pops this translation when closed; close scopes in reverse order
+     * @return a scope that pops this translation when restored; restore scopes in reverse order
      * @throws IllegalStateException if the batch is not drawing or its translation stack is full
      */
-    public Scope translate(float x, float y) {
+    public UIRenderScope translate(float x, float y) {
         batch.pushTranslation(x, -y);
-        return new Scope(batch::popTranslation);
+        return new UIRenderScope(batch::popTranslation);
     }
 
     /**
@@ -273,12 +381,12 @@ public final class UIRenderContext {
      * @param y          the top edge in render-space layout units
      * @param width      the requested clip width
      * @param clipHeight the requested clip height
-     * @return a scope restoring the previous clip when closed, in reverse nesting order
+     * @return a scope restoring the previous clip when restored, in reverse nesting order
      * @throws IllegalStateException if the batch is not drawing or its clip stack is full
      */
-    public Scope clip(float x, float y, float width, float clipHeight) {
+    public UIRenderScope clip(float x, float y, float width, float clipHeight) {
         batch.beginScissor(x, height - y - clipHeight, width, clipHeight);
-        return new Scope(batch::endScissor);
+        return new UIRenderScope(batch::endScissor);
     }
 
     /**
@@ -335,7 +443,6 @@ public final class UIRenderContext {
      * @param nano true to select NanoVG, false to select texture painting
      */
     private void selectBackend(boolean nano) {
-        if (activeSlugBatch != null) leaveSlugBackend();
         if (nanoActive == nano) return;
         backendSwitches++;
         if (nano) {
@@ -348,77 +455,4 @@ public final class UIRenderContext {
         nanoActive = nano;
     }
 
-    /**
-     * Selects a Slug renderer, keeping an existing interval alive when the requested
-     * instance is unchanged. Switching instances or leaving NanoVG completes the old
-     * backend first so painter order remains intact.
-     */
-    private void selectSlugBackend(SlugBatch requested) {
-        if (activeSlugBatch == requested) return;
-        leaveSlugBackend();
-        if (nanoActive) selectBackend(false);
-        batch.flush();
-        if (!slugViewportCaptured) {
-            slugProjection.set(Window.getProjectionMatrix());
-            glGetIntegerv(GL_VIEWPORT, slugViewport);
-            slugViewportCaptured = true;
-        }
-        requested.beginManaged(slugProjection, slugViewport[2], slugViewport[3]);
-        activeSlugBatch = requested;
-        backendSwitches++;
-    }
-
-    /** Completes the active Slug interval and restores TextureBatch graphics state. */
-    private void leaveSlugBackend() {
-        if (activeSlugBatch == null) return;
-        SlugBatch ending = activeSlugBatch;
-        activeSlugBatch = null;
-        try {
-            ending.endManaged();
-        } finally {
-            ending.cancelManaged();
-            batch.resumeAfterExternalDraw();
-            backendSwitches++;
-        }
-    }
-
-    /**
-     * Owns one pending restoration action for a translation or clipping scope.
-     * Use with try-with-resources inside the root draw and close nested scopes in
-     * reverse order. Closing is idempotent, but the scope does not validate nesting
-     * order or extend the lifetime of the batch it restores.
-     *
-     * <p>The restoration reference is cleared before invocation, so an action that
-     * throws is not retried on another close. Instances are not synchronized.</p>
-     *
-     * @author Albert Beaupre
-     */
-    public static final class Scope implements AutoCloseable {
-        private Runnable restore; // One-shot restoration callback, cleared before execution.
-
-        /**
-         * Retains a restoration callback without running it or changing batch state.
-         * The enclosing context creates this only after pushing the matching scope.
-         *
-         * @param restore the action to run once on close, or null for an inactive scope
-         */
-        private Scope(Runnable restore) {this.restore = restore;}
-
-        /**
-         * Runs the pending restoration once and marks this scope closed before
-         * invoking it. Later calls do nothing, including after restoration throws.
-         * Batch state failures propagate to the caller.
-         *
-         * @throws IllegalStateException if the underlying batch restoration rejects
-         *                               the current drawing or stack state
-         */
-        @Override
-        public void close() {
-            if (restore != null) {
-                Runnable action = restore;
-                restore = null;
-                action.run();
-            }
-        }
-    }
 }

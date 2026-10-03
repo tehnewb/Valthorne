@@ -4,7 +4,7 @@ import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 
 /**
- * <h1>SceneWindowResizeListener</h1>
+ * <h2>SceneWindowResizeListener</h2>
  *
  * <p>
  * {@code SceneWindowResizeListener} is a forwarding adapter that routes window resize events into

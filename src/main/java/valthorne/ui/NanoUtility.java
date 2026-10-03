@@ -1,14 +1,14 @@
 package valthorne.ui;
 
 import org.lwjgl.nanovg.NVGColor;
+import org.lwjgl.nanovg.NanoVG;
 import valthorne.graphics.Color;
+import valthorne.io.file.ValthorneFiles;
 
 import static org.lwjgl.nanovg.NanoVG.nvgFontFace;
 import static org.lwjgl.nanovg.NanoVG.nvgFontSize;
 import static org.lwjgl.nanovg.NanoVG.nvgTextBounds;
 import static org.lwjgl.nanovg.NanoVG.nvgTextMetrics;
-import org.lwjgl.nanovg.NanoVG;
-import valthorne.io.file.ValthorneFiles;
 
 /**
  * Shared NanoVG color conversion and text measurement helpers. Four per-thread
@@ -26,27 +26,53 @@ import valthorne.io.file.ValthorneFiles;
  * @author Albert Beaupre
  */
 public final class NanoUtility {
-    /** Sets opacity for a custom UI node within its root-managed draw callback. */
-    public static void opacity(long vg, float alpha) { NanoVG.nvgGlobalAlpha(vg, Math.max(0, Math.min(1, alpha))); }
-    /** Registers a font from a filesystem path, including extracted classpath fonts. */
-    public static int loadFont(long vg, String name, String path) { return NanoVG.nvgCreateFont(vg, name, path); }
-    /** Registers a bundled classpath font; the browser fetches the exported resource directly. */
+    /**
+     * Sets opacity for a custom UI node within its root-managed draw callback.
+     */
+    public static void opacity(long vg, float alpha) {NanoVG.nvgGlobalAlpha(vg, Math.max(0, Math.min(1, alpha)));}
+
+    /**
+     * Registers a font from a filesystem path, including extracted classpath fonts.
+     */
+    public static int loadFont(long vg, String name, String path) {return NanoVG.nvgCreateFont(vg, name, path);}
+
+    /**
+     * Registers a bundled classpath font; the browser fetches the exported resource directly.
+     */
     public static int loadResourceFont(long vg, String name, String resource) {
         return loadFont(vg, name, ValthorneFiles.extractToTempPath(resource));
     }
-    /** Draws one line without allocating geometry or color buffers per call. */
+
+    /**
+     * Draws one line without allocating geometry or color buffers per call.
+     */
     public static void strokeLine(long vg, float x, float y, float xx, float yy, int color, float width) {
-        NanoVG.nvgBeginPath(vg); NanoVG.nvgMoveTo(vg,x,y); NanoVG.nvgLineTo(vg,xx,yy);
-        NanoVG.nvgStrokeColor(vg,color1(color)); NanoVG.nvgStrokeWidth(vg,width); NanoVG.nvgStroke(vg);
+        NanoVG.nvgBeginPath(vg);
+        NanoVG.nvgMoveTo(vg, x, y);
+        NanoVG.nvgLineTo(vg, xx, yy);
+        NanoVG.nvgStrokeColor(vg, color1(color));
+        NanoVG.nvgStrokeWidth(vg, width);
+        NanoVG.nvgStroke(vg);
     }
+
     public static void strokeCircle(long vg, float x, float y, float radius, int color, float width) {
-        NanoVG.nvgBeginPath(vg); NanoVG.nvgCircle(vg,x,y,radius);
-        NanoVG.nvgStrokeColor(vg,color1(color)); NanoVG.nvgStrokeWidth(vg,width); NanoVG.nvgStroke(vg);
+        NanoVG.nvgBeginPath(vg);
+        NanoVG.nvgCircle(vg, x, y, radius);
+        NanoVG.nvgStrokeColor(vg, color1(color));
+        NanoVG.nvgStrokeWidth(vg, width);
+        NanoVG.nvgStroke(vg);
     }
+
     public static void strokeDiamond(long vg, float x, float y, float radius, int color, float width) {
-        NanoVG.nvgBeginPath(vg); NanoVG.nvgMoveTo(vg,x,y-radius); NanoVG.nvgLineTo(vg,x+radius,y);
-        NanoVG.nvgLineTo(vg,x,y+radius); NanoVG.nvgLineTo(vg,x-radius,y); NanoVG.nvgClosePath(vg);
-        NanoVG.nvgStrokeColor(vg,color1(color)); NanoVG.nvgStrokeWidth(vg,width); NanoVG.nvgStroke(vg);
+        NanoVG.nvgBeginPath(vg);
+        NanoVG.nvgMoveTo(vg, x, y - radius);
+        NanoVG.nvgLineTo(vg, x + radius, y);
+        NanoVG.nvgLineTo(vg, x, y + radius);
+        NanoVG.nvgLineTo(vg, x - radius, y);
+        NanoVG.nvgClosePath(vg);
+        NanoVG.nvgStrokeColor(vg, color1(color));
+        NanoVG.nvgStrokeWidth(vg, width);
+        NanoVG.nvgStroke(vg);
     }
 
     /**
@@ -186,7 +212,7 @@ public final class NanoUtility {
      * Copies color components into caller-provided NanoVG storage without clamping.
      * Null input writes opaque white. The target remains caller-owned.
      *
-     * @param color source color, or null for opaque white
+     * @param color  source color, or null for opaque white
      * @param target non-null writable destination struct
      * @return the same target struct
      * @throws NullPointerException if target is null
@@ -208,7 +234,7 @@ public final class NanoUtility {
      * Decodes packed ARGB consistently with Color(int), despite the parameter's
      * rgba name. Each unsigned byte is divided by 255 and written to the target.
      *
-     * @param rgba packed 0xAARRGGBB value
+     * @param rgba   packed 0xAARRGGBB value
      * @param target non-null writable destination struct
      * @return the same target struct
      * @throws NullPointerException if target is null
@@ -226,10 +252,10 @@ public final class NanoUtility {
      * Null or empty text returns zero before touching context state. A zero handle
      * estimates half font size per UTF-16 unit. Does not normalize tabs or newlines.
      *
-     * @param vg valid NanoVG context, or zero for estimation
+     * @param vg       valid NanoVG context, or zero for estimation
      * @param fontName registered font face for native measurement
      * @param fontSize requested text size in UI units
-     * @param text text to measure, possibly null
+     * @param text     text to measure, possibly null
      * @return bounds width, or estimated width without a context
      */
     public static float measureTextWidth(long vg, String fontName, float fontSize, String text) {
@@ -252,12 +278,12 @@ public final class NanoUtility {
      * measurement creates a substring and changes font state; a zero handle uses
      * half font size per selected code unit.
      *
-     * @param vg valid NanoVG context, or zero for estimation
+     * @param vg       valid NanoVG context, or zero for estimation
      * @param fontName registered font face
      * @param fontSize requested text size in UI units
-     * @param text source string, possibly null
-     * @param start requested inclusive UTF-16 start index
-     * @param end requested exclusive UTF-16 end index
+     * @param text     source string, possibly null
+     * @param start    requested inclusive UTF-16 start index
+     * @param end      requested exclusive UTF-16 end index
      * @return width of the selected range, or zero for null/empty text or range
      */
     public static float measureTextWidth(long vg, String fontName, float fontSize, String text, int start, int end) {
@@ -283,7 +309,7 @@ public final class NanoUtility {
      * Reads the selected font's line-height metric, including its line spacing,
      * rather than measuring a specific glyph string. Changes font face/size state.
      *
-     * @param vg valid NanoVG context, or zero to return fontSize
+     * @param vg       valid NanoVG context, or zero to return fontSize
      * @param fontName registered font face
      * @param fontSize requested text size in UI units
      * @return font line height, or fontSize without a context
@@ -305,7 +331,7 @@ public final class NanoUtility {
     /**
      * Delegates to measureTextHeight with identical font-state and fallback behavior.
      *
-     * @param vg valid NanoVG context, or zero for estimation
+     * @param vg       valid NanoVG context, or zero for estimation
      * @param fontName registered font face
      * @param fontSize requested text size in UI units
      * @return line-height metric, or fontSize without a context
@@ -317,7 +343,7 @@ public final class NanoUtility {
     /**
      * Reads the ascender metric above the text baseline after selecting the font.
      *
-     * @param vg valid NanoVG context, or zero to return fontSize
+     * @param vg       valid NanoVG context, or zero to return fontSize
      * @param fontName registered font face
      * @param fontSize requested text size in UI units
      * @return ascender metric, or fontSize without a context
@@ -337,7 +363,7 @@ public final class NanoUtility {
      * Reads the signed descender metric after selecting the font; NanoVG normally
      * reports a negative distance for glyphs below the baseline.
      *
-     * @param vg valid NanoVG context, or zero to return zero
+     * @param vg       valid NanoVG context, or zero to return zero
      * @param fontName registered font face
      * @param fontSize requested text size in UI units
      * @return signed descender metric, or zero without a context
@@ -358,11 +384,11 @@ public final class NanoUtility {
      * vertical interval. It is for baseline-aligned text, not top-aligned text, and
      * changes native font state through metric calls.
      *
-     * @param vg valid NanoVG context, or zero for approximate metrics
+     * @param vg       valid NanoVG context, or zero for approximate metrics
      * @param fontName registered font face
      * @param fontSize requested text size in UI units
-     * @param y top of the containing interval
-     * @param height containing interval height
+     * @param y        top of the containing interval
+     * @param height   containing interval height
      * @return baseline Y for vertically centered text
      */
     public static float getTextCenterY(long vg, String fontName, float fontSize, float y, float height) {

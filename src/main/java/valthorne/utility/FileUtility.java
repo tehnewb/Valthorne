@@ -17,7 +17,7 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
- * <h1>FileUtility</h1>
+ * <h2>FileUtility</h2>
  *
  * <p>
  * {@code FileUtility} is a focused collection of static helpers for common file-system tasks that

@@ -1,12 +1,14 @@
 package valthorne.ui.nodes;
 
 import valthorne.graphics.Color;
-import valthorne.graphics.font.Font;
+import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
 import valthorne.ui.enums.Alignment;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 
 /**
  * <p>
@@ -24,6 +26,7 @@ import valthorne.ui.theme.StyleKey;
  * <ul>
  *     <li>{@link #FONT_KEY} for the font used to render the text</li>
  *     <li>{@link #COLOR_KEY} for the optional text color</li>
+ *     <li>{@link #FONT_SIZE_KEY} for logical world units per em</li>
  * </ul>
  *
  * <p>
@@ -34,11 +37,13 @@ import valthorne.ui.theme.StyleKey;
  *
  * <p>
  * During drawing, if a font is present, the label renders its text at its render
- * position. If a color is also present, that color is used; otherwise the font's
- * default rendering path is used.
+ * position. If a color is also present, that color is used; otherwise the batch
+ * color is used. Live Slug curves follow camera zoom without raster caches.
  * </p>
  *
  * <p>
+ * Per-line layouts are retained so drawing does not split strings or repeat kerning.
+ * The font is borrowed and must outlive pending draws.
  * The class does not perform its own interaction behavior and is typically used as
  * a child inside higher-level components such as buttons, tooltips, or form controls.
  * </p>
@@ -65,24 +70,43 @@ import valthorne.ui.theme.StyleKey;
  */
 public class Label extends UINode {
 
-    /**
-     * Style key used to resolve the font used for rendering the label text.
+    /*
+     * Shared Slug outline font used by regular UI text controls.
      */
-    public static final StyleKey<Font> FONT_KEY = StyleKey.of("font", Font.class);
+    public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
 
-    /**
+    /*
+     * Logical em size shared with the theme's density-scaled font-size token.
+     */
+    public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
+
+    /*
+     * Empty retained layout shared by labels with no drawable text.
+     */
+    private static final SlugTextRun[] EMPTY_LINES = new SlugTextRun[0];
+
+    /*
      * Style key used to resolve the text color used for rendering the label.
      */
     public static final StyleKey<Color> COLOR_KEY = StyleKey.of("color", Color.class);
 
-    /**
+    /*
      * Style key used to resolve the alignment for horizontal label coordination
      */
     public static final StyleKey<Alignment> ALIGNMENT_KEY = StyleKey.of("alignment", Alignment.class, Alignment.START);
 
+    private float measuredWidth = Float.NaN; // Last intrinsic width, used to retain explicit application dimensions.
+    private float measuredHeight = Float.NaN; // Last intrinsic height, updated as text or font changes.
     private String text = ""; // Retained nonnull text, with newline-separated lines.
-    private Font font; // Borrowed explicit or style-resolved font, possibly null.
-    private Color color; // Borrowed draw tint, or null for the font's default color.
+    private SlugFont font; // Borrowed explicit or style-resolved font, possibly null.
+    private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
+    private SlugTextRun[] lines = EMPTY_LINES; // Retained line layouts, rebuilt only when font, text or size changes.
+    private SlugFont layoutFont; // Font used to build the current retained lines.
+    private String layoutText; // Source text used to build the current retained lines.
+    private float layoutSize; // Em scale used to build the current retained lines.
+    private float textWidth; // Cached maximum line advance in world units.
+    private float textHeight; // Cached total line-box height in world units.
+    private Color color; // Borrowed draw tint, or null for the batch's default color.
     private Alignment alignment = Alignment.START; // Horizontal alignment applied independently to each text line.
 
     /**
@@ -167,13 +191,14 @@ public class Label extends UINode {
 
     /**
      * Borrows a font reference, immediately recalculates dimensions, and marks
-     * layout dirty. A later resolved style font may replace this reference.
+     * layout dirty. The explicit override takes precedence over theme fonts.
      *
-     * @param font font to use, or null to produce no text geometry
+     * @param font font to use, or null to restore theme or root font selection
      * @return this label
      */
-    public Label font(Font font) {
+    public Label font(SlugFont font) {
         this.font = font;
+        setStyle(FONT_KEY, font);
         recalculateSize();
         markLayoutDirty();
         return this;
@@ -184,26 +209,50 @@ public class Label extends UINode {
      *
      * @return the font currently assigned to this label
      */
-    public Font getFont() {
+    public SlugFont getFont() {
         return font;
     }
 
     /**
-     * Borrows a color reference for subsequent draws. Null selects the font's default
-     * color path; a later resolved style color can replace this reference.
+     * Overrides this label's logical em size without mutating its shared font.
+     *
+     * @param size finite nonnegative world units per em
+     * @return this label
+     * @throws IllegalArgumentException if size is negative or nonfinite
+     */
+    public Label fontSize(float size) {
+        if (!Float.isFinite(size) || size < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
+        fontSize = size;
+        setStyle(FONT_SIZE_KEY, size);
+        recalculateSize();
+        markLayoutDirty();
+        return this;
+    }
+
+    /**
+     * Returns the resolved em scale used for drawing and intrinsic measurement.
+     *
+     * @return world units per em
+     */
+    public float getFontSize() { return fontSize; }
+
+    /**
+     * Borrows a color reference as an explicit style override for subsequent draws.
+     * Null retains the resolved theme tint, or the batch tint when none is available.
      *
      * @param color draw tint, or null
      * @return this label
      */
     public Label color(Color color) {
         this.color = color;
+        setStyle(COLOR_KEY, color);
         return this;
     }
 
     /**
      * Returns the current borrowed tint, whether explicitly assigned or style-resolved.
      *
-     * @return mutable tint reference, or null for the font's default color
+     * @return mutable tint reference, or null for the batch's current color
      */
     public Color getColor() {
         return color;
@@ -218,8 +267,10 @@ public class Label extends UINode {
      * @return this label, allowing for method chaining
      */
     public Label alignment(Alignment alignment) {
-        if (alignment != null)
+        if (alignment != null) {
             this.alignment = alignment;
+            setStyle(ALIGNMENT_KEY, alignment);
+        }
         return this;
     }
 
@@ -235,17 +286,20 @@ public class Label extends UINode {
     /**
      * Applies nonnull resolved font, color, and alignment values, preserving current
      * references when a style value is absent. Recalculates exact content width/height
-     * before delegating to base Yoga style application; this replaces explicit layout
-     * dimensions with measured text dimensions.
+     * before delegating to base Yoga style application; this updates intrinsic layout
+     * automatic dimensions with measured text dimensions, retaining explicit sizes.
      */
     @Override
     protected void applyLayout() {
         ResolvedStyle style = getStyle();
 
         if (style != null) {
-            Font resolvedFont = style.get(FONT_KEY);
+            SlugFont resolvedFont = style.get(FONT_KEY);
             Color resolvedColor = style.get(COLOR_KEY);
             Alignment resolvedAlignment = style.get(ALIGNMENT_KEY);
+            float resolvedSize = style.get(FONT_SIZE_KEY);
+            if (!Float.isFinite(resolvedSize) || resolvedSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
+            fontSize = resolvedSize;
 
             if (resolvedFont != null)
                 font = resolvedFont;
@@ -255,131 +309,81 @@ public class Label extends UINode {
                 alignment = resolvedAlignment;
         }
 
+        if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
         recalculateSize();
         super.applyLayout();
     }
 
     /**
-     * Sets layout width to the widest measured line and height to the multiline
-     * text height. Missing font or empty text sets both dimensions to zero.
+     * Updates intrinsic width and height when dimensions are automatic or still
+     * match the previous measurement. Explicit application dimensions are retained.
      */
     private void recalculateSize() {
-        if (font == null || text == null || text.isEmpty()) {
-            getLayout().width(0f);
-            getLayout().height(0f);
+        updateTextLayout();
+        float width = textWidth;
+        float height = textHeight;
+        var layout = getLayout();
+        if (layout.getWidth().isAuto() || layout.getWidth().isPoints() && layout.getWidth().getValue() == measuredWidth) {
+            layout.width(width);
+            measuredWidth = width;
+        }
+        if (layout.getHeight().isAuto() || layout.getHeight().isPoints() && layout.getHeight().getValue() == measuredHeight) {
+            layout.height(height);
+            measuredHeight = height;
+        }
+    }
+
+    /**
+     * Reuses per-line glyph layouts until the text, font or em size changes.
+     * Newline scanning occurs only during rebuilds, preserving trailing empty
+     * lines without regex or temporary arrays in the drawing path.
+     */
+    private void updateTextLayout() {
+        if (layoutFont == font && layoutSize == fontSize && text.equals(layoutText)) return;
+        layoutFont = font;
+        layoutText = text;
+        layoutSize = fontSize;
+        textWidth = 0f;
+        textHeight = 0f;
+        if (font == null || text.isEmpty()) {
+            lines = EMPTY_LINES;
             return;
         }
-
-        getLayout().width(measureTextWidth());
-        getLayout().height(measureTextHeight());
+        int count = 1;
+        for (int i = 0; i < text.length(); i++)
+            if (text.charAt(i) == '\n') count++;
+        SlugTextRun[] previous = lines;
+        if (lines.length != count) lines = new SlugTextRun[count];
+        int start = 0;
+        for (int i = 0; i < count; i++) {
+            int end = text.indexOf('\n', start);
+            if (end < 0) end = text.length();
+            String line = start == 0 && end == text.length() ? text : text.substring(start, end);
+            SlugTextRun run = i < previous.length ? previous[i] : null;
+            if (run == null || run.font() != font) run = font.createRun(line, fontSize);
+            else run.rebuild(line, fontSize);
+            lines[i] = run;
+            textWidth = Math.max(textWidth, run.width());
+            start = end + 1;
+        }
+        textHeight = count * font.lineHeight() * fontSize;
     }
 
-    /**
-     * Splits retained text at newline characters while preserving trailing empty
-     * lines. Carriage returns and other characters remain in their line.
-     *
-     * @return line array, or one empty line for null text
-     */
-    private String[] getLines() {
-        return text == null ? new String[]{""} : text.split("\n", -1);
-    }
-
-    /**
-     * Measures each line through the current font and returns the largest width.
-     *
-     * @return widest line width, or zero without a font
-     */
-    private float measureTextWidth() {
-        if (font == null)
-            return 0f;
-
-        float width = 0f;
-        String[] lines = getLines();
-
-        for (String line : lines)
-            width = Math.max(width, font.getWidth(line));
-
-        return width;
-    }
-
-    /**
-     * Measures single-line text directly. Multiline text uses the representative
-     * Ag line height plus one inferred line advance per additional line, including
-     * trailing empty lines.
-     *
-     * @return text height, or zero for absent font or empty text
-     */
-    private float measureTextHeight() {
-        if (font == null || text == null || text.isEmpty())
-            return 0f;
-
-        String[] lines = getLines();
-        if (lines.length == 1)
-            return font.getHeight(lines[0]);
-
-        float singleLineHeight = getSingleLineHeight();
-        float lineAdvance = getLineAdvance();
-        return singleLineHeight + (lines.length - 1) * lineAdvance;
-    }
-
-    /**
-     * Measures Ag as a representative ascender/descender line.
-     *
-     * @return representative line height, or zero without a font
-     */
-    private float getSingleLineHeight() {
-        return font == null ? 0f : font.getHeight("Ag");
-    }
-
-    /**
-     * Derives line spacing from the difference between two-line and single-line Ag
-     * measurements, falling back to single-line height when the difference is nonpositive.
-     *
-     * @return baseline step, or zero without a font
-     */
-    private float getLineAdvance() {
-        if (font == null)
-            return 0f;
-
-        float singleLineHeight = getSingleLineHeight();
-        float twoLineHeight = font.getHeight("Ag\nAg");
-        float lineAdvance = twoLineHeight - singleLineHeight;
-        return lineAdvance > 0f ? lineAdvance : singleLineHeight;
-    }
-
-    /**
-     * Draws each newline-separated line with independent start/center/end alignment
-     * inside the computed node width, advancing downward from the top text line.
-     * Uses the borrowed tint when present and the font's default draw path otherwise.
-     * Does nothing for a missing font or empty text.
-     *
-     * @param batch prepared texture batch receiving font glyphs
-     */
     @Override
     public void draw(TextureBatch batch) {
-        if (font == null || text == null || text.isEmpty())
-            return;
-
-        String[] lines = getLines();
+        if (font == null || lines.length == 0 || fontSize == 0f) return;
         float x = getRenderX();
-        float lineAdvance = getLineAdvance();
-        float topY = getRenderY() + measureTextHeight() - lineAdvance;
+        float baseline = getRenderY() + getHeight() - font.ascent() * fontSize;
+        float advance = font.lineHeight() * fontSize;
         float availableWidth = getWidth();
-
         for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            float lineWidth = font.getWidth(line);
+            SlugTextRun line = lines[i];
             float lineX = switch (alignment) {
                 case START -> x;
-                case CENTER -> x + (availableWidth - lineWidth) * 0.5f;
-                case END -> x + availableWidth - lineWidth;
+                case CENTER -> x + (availableWidth - line.width()) * .5f;
+                case END -> x + availableWidth - line.width();
             };
-            float lineY = topY - i * lineAdvance;
-
-            if (color != null)
-                font.draw(batch, line, lineX, lineY, color);
-            else
-                font.draw(batch, line, lineX, lineY);
+            line.draw(batch, lineX, baseline - i * advance, color);
         }
     }
 }

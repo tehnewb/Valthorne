@@ -110,12 +110,15 @@ public class NanoImage extends UINode implements NanoNode {
         if (width <= 0f || height <= 0f)
             return;
 
-        try (NVGPaint paint = NVGPaint.calloc()) {
+        NVGPaint paint = NVGPaint.calloc();
+        try {
             nvgImagePattern(vg, x, y, width, height, 0f, imageHandle, 1f, paint);
             nvgBeginPath(vg);
             nvgRect(vg, x, y, width, height);
             nvgFillPaint(vg, paint);
             nvgFill(vg);
+        } finally {
+            paint.free();
         }
     }
 

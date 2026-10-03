@@ -1,11 +1,13 @@
 package valthorne.ui.nodes;
 
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.Font;
+import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 
 /**
  * <p>
@@ -63,23 +65,30 @@ import valthorne.ui.theme.StyleKey;
  */
 public class Tooltip extends UINode {
 
-    /**
+    /*
      * Style key used to resolve the tooltip font.
      */
-    public static final StyleKey<Font> FONT_STYLE_KEY = StyleKey.of("font", Font.class);
+    public static final StyleKey<SlugFont> FONT_STYLE_KEY = StyleKey.of("font", SlugFont.class);
 
-    /**
+    /*
+     * Em scale shared by all regular UI text controls through the semantic size token.
+     */
+    public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
+
+    /*
      * Style key used to resolve the tooltip background drawable.
      */
     public static final StyleKey<Drawable> BACKGROUND_STYLE_KEY = StyleKey.of("background", Drawable.class);
 
-    /**
+    /*
      * Style key used to resolve tooltip padding, defaulting to {@code 6f}.
      */
     public static final StyleKey<Float> PADDING_STYLE_KEY = StyleKey.of("padding", Float.class, 6f);
 
     private String text; // Current text displayed by the tooltip
-    private Font font; // Resolved font used to render tooltip text
+    private SlugFont font; // Resolved font used to render tooltip text
+    private SlugTextRun run; // Retained multiline layout borrowing the resolved font.
+    private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
     private Drawable background; // Resolved background drawable for the tooltip box
     private float padding = 6f; // Resolved padding applied around the tooltip text
 
@@ -157,32 +166,40 @@ public class Tooltip extends UINode {
      */
     @Override
     protected void applyLayout() {
-        super.applyLayout();
-
         ResolvedStyle style = getStyle();
         font = null;
         background = null;
         padding = 6f;
 
-        if (style == null)
+        if (style == null) {
+            super.applyLayout();
             return;
+        }
 
         font = style.get(FONT_STYLE_KEY);
+        if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
+        fontSize = style.get(FONT_SIZE_KEY);
+        if (!Float.isFinite(fontSize) || fontSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
         background = style.get(BACKGROUND_STYLE_KEY);
 
         Float resolvedPadding = style.get(PADDING_STYLE_KEY);
         if (resolvedPadding != null)
             padding = resolvedPadding;
 
-        if (font == null || text == null)
+        if (font == null || text == null) {
+            super.applyLayout();
             return;
+        }
 
-        float width = font.getWidth(text) + padding * 2f;
-        float height = font.getHeight(text) + padding * 2f;
+        if (run == null || run.font() != font) run = font.createRun(text, fontSize);
+        else run.rebuild(text, fontSize);
+        float width = run.width() + padding * 2f;
+        float height = run.height() + padding * 2f;
 
         getLayout()
                 .width(width)
                 .height(height);
+        super.applyLayout();
     }
 
     /**
@@ -210,7 +227,7 @@ public class Tooltip extends UINode {
         if (font == null || text == null || text.isBlank())
             return;
 
-        font.draw(batch, text, getRenderX() + padding, getRenderY() + padding);
+        run.draw(batch, getRenderX() + padding, getRenderY() + getHeight() - padding - font.ascent() * fontSize, getStyle() == null ? null : getStyle().get(Label.COLOR_KEY));
     }
 
     /**

@@ -1,12 +1,11 @@
 package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
+
 import valthorne.graphics.Color;
-import valthorne.graphics.OpenGLStateSnapshot;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.shader.ShaderSources;
 
-import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -43,37 +42,59 @@ import static org.lwjgl.opengl.GL33.*;
  * @author Albert Beaupre
  */
 public final class Lighting2D implements AutoCloseable {
-    /**
+    /*
      * Instanced light-quad vertex shader source.
      */
     private static final String LIGHT_VERTEX = ShaderSources.load("lighting2d/light.vert");
-    /**
+    /*
      * Attenuation and polar-shadow fragment shader source.
      */
     private static final String LIGHT_FRAGMENT = ShaderSources.load("lighting2d/light.frag");
-    /**
+    /*
      * Vertex-ID fullscreen triangle shader source.
      */
     private static final String FULLSCREEN = ShaderSources.load("lighting2d/fullscreen.vert");
-    /**
+    /*
      * Scene/light composition shader source with exposure.
      */
     private static final String COMPOSITE = ShaderSources.load("lighting2d/composite.frag");
     private final Thread owner = Thread.currentThread(); // Creating OpenGL thread required for guarded operations.
-    private final int capacity, resolution, atlas, instances, vao, sceneFbo, sceneTexture, lightFbo, lightTexture; // Light/sample limits and owned GPU resource identifiers.
-    private final Shader lightShader, compositeShader; // Owned light and composition programs.
-    private final ArrayList<Entry> lights = new ArrayList<>(); // Light registrations with atlas slots and shadow caches.
+    private final int capacity; // Maximum registered light count.
+    private final int resolution; // Angular shadow samples per atlas row.
+    private final int atlas; // Owned polar-shadow atlas texture.
+    private final int instances; // Owned instance attribute buffer.
+    private final int vao; // Owned instanced-light vertex array.
+    private final int sceneFbo; // Owned scene capture framebuffer.
+    private final int sceneTexture; // Owned scene color texture.
+    private final int lightFbo; // Owned HDR light framebuffer.
+    private final int lightTexture; // Owned HDR light texture.
+    private final Shader lightShader; // Owned instanced light shader.
+    private final Shader compositeShader; // Owned scene composition shader.
+    private final ArrayList<Lighting2DEntry> lights = new ArrayList<>(); // Light registrations with atlas slots and shadow caches.
     private final ArrayList<Occluder2D> occluders = new ArrayList<>(); // Borrowed occluders with revision-tracked geometry.
     private final OccluderIndex2D index = new OccluderIndex2D(); // Owned CPU occluder broad-phase index.
     private final BitSet slots = new BitSet(); // Reserved atlas row indices.
-    private final FloatBuffer instanceData, shadowData; // Reusable native instance and shadow-row staging buffers.
+    private final FloatBuffer instanceData; // Reusable native light-instance staging buffer.
+    private final FloatBuffer shadowData; // Reusable native shadow-row staging buffer.
     private final Color ambient = new Color(.08f, .1f, .16f, 1); // Owned ambient linear RGB clear color.
     private long indexedGeometry = Long.MIN_VALUE; // Geometry fingerprint last indexed.
-    private float scale = .5f, exposure = 1, minX, minY, worldWidth, worldHeight; // Map scale, exposure, and active XY-world capture rectangle.
-    private int width, height, mapWidth, mapHeight, visibleCount, lastDrawCalls; // Scene/map dimensions and most recent light-pass counts.
-    private long mapFingerprint = Long.MIN_VALUE, shadowUploads, mapRenders; // Cached map identity and cumulative work counters.
+    private float scale = .5f; // Light-map resolution relative to scene resolution.
+    private float exposure = 1; // Linear composition exposure multiplier.
+    private float minX; // Capture rectangle minimum world X.
+    private float minY; // Capture rectangle minimum world Y.
+    private float worldWidth; // Capture rectangle width in world units.
+    private float worldHeight; // Capture rectangle height in world units.
+    private int width; // Scene texture width in pixels.
+    private int height; // Scene texture height in pixels.
+    private int mapWidth; // Light-map width in pixels.
+    private int mapHeight; // Light-map height in pixels.
+    private int visibleCount; // Visible light count in the latest pass.
+    private int lastDrawCalls; // Light draw count in the latest pass.
+    private long mapFingerprint = Long.MIN_VALUE; // Cached lighting map identity.
+    private long shadowUploads; // Cumulative polar-shadow row uploads.
+    private long mapRenders; // Cumulative light-map render passes.
     private boolean disposed; // Whether owned GPU resources were released.
-    private State capture; // Active capture's saved GL state, null when inactive.
+    private Lighting2DState capture; // Active capture's saved GL state, null when inactive.
 
     /**
      * Creates capacity for 512 lights with 1024 angular samples per shadow row.
@@ -101,7 +122,8 @@ public final class Lighting2D implements AutoCloseable {
         resolution = shadowResolution;
         instanceData = BufferUtils.createFloatBuffer(capacity * 16);
         shadowData = BufferUtils.createFloatBuffer(resolution);
-        try (State ignored = new State()) {
+        Lighting2DState ignored = new Lighting2DState();
+        try {
             lightShader = new Shader(LIGHT_VERTEX, LIGHT_FRAGMENT);
             compositeShader = new Shader(FULLSCREEN, COMPOSITE);
             atlas = glGenTextures();
@@ -124,6 +146,8 @@ public final class Lighting2D implements AutoCloseable {
                 glVertexAttribPointer(i, 4, GL_FLOAT, false, 64, i * 16L);
                 glVertexAttribDivisor(i, 1);
             }
+        } finally {
+            ignored.restore();
         }
     }
 
@@ -190,7 +214,7 @@ public final class Lighting2D implements AutoCloseable {
         if (lights.size() == capacity) throw new IllegalStateException("Light capacity reached");
         int slot = slots.nextClearBit(0);
         slots.set(slot);
-        lights.add(new Entry(light, slot, new PolarShadow2D(resolution)));
+        lights.add(new Lighting2DEntry(light, slot, new PolarShadow2D(resolution)));
         mapFingerprint = Long.MIN_VALUE;
         return this;
     }
@@ -239,6 +263,27 @@ public final class Lighting2D implements AutoCloseable {
         check();
         return occluders.remove(o);
     }
+
+    /**
+     * Returns an independent ambient color for configuration inspection.
+     *
+     * @return copied ambient linear RGB
+     */
+    public Color getAmbient() {return new Color(ambient.r(), ambient.g(), ambient.b(), ambient.a());}
+
+    /**
+     * Returns the active composition exposure.
+     *
+     * @return positive multiplier
+     */
+    public float getExposure() {return exposure;}
+
+    /**
+     * Returns light-map resolution relative to the window.
+     *
+     * @return scale in [.25,1]
+     */
+    public float getResolutionScale() {return scale;}
 
     /**
      * Validates finite nonnegative RGB, copies the color, and invalidates the map.
@@ -364,7 +409,7 @@ public final class Lighting2D implements AutoCloseable {
         PointLight2D.positive(worldHeight);
         if (pixelWidth < 1 || pixelHeight < 1 || pixelWidth > glGetInteger(GL_MAX_TEXTURE_SIZE) || pixelHeight > glGetInteger(GL_MAX_TEXTURE_SIZE))
             throw new IllegalArgumentException("Invalid viewport dimensions");
-        capture = new State();
+        capture = new Lighting2DState();
         try {
             if (this.minX != minX || this.minY != minY || this.worldWidth != worldWidth || this.worldHeight != worldHeight)
                 mapFingerprint = Long.MIN_VALUE;
@@ -397,7 +442,7 @@ public final class Lighting2D implements AutoCloseable {
     public void endScene() {
         check();
         if (capture == null) throw new IllegalStateException("Call beginScene first");
-        State saved = capture;
+        Lighting2DState saved = capture;
         capture = null;
         try {
             glDisable(GL_SCISSOR_TEST);
@@ -423,7 +468,7 @@ public final class Lighting2D implements AutoCloseable {
             compositeShader.setUniform1f("u_exposure", exposure);
             glDrawArrays(GL_TRIANGLES, 0, 3);
         } finally {
-            saved.close();
+            saved.restore();
         }
     }
 
@@ -434,7 +479,7 @@ public final class Lighting2D implements AutoCloseable {
     public void cancelScene() {
         check();
         if (capture != null) {
-            capture.close();
+            capture.restore();
             capture = null;
         }
     }
@@ -482,7 +527,7 @@ public final class Lighting2D implements AutoCloseable {
             index.rebuild(occluders);
             indexedGeometry = geometry;
         }
-        for (Entry entry : lights) {
+        for (Lighting2DEntry entry : lights) {
             PointLight2D l = entry.light;
             if (!l.enabled || l.intensity == 0 || l.r + l.g + l.b == 0 || l.x + l.radius < minX || l.y + l.radius < minY || l.x - l.radius > minX + worldWidth || l.y - l.radius > minY + worldHeight)
                 continue;
@@ -556,87 +601,4 @@ public final class Lighting2D implements AutoCloseable {
         disposed = true;
     }
 
-    /**
-     * Registration tying one borrowed light to a reserved atlas row and owned polar
-     * shadow cache. Revision markers control reconsideration when the light is visible.
-     * Removal releases the row for a subsequent registration.
-     *
-     * @author Albert Beaupre
-     */
-    private static final class Entry {
-        final PointLight2D light; // Borrowed registered light.
-        final int slot; // Reserved atlas row.
-        final PolarShadow2D shadow; // Owned reusable polar-shadow cache.
-        long geometry = Long.MIN_VALUE, lightRevision = Long.MIN_VALUE; // Last geometry and light-shadow revisions considered.
-
-        /**
-         * Retains registration state with initially invalid revision markers so a visible
-         * pass considers the light's shadow geometry.
-         *
-         * @param light  borrowed light
-         * @param slot   reserved atlas row
-         * @param shadow owned CPU shadow cache
-         */
-        Entry(PointLight2D light, int slot, PolarShadow2D shadow) {
-            this.light = light;
-            this.slot = slot;
-            this.shadow = shadow;
-        }
-    }
-
-    /**
-     * Selected OpenGL snapshot extending shared render state with framebuffer bindings,
-     * viewport, clear color, write mask, scissor/sRGB enablement, and samplers zero/one.
-     * It owns no GPU objects and does not preserve arbitrary unlisted context state.
-     * Keep captured object identifiers alive until restoration.
-     *
-     * @author Albert Beaupre
-     */
-    private static final class State implements AutoCloseable {
-        final OpenGLStateSnapshot base = new OpenGLStateSnapshot(); // Captured shared render bindings and capabilities.
-        final int draw = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING), read = glGetInteger(GL_READ_FRAMEBUFFER_BINDING); // Captured draw/read framebuffer identifiers.
-        final int[] viewport = new int[4]; // Captured viewport origin and size.
-        final float[] clear = new float[4]; // Captured RGBA clear color.
-        final boolean[] mask = new boolean[4]; // Captured per-channel color-write mask.
-        final boolean scissor = glIsEnabled(GL_SCISSOR_TEST), srgb = glIsEnabled(GL_FRAMEBUFFER_SRGB); // Captured scissor and sRGB enablement.
-        final int sampler0, sampler1; // Captured sampler bindings on units zero and one.
-
-        /**
-         * Captures supplemental context state immediately and restores the active texture
-         * selector after querying sampler bindings. Use the same current context on close.
-         */
-        State() {
-            glGetIntegerv(GL_VIEWPORT, viewport);
-            glGetFloatv(GL_COLOR_CLEAR_VALUE, clear);
-            ByteBuffer data = BufferUtils.createByteBuffer(4);
-            glGetBooleanv(GL_COLOR_WRITEMASK, data);
-            for (int i = 0; i < 4; i++) mask[i] = data.get(i) != 0;
-            int active = glGetInteger(GL_ACTIVE_TEXTURE);
-            glActiveTexture(GL_TEXTURE0);
-            sampler0 = glGetInteger(GL_SAMPLER_BINDING);
-            glActiveTexture(GL_TEXTURE1);
-            sampler1 = glGetInteger(GL_SAMPLER_BINDING);
-            glActiveTexture(active);
-        }
-
-        /**
-         * Restores captured supplemental state and then the shared render snapshot.
-         * Repeated calls reapply original values; no closed flag is maintained.
-         * Captured GPU objects must remain alive in the same current context.
-         */
-        public void close() {
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
-            glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-            glClearColor(clear[0], clear[1], clear[2], clear[3]);
-            glColorMask(mask[0], mask[1], mask[2], mask[3]);
-            if (scissor) glEnable(GL_SCISSOR_TEST);
-            else glDisable(GL_SCISSOR_TEST);
-            if (srgb) glEnable(GL_FRAMEBUFFER_SRGB);
-            else glDisable(GL_FRAMEBUFFER_SRGB);
-            glBindSampler(0, sampler0);
-            glBindSampler(1, sampler1);
-            base.close();
-        }
-    }
 }

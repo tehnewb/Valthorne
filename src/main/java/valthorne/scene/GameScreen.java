@@ -2,8 +2,10 @@ package valthorne.scene;
 
 import valthorne.Application;
 
+import java.util.Objects;
+
 /**
- * <h1>GameScreen</h1>
+ * <h2>GameScreen</h2>
  *
  * <p>
  * {@code GameScreen} is a lightweight application-level scene controller that bridges your engine's
@@ -46,7 +48,7 @@ import valthorne.Application;
  */
 public class GameScreen implements Application {
 
-    private Scene currentScene; // The currently active scene controlled by this game screen.
+    private Scene currentScene; // Active scene accessed on the application thread.
 
     /**
      * Creates a new {@code GameScreen} with an optional initial scene.
@@ -77,6 +79,7 @@ public class GameScreen implements Application {
             return;
         }
 
+        this.currentScene.setGameScreen(this);
         this.currentScene.initializeFields();
     }
 
@@ -95,7 +98,7 @@ public class GameScreen implements Application {
             return;
         }
 
-        this.currentScene.drawScene();
+        currentScene.drawScene();
     }
 
     /**
@@ -114,11 +117,7 @@ public class GameScreen implements Application {
             return;
         }
 
-        if (currentScene.isPaused()) {
-            return;
-        }
-
-        this.currentScene.updateScene(delta);
+        currentScene.updateScene(delta);
     }
 
     /**
@@ -165,7 +164,40 @@ public class GameScreen implements Application {
             return;
         }
 
+        scene.setGameScreen(this);
         scene.initializeFields();
+    }
+
+    /**
+     * Prepares a rebuilt scene before replacing the current one. A failed init
+     * leaves the current scene active so an editor can restore its source file.
+     *
+     * @param replacement newly constructed scene
+     */
+    public void replaceSceneAfterPreparation(Scene replacement) {
+        Objects.requireNonNull(replacement);
+        replacement.setGameScreen(this);
+        try {
+            replacement.initializeFields();
+        } catch (RuntimeException | Error failure) {
+            try {
+                replacement.disposeScene();
+            } catch (RuntimeException | Error cleanup) {
+                failure.addSuppressed(cleanup);
+            }
+            throw failure;
+        }
+        try {
+            if (currentScene != null) currentScene.disposeScene();
+        } catch (RuntimeException | Error failure) {
+            try {
+                replacement.disposeScene();
+            } catch (RuntimeException | Error cleanup) {
+                failure.addSuppressed(cleanup);
+            }
+            throw failure;
+        }
+        currentScene = replacement;
     }
 
     /**
@@ -176,4 +208,5 @@ public class GameScreen implements Application {
     public Scene getCurrentScene() {
         return currentScene;
     }
+
 }

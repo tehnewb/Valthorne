@@ -22,15 +22,22 @@ import static org.lwjgl.opengl.GL33.*;
  * Resources and draw calls belong to the creating GL thread.
  */
 public final class GroundShadowRenderer2D implements AutoCloseable {
-    private final Shader shader;
-    private final int vao, vbo;
-    private final FloatBuffer vertices = BufferUtils.createFloatBuffer(20);
-    private boolean closed;
-    private int drawCalls;
-    private final PointLight2D blended = new PointLight2D();
+    private final Shader shader; // Owned shader for this rendering pass.
+    private final int vao; // Owned vertex array describing pass geometry.
+    private final int vbo; // Owned streaming vertex buffer.
+    private final FloatBuffer vertices = BufferUtils.createFloatBuffer(20); // Reusable projected-shadow quad staging.
+    private boolean closed; // Whether the owned GL resources were released.
+    private int drawCalls; // Draw count in the latest shadow pass.
+    private final PointLight2D blended = new PointLight2D(); // Reusable virtual source blended from nearby lights.
 
+    /**
+     * Creates the shader and streaming quad resources on the current GL context,
+     * restoring the caller's selected bindings afterward. Close on the same
+     * graphics thread after the final pass.
+     */
     public GroundShadowRenderer2D() {
-        try (var state = new OpenGLStateSnapshot()) {
+        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+        try {
             shader = new Shader(ShaderSources.load("lighting2d/ground-shadow.vert"), ShaderSources.load("lighting2d/ground-shadow.frag"));
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
@@ -41,13 +48,27 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
             glVertexAttribPointer(0, 3, GL_FLOAT, false, 20, 0);
             glEnableVertexAttribArray(1);
             glVertexAttribPointer(1, 2, GL_FLOAT, false, 20, 12);
+        } finally {
+            state.restore();
         }
     }
 
+    /**
+     * Returns the draw count from the latest shadow pass.
+     *
+     * @return projected and contact shadow draw calls
+     */
     public int getDrawCalls() {
         return drawCalls;
     }
 
+    /**
+     * Draws alpha-textured ground shadows from one dominant light.
+     *
+     * @param sceneBatch active scene batch, flushed before external drawing
+     * @param light borrowed dominant elevated light
+     * @param casters borrowed shadow cards in painter order
+     */
     public void draw(TextureBatch sceneBatch, PointLight2D light, List<SpriteGroundShadow2D> casters) {
         draw(sceneBatch, light, casters, null);
     }
@@ -55,6 +76,12 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     /**
      * Artistic single-shadow approximation: nearby fill lights steer a weighted virtual source.
      * This is not independent per-light visibility; avoids stacked black shadows.
+     *
+     * @param sceneBatch active scene batch flushed before this external pass
+     * @param light borrowed dominant elevated light
+     * @param casters borrowed shadow cards in painter order
+     * @param fills borrowed supplementary lights, or null for a single-source pass
+     * @throws IllegalStateException if this renderer has been closed
      */
     public void draw(TextureBatch sceneBatch, PointLight2D light, List<SpriteGroundShadow2D> casters, PointLight2D[] fills) {
         if (closed) throw new IllegalStateException("Ground shadow renderer is closed");
@@ -62,7 +89,8 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (!light.enabled || !light.shadows || light.elevation <= 0 || light.intensity <= 0 || light.r + light.g + light.b <= 0)
             return;
         sceneBatch.flush();
-        try (var state = new OpenGLStateSnapshot()) {
+        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+        try {
             glDisable(GL_DEPTH_TEST);
             glDepthMask(false);
             glDisable(GL_CULL_FACE);
@@ -141,10 +169,24 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 drawCalls++;
             }
+        } finally {
+            state.restore();
         }
     }
 
+    /**
+     * Estimates a light's luminance contribution at one ground coordinate.
+     *
+     * @param light borrowed candidate light
+     * @param x receiver world X
+     * @param y receiver world Y
+     * @return nonnegative attenuation-weighted luminance
+     */
     private static float weight(PointLight2D light, float x, float y) {
+        /*
+         * Disabled and degenerate lights contribute nothing; squared falloff
+         * weights the virtual source without allocating intermediate vectors.
+         */
         if (!light.enabled || light.radius <= 0) return 0;
         float dx = x - light.x, dy = y - light.y;
         float attenuation = Math.max(0, 1 - (float) Math.sqrt(dx * dx + dy * dy + light.elevation * light.elevation) / light.radius);

@@ -24,7 +24,6 @@ import java.util.Objects;
  *     <li>Utility methods for position management, slicing, and buffer reset.</li>
  *     <li>Configurable byte order (big-endian or little-endian) for multi-byte types.</li>
  * </ul>
- * </p>
  * <p>
  * <b>Thread Safety:</b> This class is not thread-safe. If multiple threads access a {@code DynamicByteBuffer} instance
  * concurrently, external synchronization is required to prevent data corruption or inconsistent state.
@@ -44,7 +43,6 @@ import java.util.Objects;
  * System.out.println(dbb.readString()); // Outputs: Hello
  * System.out.println(dbb.readBit());    // Outputs: true
  * </pre>
- * </p>
  * <p>
  * <b>Note:</b> When performing bit-level operations, ensure to call {@link #flushBits()} after writing bits to ensure all
  * buffered bits are written to the underlying byte array. Reading or writing bits after changing the read or write position
@@ -53,7 +51,6 @@ import java.util.Objects;
  * </p>
  *
  * @author Albert Beaupre
- * @version 1.0
  * @see java.nio.ByteBuffer
  * @see BufferUnderflowException
  * @see java.nio.BufferOverflowException

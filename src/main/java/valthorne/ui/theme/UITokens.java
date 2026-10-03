@@ -42,13 +42,13 @@ public final class UITokens {
      */
     public static final StyleKey<Float> SPACING = StyleKey.of("ui.spacing", Float.class, 8f);
     /**
-     * Semantic corner radius in layout units, initially defaulting to 6.
+     * Semantic corner radius in layout units, initially defaulting to zero.
      * This does not automatically update a widget's concrete radius property.
      */
-    public static final StyleKey<Float> RADIUS = StyleKey.of("ui.radius", Float.class, 6f);
-    /**
-     * Semantic font size in layout units, initially defaulting to 16.
-     * Font selection and application of this size remain the consumer's responsibility.
+    public static final StyleKey<Float> RADIUS = StyleKey.of("ui.radius", Float.class, 0f);
+    /*
+     * Logical world units per em for regular Slug text controls, defaulting to 16.
+     * Their FONT_SIZE_KEY aliases share this token without mutating the borrowed font.
      */
     public static final StyleKey<Float> FONT_SIZE = StyleKey.of("ui.fontSize", Float.class, 16f);
     /**

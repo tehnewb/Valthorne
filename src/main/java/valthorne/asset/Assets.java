@@ -6,6 +6,10 @@ import valthorne.graphics.font.FontLoader;
 import valthorne.graphics.font.FontParameters;
 import valthorne.graphics.font.slug.SlugLoader;
 import valthorne.graphics.font.slug.SlugParameters;
+import valthorne.graphics.map.ldtk.LdtkLoader;
+import valthorne.graphics.map.ldtk.LdtkMap;
+import valthorne.graphics.map.ldtk.LdtkParameters;
+import valthorne.graphics.map.ldtk.LdtkProject;
 import valthorne.graphics.map.tiled.TiledMapLoader;
 import valthorne.graphics.map.tiled.TiledMapParameters;
 import valthorne.graphics.texture.TextureLoader;
@@ -121,6 +125,7 @@ public final class Assets {
         addLoader(FontParameters.class, new FontLoader());
         addLoader(SlugParameters.class, new SlugLoader());
         addLoader(TiledMapParameters.class, new TiledMapLoader());
+        addLoader(LdtkParameters.class, new LdtkLoader());
     }
 
     /**

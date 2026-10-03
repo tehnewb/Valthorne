@@ -7,7 +7,7 @@ import valthorne.event.events.MouseReleaseEvent;
 import valthorne.event.listeners.MouseListener;
 
 /**
- * <h1>SceneMouseListener</h1>
+ * <h2>SceneMouseListener</h2>
  *
  * <p>
  * {@code SceneMouseListener} is a forwarding adapter that routes mouse button, drag, and move events

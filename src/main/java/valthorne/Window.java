@@ -7,12 +7,17 @@ import valthorne.event.EventTypes;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
+import java.util.function.UnaryOperator;
 import valthorne.graphics.ImmediateTextureRenderer;
 import valthorne.graphics.texture.TextureData;
 import org.joml.Matrix4f;
 import valthorne.math.geometry.Dimensional;
 
 import java.nio.IntBuffer;
+import java.nio.DoubleBuffer;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import valthorne.event.events.FileDropEvent;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -48,6 +53,11 @@ import valthorne.graphics.GraphicsCapabilities;
  */
 public final class Window {
 
+    /*
+     * Optional render-thread clear-color policy, borrowed only while a caller installs it.
+     */
+    private static UnaryOperator<Color> clearColorFilter;
+
     /**
      * Engine-managed projection matrix used by shader rendering paths.
      */
@@ -63,25 +73,18 @@ public final class Window {
     private static final WindowResizeEvent resizeEvent = new WindowResizeEvent(0, 0, 0, 0);
 
     /**
-     * Native framebuffer-size callback reference retained for cleanup.
-     */
-    private static GLFWFramebufferSizeCallback fbCallback;
-    /**
      * Native focus callback reference; focus loss clears keyboard and pointer state.
      */
     private static GLFWWindowFocusCallback focusCallback;
     /**
-     * Native iconify callback reference retained for cleanup.
-     */
-    private static GLFWWindowIconifyCallback iconifyCallback;
-    /**
-     * Native maximize callback reference retained for cleanup.
-     */
-    private static GLFWWindowMaximizeCallback maximizeCallback;
-    /**
      * Native close callback reference that requests window closure.
      */
     private static GLFWWindowCloseCallback closeCallback;
+
+    /*
+     * Owned native path-drop callback, released with the window.
+     */
+    private static GLFWDropCallback dropCallback;
     /**
      * Native position callback reference that refreshes cached desktop coordinates.
      */
@@ -90,10 +93,6 @@ public final class Window {
      * Native logical-size callback reference that updates projection and publishes resize events.
      */
     private static GLFWWindowSizeCallback sizeCallback;
-    /**
-     * Native content-scale callback reference retained for cleanup.
-     */
-    private static GLFWWindowContentScaleCallback scaleCallback;
 
     /**
      * Cached swap-interval preference, initially disabled.
@@ -320,10 +319,7 @@ public final class Window {
 
         if (config.getSamples() > 0) glEnable(GL_MULTISAMPLE);
 
-        fbCallback = glfwSetFramebufferSizeCallback(address, (win, newW, newH) -> {
-        });
-
-        sizeCallback = glfwSetWindowSizeCallback(address, (win, newW, newH) -> {
+        sizeCallback = GLFWWindowSizeCallback.create((win, newW, newH) -> {
             if (newW <= 0 || newH <= 0) return;
 
             int oldWidth = Window.width;
@@ -342,30 +338,36 @@ public final class Window {
             resizeEvent.setNewWidth(Window.width);
             JGL.publish(resizeEvent);
         });
+        glfwSetWindowSizeCallback(address, sizeCallback);
 
-        posCallback = glfwSetWindowPosCallback(address, (win, newX, newY) -> {
+        posCallback = GLFWWindowPosCallback.create((win, newX, newY) -> {
             Window.x = newX;
             Window.y = newY;
         });
+        glfwSetWindowPosCallback(address, posCallback);
 
-        focusCallback = glfwSetWindowFocusCallback(address, (win, focused) -> {
+        focusCallback = GLFWWindowFocusCallback.create((win, focused) -> {
             if (!focused) {
                 Mouse.cancelButtons();
                 Keyboard.resetState();
             }
             JGL.publish(new WindowFocusEvent(focused));
         });
+        glfwSetWindowFocusCallback(address, focusCallback);
 
-        iconifyCallback = glfwSetWindowIconifyCallback(address, (win, iconified) -> {
+        closeCallback = GLFWWindowCloseCallback.create(win -> glfwSetWindowShouldClose(win, true));
+        glfwSetWindowCloseCallback(address, closeCallback);
+        dropCallback = GLFWDropCallback.create((win, count, names) -> {
+            ArrayList<Path> paths = new ArrayList<>(count);
+            for (int index = 0; index < count; index++) paths.add(Path.of(GLFWDropCallback.getName(names, index)));
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                DoubleBuffer cursorX = stack.mallocDouble(1);
+                DoubleBuffer cursorY = stack.mallocDouble(1);
+                glfwGetCursorPos(win, cursorX, cursorY);
+                JGL.publish(new FileDropEvent(paths, (float) cursorX.get(0), Window.height - (float) cursorY.get(0)));
+            }
         });
-
-        maximizeCallback = glfwSetWindowMaximizeCallback(address, (win, maximized) -> {
-        });
-
-        scaleCallback = glfwSetWindowContentScaleCallback(address, (win, xs, ys) -> {
-        });
-
-        closeCallback = glfwSetWindowCloseCallback(address, (win) -> glfwSetWindowShouldClose(win, true));
+        glfwSetDropCallback(address, dropCallback);
 
         if (!config.isFullscreen() && !config.isMaximized()) {
             GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
@@ -416,25 +418,29 @@ public final class Window {
      * @param color the color to use for clearing the framebuffer; must not be null
      */
     public static void clear(Color color) {
-        glClearColor(color.r(), color.g(), color.b(), color.a());
+        /*
+         * Resolve an optional scoped policy before clearing without allocating colors.
+         */
+        Color effective = clearColorFilter == null ? color : clearColorFilter.apply(color);
+        glClearColor(effective.r(), effective.g(), effective.b(), effective.a());
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
     /**
-     * Clears color and depth for a new 3D frame, even after a pass disabled depth writes.
+     * Installs a render-thread policy applied to subsequent framebuffer clears.
+     * Callers must restore the returned policy in a finally block, in reverse
+     * nesting order. The policy and colors remain borrowed; no resource is owned.
+     *
+     * @param filter color policy, or null to use the supplied color directly
+     * @return previous policy, or null when none was installed
      */
-    public static void clear3D(Color color) {
-        boolean depthWrite = glGetBoolean(GL_DEPTH_WRITEMASK);
-        double clearDepth = glGetDouble(GL_DEPTH_CLEAR_VALUE);
-        try {
-            glDepthMask(true);
-            glClearDepth(1.0);
-            glClearColor(color.r(), color.g(), color.b(), color.a());
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        } finally {
-            glDepthMask(depthWrite);
-            glClearDepth(clearDepth);
-        }
+    public static UnaryOperator<Color> setClearColorFilter(UnaryOperator<Color> filter) {
+        /*
+         * Return the prior reference so nested passes restore policy without wrappers.
+         */
+        UnaryOperator<Color> previous = clearColorFilter;
+        clearColorFilter = filter;
+        return previous;
     }
 
     /**
@@ -825,10 +831,13 @@ public final class Window {
         Throwable failure = null;
 
         failure = appendSuppressed(failure, runSafe(ImmediateTextureRenderer::dispose));
-        GLFWFramebufferSizeCallback framebufferCallback = fbCallback;
-        fbCallback = null;
-        if (framebufferCallback != null) {
-            failure = appendSuppressed(failure, runSafe(framebufferCallback::free));
+        long handle = address;
+        if (handle != NULL) {
+            failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowSizeCallback(handle, null)));
+            failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowPosCallback(handle, null)));
+            failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowFocusCallback(handle, null)));
+            failure = appendSuppressed(failure, runSafe(() -> glfwSetWindowCloseCallback(handle, null)));
+            failure = appendSuppressed(failure, runSafe(() -> glfwSetDropCallback(handle, null)));
         }
 
         GLFWWindowSizeCallback windowSizeCallback = sizeCallback;
@@ -849,31 +858,15 @@ public final class Window {
             failure = appendSuppressed(failure, runSafe(windowFocusCallback::free));
         }
 
-        GLFWWindowIconifyCallback windowIconifyCallback = iconifyCallback;
-        iconifyCallback = null;
-        if (windowIconifyCallback != null) {
-            failure = appendSuppressed(failure, runSafe(windowIconifyCallback::free));
-        }
-
-        GLFWWindowMaximizeCallback windowMaximizeCallback = maximizeCallback;
-        maximizeCallback = null;
-        if (windowMaximizeCallback != null) {
-            failure = appendSuppressed(failure, runSafe(windowMaximizeCallback::free));
-        }
-
-        GLFWWindowContentScaleCallback windowScaleCallback = scaleCallback;
-        scaleCallback = null;
-        if (windowScaleCallback != null) {
-            failure = appendSuppressed(failure, runSafe(windowScaleCallback::free));
-        }
-
         GLFWWindowCloseCallback windowCloseCallback = closeCallback;
         closeCallback = null;
         if (windowCloseCallback != null) {
             failure = appendSuppressed(failure, runSafe(windowCloseCallback::free));
         }
+        GLFWDropCallback windowDropCallback = dropCallback;
+        dropCallback = null;
+        if (windowDropCallback != null) failure = appendSuppressed(failure, runSafe(windowDropCallback::free));
 
-        long handle = address;
         address = NULL;
         graphicsCapabilities = null;
         if (handle != NULL) {
@@ -897,14 +890,10 @@ public final class Window {
      * call only after owned resources have been released or during safe reset.
      */
     static void resetState() {
-        fbCallback = null;
         focusCallback = null;
-        iconifyCallback = null;
-        maximizeCallback = null;
         closeCallback = null;
         posCallback = null;
         sizeCallback = null;
-        scaleCallback = null;
         address = NULL;
         x = 0;
         y = 0;

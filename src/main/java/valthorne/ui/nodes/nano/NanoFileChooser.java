@@ -4,6 +4,9 @@ import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.ui.UIInputEvent;
 import valthorne.ui.UINode;
+import valthorne.graphics.Color;
+import valthorne.ui.theme.ResolvedStyle;
+import valthorne.ui.theme.UITokens;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -257,7 +260,9 @@ public class NanoFileChooser extends NanoPanel {
          * @param vg active NanoVG context
          */
         @Override public void draw(long vg) {
-            var color = getStyle().get(valthorne.ui.theme.UITokens.TEXT);
+            ResolvedStyle style = getStyle();
+            Color color = style == null ? null : style.get(UITokens.TEXT);
+            if (color == null) color = style == null ? Color.WHITE : style.get(NanoButton.TEXT_COLOR_KEY);
             int rgb = color == null ? 0x667788 : Math.round(color.r() * 255) << 16 | Math.round(color.g() * 255) << 8 | Math.round(color.b() * 255);
             float x = getAbsoluteX() + 9, y = getAbsoluteY() + 9;
             valthorne.ui.Canvas2D.color(vg, rgb, 1);
@@ -655,6 +660,7 @@ public class NanoFileChooser extends NanoPanel {
         if (modal == null) {
             if (getParent() != null) throw new IllegalStateException("An embedded chooser cannot be opened as a dialog");
             modal = new ChooserDialog(owner).closeOnEscape(false).closeOnOutsideClick(false);
+            modal.setTheme(owner.getTheme());
             modal.content(this);
         } else if (modal.getModalParent() != owner) throw new IllegalStateException("Reuse the original dialog owner");
         float width = Math.min(760, owner.getRoot().getWidth() - 32);

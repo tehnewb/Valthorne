@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * <h1>TextUtility</h1>
+ * <h2>TextUtility</h2>
  *
  * <p>
  * {@code TextUtility} is a mutable, chainable text helper built for situations where you want to

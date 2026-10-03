@@ -1,7 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.ui.behavior.DirectoryBrowserModel;
-import valthorne.ui.behavior.DirectoryBrowserModel.Entry;
+import valthorne.ui.behavior.DirectoryEntry;
 
 import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
@@ -246,7 +246,7 @@ public class NanoFileExplorer extends NanoPanel {
      * Reads the immutable last successful directory snapshot.
      * @return entries in displayed order
      */
-    public List<Entry> getEntries() { return model.getEntries(); }
+    public List<DirectoryEntry> getEntries() { return model.getEntries(); }
 
     /**
      * Reads the selected path from the snapshot without resolving it again.
@@ -273,7 +273,7 @@ public class NanoFileExplorer extends NanoPanel {
     public void select(int index, boolean extend, boolean toggle) {
         if (isDisabled()) return;
         model.select(index, extend, toggle);
-        if (index >= 0) list.scrollToIndex(index);
+        if (index >= 0) list.revealIndex(index);
     }
 
     /**
@@ -381,10 +381,12 @@ public class NanoFileExplorer extends NanoPanel {
          * @param index valid current listing index
          */
         private FileRow(int index) {
-            super((model.getEntries().get(index).directory() ? "[Folder] " : "") + model.getEntries().get(index).path().getFileName());
+            super(model.getEntries().get(index).path().getFileName().toString());
             this.index = index; action(button -> select(index));
+            setStyleName("chooser-row"); leftAligned(true);
+            setStyle(NanoButton.PADDING_X_KEY, 32f);
             if (details) {
-                setStyleName("chooser-row"); getLabel().setVisible(false);
+                getLabel().setVisible(false);
                 NanoScrollPanel name = NanoWidgetSupport.viewport(); name.horizontal(false).vertical(false).horizontalBar(false).verticalBar(false);
                 name.setClickable(false);
                 name.getLayout().absolute().left(30).top(0).widthPercent(48).heightPercent(100);
@@ -396,6 +398,10 @@ public class NanoFileExplorer extends NanoPanel {
                         .format(Files.getLastModifiedTime(model.getEntries().get(index).path()).toInstant().atZone(java.time.ZoneId.systemDefault())); }
                 catch (IOException | SecurityException failure) { date = "Unavailable"; }
                 NanoLabel modified = new NanoLabel(date); modified.setClickable(false); modified.getLayout().absolute().leftPercent(57).top(6); add(modified);
+            } else {
+                NanoFileIcon icon = new NanoFileIcon(model.getEntries().get(index).directory());
+                icon.getLayout().absolute().left(9).top(7).width(16).height(18);
+                add(icon);
             }
         }
 
@@ -409,7 +415,7 @@ public class NanoFileExplorer extends NanoPanel {
             if (!isActivationRelease(event) || NanoFileExplorer.this.isDisabled()) return;
             event.consume();
             boolean twice = model.click(index, event.isShiftDown(), event.isCtrlDown() || event.isSuperDown(), System.nanoTime());
-            list.scrollToIndex(index);
+            list.revealIndex(index);
             if (twice) openSelection();
         }
     }

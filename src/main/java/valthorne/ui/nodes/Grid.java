@@ -86,6 +86,8 @@ public class Grid extends UIContainer {
     private int columns = 1; // Number of columns the grid should use when distributing children
     private LayoutValue cellWidth = LayoutValue.auto(); // Width applied to each child cell when not auto
     private LayoutValue cellHeight = LayoutValue.auto(); // Height applied to each child cell when not auto
+    private boolean computedWidth; // Whether fixed cell geometry supplied the current width constraints.
+    private boolean computedHeight; // Whether fixed cell geometry supplied the current height constraints.
 
     /**
      * <p>
@@ -304,7 +306,7 @@ public class Grid extends UIContainer {
      * If the grid is using point-based fixed cell sizes, it also computes and applies
      * explicit width and height constraints for the grid itself based on the number
      * of active columns, rows, and configured gaps. If either dimension is auto,
-     * the corresponding size is left automatic.
+     * application sizing is retained unless replacing a previously computed fixed extent.
      * </p>
      */
     @Override
@@ -331,15 +333,19 @@ public class Grid extends UIContainer {
         if (!cellWidth.isAuto() && cellWidth.isPoints()) {
             float totalWidth = usedColumns == 0 ? 0f : (usedColumns * cellWidth.getValue()) + Math.max(0, usedColumns - 1) * horizontalGap;
             getLayout().width(totalWidth).minWidth(totalWidth).maxWidth(totalWidth);
-        } else {
+            computedWidth = true;
+        } else if (computedWidth) {
             getLayout().widthAuto().minWidthAuto().maxWidthAuto();
+            computedWidth = false;
         }
 
         if (!cellHeight.isAuto() && cellHeight.isPoints()) {
             float totalHeight = rows == 0 ? 0f : (rows * cellHeight.getValue()) + Math.max(0, rows - 1) * verticalGap;
             getLayout().height(totalHeight).minHeight(totalHeight).maxHeight(totalHeight);
-        } else {
+            computedHeight = true;
+        } else if (computedHeight) {
             getLayout().heightAuto().minHeightAuto().maxHeightAuto();
+            computedHeight = false;
         }
 
         super.applyLayout();

@@ -1,11 +1,12 @@
 package valthorne.audio;
 
+import valthorne.Audio;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import valthorne.Audio;
 
 /**
  * <p>

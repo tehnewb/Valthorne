@@ -1,18 +1,20 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.NanoText;
+
 import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.NodeAction;
-import valthorne.ui.UINode;
+import valthorne.ui.UIGradient;
 import valthorne.ui.UIRoot;
+import valthorne.ui.behavior.ActivationBehavior;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import static org.lwjgl.nanovg.NanoVG.*;
-import valthorne.ui.behavior.ActivationBehavior;
 
 /**
  * Focusable NanoVG button with centered text and state-specific background,
@@ -28,11 +30,22 @@ import valthorne.ui.behavior.ActivationBehavior;
  * @author Albert Beaupre
  */
 public class NanoButton extends NanoContainer {
+
+    /*
+     * Optional gradient for the button background.
+     */
+    public static final StyleKey<UIGradient> BACKGROUND_GRADIENT_KEY = StyleKey.of("nano.button.backgroundGradient", UIGradient.class, null);
+
+    /*
+     * Optional gradient for the button border.
+     */
+    public static final StyleKey<UIGradient> BORDER_GRADIENT_KEY = StyleKey.of("nano.button.borderGradient", UIGradient.class, null);
     private NanoLabel label; // Optional independently laid-out caption for composite controls.
 
     /**
      * Materializes the caption as a NanoVG child so composite buttons can position,
      * clip, or hide it independently. Text setters continue to update this label.
+     *
      * @return owned caption, which may be reparented into an owned clipping viewport
      */
     public NanoLabel getLabel() {
@@ -128,7 +141,7 @@ public class NanoButton extends NanoContainer {
     /**
      * Theme corner radius used during layout; colors are retained by reference.
      */
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.button.cornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.button.cornerRadius", Float.class, 0f);
     /**
      * Theme border width used during layout; colors are retained by reference.
      */
@@ -163,8 +176,10 @@ public class NanoButton extends NanoContainer {
     private float fontSize = 18f; // Text size in UI units.
     private float paddingX = 14f; // Padding on each horizontal side in UI units.
     private float paddingY = 8f; // Padding on each vertical side in UI units.
-    private float cornerRadius = 6f; // Rounded-corner radius in UI units.
+    private float cornerRadius = 0f; // Rounded-corner radius in UI units.
     private float borderWidth = 1f; // Outer border stroke width in UI units.
+    private UIGradient backgroundGradient; // Optional gradient replacing the selected background color.
+    private UIGradient borderGradient; // Optional gradient replacing the selected border color.
 
     private boolean fontLoaded; // Reserved font state; not used by the current implementation.
     private NodeAction<NanoButton> action; // Optional local callback taking precedence over the theme action.
@@ -214,7 +229,9 @@ public class NanoButton extends NanoContainer {
         return this;
     }
 
-    /** Aligns painted text to the leading edge for menu rows. Center is the default. */
+    /**
+     * Aligns painted text to the leading edge for menu rows. Center is the default.
+     */
     public NanoButton leftAligned(boolean enabled) {
         leftAligned = enabled;
         return this;
@@ -328,6 +345,28 @@ public class NanoButton extends NanoContainer {
     public NanoButton backgroundColor(Color color) {
         if (color != null)
             this.backgroundColor = color;
+        return this;
+    }
+
+    /**
+     * Sets the background gradient, or clears it with null.
+     *
+     * @param gradient gradient borrowed by this button
+     * @return this button
+     */
+    public NanoButton backgroundGradient(UIGradient gradient) {
+        backgroundGradient = gradient;
+        return this;
+    }
+
+    /**
+     * Sets the border gradient, or clears it with null.
+     *
+     * @param gradient gradient borrowed by this button
+     * @return this button
+     */
+    public NanoButton borderGradient(UIGradient gradient) {
+        borderGradient = gradient;
         return this;
     }
 
@@ -602,6 +641,10 @@ public class NanoButton extends NanoContainer {
         ResolvedStyle style = getStyle();
 
         if (style != null) {
+            UIGradient resolvedBackgroundGradient = style.get(BACKGROUND_GRADIENT_KEY);
+            UIGradient resolvedBorderGradient = style.get(BORDER_GRADIENT_KEY);
+            if (resolvedBackgroundGradient != null) backgroundGradient = resolvedBackgroundGradient;
+            if (resolvedBorderGradient != null) borderGradient = resolvedBorderGradient;
             Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
             Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
             Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
@@ -688,7 +731,8 @@ public class NanoButton extends NanoContainer {
 
     /**
      * Paints state-selected background and border, followed by centered text when
-     * nonempty. The border is centered on the outer path, not inset like NanoPanel.
+     * nonempty. A dragged button keeps its text and children but omits its background
+     * and border. The border is centered on the outer path, not inset like NanoPanel.
      * Skips invisible nodes and a zero handle. Requires root-prepared frame state.
      *
      * @param vg borrowed active NanoVG context, or zero to skip
@@ -698,10 +742,23 @@ public class NanoButton extends NanoContainer {
         if (!isVisible() || vg == 0L)
             return;
 
-        float x = getAbsoluteX();
-        float y = getAbsoluteY();
-        float width = getWidth();
-        float height = getHeight();
+        drawAt(vg, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight(), 1f);
+        super.draw(vg);
+    }
+
+    /**
+     * Paints this button's current state without traversing its runtime children.
+     * This keeps game-owned buttons visually current in external scene previews.
+     *
+     * @param vg     active NanoVG frame
+     * @param x      projected left edge
+     * @param y      projected top edge
+     * @param width  projected width
+     * @param height projected height
+     * @param scale  projection scale applied to paint metrics
+     */
+    public void drawAt(long vg, float x, float y, float width, float height, float scale) {
+        if (!isVisible() || vg == 0L) return;
 
         Color drawBackground = backgroundColor;
         Color drawBorder = borderColor;
@@ -725,28 +782,33 @@ public class NanoButton extends NanoContainer {
             drawText = hoverTextColor;
         }
 
-        nvgBeginPath(vg);
-        nvgRoundedRect(vg, x, y, width, height, cornerRadius);
-        nvgFillColor(vg, NanoUtility.color1(drawBackground));
-        nvgFill(vg);
-
-        if (borderWidth > 0f) {
+        if (!isDragging()) {
             nvgBeginPath(vg);
-            nvgRoundedRect(vg, x, y, width, height, cornerRadius);
-            nvgStrokeWidth(vg, borderWidth);
-            nvgStrokeColor(vg, NanoUtility.color1(drawBorder));
-            nvgStroke(vg);
+            nvgRoundedRect(vg, x, y, width, height, cornerRadius * scale);
+            if (backgroundGradient == null) {
+                nvgFillColor(vg, NanoUtility.color1(drawBackground));
+                nvgFill(vg);
+            } else backgroundGradient.fill(vg, x, y, width, height);
+
+            if (borderWidth > 0f) {
+                nvgBeginPath(vg);
+                nvgRoundedRect(vg, x, y, width, height, cornerRadius * scale);
+                nvgStrokeWidth(vg, borderWidth * scale);
+                if (borderGradient == null) {
+                    nvgStrokeColor(vg, NanoUtility.color1(drawBorder));
+                    nvgStroke(vg);
+                } else borderGradient.stroke(vg, x, y, width, height);
+            }
         }
 
         if (label == null && text != null && !text.isEmpty()) {
-            nvgFontSize(vg, fontSize);
+            nvgFontSize(vg, fontSize * scale);
             nvgFontFace(vg, fontName);
             nvgTextAlign(vg, (leftAligned ? NVG_ALIGN_LEFT : NVG_ALIGN_CENTER) | NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, NanoUtility.color1(drawText));
-            nvgText(vg, leftAligned ? x + paddingX : x + width * 0.5f, y + height * 0.5f, text);
+            NanoText.draw(this, vg, leftAligned ? x + paddingX * scale : x + width * 0.5f, y + height * 0.5f, text, fontSize * scale, drawText, (leftAligned ? NVG_ALIGN_LEFT : NVG_ALIGN_CENTER) | NVG_ALIGN_MIDDLE);
         }
         if (label != null) label.color(drawText);
-        super.draw(vg);
     }
 
     /**
@@ -761,7 +823,7 @@ public class NanoButton extends NanoContainer {
         if (root == null || value == null || value.isEmpty())
             return value == null ? 0f : value.length() * fontSize * 0.5f;
 
-        return NanoUtility.measureTextWidth(root.getNanoVGHandle(), fontName, fontSize, value);
+        return NanoText.measureTextWidth(this, root.getNanoVGHandle(), fontName, fontSize, value);
     }
 
     /**
@@ -775,7 +837,7 @@ public class NanoButton extends NanoContainer {
         if (root == null)
             return fontSize;
 
-        return NanoUtility.measureTextHeight(root.getNanoVGHandle(), fontName, fontSize);
+        return NanoText.measureTextHeight(this, root.getNanoVGHandle(), fontName, fontSize);
     }
 
     /**

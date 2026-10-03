@@ -1,18 +1,18 @@
 package valthorne.ui.nodes.nano;
 
+import org.joml.Vector2f;
+import valthorne.Mouse;
 import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
-import org.joml.Vector2f;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.UINode;
+import valthorne.ui.behavior.ScrollBehavior;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 import static org.lwjgl.nanovg.NanoVG.*;
-import valthorne.Mouse;
-import valthorne.ui.behavior.ScrollBehavior;
 
 /**
  * Scrollable NanoVG container with one managed content node and optional horizontal
@@ -107,7 +107,7 @@ public class NanoScrollPanel extends NanoContainer {
     /**
      * Theme corner radius for scrollbar painting; sizes use UI units.
      */
-    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.scrollpanel.cornerRadius", Float.class, 6f);
+    public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.scrollpanel.cornerRadius", Float.class, 0f);
     private final ScrollMetrics metrics = new ScrollMetrics(); // Reused metric cache shared by range, input, and paint calculations.
     private UINode content = new NanoPanel(); // Managed content node whose dimensions determine overflow.
     private boolean horizontal = true; // Whether horizontal offset changes are allowed.
@@ -138,7 +138,7 @@ public class NanoScrollPanel extends NanoContainer {
     private float verticalBarWidth = 8f; // Visible vertical track thickness in UI units.
     private float barPadding = 0f; // Horizontal track X inset in UI units.
     private float minThumbSize = 18f; // Requested minimum thumb length, capped to available track length.
-    private float cornerRadius = 6f; // Background and border corner radius in UI units.
+    private float cornerRadius = 0f; // Background and border corner radius in UI units.
 
     /**
      * Creates a scrollable container with an attached empty NanoPanel as content.
@@ -362,7 +362,7 @@ public class NanoScrollPanel extends NanoContainer {
     }
 
     /** Returns the styled vertical track thickness for virtual row layout. */
-    public float getVerticalBarWidth() { return verticalBarWidth; }
+    public float getVerticalBarWidth() {return verticalBarWidth;}
 
     /**
      * Invalidates inherited style state and immediately rebuilds this panel's local
@@ -403,8 +403,8 @@ public class NanoScrollPanel extends NanoContainer {
      * and falls back to this node when its capabilities match. Converts world Y to
      * top-left layout Y for scrollbar comparisons.
      *
-     * @param x hit-test world X
-     * @param y hit-test world Y
+     * @param x           hit-test world X
+     * @param y           hit-test world Y
      * @param requiredBit required capability bit, or negative for any
      * @return eligible descendant/panel, or null
      */
@@ -465,8 +465,7 @@ public class NanoScrollPanel extends NanoContainer {
      */
     @Override
     public void onMouseScroll(MouseScrollEvent event) {
-        Vector2f next = ScrollBehavior.wheel(event, horizontal, vertical,
-                getScrollX(), getScrollY(), getMaxScrollX(), getMaxScrollY(), scrollSpeed);
+        Vector2f next = ScrollBehavior.wheel(event, horizontal, vertical, getScrollX(), getScrollY(), getMaxScrollX(), getMaxScrollY(), scrollSpeed);
         scroll(next.x(), next.y());
     }
 
@@ -613,9 +612,7 @@ public class NanoScrollPanel extends NanoContainer {
 
         if (content != null) {
             TextureBatch sharedBatch = getRoot().getRenderContext().getBatch();
-            sharedBatch.beginScissor(getRenderX() + sharedBatch.getTranslationX(),
-                    getRenderY() + sharedBatch.getTranslationY() + metrics.horizontalBarHeight,
-                    width - metrics.verticalBarWidth, height - metrics.horizontalBarHeight);
+            sharedBatch.beginScissor(getRenderX() + sharedBatch.getTranslationX(), getRenderY() + sharedBatch.getTranslationY() + metrics.horizontalBarHeight, width - metrics.verticalBarWidth, height - metrics.horizontalBarHeight);
             sharedBatch.pushTranslation(-scrollX, scrollY);
             try {
                 super.draw(vg);
@@ -628,28 +625,28 @@ public class NanoScrollPanel extends NanoContainer {
         if (metrics.showHorizontalBar && metrics.horizontalBarWidth > 0f) {
             nvgBeginPath(vg);
             nvgFillColor(vg, NanoUtility.color2(horizontalBarBackgroundColor));
-            nvgRoundedRect(vg, metrics.horizontalBarX, metrics.horizontalBarY, metrics.horizontalBarWidth, metrics.horizontalBarHeight, metrics.horizontalBarHeight * 0.5f);
+            nvgRoundedRect(vg, metrics.horizontalBarX, metrics.horizontalBarY, metrics.horizontalBarWidth, metrics.horizontalBarHeight, Math.min(cornerRadius, metrics.horizontalBarHeight * 0.5f));
             nvgFill(vg);
 
             Color thumbColor = draggingHorizontalBar ? horizontalBarPressedForegroundColor : hoverHorizontalBar ? horizontalBarHoverForegroundColor : horizontalBarForegroundColor;
 
             nvgBeginPath(vg);
             nvgFillColor(vg, NanoUtility.color3(thumbColor));
-            nvgRoundedRect(vg, metrics.horizontalThumbX, metrics.horizontalThumbY, metrics.horizontalThumbWidth, metrics.horizontalThumbHeight, metrics.horizontalThumbHeight * 0.5f);
+            nvgRoundedRect(vg, metrics.horizontalThumbX, metrics.horizontalThumbY, metrics.horizontalThumbWidth, metrics.horizontalThumbHeight, Math.min(cornerRadius, metrics.horizontalThumbHeight * 0.5f));
             nvgFill(vg);
         }
 
         if (metrics.showVerticalBar && metrics.verticalBarHeight > 0f) {
             nvgBeginPath(vg);
             nvgFillColor(vg, NanoUtility.color4(verticalBarBackgroundColor));
-            nvgRoundedRect(vg, metrics.verticalBarX, metrics.verticalBarY, metrics.verticalBarWidth, metrics.verticalBarHeight, metrics.verticalBarWidth * 0.5f);
+            nvgRoundedRect(vg, metrics.verticalBarX, metrics.verticalBarY, metrics.verticalBarWidth, metrics.verticalBarHeight, Math.min(cornerRadius, metrics.verticalBarWidth * 0.5f));
             nvgFill(vg);
 
             Color thumbColor = draggingVerticalBar ? verticalBarPressedForegroundColor : hoverVerticalBar ? verticalBarHoverForegroundColor : verticalBarForegroundColor;
 
             nvgBeginPath(vg);
             nvgFillColor(vg, NanoUtility.color1(thumbColor));
-            nvgRoundedRect(vg, metrics.verticalThumbX, metrics.verticalThumbY, metrics.verticalThumbWidth, metrics.verticalThumbHeight, metrics.verticalThumbWidth * 0.5f);
+            nvgRoundedRect(vg, metrics.verticalThumbX, metrics.verticalThumbY, metrics.verticalThumbWidth, metrics.verticalThumbHeight, Math.min(cornerRadius, metrics.verticalThumbWidth * 0.5f));
             nvgFill(vg);
         }
 
@@ -798,7 +795,7 @@ public class NanoScrollPanel extends NanoContainer {
         verticalBarWidth = 8f;
         barPadding = 4f;
         minThumbSize = 18f;
-        cornerRadius = 6f;
+        cornerRadius = 0f;
 
         if (style == null) return;
 

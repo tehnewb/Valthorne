@@ -1,10 +1,13 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.NanoText;
+
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
+import valthorne.ui.enums.Alignment;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 import valthorne.Keyboard;
@@ -16,8 +19,12 @@ import valthorne.ui.behavior.TextEditing;
 import static org.lwjgl.nanovg.NanoVG.*;
 
 /**
- * NanoVG text leaf with explicit line breaks, expanded tab stops, and left/top
- * alignment. Fonts are selected by an already registered NanoVG name; this node
+ * NanoVG text leaf with explicit line breaks, expanded tab stops, configurable
+ * horizontal and vertical alignment. Each line is aligned within the resolved
+ * label width; the complete text block is aligned within its height. In NanoVG's
+ * top-left coordinates, vertical START means top and END means bottom. Selection
+ * and projected previews use the same offsets. Fonts are selected by
+ * an already registered NanoVG name; this node
  * does not load or own font resources. Width and height are measured from the
  * root's context when available, otherwise estimated from character count.
  *
@@ -51,12 +58,24 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     public static final StyleKey<Float> LINE_SPACING_KEY = StyleKey.of("nano.label.lineSpacing", Float.class, 0f);
 
+    /*
+     * Optional theme override for horizontal alignment of each text line.
+     */
+    public static final StyleKey<Alignment> HORIZONTAL_ALIGNMENT_KEY = StyleKey.of("nano.label.horizontalAlignment", Alignment.class);
+
+    /*
+     * Optional theme override for vertical alignment of the complete text block.
+     */
+    public static final StyleKey<Alignment> VERTICAL_ALIGNMENT_KEY = StyleKey.of("nano.label.verticalAlignment", Alignment.class);
+
     private String text = ""; // Raw non-null text before newline and tab normalization.
     private String fontName = "default"; // Borrowed NanoVG font registration name.
     private float fontSize = 18f; // Text measurement and drawing size in UI units.
     private Color color = Color.WHITE; // Borrowed mutable text color, initially the shared white constant.
     private float tabSize = 4f; // Requested tab-stop interval rounded to integer character columns.
     private float lineSpacing; // Extra UI-unit distance between successive lines.
+    private Alignment horizontalAlignment = Alignment.START; // Horizontal placement of each line within the resolved label width.
+    private Alignment verticalAlignment = Alignment.START; // Vertical placement of the complete text block; START is top.
     private boolean fontLoaded; // Reserved font state; current implementation does not read or update it.
     private TextSelection selection;
     private boolean selecting;
@@ -135,12 +154,13 @@ public class NanoLabel extends UINode implements NanoNode {
         if (point.y() >= getAbsoluteY() + getHeight()) return normalizeText(text).length();
         long vg = getRoot() == null ? 0 : getRoot().getNanoVGHandle();
         String[] lines = splitLines(normalizeText(text));
-        float height = vg == 0 ? fontSize : NanoUtility.measureTextHeight(vg, fontName, fontSize);
+        float height = vg == 0 ? fontSize : NanoText.measureTextHeight(this, vg, fontName, fontSize);
+        float textY = getAbsoluteY() + blockOffset(lines.length, height, lineSpacing, getHeight());
         int line = Math.max(0, Math.min(lines.length - 1,
-                (int) Math.floor((point.y() - getAbsoluteY()) / (height + lineSpacing))));
+                (int) Math.floor((point.y() - textY) / (height + lineSpacing))));
         int offset = 0;
         for (int i = 0; i < line; i++) offset += lines[i].length() + 1;
-        float target = point.x() - getAbsoluteX();
+        float target = point.x() - getAbsoluteX() - lineOffset(vg, lines[line], fontSize, getWidth());
         float previous = 0;
         String value = lines[line];
         for (int i = 0; i < value.length();) {
@@ -155,7 +175,96 @@ public class NanoLabel extends UINode implements NanoNode {
 
     private float measure(long vg, String value) {
         return vg == 0 ? value.length() * fontSize * .5f
-                : NanoUtility.measureTextWidth(vg, fontName, fontSize, value);
+                : NanoText.measureTextWidth(this, vg, fontName, fontSize, value);
+    }
+
+    /**
+     * Computes a line's left offset using the same metrics as rendering. Start
+     * alignment avoids measurement; overflowing text retains its requested alignment.
+     *
+     * @param vg active context, or zero to estimate character widths
+     * @param line normalized text line
+     * @param size rendered font size in UI units
+     * @param width available label width in the same units
+     * @return horizontal offset from the label's left edge
+     */
+    private float lineOffset(long vg, String line, float size, float width) {
+        if (horizontalAlignment == Alignment.START) return 0f;
+        float textWidth = vg == 0L ? line.length() * size * 0.5f : NanoText.measureTextWidth(this, vg, fontName, size, line);
+        float remaining = width - textWidth;
+        return horizontalAlignment == Alignment.CENTER ? remaining * 0.5f : remaining;
+    }
+
+    /**
+     * Positions the complete multiline block, excluding spacing after its last
+     * line. Overflow retains the requested alignment rather than being clamped.
+     *
+     * @param lines number of normalized text lines
+     * @param lineHeight rendered height of one line
+     * @param spacing distance between lines
+     * @param height available label height in the same units
+     * @return offset from the top edge
+     */
+    private float blockOffset(int lines, float lineHeight, float spacing, float height) {
+        if (verticalAlignment == Alignment.START) return 0f;
+        float remaining = height - lines * lineHeight - Math.max(0, lines - 1) * spacing;
+        return verticalAlignment == Alignment.CENTER ? remaining * 0.5f : remaining;
+    }
+
+    /**
+     * Sets independent horizontal and vertical text alignment. Horizontal alignment
+     * applies to each line; vertical alignment applies to the complete text block.
+     * Explicit dimensions provide space for alignment beyond intrinsic text size.
+     * Resolved theme values may override either axis during layout.
+     *
+     * @param horizontal horizontal alignment, or null to retain its current value
+     * @param vertical vertical alignment, or null to retain its current value
+     * @return this label
+     */
+    public NanoLabel alignment(Alignment horizontal, Alignment vertical) {
+        if (horizontal != null) horizontalAlignment = horizontal;
+        if (vertical != null) verticalAlignment = vertical;
+        return this;
+    }
+
+    /**
+     * Reads the horizontal alignment applied independently to each line.
+     *
+     * @return current horizontal alignment
+     */
+    public Alignment getHorizontalAlignment() {
+        return horizontalAlignment;
+    }
+
+    /**
+     * Sets horizontal text alignment while retaining vertical alignment.
+     *
+     * @param horizontal alignment, or null to retain the current value
+     * @return this label
+     */
+    public NanoLabel horizontalAlignment(Alignment horizontal) {
+        if (horizontal != null) horizontalAlignment = horizontal;
+        return this;
+    }
+
+    /**
+     * Reads vertical alignment of the complete text block.
+     *
+     * @return current vertical alignment; START is top and END is bottom
+     */
+    public Alignment getVerticalAlignment() {
+        return verticalAlignment;
+    }
+
+    /**
+     * Sets vertical text alignment while retaining horizontal alignment.
+     *
+     * @param vertical alignment, or null to retain the current value; START is top
+     * @return this label
+     */
+    public NanoLabel verticalAlignment(Alignment vertical) {
+        if (vertical != null) verticalAlignment = vertical;
+        return this;
     }
 
     /**
@@ -362,12 +471,16 @@ public class NanoLabel extends UINode implements NanoNode {
             Color resolvedColor = style.get(COLOR_KEY);
             Float resolvedTabSize = style.get(TAB_SIZE_KEY);
             Float resolvedLineSpacing = style.get(LINE_SPACING_KEY);
+            Alignment resolvedHorizontalAlignment = style.get(HORIZONTAL_ALIGNMENT_KEY);
+            Alignment resolvedVerticalAlignment = style.get(VERTICAL_ALIGNMENT_KEY);
 
             if (resolvedFontName != null && !resolvedFontName.isBlank()) fontName = resolvedFontName;
             if (resolvedFontSize != null) fontSize = Math.max(1f, resolvedFontSize);
             if (resolvedColor != null) color = resolvedColor;
             if (resolvedTabSize != null) tabSize = Math.max(1f, resolvedTabSize);
             if (resolvedLineSpacing != null) lineSpacing = Math.max(0f, resolvedLineSpacing);
+            if (resolvedHorizontalAlignment != null) horizontalAlignment = resolvedHorizontalAlignment;
+            if (resolvedVerticalAlignment != null) verticalAlignment = resolvedVerticalAlignment;
         }
 
         String normalized = normalizeText(text);
@@ -383,10 +496,10 @@ public class NanoLabel extends UINode implements NanoNode {
             nvgFontSize(vg, fontSize);
             nvgFontFace(vg, fontName);
 
-            float lineHeight = NanoUtility.measureTextHeight(vg, fontName, fontSize);
+            float lineHeight = NanoText.measureTextHeight(this, vg, fontName, fontSize);
 
             for (String line : lines) {
-                measuredWidth = Math.max(measuredWidth, NanoUtility.measureTextWidth(vg, fontName, fontSize, line));
+                measuredWidth = Math.max(measuredWidth, NanoText.measureTextWidth(this, vg, fontName, fontSize, line));
             }
 
             measuredHeight = lines.length == 0 ? lineHeight : (lines.length * lineHeight) + Math.max(0, lines.length - 1) * lineSpacing;
@@ -405,7 +518,7 @@ public class NanoLabel extends UINode implements NanoNode {
     }
 
     /**
-     * Draws normalized lines at absolute node coordinates using left/top alignment.
+     * Draws normalized lines with both alignment axes within the node's bounds.
      * Skips invisible nodes and a zero context handle. The root must already have
      * begun the NanoVG frame and prepared transforms and clipping.
      *
@@ -423,12 +536,13 @@ public class NanoLabel extends UINode implements NanoNode {
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
         nvgFillColor(vg, NanoUtility.color1(color));
 
-        float lineHeight = NanoUtility.measureTextHeight(vg, fontName, fontSize);
+        float lineHeight = NanoText.measureTextHeight(this, vg, fontName, fontSize);
         float x = getAbsoluteX();
-        float y = getAbsoluteY();
+        float y = getAbsoluteY() + blockOffset(lines.length, lineHeight, lineSpacing, getHeight());
 
         int offset = 0;
         for (int i = 0; i < lines.length; i++) {
+            float lineX = x + lineOffset(vg, lines[i], fontSize, getWidth());
             if (selection != null && (isFocused() || documentSelection)) {
                 int start = Math.max(0, selection.start() - offset);
                 int end = Math.min(lines[i].length(), selection.end() - offset);
@@ -436,14 +550,40 @@ public class NanoLabel extends UINode implements NanoNode {
                     float left = measure(vg, lines[i].substring(0, start));
                     float right = measure(vg, lines[i].substring(0, end));
                     nvgBeginPath(vg);
-                    nvgRect(vg, x + left, y + i * (lineHeight + lineSpacing), right - left, lineHeight);
+                    nvgRect(vg, lineX + left, y + i * (lineHeight + lineSpacing), right - left, lineHeight);
                     nvgFillColor(vg, NanoUtility.color1(SELECTION_COLOR));
                     nvgFill(vg);
                     nvgFillColor(vg, NanoUtility.color1(color));
                 }
             }
-            nvgText(vg, x, y + i * (lineHeight + lineSpacing), lines[i]);
+            NanoText.draw(this, vg, lineX, y + i * (lineHeight + lineSpacing), lines[i], fontSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             offset += lines[i].length() + 1;
+        }
+    }
+
+    /**
+     * Draws this label's live text at a projected position without its runtime
+     * selection decoration. The caller supplies an active NanoVG frame and owns
+     * clipping, making this suitable for an editor scene preview.
+     *
+     * @param vg active NanoVG frame
+     * @param x projected left edge
+     * @param y projected top edge
+     * @param scale projected text scale
+     */
+    public void drawAt(long vg, float x, float y, float scale) {
+        if (!isVisible() || vg == 0L) return;
+        String[] lines = splitLines(normalizeText(text));
+        float projectedSize = fontSize * scale;
+        nvgFontSize(vg, projectedSize);
+        nvgFontFace(vg, fontName);
+        nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        nvgFillColor(vg, NanoUtility.color1(color));
+        float lineHeight = NanoText.measureTextHeight(this, vg, fontName, projectedSize);
+        float textY = y + blockOffset(lines.length, lineHeight, lineSpacing * scale, getHeight() * scale);
+        for (int index = 0; index < lines.length; index++) {
+            float lineX = x + lineOffset(vg, lines[index], projectedSize, getWidth() * scale);
+            NanoText.draw(this, vg, lineX, textY + index * (lineHeight + lineSpacing * scale), lines[index], projectedSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
         }
     }
 

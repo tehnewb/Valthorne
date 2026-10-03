@@ -1,24 +1,23 @@
 package valthorne.ui.nodes.nano;
 
-import valthorne.event.events.KeyPressEvent;
-import valthorne.event.events.MouseDragEvent;
-import valthorne.event.events.MousePressEvent;
-import valthorne.event.events.MouseScrollEvent;
+import org.joml.Vector2f;
+import valthorne.Mouse;
+import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
-import org.joml.Vector2f;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.NodeAction;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
+import valthorne.ui.behavior.RangeModel;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 import valthorne.viewport.Viewport;
 
-import static org.lwjgl.nanovg.NanoVG.*;
-import valthorne.Mouse;
-import valthorne.event.events.MouseReleaseEvent;
-import valthorne.ui.behavior.RangeModel;
+import static org.lwjgl.nanovg.NanoVG.nvgBeginPath;
+import static org.lwjgl.nanovg.NanoVG.nvgFill;
+import static org.lwjgl.nanovg.NanoVG.nvgFillColor;
+import static org.lwjgl.nanovg.NanoVG.nvgRoundedRect;
 
 /**
  * Focusable NanoVG range control with mouse, wheel, and keyboard input. Values
@@ -96,6 +95,14 @@ public class NanoSlider extends UINode implements NanoNode {
      */
     public static final StyleKey<Float> THUMB_SIZE_KEY = StyleKey.of("nano.slider.thumbSize", Float.class, 18f);
     /**
+     * Radius of the track and filled track; defaults to pill-shaped ends.
+     */
+    public static final StyleKey<Float> TRACK_CORNER_RADIUS_KEY = StyleKey.of("nano.slider.trackCornerRadius", Float.class, 0f);
+    /**
+     * Radius of the thumb; defaults to a circular thumb.
+     */
+    public static final StyleKey<Float> THUMB_CORNER_RADIUS_KEY = StyleKey.of("nano.slider.thumbCornerRadius", Float.class, 0f);
+    /**
      * Theme input-change callback used when the local action is null.
      */
     public static final StyleKey<NodeAction<NanoSlider>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<NanoSlider>>) (Class<?>) NodeAction.class);
@@ -103,6 +110,8 @@ public class NanoSlider extends UINode implements NanoNode {
     private NodeAction<NanoSlider> action; // Optional local input-change callback overriding theme fallback.
     private float trackHeight = 8f; // Track cross-axis thickness in UI units.
     private float thumbSize = 18f; // Circular thumb diameter and reserved travel size in UI units.
+    private float trackCornerRadius = 0f;
+    private float thumbCornerRadius = 0f;
     private boolean vertical; // Whether increasing values move the thumb upward.
     private Color trackColor = new Color(0xFF2A2A2A); // Borrowed track color for state-dependent painting.
     private Color hoverTrackColor = new Color(0xFF323232); // Borrowed hover track color for state-dependent painting.
@@ -128,8 +137,8 @@ public class NanoSlider extends UINode implements NanoNode {
      * Creates a horizontal slider with validated range and value, using theme action
      * fallback. A reversed range collapses at min and the value is clamped.
      *
-     * @param min finite minimum
-     * @param max finite requested maximum
+     * @param min   finite minimum
+     * @param max   finite requested maximum
      * @param value finite initial value
      * @throws IllegalArgumentException if an input or effective range width is non-finite
      */
@@ -140,9 +149,9 @@ public class NanoSlider extends UINode implements NanoNode {
      * and wheel capabilities, and assigns default dimensions. Initialization does
      * not invoke the action; a reversed range collapses at min.
      *
-     * @param min finite minimum
-     * @param max finite requested maximum
-     * @param value finite initial value
+     * @param min    finite minimum
+     * @param max    finite requested maximum
+     * @param value  finite initial value
      * @param action optional local input-change callback
      * @throws IllegalArgumentException if an input or effective range width is non-finite
      */
@@ -521,8 +530,7 @@ public class NanoSlider extends UINode implements NanoNode {
      */
     @Override
     public void onMouseDrag(MouseDragEvent event) {
-        if (event.getButton() == Mouse.LEFT && isDragging())
-            updateFromPointer(event.getToX(), event.getToY());
+        if (event.getButton() == Mouse.LEFT && isDragging()) updateFromPointer(event.getToX(), event.getToY());
     }
 
     /**
@@ -536,8 +544,7 @@ public class NanoSlider extends UINode implements NanoNode {
     private void updateFromPointer(int screenX, int screenY) {
         Vector2f local = screenToLocal(screenX, screenY);
         float previous = model.value();
-        model.pointer(vertical ? local.y() : local.x(), vertical ? getHeight() : getWidth(),
-                thumbSize, vertical);
+        model.pointer(vertical ? local.y() : local.x(), vertical ? getHeight() : getWidth(), thumbSize, vertical);
         if (previous != model.value()) fireAction();
     }
 
@@ -628,6 +635,8 @@ public class NanoSlider extends UINode implements NanoNode {
             Color resolvedDisabledThumbColor = style.get(DISABLED_THUMB_COLOR_KEY);
             Float resolvedTrackHeight = style.get(TRACK_HEIGHT_KEY);
             Float resolvedThumbSize = style.get(THUMB_SIZE_KEY);
+            Float resolvedTrackCornerRadius = style.get(TRACK_CORNER_RADIUS_KEY);
+            Float resolvedThumbCornerRadius = style.get(THUMB_CORNER_RADIUS_KEY);
             if (resolvedTrackColor != null) trackColor = resolvedTrackColor;
             if (resolvedHoverTrackColor != null) hoverTrackColor = resolvedHoverTrackColor;
             if (resolvedFocusedTrackColor != null) focusedTrackColor = resolvedFocusedTrackColor;
@@ -643,6 +652,8 @@ public class NanoSlider extends UINode implements NanoNode {
             if (resolvedDisabledThumbColor != null) disabledThumbColor = resolvedDisabledThumbColor;
             if (resolvedTrackHeight != null) trackHeight = Math.max(0f, resolvedTrackHeight);
             if (resolvedThumbSize != null) thumbSize = Math.max(0f, resolvedThumbSize);
+            if (resolvedTrackCornerRadius != null) trackCornerRadius = Math.max(0f, resolvedTrackCornerRadius);
+            if (resolvedThumbCornerRadius != null) thumbCornerRadius = Math.max(0f, resolvedThumbCornerRadius);
         }
         if (vertical) {
             if (getLayout().getWidth().isAuto()) getLayout().width(Math.max(trackHeight, thumbSize));
@@ -684,9 +695,10 @@ public class NanoSlider extends UINode implements NanoNode {
         float trackY = getTrackY();
         float trackW = getTrackWidth();
         float trackH = getTrackActualHeight();
+        float trackRadius = Math.min(trackCornerRadius, Math.min(trackW, trackH) * 0.5f);
         nvgBeginPath(vg);
         nvgFillColor(vg, NanoUtility.color1(drawTrack));
-        nvgRoundedRect(vg, trackX, trackY, trackW, trackH, Math.min(trackW, trackH) * 0.5f);
+        nvgRoundedRect(vg, trackX, trackY, trackW, trackH, trackRadius);
         nvgFill(vg);
         float percent = getPercent();
         if (vertical) {
@@ -695,7 +707,7 @@ public class NanoSlider extends UINode implements NanoNode {
                 float fillY = trackY + (trackH - fillH);
                 nvgBeginPath(vg);
                 nvgFillColor(vg, NanoUtility.color1(drawFill));
-                nvgRoundedRect(vg, trackX, fillY, trackW, fillH, Math.min(trackW, trackH) * 0.5f);
+                nvgRoundedRect(vg, trackX, fillY, trackW, fillH, trackRadius);
                 nvgFill(vg);
             }
         } else {
@@ -703,13 +715,13 @@ public class NanoSlider extends UINode implements NanoNode {
             if (fillW > 0f) {
                 nvgBeginPath(vg);
                 nvgFillColor(vg, NanoUtility.color1(drawFill));
-                nvgRoundedRect(vg, trackX, trackY, fillW, trackH, Math.min(trackW, trackH) * 0.5f);
+                nvgRoundedRect(vg, trackX, trackY, fillW, trackH, trackRadius);
                 nvgFill(vg);
             }
         }
         nvgBeginPath(vg);
         nvgFillColor(vg, NanoUtility.color1(drawThumb));
-        nvgCircle(vg, getThumbCenterX(), getThumbCenterY(), thumbSize * 0.5f);
+        nvgRoundedRect(vg, getThumbCenterX() - thumbSize * 0.5f, getThumbCenterY() - thumbSize * 0.5f, thumbSize, thumbSize, Math.min(thumbCornerRadius, thumbSize * 0.5f));
         nvgFill(vg);
     }
 
