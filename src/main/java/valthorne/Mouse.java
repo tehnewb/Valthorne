@@ -247,14 +247,14 @@ public final class Mouse {
      * Bitmask representing the current modifier key state.
      */
     private static byte modifierState; // Bitmask representing the current modifier key state
-    /*
-     * Accumulated native horizontal scroll offsets since the current frame boundary.
+    /**
+     * Latest horizontal scroll delta.
      */
-    private static double scrollX;
-    /*
-     * Accumulated native vertical scroll offsets since the current frame boundary.
+    private static byte scrollX; // Latest horizontal scroll delta
+    /**
+     * Latest vertical scroll delta.
      */
-    private static double scrollY;
+    private static byte scrollY; // Latest vertical scroll delta
 
     /**
      * Native GLFW cursor handle currently assigned to the window.
@@ -374,8 +374,8 @@ public final class Mouse {
         glfwSetMouseButtonCallback(Window.getAddress(), mouseButtonCallback);
 
         scrollCallback = GLFWScrollCallback.create((win, xoff, yoff) -> {
-            scrollX += xoff;
-            scrollY += yoff;
+            scrollX = (byte) xoff;
+            scrollY = (byte) yoff;
 
             scrollEvent.setPreciseOffsets((float) xoff, (float) yoff);
 
@@ -733,30 +733,24 @@ public final class Mouse {
     }
 
     /**
-     * Returns accumulated horizontal native scroll since the frame boundary.
-     * Poll after native events are processed. Frame completion, focus loss, and
-     * disposal clear the total. Event payloads still describe individual callbacks.
+     * <p>
+     * Returns the most recent horizontal scroll delta.
+     * </p>
      *
-     * @return signed horizontal offsets, retaining native double precision
+     * @return the horizontal scroll amount
      */
-    public static double getScrollX() {
-        /*
-         * Read primitive accumulation directly without allocation or narrowing.
-         */
+    public static byte getScrollX() {
         return scrollX;
     }
 
     /**
-     * Returns accumulated vertical native scroll since the frame boundary.
-     * Poll after native events are processed. Frame completion, focus loss, and
-     * disposal clear the total. Event payloads still describe individual callbacks.
+     * <p>
+     * Returns the most recent vertical scroll delta.
+     * </p>
      *
-     * @return signed vertical offsets, retaining native double precision
+     * @return the vertical scroll amount
      */
-    public static double getScrollY() {
-        /*
-         * Fractional input remains available until the existing frame reset.
-         */
+    public static byte getScrollY() {
         return scrollY;
     }
 
@@ -785,14 +779,10 @@ public final class Mouse {
      * index. The method checks whether the requested bit is currently set.
      * </p>
      *
-     * @param button the mouse button index; values outside 0 through GLFW_MOUSE_BUTTON_LAST return false
+     * @param button the mouse button index
      * @return {@code true} if the specified button is currently down
      */
     public static boolean isButtonDown(int button) {
-        /*
-         * Validate before shifting because Java masks shift distances and sign-extends bytes.
-         */
-        if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST) return false;
         return (buttonState & (1 << button)) != 0;
     }
 
