@@ -1,5 +1,7 @@
 package valthorne.viewport;
 
+import java.util.Arrays;
+
 import valthorne.Window;
 import valthorne.camera.Camera;
 import valthorne.graphics.DrawFunction;
@@ -119,7 +121,8 @@ public abstract class Viewport {
     protected float worldWidth; // Logical world width visible through this viewport.
     protected float worldHeight; // Logical world height visible through this viewport.
     protected Camera camera; // Optional camera used to build the active projection transform.
-    private boolean scissorWasEnabled; // True when a scissor test was already active before beginScissor was called.
+    private int[] scissorScopes = new int[20]; // Saved box and enable flag for four nested scopes; grows only on deeper nesting.
+    private int scissorDepth; // Number of successful scopes awaiting restoration.
 
     /**
      * Creates a viewport with the specified logical world size.
@@ -304,7 +307,9 @@ public abstract class Viewport {
      *
      * <p>
      * If the resulting scissor rectangle has no visible area, this method returns {@code false}
-     * and no new scissor state is applied.
+     * and neither OpenGL state nor restoration depth is changed. Successful scopes
+     * may nest on the same instance and must end in reverse order. Storage is reused
+     * without per-scope allocation except when reaching a new capacity.
      * </p>
      *
      * @param wx the world-space x coordinate of the scissor rectangle
@@ -343,7 +348,7 @@ public abstract class Viewport {
             return false;
         }
 
-        scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        boolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
 
         glGetIntegerv(GL_SCISSOR_BOX, previousScissor);
         int prevX = previousScissor[0];
@@ -377,6 +382,14 @@ public abstract class Viewport {
             }
         }
 
+        int offset = scissorDepth * 5;
+        if (offset + 5 > scissorScopes.length) scissorScopes = Arrays.copyOf(scissorScopes, scissorScopes.length * 2);
+        scissorScopes[offset] = prevX;
+        scissorScopes[offset + 1] = prevY;
+        scissorScopes[offset + 2] = prevW;
+        scissorScopes[offset + 3] = prevH;
+        scissorScopes[offset + 4] = scissorWasEnabled ? 1 : 0;
+        scissorDepth++;
         glEnable(GL_SCISSOR_TEST);
         glScissor(fx, fy, fw, fh);
         return true;
@@ -387,15 +400,16 @@ public abstract class Viewport {
      *
      * <p>
      * If a scissor test was already active before this viewport began its scissor scope, the
-     * previous scissor rectangle is restored. Otherwise the OpenGL scissor test is disabled.
+     * previous scissor rectangle and enable state are restored, including the saved box
+     * when scissoring was disabled. Scopes must close in reverse order across instances.
      * </p>
      */
     public void endScissor() {
-        if (scissorWasEnabled) {
-            glScissor(previousScissor[0], previousScissor[1], previousScissor[2], previousScissor[3]);
-        } else {
-            glDisable(GL_SCISSOR_TEST);
-        }
+        if (scissorDepth == 0) throw new IllegalStateException("No active scissor scope");
+        int offset = --scissorDepth * 5;
+        glScissor(scissorScopes[offset], scissorScopes[offset + 1], scissorScopes[offset + 2], scissorScopes[offset + 3]);
+        if (scissorScopes[offset + 4] != 0) glEnable(GL_SCISSOR_TEST);
+        else glDisable(GL_SCISSOR_TEST);
     }
 
     /**
