@@ -247,14 +247,14 @@ public final class Mouse {
      * Bitmask representing the current modifier key state.
      */
     private static byte modifierState; // Bitmask representing the current modifier key state
-    /**
-     * Latest horizontal scroll delta.
+    /*
+     * Accumulated native horizontal scroll offsets since the current frame boundary.
      */
-    private static byte scrollX; // Latest horizontal scroll delta
-    /**
-     * Latest vertical scroll delta.
+    private static double scrollX;
+    /*
+     * Accumulated native vertical scroll offsets since the current frame boundary.
      */
-    private static byte scrollY; // Latest vertical scroll delta
+    private static double scrollY;
 
     /**
      * Native GLFW cursor handle currently assigned to the window.
@@ -374,8 +374,8 @@ public final class Mouse {
         glfwSetMouseButtonCallback(Window.getAddress(), mouseButtonCallback);
 
         scrollCallback = GLFWScrollCallback.create((win, xoff, yoff) -> {
-            scrollX = (byte) xoff;
-            scrollY = (byte) yoff;
+            scrollX += xoff;
+            scrollY += yoff;
 
             scrollEvent.setPreciseOffsets((float) xoff, (float) yoff);
 
@@ -733,24 +733,30 @@ public final class Mouse {
     }
 
     /**
-     * <p>
-     * Returns the most recent horizontal scroll delta.
-     * </p>
+     * Returns accumulated horizontal native scroll since the frame boundary.
+     * Poll after native events are processed. Frame completion, focus loss, and
+     * disposal clear the total. Event payloads still describe individual callbacks.
      *
-     * @return the horizontal scroll amount
+     * @return signed horizontal offsets, retaining native double precision
      */
-    public static byte getScrollX() {
+    public static double getScrollX() {
+        /*
+         * Read primitive accumulation directly without allocation or narrowing.
+         */
         return scrollX;
     }
 
     /**
-     * <p>
-     * Returns the most recent vertical scroll delta.
-     * </p>
+     * Returns accumulated vertical native scroll since the frame boundary.
+     * Poll after native events are processed. Frame completion, focus loss, and
+     * disposal clear the total. Event payloads still describe individual callbacks.
      *
-     * @return the vertical scroll amount
+     * @return signed vertical offsets, retaining native double precision
      */
-    public static byte getScrollY() {
+    public static double getScrollY() {
+        /*
+         * Fractional input remains available until the existing frame reset.
+         */
         return scrollY;
     }
 
