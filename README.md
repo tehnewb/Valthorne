@@ -167,23 +167,6 @@ For larger games, use `GameScreen` with a `Scene` to organize levels, a
 `TextureBatch` to batch sprite rendering, and retained UI nodes for menus and
 controls. The source Javadocs describe their APIs and resource lifetimes.
 
-## Build and verification
-
-Use the included Gradle wrapper:
-
-```sh
-./gradlew -Pprototype3d=false -PeditorPrototype=false build
-./gradlew -Pprototype3d=false -PeditorPrototype=false verifyRelease verifySlugTextureBatch
-```
-
-On Windows, use `gradlew.bat`. `build` creates the library, sources, and Javadoc
-archives. `verifyRelease` validates artifacts, licenses, resources, and metadata
-in a local Maven repository. `verifySlugTextureBatch` checks GPU-rendered text.
-These commands do not upload a release.
-
-Private editor and 3D prototypes are excluded from public artifacts. Follow
-[AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) when changing code.
-
 ## License and community
 
 Valthorne is distributed under the [Apache License 2.0](LICENSE). Third-party
