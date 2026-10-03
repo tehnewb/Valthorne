@@ -541,3 +541,4 @@ $RECYCLE.BIN/
 !/src/test/java/valthorne/graphics/font/slug/
 /src/test/java/valthorne/graphics/font/slug/*
 !/src/test/java/valthorne/graphics/font/slug/SlugTextureBatchVerification.java
+/src/test/
