@@ -34,6 +34,10 @@ package valthorne.camera;
  *     uiCamera.rebuild(windowWidth, windowHeight);
  * </pre>
  *
+ * <p>Invalid dimensions, live center values, or unrepresentable float bounds throw
+ * IllegalArgumentException before changing the previous projection. Zero dimensions
+ * during minimization must be skipped by the caller.</p>
+ *
  * @author Albert Beaupre
  * @since November 16th, 2025
  */
@@ -53,6 +57,7 @@ public class UIOrthographicCamera extends Camera {
      */
     @Override
     public void rebuild(float worldWidth, float worldHeight) {
+        validateProjectionDimensions(worldWidth, worldHeight);
         float w = worldWidth / zoom;
         float h = worldHeight / zoom;
 
@@ -62,6 +67,6 @@ public class UIOrthographicCamera extends Camera {
         float bottom = center.y() + h;
 
         // Build a top-left aligned orthographic projection for UI rendering
-        projection.setOrtho(left, right, bottom, top, -1f, 1f);
+        setOrthographicProjection(left, right, bottom, top);
     }
 }
