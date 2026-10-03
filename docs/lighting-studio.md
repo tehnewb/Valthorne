@@ -2,7 +2,6 @@
 
 On Windows x64 the studio defaults to **Filament / real-time PBR**. Other supported
 OpenGL 4.3 desktop hosts use the path tracer and omit the Filament choice. See
-[Filament integration](filament.md) for its lighting contract and
 [platform requirements](platforms.md). This studio cannot run on macOS OpenGL;
 use `run3DExample` or `runPhysics3DExample` for the portable raster path.
 
@@ -23,7 +22,6 @@ The workbench uses Valthorne's themed UI, including scrollable properties, dropd
 - **Realtime / temporal GI** is the default. It renders at full viewport resolution and reuses valid lighting history while navigating. **Progressive / bounced light** is the original stationary accumulation mode.
 - Interactive/High/Ultra controls samples and bounce depth; progressive mode also changes internal resolution. Exposure, denoising, VSync and sample restart are available in the properties panel. Scroll down for all rendering controls.
 
-The current selection is labeled in the viewport. The status bar shows FPS and asynchronously measured GPU time, rendering mode or progressive sample count, light count and action feedback. A converged stationary image is labeled “Cached image.” Realtime mode validates history against surface identity, normal and world position. Light, material, geometry, sky, projection-type and quality changes invalidate history; camera navigation reprojects matching surfaces. Newly exposed regions still need fresh samples, and glass/reflections may retain noise or short temporal lag. Stationary views continue refining. See [path-tracing requirements and limitations](path-tracing.md).
 
 The default rig uses neutral sources, a closer camera, and a toggleable checker reference behind the material spheres. The blue sphere is ceramic; the gold sphere is metallic and the center sphere is clear glass. Colored presets and placement remain available. “Reference pattern on / off” is in the rendering panel.
 

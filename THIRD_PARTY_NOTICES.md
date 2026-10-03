@@ -20,7 +20,6 @@ binaries. Distribute the licenses accompanying those dependencies with your game
 - **Filament studio environment**: derived from Filament's `studio_small_02_2k.hdr`,
   originally HDRI Haven / Poly Haven, CC0. The dedication is in
   `META-INF/licenses/filament-environment-CC0.html`; generation is documented in
-  [the Filament guide](docs/filament.md).
 - Shader sources and Filament material sources/packages in this repository use
   the repository license unless an individual file states otherwise.
 

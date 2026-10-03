@@ -65,7 +65,6 @@ is still pending. The transfer incurs a GPU/CPU copy every frame. Unsupported
 runtime architectures retain AUTO's raster fallback. Android and iOS still
 require separate native launchers and engine adapters; this change does not
 complete those ports.
-See [Filament contracts](filament.md).
 
 On Linux, install your distribution's graphics driver and desktop display
 dependencies. A hidden GLFW window still needs a display server. CI uses Xvfb and

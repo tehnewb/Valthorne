@@ -234,5 +234,4 @@ Reset the object to its initial state for reuse.
 ## Related guides
 
 - [2D particles and spawn distributions](particles-2d.md)
-- [3D particles and physics integration](particles-3d.md)
 - [Resizable and unordered arrays](arrays.md)

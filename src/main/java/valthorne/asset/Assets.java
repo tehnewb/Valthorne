@@ -8,8 +8,6 @@ import valthorne.graphics.font.slug.SlugLoader;
 import valthorne.graphics.font.slug.SlugParameters;
 import valthorne.graphics.map.tiled.TiledMapLoader;
 import valthorne.graphics.map.tiled.TiledMapParameters;
-import valthorne.graphics.model.ModelLoader;
-import valthorne.graphics.model.ModelParameters;
 import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
 
@@ -123,7 +121,6 @@ public final class Assets {
         addLoader(FontParameters.class, new FontLoader());
         addLoader(SlugParameters.class, new SlugLoader());
         addLoader(TiledMapParameters.class, new TiledMapLoader());
-        addLoader(ModelParameters.class, new ModelLoader());
     }
 
     /**

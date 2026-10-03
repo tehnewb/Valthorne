@@ -849,7 +849,6 @@ between directions as needed during playback or processing.
 
 ### TransformAnimation3D
 
-[Source](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java)
 
 Samples immutable local-transform keyframes using linear position and scale
 interpolation and shortest-path quaternion interpolation. Time is measured in
@@ -962,7 +961,6 @@ interpolation produces an invalid transform
 
 ### TransformAnimation3D.Keyframe
 
-[Source](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java)
 
 Immutable transform sample at a nonnegative time. Position, rotation and
 scale are copied on construction and access. Position and scale must be
@@ -1035,4 +1033,3 @@ Changing the result cannot affect stored interpolation endpoints.
 
 - [Ticks and frame timing](timing.md)
 - [Textures, sprites, atlases, and batching](textures.md)
-- [3D models, materials, scenes, and billboards](models.md)

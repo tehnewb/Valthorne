@@ -14,7 +14,6 @@ source checkout. Some older operation references describe historical APIs;
 check the linked Java source when using an API in this revision.
 
 1. [Application lifecycle](runtime.md): launch the engine and place initialization, updates, drawing, and cleanup correctly.
-2. [Textures and batching](textures.md) or [3D models](models.md): establish a rendering path.
 3. [Cameras](cameras.md) and [viewports](viewports.md): keep drawing and input in the same coordinate system.
 4. [Scenes](scenes.md), [assets](assets.md), and [audio](audio.md): organize application content and resource lifetimes.
 5. [UI foundations](ui-core.md): add controls, layout, themes, and routed input.
@@ -42,14 +41,7 @@ The checkout targets Java 25. Build the library with the Gradle wrapper; on Wind
 | [Shaders and visual effects](shaders.md) | `Billboard3DShader`, `BlurShader`, `BurnShader`, `ComputeShader`, `DepthShader3D`, … |
 | [Raycast lighting and shape occlusion](raycast-lighting.md) | `ConeLight`, `DynamicMesh2D`, `Light`, `LightMapRenderer`, `LightMesh`, … |
 | [Batched 2D lighting](lighting-2d.md) | `Lighting2D`, `AlphaOccluder2D`, `SpriteGroundShadow2D`, `PointLight2D`, … |
-| [Raster 3D lighting and shadow maps](lighting-3d.md) | `LightGrid3D`, `Lighting3D`, `PointLight3D`, `ShadowMap3D` |
 | [Screen-space radiance cascades](radiance-cascades.md) | `RadianceCascadeLevel`, `RadianceCascades`, `RadianceCascadeSettings`, `RadianceRenderTarget`, `RadianceSceneBuffer`, … |
-| [Filament rendering](filament.md) | `FilamentRenderer3D`, `VertexCompaction3D` |
-| [2D and 3D path tracing](path-tracing.md) | `PathTracer2D`, `PathTracer3D`, `PathTracingScene` |
-| [3D models, materials, scenes, and billboards](models.md) | `BillboardBatch3D`, `BillboardMode3D`, `BillboardRenderable3D`, `BillboardSprite3D`, `Material3D`, … |
-| [Conservative 3D visibility and occlusion](culling.md) | `OcclusionCuller3D` |
-| [Jolt rigid-body physics](physics.md) | `BodySettings3D`, `CollisionLayers3D`, `CollisionShape3D`, `ContactEvent3D`, `DistanceJoint3D`, … |
-| [3D particles and physics integration](particles-3d.md) | `Particle3D`, `ParticleEmitter3D` |
 | [2D particles and spawn distributions](particles-2d.md) | `BoxSpawnDistributor`, `CircleSpawnDistributor`, `ConeSpawnDistributor`, `LineSpawnDistributor`, `Particle`, … |
 | [Tiled maps and tilesets](tiled-maps.md) | `FileSystemResolver`, `MapChunk`, `MapLayer`, `ResolvedTile`, `TileAnimationFrame`, … |
 | [LDtk projects and maps](ldtk-maps.md) | `LdtkLoader`, `LdtkProject`, `LdtkMap`, `LdtkLevel`, `LdtkLayer`, … |
@@ -121,11 +113,7 @@ connect shared concepts.
 | [audio/sound/WaveSoundDecoder.java](../../src/main/java/valthorne/audio/WaveSoundDecoder.java) | [audio](audio.md) |
 | [audio/sound/WaveSoundStream.java](../../src/main/java/valthorne/audio/WaveSoundStream.java) | [audio](audio.md) |
 | [camera/Camera.java](../../src/main/java/valthorne/camera/Camera.java) | [cameras](cameras.md) |
-| [camera/Camera3D.java](../../src/main/java/valthorne/camera/Camera3D.java) | [cameras](cameras.md) |
-| [camera/OrbitCameraController.java](../../src/main/java/valthorne/camera/OrbitCameraController.java) | [cameras](cameras.md) |
 | [camera/OrthographicCamera.java](../../src/main/java/valthorne/camera/OrthographicCamera.java) | [cameras](cameras.md) |
-| [camera/OrthographicCamera3D.java](../../src/main/java/valthorne/camera/OrthographicCamera3D.java) | [cameras](cameras.md) |
-| [camera/PerspectiveCamera.java](../../src/main/java/valthorne/camera/PerspectiveCamera.java) | [cameras](cameras.md) |
 | [camera/UIOrthographicCamera.java](../../src/main/java/valthorne/camera/UIOrthographicCamera.java) | [cameras](cameras.md) |
 | [collections/array/Array.java](../../src/main/java/valthorne/collections/array/Array.java) | [arrays](arrays.md) |
 | [collections/array/ByteArray.java](../../src/main/java/valthorne/collections/array/ByteArray.java) | [arrays](arrays.md) |
@@ -208,7 +196,6 @@ connect shared concepts.
 | [graphics/animation/AnimationListener.java](../../src/main/java/valthorne/graphics/animation/AnimationListener.java) | [animation](animation.md) |
 | [graphics/animation/AnimationUtility.java](../../src/main/java/valthorne/graphics/animation/AnimationUtility.java) | [animation](animation.md) |
 | [graphics/animation/PlaybackMode.java](../../src/main/java/valthorne/graphics/animation/PlaybackMode.java) | [animation](animation.md) |
-| [graphics/animation/TransformAnimation3D.java](../../src/main/java/valthorne/graphics/animation/TransformAnimation3D.java) | [animation](animation.md) |
 | [graphics/Color.java](../../src/main/java/valthorne/graphics/Color.java) | [textures](textures.md) |
 | [graphics/debug/PerformanceOverlay.java](../../src/main/java/valthorne/graphics/debug/PerformanceOverlay.java) | [diagnostics](diagnostics.md) |
 | [graphics/Drawable.java](../../src/main/java/valthorne/graphics/Drawable.java) | [textures](textures.md) |
@@ -247,11 +234,8 @@ connect shared concepts.
 | [graphics/lighting2d/Lighting2D.java](../../src/main/java/valthorne/graphics/lighting2d/Lighting2D.java) | [lighting-2d](lighting-2d.md) |
 | [graphics/lighting2d/Occluder2D.java](../../src/main/java/valthorne/graphics/lighting2d/Occluder2D.java) | [lighting-2d](lighting-2d.md) |
 | [graphics/lighting2d/OccluderIndex2D.java](../../src/main/java/valthorne/graphics/lighting2d/OccluderIndex2D.java) | [lighting-2d](lighting-2d.md) |
-| [graphics/lighting2d/PathTracer2D.java](../../src/main/java/valthorne/graphics/lighting2d/PathTracer2D.java) | [path-tracing](path-tracing.md) |
 | [graphics/lighting2d/PointLight2D.java](../../src/main/java/valthorne/graphics/lighting2d/PointLight2D.java) | [lighting-2d](lighting-2d.md) |
 | [graphics/lighting2d/PolarShadow2D.java](../../src/main/java/valthorne/graphics/lighting2d/PolarShadow2D.java) | [lighting-2d](lighting-2d.md) |
-| [graphics/lighting3d/LightGrid3D.java](../../src/main/java/valthorne/graphics/lighting3d/LightGrid3D.java) | [lighting-3d](lighting-3d.md) |
-| [graphics/lighting3d/Lighting3D.java](../../src/main/java/valthorne/graphics/lighting3d/Lighting3D.java) | [lighting-3d](lighting-3d.md) |
 | [graphics/map/tiled/FileSystemResolver.java](../../src/main/java/valthorne/graphics/map/tiled/FileSystemResolver.java) | [tiled-maps](tiled-maps.md) |
 | [graphics/map/tiled/MapChunk.java](../../src/main/java/valthorne/graphics/map/tiled/MapChunk.java) | [tiled-maps](tiled-maps.md) |
 | [graphics/map/tiled/MapLayer.java](../../src/main/java/valthorne/graphics/map/tiled/MapLayer.java) | [tiled-maps](tiled-maps.md) |
@@ -276,44 +260,12 @@ connect shared concepts.
 | [graphics/map/tiled/TiledXML.java](../../src/main/java/valthorne/graphics/map/tiled/TiledXML.java) | [tiled-maps](tiled-maps.md) |
 | [graphics/map/tiled/TileSet.java](../../src/main/java/valthorne/graphics/map/tiled/TileSet.java) | [tiled-maps](tiled-maps.md) |
 | [graphics/map/tiled/TileSetData.java](../../src/main/java/valthorne/graphics/map/tiled/TileSetData.java) | [tiled-maps](tiled-maps.md) |
-| [graphics/render/BillboardBatch3D.java](../../src/main/java/valthorne/graphics/render/BillboardBatch3D.java) | [models](models.md) |
-| [graphics/scene/BillboardMode3D.java](../../src/main/java/valthorne/graphics/scene/BillboardMode3D.java) | [models](models.md) |
-| [graphics/scene/BillboardRenderable3D.java](../../src/main/java/valthorne/graphics/scene/BillboardRenderable3D.java) | [models](models.md) |
-| [graphics/scene/BillboardSprite3D.java](../../src/main/java/valthorne/graphics/scene/BillboardSprite3D.java) | [models](models.md) |
-| [graphics/render/FilamentRenderer3D.java](../../src/main/java/valthorne/graphics/render/FilamentRenderer3D.java) | [filament](filament.md) |
-| [graphics/model/Material3D.java](../../src/main/java/valthorne/graphics/model/Material3D.java) | [models](models.md) |
-| [graphics/render/MeshBatch3D.java](../../src/main/java/valthorne/graphics/render/MeshBatch3D.java) | [models](models.md) |
-| [graphics/scene/MeshRenderable3D.java](../../src/main/java/valthorne/graphics/scene/MeshRenderable3D.java) | [models](models.md) |
-| [graphics/render/MeshRenderState3D.java](../../src/main/java/valthorne/graphics/render/MeshRenderState3D.java) | [models](models.md) |
-| [graphics/model/Model3D.java](../../src/main/java/valthorne/graphics/model/Model3D.java) | [models](models.md) |
-| [graphics/render/ModelBatch3D.java](../../src/main/java/valthorne/graphics/render/ModelBatch3D.java) | [models](models.md) |
-| [graphics/model/ModelBuilder3D.java](../../src/main/java/valthorne/graphics/model/ModelBuilder3D.java) | [models](models.md) |
-| [graphics/scene/ModelInstance3D.java](../../src/main/java/valthorne/graphics/scene/ModelInstance3D.java) | [models](models.md) |
-| [graphics/model/ModelLoader.java](../../src/main/java/valthorne/graphics/model/ModelLoader.java) | [models](models.md) |
-| [graphics/model/ModelParameters.java](../../src/main/java/valthorne/graphics/model/ModelParameters.java) | [models](models.md) |
-| [graphics/model/ObjModel3D.java](../../src/main/java/valthorne/graphics/model/ObjModel3D.java) | [models](models.md) |
-| [graphics/render/OcclusionCuller3D.java](../../src/main/java/valthorne/graphics/render/OcclusionCuller3D.java) | [culling](culling.md) |
-| [graphics/render/PathTracer3D.java](../../src/main/java/valthorne/graphics/render/PathTracer3D.java) | [path-tracing](path-tracing.md) |
-| [graphics/render/PathTracingScene.java](../../src/main/java/valthorne/graphics/render/PathTracingScene.java) | [path-tracing](path-tracing.md) |
-| [graphics/scene/PickResult3D.java](../../src/main/java/valthorne/graphics/scene/PickResult3D.java) | [models](models.md) |
-| [graphics/lighting3d/PointLight3D.java](../../src/main/java/valthorne/graphics/lighting3d/PointLight3D.java) | [lighting-3d](lighting-3d.md) |
-| [graphics/scene/ProceduralMeshEmitter3D.java](../../src/main/java/valthorne/graphics/scene/ProceduralMeshEmitter3D.java) | [models](models.md) |
-| [graphics/scene/ProceduralRenderable3D.java](../../src/main/java/valthorne/graphics/scene/ProceduralRenderable3D.java) | [models](models.md) |
-| [graphics/scene/Renderable3D.java](../../src/main/java/valthorne/graphics/scene/Renderable3D.java) | [models](models.md) |
-| [graphics/render/RenderPass3D.java](../../src/main/java/valthorne/graphics/render/RenderPass3D.java) | [models](models.md) |
-| [graphics/render/RenderStateSnapshot3D.java](../../src/main/java/valthorne/graphics/render/RenderStateSnapshot3D.java) | [models](models.md) |
-| [graphics/scene/Scene3D.java](../../src/main/java/valthorne/graphics/scene/Scene3D.java) | [models](models.md) |
-| [graphics/scene/SceneNode3D.java](../../src/main/java/valthorne/graphics/scene/SceneNode3D.java) | [models](models.md) |
-| [graphics/render/ShadowMap3D.java](../../src/main/java/valthorne/graphics/render/ShadowMap3D.java) | [lighting-3d](lighting-3d.md) |
-| [graphics/render/VertexCompaction3D.java](../../src/main/java/valthorne/graphics/render/VertexCompaction3D.java) | [filament](filament.md) |
 | [graphics/particle/BoxSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/BoxSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/CircleSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/CircleSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/ConeSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/ConeSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/LineSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/LineSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/Particle.java](../../src/main/java/valthorne/graphics/particle/Particle.java) | [particles-2d](particles-2d.md) |
-| [graphics/particle/Particle3D.java](../../src/main/java/valthorne/graphics/particle/Particle3D.java) | [particles-3d](particles-3d.md) |
 | [graphics/particle/ParticleEmitter.java](../../src/main/java/valthorne/graphics/particle/ParticleEmitter.java) | [particles-2d](particles-2d.md) |
-| [graphics/particle/ParticleEmitter3D.java](../../src/main/java/valthorne/graphics/particle/ParticleEmitter3D.java) | [particles-3d](particles-3d.md) |
 | [graphics/particle/ParticleSystem.java](../../src/main/java/valthorne/graphics/particle/ParticleSystem.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/PointSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/PointSpawnDistributor.java) | [particles-2d](particles-2d.md) |
 | [graphics/particle/RadialBurstSpawnDistributor.java](../../src/main/java/valthorne/graphics/particle/RadialBurstSpawnDistributor.java) | [particles-2d](particles-2d.md) |
@@ -327,15 +279,11 @@ connect shared concepts.
 | [graphics/radiance/RadianceRenderTarget.java](../../src/main/java/valthorne/graphics/radiance/RadianceRenderTarget.java) | [radiance-cascades](radiance-cascades.md) |
 | [graphics/radiance/RadianceSceneBuffer.java](../../src/main/java/valthorne/graphics/radiance/RadianceSceneBuffer.java) | [radiance-cascades](radiance-cascades.md) |
 | [graphics/radiance/RadianceTexture.java](../../src/main/java/valthorne/graphics/radiance/RadianceTexture.java) | [radiance-cascades](radiance-cascades.md) |
-| [graphics/shader/Billboard3DShader.java](../../src/main/java/valthorne/graphics/shader/Billboard3DShader.java) | [shaders](shaders.md) |
 | [graphics/shader/BlurShader.java](../../src/main/java/valthorne/graphics/shader/BlurShader.java) | [shaders](shaders.md) |
 | [graphics/shader/BurnShader.java](../../src/main/java/valthorne/graphics/shader/BurnShader.java) | [shaders](shaders.md) |
 | [graphics/shader/ComputeShader.java](../../src/main/java/valthorne/graphics/shader/ComputeShader.java) | [shaders](shaders.md) |
-| [graphics/shader/DepthShader3D.java](../../src/main/java/valthorne/graphics/shader/DepthShader3D.java) | [shaders](shaders.md) |
 | [graphics/shader/FlashShader.java](../../src/main/java/valthorne/graphics/shader/FlashShader.java) | [shaders](shaders.md) |
 | [graphics/shader/GlowShader.java](../../src/main/java/valthorne/graphics/shader/GlowShader.java) | [shaders](shaders.md) |
-| [graphics/shader/LightingShader3D.java](../../src/main/java/valthorne/graphics/shader/LightingShader3D.java) | [shaders](shaders.md) |
-| [graphics/shader/Mesh3DShader.java](../../src/main/java/valthorne/graphics/shader/Mesh3DShader.java) | [shaders](shaders.md) |
 | [graphics/shader/OutlineShader.java](../../src/main/java/valthorne/graphics/shader/OutlineShader.java) | [shaders](shaders.md) |
 | [graphics/shader/ReflectionShader.java](../../src/main/java/valthorne/graphics/shader/ReflectionShader.java) | [shaders](shaders.md) |
 | [graphics/shader/Shader.java](../../src/main/java/valthorne/graphics/shader/Shader.java) | [shaders](shaders.md) |
@@ -382,17 +330,6 @@ connect shared concepts.
 | [math/geometry/Shape.java](../../src/main/java/valthorne/math/geometry/Shape.java) | [math](math.md) |
 | [math/geometry/Triangle.java](../../src/main/java/valthorne/math/geometry/Triangle.java) | [math](math.md) |
 | [math/MathUtils.java](../../src/main/java/valthorne/math/MathUtils.java) | [math](math.md) |
-| [math/physics/BodySettings3D.java](../../src/main/java/valthorne/math/physics/BodySettings3D.java) | [physics](physics.md) |
-| [math/physics/CollisionLayers3D.java](../../src/main/java/valthorne/math/physics/CollisionLayers3D.java) | [physics](physics.md) |
-| [math/physics/CollisionShape3D.java](../../src/main/java/valthorne/math/physics/CollisionShape3D.java) | [physics](physics.md) |
-| [math/physics/ContactEvent3D.java](../../src/main/java/valthorne/math/physics/ContactEvent3D.java) | [physics](physics.md) |
-| [math/physics/DistanceJoint3D.java](../../src/main/java/valthorne/math/physics/DistanceJoint3D.java) | [physics](physics.md) |
-| [math/physics/JoltRuntime.java](../../src/main/java/valthorne/math/physics/JoltRuntime.java) | [physics](physics.md) |
-| [math/physics/MotionType3D.java](../../src/main/java/valthorne/math/physics/MotionType3D.java) | [physics](physics.md) |
-| [math/physics/PhysicsMath3D.java](../../src/main/java/valthorne/math/physics/PhysicsMath3D.java) | [physics](physics.md) |
-| [math/physics/PhysicsRayHit3D.java](../../src/main/java/valthorne/math/physics/PhysicsRayHit3D.java) | [physics](physics.md) |
-| [math/physics/PhysicsWorld3D.java](../../src/main/java/valthorne/math/physics/PhysicsWorld3D.java) | [physics](physics.md) |
-| [math/physics/RigidBody3D.java](../../src/main/java/valthorne/math/physics/RigidBody3D.java) | [physics](physics.md) |
 | [Mouse.java](../../src/main/java/valthorne/Mouse.java) | [input](input.md) |
 | [plugin/Plugin.java](../../src/main/java/valthorne/plugin/Plugin.java) | [plugins](plugins.md) |
 | [plugin/PluginLoader.java](../../src/main/java/valthorne/plugin/PluginLoader.java) | [plugins](plugins.md) |
@@ -510,14 +447,12 @@ connect shared concepts.
 | [utility/TimeUtility.java](../../src/main/java/valthorne/utility/TimeUtility.java) | [timing](timing.md) |
 | [viewport/FillViewport.java](../../src/main/java/valthorne/viewport/FillViewport.java) | [viewports](viewports.md) |
 | [viewport/FitViewport.java](../../src/main/java/valthorne/viewport/FitViewport.java) | [viewports](viewports.md) |
-| [viewport/PerspectiveViewport.java](../../src/main/java/valthorne/viewport/PerspectiveViewport.java) | [viewports](viewports.md) |
 | [viewport/ScreenViewport.java](../../src/main/java/valthorne/viewport/ScreenViewport.java) | [viewports](viewports.md) |
 | [viewport/StretchViewport.java](../../src/main/java/valthorne/viewport/StretchViewport.java) | [viewports](viewports.md) |
 | [viewport/Viewport.java](../../src/main/java/valthorne/viewport/Viewport.java) | [viewports](viewports.md) |
 | [Window.java](../../src/main/java/valthorne/Window.java) | [runtime](runtime.md) |
 
 | [PlatformTools.java](../../src/main/java/valthorne/PlatformTools.java) | [runtime](runtime.md) |
-| [FilamentPlatform.java](../../src/main/java/valthorne/graphics/FilamentPlatform.java) | [filament](filament.md) |
 | [GraphicsCapabilities.java](../../src/main/java/valthorne/graphics/GraphicsCapabilities.java) | [runtime](runtime.md) |
 | [SlugData.java](../../src/main/java/valthorne/graphics/font/slug/SlugData.java) | [slug-fonts](slug-fonts.md) |
 | [SlugLoader.java](../../src/main/java/valthorne/graphics/font/slug/SlugLoader.java) | [slug-fonts](slug-fonts.md) |
@@ -545,7 +480,6 @@ connect shared concepts.
 | [LdtkSource.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkSource.java) | [ldtk-maps](ldtk-maps.md) |
 | [LdtkTile.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkTile.java) | [ldtk-maps](ldtk-maps.md) |
 | [LdtkTileset.java](../../src/main/java/valthorne/graphics/map/ldtk/LdtkTileset.java) | [ldtk-maps](ldtk-maps.md) |
-| [SceneRenderer3D.java](../../src/main/java/valthorne/graphics/render/SceneRenderer3D.java) | [models](models.md) |
 | [AssetService.java](../../src/main/java/valthorne/portable/AssetService.java) | [portable-services](portable-services.md) |
 | [FrameLoop.java](../../src/main/java/valthorne/portable/FrameLoop.java) | [portable-services](portable-services.md) |
 | [InteractiveScene.java](../../src/main/java/valthorne/portable/InteractiveScene.java) | [portable-services](portable-services.md) |

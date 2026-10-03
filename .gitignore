@@ -97,3 +97,10 @@ $RECYCLE.BIN/
 *~
 *.swp
 *.swo
+
+# Local 3D prototype source and resources.
+/.prototype3d/
+/src/main/java/valthorne/threed/
+/src/test/java/valthorne/threed/
+/portable/web/
+/portable/validation/

@@ -368,4 +368,3 @@ method. It ensures that all prepared assets are processed in an asynchronous and
 - [Bitmap fonts and glyph styling](fonts.md)
 - [Audio playback and ambient areas](audio.md)
 - [Tiled maps and tilesets](tiled-maps.md)
-- [3D models, materials, scenes, and billboards](models.md)

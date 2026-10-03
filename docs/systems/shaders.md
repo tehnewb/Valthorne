@@ -60,7 +60,6 @@ The sections below explain each component and its declared public or protected o
 
 ### Billboard3DShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/Billboard3DShader.java)
 
 GLSL 3.30 program for textured billboard geometry already oriented in world
 space by BillboardBatch3D. The vertex stage transforms supplied positions;
@@ -676,7 +675,6 @@ uniforms have location -1 and are ignored by OpenGL.
 
 ### DepthShader3D
 
-[Source](../../src/main/java/valthorne/graphics/shader/DepthShader3D.java)
 
 GLSL 3.30 depth-pass shader that preserves alpha-cutout silhouettes without
 evaluating lighting or writing a color output. Surviving fragments use normal
@@ -913,7 +911,6 @@ Configures and binds this shader program for rendering with a soft glow effect.
 
 ### LightingShader3D
 
-[Source](../../src/main/java/valthorne/graphics/shader/LightingShader3D.java)
 
 Specialized forward-lighting shader using tiled point-light lists and GGX
 material shading. Shares the world-space mesh vertex contract with Mesh3DShader.
@@ -942,7 +939,6 @@ the rendering pipeline before use.
 
 ### Mesh3DShader
 
-[Source](../../src/main/java/valthorne/graphics/shader/Mesh3DShader.java)
 
 Compatibility raster shader for world-space 3D mesh vertices. Supports vertex
 color and albedo tinting, directional and up to eight point lights, directional
@@ -2022,5 +2018,4 @@ a current OpenGL context and a sprite with a valid, nonzero-size texture.
 ## Related guides
 
 - [Textures, sprites, atlases, and batching](textures.md)
-- [3D models, materials, scenes, and billboards](models.md)
 - [Screen-space radiance cascades](radiance-cascades.md)

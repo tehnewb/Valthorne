@@ -7,7 +7,7 @@ group = "io.github.tehnewb"
 version = providers.gradleProperty('releaseVersion')
         .orElse(providers.gradleProperty('version'))
         .get()
-description = "A 2D and 3D game development library"
+description = "A 2D game development library"
 
 repositories {
     mavenCentral()
@@ -21,6 +21,7 @@ def lwjglModules = [
         "lwjgl",
         "lwjgl-glfw",
         "lwjgl-opengl",
+        "lwjgl-bgfx",
         "lwjgl-stb",
         "lwjgl-openal",
         "lwjgl-yoga",
@@ -53,25 +54,9 @@ dependencies {
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
     implementation "org.apache.commons:commons-compress:1.28.0"
     implementation "com.fasterxml.jackson.core:jackson-databind:2.18.2"
-    implementation "io.github.erkko68.filament-ffm:filament-ffm:0.4.0"
-
-    // Publish the same native runtime set regardless of the build host.
-    ['windows-x64', 'linux-x64', 'linux-arm64', 'macos-arm64'].each { platform ->
-        runtimeOnly "io.github.erkko68.filament-ffm:filament-ffm-runtime-${platform}:0.4.0"
-    }
-
-    // Platform-independent Jolt JNI classes; platform suffix is the upstream publication name.
+    // Shared Jolt native runtime supports constrained 2D simulation too.
     implementation "com.github.stephengold:jolt-jni-Windows64:$joltVersion"
-
-    [
-            "Windows64",
-            "Windows_ARM64",
-            "Linux64",
-            "Linux_ARM64",
-            "Linux_ARM32hf",
-            "MacOSX64",
-            "MacOSX_ARM64"
-    ].each { platform ->
+    ['Windows64', 'Windows_ARM64', 'Linux64', 'Linux_ARM64', 'Linux_ARM32hf', 'MacOSX64', 'MacOSX_ARM64'].each { platform ->
         runtimeOnly "com.github.stephengold:jolt-jni-${platform}:$joltVersion:ReleaseSp"
     }
 
@@ -94,119 +79,7 @@ java {
 }
 
 apply from: 'gradle/benchmarks.gradle'
-
-// Material packages are committed so consumers do not need a native compiler.
-// Binding 0.4.0 uses Filament material ABI 75, not the newer SDK ABI 76.
-def filamentMaterialTasks = ['surface', 'solid', 'glass', 'alpha'].collect { materialName ->
-    tasks.register("compileFilament${materialName.capitalize()}Material", Exec) {
-        group = 'build'
-
-        def source = file("src/main/resources/valthorne/filament/${materialName}.mat")
-        def output = file("src/main/resources/valthorne/filament/${materialName}.filamat")
-
-        def executable = System.getProperty('os.name')
-                .toLowerCase(Locale.ROOT)
-                .startsWith('windows')
-                ? 'matc.exe'
-                : 'matc'
-
-        def compiler = providers.gradleProperty('filamentMatc')
-                .orElse(file("build/filament-sdk-1.75/bin/${executable}").absolutePath)
-
-        inputs.file(source)
-        outputs.file(output)
-
-        doFirst {
-            if (!file(compiler.get()).isFile()) {
-                throw new GradleException(
-                        'Set -PfilamentMatc to matc from Filament 1.75.0.'
-                )
-            }
-
-            def abi = providers.exec {
-                commandLine compiler.get(), '--version'
-            }.standardOutput.asText.get().trim()
-
-            if (abi != '75') {
-                throw new GradleException(
-                        "Filament material ABI must be 75, received ${abi}."
-                )
-            }
-
-            commandLine(
-                    compiler.get(),
-                    '-p', 'desktop',
-                    '-a', 'opengl',
-                    '-o', output.absolutePath,
-                    source.absolutePath
-            )
-        }
-    }
-}
-
-tasks.register('compileFilamentMaterials') {
-    group = 'build'
-    description = 'Rebuilds Filament material packages using the pinned SDK material ABI.'
-
-    dependsOn filamentMaterialTasks
-}
-
-tasks.named('processResources') {
-    mustRunAfter filamentMaterialTasks
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = "UTF-8"
-    options.release = 25
-    options.compilerArgs += ["-parameters"]
-}
-
-tasks.withType(Javadoc).configureEach {
-    options.noTimestamp = true
-    options.addStringOption("Xdoclint:none", "-quiet")
-    options.addStringOption("encoding", "UTF-8")
-    options.addBooleanOption("html5", true)
-
-    failOnError = true
-}
-
-tasks.matching {
-    it.name == "plainJavadocJar"
-}.configureEach {
-    enabled = false
-}
-
-// JVM access required by LWJGL, Jolt JNI, Filament FFM, and JOML on Java 25.
-//
-// --enable-native-access:
-// Allows unnamed/classpath modules such as LWJGL to load native libraries.
-//
-// --add-exports:
-// Allows JOML 1.10.9 to use jdk.internal.misc.Unsafe instead of falling back
-// to the terminally deprecated sun.misc.Unsafe implementation.
-def valthorneJvmArgs = [
-        "--enable-native-access=ALL-UNNAMED",
-        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED"
-]
-
-def isMacOS = System.getProperty('os.name')
-        .toLowerCase(Locale.ROOT)
-        .contains('mac')
-
-// Apply to any JavaExec tasks
-// (e.g. application plugin's run task, IntelliJ-created Gradle Java runners,
-// or custom JavaExec tasks).
-tasks.withType(JavaExec).configureEach {
-    jvmArgs += valthorneJvmArgs
-
-    if (isMacOS) {
-        jvmArgs '-XstartOnFirstThread'
-    }
-
-    javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
+apply from: 'gradle/bgfx.gradle'
 
 mavenPublishing {
     publishToMavenCentral()
@@ -225,7 +98,7 @@ mavenPublishing {
 
     pom {
         name = "Valthorne"
-        description = "2D and 3D game library"
+        description = "2D game library"
         inceptionYear = "2025"
         url = "https://github.com/tehnewb/Valthorne"
 

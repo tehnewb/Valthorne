@@ -1701,4 +1701,3 @@ Samples one uniform parameter t and evaluates radius maxRadius*t and angle
 
 - [Textures, sprites, atlases, and batching](textures.md)
 - [Ticks and frame timing](timing.md)
-- [3D particles and physics integration](particles-3d.md)

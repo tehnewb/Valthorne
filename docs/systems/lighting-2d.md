@@ -965,6 +965,5 @@ hash-based rather than a full equality comparison.
 ## Related guides
 
 - [Raycast lighting and shape occlusion](raycast-lighting.md)
-- [2D and 3D path tracing](path-tracing.md)
 - [Textures, sprites, atlases, and batching](textures.md)
 - [Existing lighting guide](../lighting.md)

@@ -2,7 +2,7 @@ package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
-import valthorne.graphics.render.RenderStateSnapshot3D;
+import valthorne.graphics.OpenGLStateSnapshot;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.shader.ShaderSources;
 
@@ -593,7 +593,7 @@ public final class Lighting2D implements AutoCloseable {
      * @author Albert Beaupre
      */
     private static final class State implements AutoCloseable {
-        final RenderStateSnapshot3D base = new RenderStateSnapshot3D(); // Captured shared render bindings and capabilities.
+        final OpenGLStateSnapshot base = new OpenGLStateSnapshot(); // Captured shared render bindings and capabilities.
         final int draw = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING), read = glGetInteger(GL_READ_FRAMEBUFFER_BINDING); // Captured draw/read framebuffer identifiers.
         final int[] viewport = new int[4]; // Captured viewport origin and size.
         final float[] clear = new float[4]; // Captured RGBA clear color.

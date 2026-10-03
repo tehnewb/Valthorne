@@ -508,5 +508,4 @@ Converts frame count to seconds at a given FPS.
 ## Related guides
 
 - [Application lifecycle and window management](runtime.md)
-- [Jolt rigid-body physics](physics.md)
 - [Frame and transform animation](animation.md)

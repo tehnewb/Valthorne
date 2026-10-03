@@ -2,7 +2,7 @@ package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
-import valthorne.graphics.render.RenderStateSnapshot3D;
+import valthorne.graphics.OpenGLStateSnapshot;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.shader.ShaderSources;
 import valthorne.graphics.texture.TextureBatch;
@@ -30,7 +30,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     private final PointLight2D blended = new PointLight2D();
 
     public GroundShadowRenderer2D() {
-        try (var state = new RenderStateSnapshot3D()) {
+        try (var state = new OpenGLStateSnapshot()) {
             shader = new Shader(ShaderSources.load("lighting2d/ground-shadow.vert"), ShaderSources.load("lighting2d/ground-shadow.frag"));
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
@@ -62,7 +62,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (!light.enabled || !light.shadows || light.elevation <= 0 || light.intensity <= 0 || light.r + light.g + light.b <= 0)
             return;
         sceneBatch.flush();
-        try (var state = new RenderStateSnapshot3D()) {
+        try (var state = new OpenGLStateSnapshot()) {
             glDisable(GL_DEPTH_TEST);
             glDepthMask(false);
             glDisable(GL_CULL_FACE);

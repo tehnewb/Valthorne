@@ -1,0 +1,33 @@
+// bgfx's OpenGL raw shader container, matching shaderc --raw and LWJGL 3.4.3.
+// GLSL compilation happens in the driver; consumers need no shaderc installation.
+def bgfxShaderOutput = layout.buildDirectory.dir('generated/bgfx-shaders')
+def packageBgfxShaders = tasks.register('packageBgfxShaders') {
+    inputs.files(fileTree('src/main/resources/valthorne/shaders/bgfx'))
+    outputs.dir(bgfxShaderOutput)
+    doLast {
+        fileTree('src/main/resources/valthorne/shaders/bgfx').matching {
+            include '*.vert', '*.frag'
+        }.each { source ->
+            def destination = bgfxShaderOutput.get().file('valthorne/bgfx/' + source.name + '.bin').asFile
+            destination.parentFile.mkdirs()
+            byte[] code = source.getText('UTF-8').replace('\r\n', '\n').getBytes('UTF-8')
+            destination.withDataOutputStream { output ->
+                output.writeByte(source.name.endsWith('.vert') ? 86 : 70)
+                output.writeByte(83)
+                output.writeByte(72)
+                output.writeByte(12)
+                output.writeInt(0) // Input interface hash: raw shaders use no preprocessing.
+                output.writeInt(0) // Output interface hash.
+                output.writeInt(0) // Raw shader resource bindings.
+                output.writeInt(0) // Raw unordered-access bindings.
+                output.writeShort(0) // No declared user uniforms; matrices are predefined.
+                output.writeInt(Integer.reverseBytes(code.length))
+                output.write(code)
+                output.writeByte(0)
+            }
+        }
+    }
+}
+sourceSets.main.resources.srcDir(packageBgfxShaders)
+tasks.named('processResources') { dependsOn packageBgfxShaders }
+

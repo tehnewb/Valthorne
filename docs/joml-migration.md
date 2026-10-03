@@ -38,4 +38,3 @@ JOML AABBf.isValid() requires positive volume; it rejects planar or point bounds
 
 The build, examples, JMH sources, and all standard/3D/physics/UI/lighting suites pass. Current suite counts are 146 standard, 68 3D, 19 native Jolt, 44 UI, and 27 lighting tests; suites overlap. Checks cover projection replacement, column-major uploads, mirrored meshes, planar/point bounds, picking edge hits, inverse-transpose normals, zero normals, normalized quaternions, physics ray distances, and reused Window projection snapshots. Physics Studio and Lighting Studio native-input smoke tests pass, with a rendered-framebuffer visual check.
 
-The library JAR contains none of the eight removed classes. [Validation and benchmark artifacts](benchmarks/joml-migration/README.md) record the new implementation. This is an API/library migration, not a claim that every workload is faster.

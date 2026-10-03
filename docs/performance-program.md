@@ -97,7 +97,6 @@ The accepted result removes **56 bytes per moving instance update**. The single-
 
 Regression tests ran against the baseline before editing and against the candidate afterward. They cover 300 parent/local compositions, cached repeated reads, direct position/scale mutations, negative nonuniform scaling, Euler/quaternion rotations, every nonfinite local component, zero scales and recovery after invalid input. Existing 3D tests and full build/physics/UI integration checks also pass.
 
-Reports: [before](benchmarks/model-transform-before.json), [after](benchmarks/model-transform-after.json), [environment and baseline hash](benchmarks/model-transform-environment.txt). Local full logs, baseline source and candidate diff are in `build/reports/model-transform/`. No stage, commit or push was performed.
 
 Next measurement: path-tracing scene-snapshot allocation for unchanged versus moving scenes at small/large instance counts, then hierarchical bounds. Continue the remaining subsystem queue rather than generalizing this transform result to unrelated systems.
 
@@ -124,7 +123,6 @@ Validation: full build, 137 standard tests, 62 3D tests, 17 physics tests and 44
 
 ## Filament / Physics Studio validation and scheduling note — 2026-09-09
 
-The user-selected Filament integration and interactive Jolt lab are documented in [physics-studio.md](physics-studio.md), with raw measurements in [benchmarks/physics-studio](benchmarks/physics-studio/README.md). The final 288-body run measured 4.617 ms mean completed rendering and 0.856 ms mean physics update. These are workload measurements, not improvements over the previous path tracer or all engine subsystems. The native-light cleanup reduces the stress scene from 303 light components to three; its timing improvement is **not established**. This is retained as an explicit resource-management tradeoff. Tests cover disabling/re-enabling emission, empty geometry, resource ownership, rendering, and native UI controls.
 
 At the 21:55 UTC scheduled audit, the Physics Studio preview (PID 27836) was still running for the user. The separate task **Diagnose and fix computer slowdowns** was actively running a Windows-drive filesystem scan and investigating storage latency. Consequently, this run deferred new timing experiments and runtime modifications: adding CPU/GPU benchmarks would compete with the preview/repair work and cannot provide a clean baseline. No preview was stopped and no JMH lock was bypassed. Existing benchmark variation must not be interpreted as an engine regression or speedup without a controlled rerun.
 
@@ -132,7 +130,6 @@ Next eligible measurement remains CPU scene-snapshot allocation: unchanged versu
 
 ## JOML migration — 2026-09-09
 
-At the user's request, vectors, matrices, quaternions, rays, bounds, intersection operations and frustum tests now use JOML/JOML primitives directly. Eight duplicate classes were removed. Jolt remains the physics engine. See [migration/validation details](joml-migration.md) and [new benchmark reports](benchmarks/joml-migration/README.md).
 
 The archived custom-math passes above remain historical evidence; their code and timing are no longer the current implementation. This migration does not establish a before/after speedup: benchmark result objects changed to direct JOML objects, sampling duration differs from historical reports, and a separate Windows storage repair was active during this session. New forked JMH/GC measurements are diagnostic. Preserve this distinction in future performance claims.
 
@@ -144,7 +141,6 @@ Next concrete measurement: unchanged/moving scene-snapshot allocation at small/l
 
 Physics Studio now includes a 16-light editor, mouse placement/dragging, saved rigs and three realistic textured Poly Haven props. Jolt remains the physics backend and JOML remains the math API. Shared plinth/bulb meshes and model reuse keep the realistic gallery at seven native mesh-cache entries. Filament albedo textures now use trilinear mipmapping; square-texture GPU storage grows by about one third to reduce minification aliasing. Material UV flipping is disabled to match engine conventions, with a framebuffer regression that failed before the correction and passes afterward.
 
-Final completed-render means were 3.440 ms for the realistic gallery with three lights, 5.162 ms with sixteen lights, and 4.785 ms for the 288-body stress scene. Mean physics times were 0.032, 0.033 and 0.833 ms. These are feature workload measurements, not a speedup over different earlier model sets. Full validation, source hashes, memory tradeoffs and raw logs are in [the realistic-model report](benchmarks/realistic-models/README.md).
 
 The CPU scene-snapshot allocation measurement remains next in the broader subsystem queue. Do not benchmark against the live preview or infer universal instruction/memory improvements from these scene timings.
 
@@ -152,19 +148,14 @@ The CPU scene-snapshot allocation measurement remains next in the broader subsys
 
 The engine now supports scene-attached mesh particles and optional dynamic Jolt bodies while retaining cosmetic/billboard emission. Filament reuses compatible native entries through particle churn. Pooled reset reuses sprite/material state, cosmetic survivor compaction avoids repeated array shifts, native destination getters reuse storage, and step-listener snapshots are cached until membership changes.
 
-The identical forked JMH harness measured the original implementation, an initial candidate and a refined candidate. The initial small-emitter steady update regression prompted a targeted hot-loop change. The final 256-particle steady update overlaps the original confidence interval (1.057 vs 1.021 microseconds); 4,096-particle steady time fell 41.4% and churn time fell 52.1%. Every refined cosmetic workload allocates less than 0.73 bytes per operation, compared with roughly 104 bytes per reused particle in the old reset path. These measurements do not establish total retained-memory or hardware-instruction reductions. Raw samples, frozen sources, confidence intervals and reproduction instructions are in [the particle report](benchmarks/particles-3d/README.md).
 
-Native moving-camera runs measured a 192-particle Jolt fountain at 4.055 ms mean completed rendering / 0.343 ms simulation and a 480-particle fountain at 4.939 / 0.548 ms. [Native comparisons](benchmarks/particles-3d/native/README.md) include cosmetic particles and the existing 288-body stress scenario. All required build suites and native interaction/scene-switch checks pass. The particle preview is left open for the user; do not run competing benchmarks while it is active.
 
 The broader queue remains active. Next measure small/large unchanged/moving scene snapshot allocation; particle birth/death and per-frame scene collection still have costs. No claim is made that every engine system has reached a theoretical optimization limit.
 
 ## Attached particle lights and first-person arena — 2026-09-09
 
-Particles can now receive Filament surface lighting and optionally carry independent point lights. Light state is lazy for ordinary particles; enabled lights follow cosmetic or Jolt motion, reuse native entities while moving/fading, and leave the scene on expiry, detach or close. The new playable [Live Fire arena](fps-arena.md) combines first-person Jolt movement, drone waves, weapon/grenade combat, realistic props, bounded debris/flaring effects, editable lighting and an FPS HUD. A pinned Jolt JNI layer-filter bridge correction is guarded by physical tests of all 256 user-layer pairs.
 
-The unchanged six-case forked JMH harness measured optional-light support before and after: steady-update means changed by less than 1% with overlapping intervals, and all cases remain below one byte per emitter operation. Churn means increased within overlapping intervals, so neither a regression nor universal zero overhead is established. See [raw CPU evidence and snapshots](benchmarks/particle-lights/README.md).
 
-Nine sequential native arena runs compared Jolt/lit, Jolt/unlit and cosmetic/lit effects using three fresh processes per configuration. Mean completed rendering / simulation including scripted actions was 3.789 / 0.346 ms, 3.735 / 0.344 ms, and 4.104 / 0.183 ms respectively. Each reached 170 particles; native lights peaked at 15/4/15 and all retained nine mesh-cache entries. Rendering variation overlaps and cosmetic motion changes particle positions, so these are feature workload measurements, not an optimization speedup. [Full methodology, limits, logs, screenshots and measured sources](benchmarks/fps-arena/README.md).
 
 Final validation passes 197 standard, 84 3D, 32 physics, 52 UI and 27 lighting tests, plus 1,349 headless gameplay checks, 83 light-rig checks and six packaged-model checks. Suite counts overlap. Native input validation passes movement, jumping, looking/aiming, combat, particle controls, pause and restart. Flare and muzzle spawn checks prevent emitter centers appearing through nearby walls. Particle shadows remain opt-in to keep the effect light budget practical.
 
@@ -176,7 +167,6 @@ The arena now has downloaded weapon/arms, robot, grenade, magazine and industria
 
 After the feature scene was fixed, three identical native runs before and after an OBJ warm-texture change measured 6.935 versus 6.329 ms mean completed rendering, an observed 8.7% reduction. The change avoids repeated graphics-state snapshots and driver queries when imported textures are already uploaded, while restoring caller-modified material bindings. Simulation ranges overlap, and total memory/hardware instructions were not measured. Diagnostic Jolt/unlit and cosmetic/lit configurations were also run once each. These asset/light workloads differ from the historical arena and must not be compared directly with its timings.
 
-All final suites passed: 200 standard, 87 3D, 32 physics, 52 UI and 27 lighting tests, plus 1,425 headless gameplay checks, 83 light-rig checks, six gallery model checks and 16 new asset entries. Suite counts overlap. Native tests verify real alpha compositing, moving explicit lights, opacity masking, warm texture requests without OpenGL access, texture ownership and gameplay controls. Actual final framebuffers were inspected. [Raw measurements, frozen sources, limitations, validation and screenshots](benchmarks/fps-realistic-alpha/README.md).
 
 The visible FPS preview is opened after measurements; consult `build/fps-live.pid` and the current process inventory before any scheduled benchmark. The wider subsystem queue remains active, with scene-snapshot allocation next. No claim is made that every engine subsystem is fully optimized.
 
@@ -188,7 +178,6 @@ Rechecked at 2026-09-10 01:45 UTC: PID 9580 remains open and responsive. The doc
 
 The 23:31 UTC audit found the old preview closed and no competing renderer/benchmark. Added a twelve-case forked JMH/GC harness for one/256 unchanged/moving direct, hierarchical and two-part OBJ placements, plus eight CPU collection/build contract tests, which passed. Preliminary allocation measurements identify repeated matrix/instance/material snapshots as a concrete target; no optimization was applied or accepted.
 
-During measurement, IntelliJ and the new **Fix main class compile errors** task began building and changing source-set configuration in this checkout. These builds contaminated the timing baseline, and subsequent cleanup removed temporary stdout/test XML. The raw JMH JSON and measured source snapshots are preserved in [the preliminary report](benchmarks/scene-snapshot/README.md). Renderer collection paths remain unchanged. No further benchmark or runtime modification was attempted alongside the active repair.
 
 Next eligible work: after that task and previews are idle, rerun `benchmarkSceneSnapshot` with a fresh source/class inventory, then measure a renderer-owned reusable matrix/instance collector against that isolated baseline. Preserve OBJ transform sharing, mutable-input signatures, independent constructor snapshots, failure recovery and prompt release of packed build arrays. The broader subsystem queue remains active; the last accepted result is still the OBJ warm-texture optimization.
 
@@ -196,7 +185,6 @@ Next eligible work: after that task and previews are idle, rerun `benchmarkScene
 
 Completed the user-requested follow-through. Filament and the path tracer now reuse matrix/instance collection storage while preserving source ordering, current mutable-value signatures, shared OBJ placement transforms, texture rebinding and independent constructor snapshots. Shrink/failure/close paths release retired references; packed path-tracer build lists are cleared and trimmed after upload in a finally block. OBJ effective-material copies are unchanged.
 
-Twelve controlled forked JMH/GC cases compare one/256 direct, hierarchical and two-part OBJ placements, unchanged/moving. Transient allocation falls by over 99% for direct scenes, approximately 61–63% for hierarchies and 29–54% for OBJ cases. Stationary direct-scene timing intervals separate, but most timing results remain inconclusive. A longer focused static-OBJ pair measured 39.775 ± 2.449 versus 37.248 ± 3.219 µs/op, overlapping intervals with lower allocation; no OBJ slowdown/speedup is established. Retained scratch capacity is an explicit tradeoff, and no total-memory, hardware-instruction or end-to-end FPS reduction is claimed. [Raw results, frozen sources, methodology and limits](benchmarks/scene-snapshot/RESULTS.md).
 
 The final build, nine collection contract tests, 87 3D tests, 32 Jolt tests, 27 lighting tests and 1,425 gameplay checks pass. The standard test report has two skips for optional local audio fixtures; affected rendering/physics suites have none. Native FPS interaction validation passes and the actual framebuffer was inspected. Build timing windows were coordinated with release/UI work; a lock-blocked focused run was retried only after the UI benchmark ended. No lock bypass or parallel benchmark occurred.
 
@@ -224,4 +212,3 @@ Next culling work: measured opaque-texture certification or conservative coverag
 
 ## FPS render profiling and exact mesh indexing — 2026-09-11
 
-Exact immutable vertex indexing reduces uploaded vertex-buffer bytes by 76.1% in the local FPS combat scene. A separately compiled solid-material path avoids alpha discard where it cannot affect coverage; transparent particles and uncertain cutouts keep their existing shaders. Same-binary reversed-order comparisons suggest approximately 7.2% lower render time, but concurrent GPU activity makes that timing gain provisional. The requested 10× improvement is not achieved. Automatic instancing was tested and removed after regression. HIGH remains the demo default. Build, graphics/physics/lighting/gameplay checks, release consumers and interactive FPS smoke pass. [Measurements, reproduction and limitations](benchmarks/fps-rendering/README.md).

@@ -181,7 +181,6 @@ orthographic projection is then rebuilt for the current world size.
 
 ### PerspectiveViewport
 
-[Source](../../src/main/java/valthorne/viewport/PerspectiveViewport.java)
 
 Viewport that binds a 3D camera's combined projection-view matrix into the engine.
 

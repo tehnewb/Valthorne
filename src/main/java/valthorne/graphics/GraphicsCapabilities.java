@@ -15,10 +15,8 @@ import static org.lwjgl.opengl.GL11.*;
  * @param version     actual driver version (GLFW requests minimum versions)
  * @param raster      whether the built-in GLSL 330 raster path is supported
  * @param compute     whether compute, storage buffers and image operations are available
- * @param pathTracing whether the built-in GLSL 430 path is supported
- * @param filament    whether a packaged native runtime and presentation context exist
  */
-public record GraphicsCapabilities(String vendor, String renderer, String version, boolean raster, boolean compute, boolean pathTracing, boolean filament) {
+public record GraphicsCapabilities(String vendor, String renderer, String version, boolean raster, boolean compute) {
     /**
      * Captures capabilities without parsing driver strings or probing GL_EXTENSIONS.
      * The calling thread must have a current desktop OpenGL context.
@@ -28,7 +26,7 @@ public record GraphicsCapabilities(String vendor, String renderer, String versio
      */
     public static GraphicsCapabilities current() {
         GLCapabilities gl = GL.getCapabilities();
-        return new GraphicsCapabilities(glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION), gl.OpenGL33, supportsCompute(gl), gl.OpenGL43, FilamentPlatform.supported() && gl.OpenGL41);
+        return new GraphicsCapabilities(glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION), gl.OpenGL33, supportsCompute(gl));
     }
 
     /**

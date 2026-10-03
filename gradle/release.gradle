@@ -58,11 +58,9 @@ tasks.register('verifyReleaseArtifacts') {
                     throw new GradleException('Published Javadoc has no index.html')
                 if (classifier == '') {
                     ['valthorne/JGL.class', 'valthorne/shaders/core/shape.vert',
-                     'valthorne/filament/surface.filamat', 'valthorne/filament/alpha.filamat',
-                     'valthorne/filament/glass.filamat', 'valthorne/filament/studio-ibl.ktx',
                      'ui/AtkinsonHyperlegible-Regular.ttf', 'ui/OFL-AtkinsonHyperlegible.txt',
                      'META-INF/LICENSE', 'META-INF/THIRD_PARTY_NOTICES.md',
-                     'META-INF/licenses/filament.txt'].each { resource ->
+                     'META-INF/LICENSE'].each { resource ->
                         if (zip.getEntry(resource) == null) throw new GradleException("Missing runtime resource: ${resource}")
                     }
                     def forbidden = zip.entries().find { entry -> entry.name.endsWith('.java') }

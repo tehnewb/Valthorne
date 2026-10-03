@@ -2,7 +2,7 @@ package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
-import valthorne.graphics.render.RenderStateSnapshot3D;
+import valthorne.graphics.OpenGLStateSnapshot;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.shader.ShaderSources;
 import valthorne.graphics.texture.TextureBatch;
@@ -26,7 +26,7 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
     private static final String[] ENERGY_NAMES = {"u_energy[0]", "u_energy[1]", "u_energy[2]", "u_energy[3]", "u_energy[4]"};
 
     public SpriteVolumeRenderer2D() {
-        try (var state = new RenderStateSnapshot3D()) {
+        try (var state = new OpenGLStateSnapshot()) {
             shader = new Shader(ShaderSources.load("lighting2d/sprite-volume.vert"), ShaderSources.load("lighting2d/sprite-volume.frag"));
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
@@ -50,7 +50,7 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
         float baseX = quad.get(0) + card.anchorU * (quad.get(2) - quad.get(0)) + card.anchorV * (quad.get(6) - quad.get(0));
         float baseY = quad.get(1) + card.anchorU * (quad.get(3) - quad.get(1)) + card.anchorV * (quad.get(7) - quad.get(1));
         batch.flush();
-        try (var state = new RenderStateSnapshot3D()) {
+        try (var state = new OpenGLStateSnapshot()) {
             glDisable(GL_DEPTH_TEST);
             glDepthMask(false);
             glDisable(GL_CULL_FACE);

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  A Java 25 library for building desktop 2D and 3D games.
+  A Java 25 library for building desktop 2D games.
 </p>
 
 <p align="center">
@@ -154,8 +154,6 @@ the classpath under `src/main/resources`.
 | 2D graphics | [Textures](docs/systems/textures.md), [cameras](docs/systems/cameras.md), [shaders](docs/systems/shaders.md), [particles](docs/systems/particles-2d.md), [lighting](docs/systems/lighting-2d.md) |
 | Fonts and UI | [Bitmap fonts](docs/systems/fonts.md), [Slug fonts](docs/systems/slug-fonts.md), [UI foundations](docs/systems/ui-core.md), [controls](docs/systems/ui-controls.md), [widgets](docs/ui-widgets.md), [windows](docs/ui-windows.md), [themes](docs/systems/ui-themes.md) |
 | Maps | [Tiled maps](docs/systems/tiled-maps.md), [LDtk maps](docs/systems/ldtk-maps.md) |
-| 3D graphics | [Models and scenes](docs/systems/models.md), [3D lighting](docs/systems/lighting-3d.md), [Filament](docs/systems/filament.md), [path tracing](docs/systems/path-tracing.md), [culling](docs/systems/culling.md) |
-| Physics and audio | [Jolt physics](docs/systems/physics.md), [audio](docs/systems/audio.md) |
 | Foundation APIs | [Collections](docs/systems/arrays.md), [buffers](docs/systems/buffers.md), [files](docs/systems/files.md), [settings](docs/systems/settings.md), [compression](docs/systems/compression.md), [encryption](docs/systems/encryption.md), [utilities](docs/systems/utilities.md) |
 | Browser target | [Portable desktop/web target](portable/README.md) |
 

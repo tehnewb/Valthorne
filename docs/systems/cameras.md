@@ -184,7 +184,6 @@ Returns the active projection matrix used by the camera during rendering.
 
 ### Camera3D
 
-[Source](../../src/main/java/valthorne/camera/Camera3D.java)
 
 Owns a mutable camera pose, projection and view matrices, their combined inverse,
 and a frustum for projection, picking, and culling. Subclasses supply the projection
@@ -761,7 +760,6 @@ aspect ratio without replacing the owned matrix reference.
 
 ### OrbitCameraController
 
-[Source](../../src/main/java/valthorne/camera/OrbitCameraController.java)
 
 Maintains a Z-up editor camera's orbit center, angular pose, and viewing distance.
 Input integration is left to the caller: drag deltas rotate or pan, wheel deltas
@@ -923,7 +921,6 @@ The projection boundaries are computed so that the camera centers on
 
 ### OrthographicCamera3D
 
-[Source](../../src/main/java/valthorne/camera/OrthographicCamera3D.java)
 
 Orthographic camera whose visible height is `worldHeight / zoom` world
 units. Width follows the viewport aspect ratio, and the projection is centered
@@ -1003,7 +1000,6 @@ The base rebuild operation updates the remaining derived camera state.
 
 ### PerspectiveCamera
 
-[Source](../../src/main/java/valthorne/camera/PerspectiveCamera.java)
 
 Perspective camera with a configurable vertical field of view in degrees.
 The default angle is 67 degrees; aspect ratio comes from the viewport dimensions
@@ -1122,6 +1118,4 @@ conventions.
 ## Related guides
 
 - [Viewport scaling and coordinate conversion](viewports.md)
-- [3D models, materials, scenes, and billboards](models.md)
-- [Jolt rigid-body physics](physics.md)
 - [Keyboard, mouse, and cursor input](input.md)
