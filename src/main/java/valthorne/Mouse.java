@@ -253,17 +253,17 @@ public final class Mouse {
      */
     private static byte buttonState;
 
-    /*
+    /**
      * Event-time modifier mask supplied by the last native mouse-button callback.
      */
     private static byte modifierState;
 
-    /*
+    /**
      * Accumulated native horizontal scroll offsets since the current frame boundary.
      */
     private static double scrollX;
 
-    /*
+    /**
      * Accumulated native vertical scroll offsets since the current frame boundary.
      */
     private static double scrollY;
@@ -826,7 +826,8 @@ public final class Mouse {
         /*
          * Validate before shifting because Java masks shift distances and sign-extends bytes.
          */
-        if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST) return false;
+        if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST)
+            return false;
         return (buttonState & (1 << button)) != 0;
     }
 
