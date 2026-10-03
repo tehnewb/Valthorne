@@ -733,43 +733,13 @@ public final class Mouse {
     }
 
     /**
-     * <p>
-     * Returns accumulated horizontal scroll, truncated toward zero and saturated to the
-     * byte range. Use {@link #getPreciseScrollX()} to retain fractional and large offsets.
-     * </p>
-     *
-     * @return the horizontal scroll amount
-     */
-    public static byte getScrollX() {
-        /*
-         * Saturation prevents large offsets from wrapping into the opposite direction.
-         */
-        return (byte) Math.max(Byte.MIN_VALUE, Math.min(Byte.MAX_VALUE, scrollX));
-    }
-
-    /**
-     * <p>
-     * Returns accumulated vertical scroll, truncated toward zero and saturated to the
-     * byte range. Use {@link #getPreciseScrollY()} to retain fractional and large offsets.
-     * </p>
-     *
-     * @return the vertical scroll amount
-     */
-    public static byte getScrollY() {
-        /*
-         * Keep the existing return type while offering precise polling separately.
-         */
-        return (byte) Math.max(Byte.MIN_VALUE, Math.min(Byte.MAX_VALUE, scrollY));
-    }
-
-    /**
      * Returns accumulated horizontal native scroll since the frame boundary.
      * Poll after native events are processed. Frame completion, focus loss, and
      * disposal clear the total. Event payloads still describe individual callbacks.
      *
      * @return signed horizontal offsets, retaining native double precision
      */
-    public static double getPreciseScrollX() {
+    public static double getScrollX() {
         /*
          * Read primitive accumulation directly without allocation or narrowing.
          */
@@ -783,7 +753,7 @@ public final class Mouse {
      *
      * @return signed vertical offsets, retaining native double precision
      */
-    public static double getPreciseScrollY() {
+    public static double getScrollY() {
         /*
          * Fractional input remains available until the existing frame reset.
          */
