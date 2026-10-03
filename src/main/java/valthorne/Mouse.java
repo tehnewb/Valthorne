@@ -247,14 +247,14 @@ public final class Mouse {
      * Bitmask representing the current modifier key state.
      */
     private static byte modifierState; // Bitmask representing the current modifier key state
-    /**
-     * Latest horizontal scroll delta.
+    /*
+     * Accumulated native horizontal scroll offsets since the current frame boundary.
      */
-    private static byte scrollX; // Latest horizontal scroll delta
-    /**
-     * Latest vertical scroll delta.
+    private static double scrollX;
+    /*
+     * Accumulated native vertical scroll offsets since the current frame boundary.
      */
-    private static byte scrollY; // Latest vertical scroll delta
+    private static double scrollY;
 
     /**
      * Native GLFW cursor handle currently assigned to the window.
@@ -374,8 +374,8 @@ public final class Mouse {
         glfwSetMouseButtonCallback(Window.getAddress(), mouseButtonCallback);
 
         scrollCallback = GLFWScrollCallback.create((win, xoff, yoff) -> {
-            scrollX = (byte) xoff;
-            scrollY = (byte) yoff;
+            scrollX += xoff;
+            scrollY += yoff;
 
             scrollEvent.setPreciseOffsets((float) xoff, (float) yoff);
 
@@ -734,23 +734,59 @@ public final class Mouse {
 
     /**
      * <p>
-     * Returns the most recent horizontal scroll delta.
+     * Returns accumulated horizontal scroll, truncated toward zero and saturated to the
+     * byte range. Use {@link #getPreciseScrollX()} to retain fractional and large offsets.
      * </p>
      *
      * @return the horizontal scroll amount
      */
     public static byte getScrollX() {
-        return scrollX;
+        /*
+         * Saturation prevents large offsets from wrapping into the opposite direction.
+         */
+        return (byte) Math.max(Byte.MIN_VALUE, Math.min(Byte.MAX_VALUE, scrollX));
     }
 
     /**
      * <p>
-     * Returns the most recent vertical scroll delta.
+     * Returns accumulated vertical scroll, truncated toward zero and saturated to the
+     * byte range. Use {@link #getPreciseScrollY()} to retain fractional and large offsets.
      * </p>
      *
      * @return the vertical scroll amount
      */
     public static byte getScrollY() {
+        /*
+         * Keep the existing return type while offering precise polling separately.
+         */
+        return (byte) Math.max(Byte.MIN_VALUE, Math.min(Byte.MAX_VALUE, scrollY));
+    }
+
+    /**
+     * Returns accumulated horizontal native scroll since the frame boundary.
+     * Poll after native events are processed. Frame completion, focus loss, and
+     * disposal clear the total. Event payloads still describe individual callbacks.
+     *
+     * @return signed horizontal offsets, retaining native double precision
+     */
+    public static double getPreciseScrollX() {
+        /*
+         * Read primitive accumulation directly without allocation or narrowing.
+         */
+        return scrollX;
+    }
+
+    /**
+     * Returns accumulated vertical native scroll since the frame boundary.
+     * Poll after native events are processed. Frame completion, focus loss, and
+     * disposal clear the total. Event payloads still describe individual callbacks.
+     *
+     * @return signed vertical offsets, retaining native double precision
+     */
+    public static double getPreciseScrollY() {
+        /*
+         * Fractional input remains available until the existing frame reset.
+         */
         return scrollY;
     }
 
