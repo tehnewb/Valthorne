@@ -491,3 +491,13 @@ $RECYCLE.BIN/
 /src/main/resources/valthorne/shaders/pathtrace/present.frag
 /src/main/resources/valthorne/shaders/pathtrace/present.vert
 /src/main/resources/valthorne/shaders/pathtrace/trace.comp
+
+# Private editor prototype: implementation, assets, tests, and authored state.
+/src/main/java/valthorne/ui/engine/
+/src/test/java/valthorne/ui/engine/
+/.prototype-editor/
+/.valthorne/
+/docs/scene-editor.md
+/src/testFixtures/
+/src/main/resources/ui/icons/
+/src/main/resources/ui/scene-selection.png

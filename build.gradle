@@ -126,6 +126,27 @@ mavenPublishing {
     }
 }
 
+
+// The editor is installed locally and is never part of a public checkout.
+def editorPrototype = providers.gradleProperty('editorPrototype').map { it.toBoolean() }
+        .getOrElse(file('.prototype-editor/editor.gradle').isFile())
+if (editorPrototype) {
+    if (!file('.prototype-editor/editor.gradle').isFile()) throw new GradleException('The local editor prototype is not installed.')
+    apply from: '.prototype-editor/editor.gradle'
+} else {
+    sourceSets.main.java.exclude 'valthorne/ui/engine/**'
+    sourceSets.test.java.exclude 'valthorne/ui/engine/**'
+    sourceSets.main.resources.exclude 'ui/icons/**', 'ui/scene-selection.png'
+    tasks.withType(Jar).configureEach { exclude 'valthorne/ui/engine/**', 'ui/icons/**', 'ui/scene-selection.png' }
+}
+tasks.matching { it.name.startsWith('publish') }.configureEach {
+    doFirst {
+        if (editorPrototype) throw new GradleException('Publish with -PeditorPrototype=false to exclude the local editor.')
+    }
+}
+
+apply from: 'gradle/editor-boundary.gradle'
+
 apply from: 'gradle/release.gradle'
 
 // Shared-source desktop/web application entry point.

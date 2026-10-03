@@ -1,0 +1,25 @@
+tasks.register('verifyEditorBoundary') {
+    group = 'verification'
+    description = 'Rejects production dependencies on editor implementation outside ui.engine.'
+    dependsOn tasks.named('compileJava')
+    doLast {
+        def references = []
+        sourceSets.main.output.classesDirs.each { directory ->
+            fileTree(directory).matching {
+                include '**/*.class'
+                exclude 'valthorne/ui/engine/**'
+            }.each { classFile ->
+                def constants = new String(classFile.bytes, 'ISO-8859-1')
+                if (constants.contains('valthorne/ui/engine/') || constants.contains('valthorne.ui.engine.')) {
+                    references.add(classFile)
+                }
+            }
+        }
+        if (!references.isEmpty()) {
+            throw new GradleException('Production classes depend on ui.engine: ' + references.join(', '))
+        }
+        println 'Editor dependency boundary verified: production classes outside ui.engine have no editor references'
+    }
+}
+
+tasks.named('check') { dependsOn 'verifyEditorBoundary' }
