@@ -119,6 +119,7 @@ public abstract class Viewport {
     protected float worldWidth; // Logical world width visible through this viewport.
     protected float worldHeight; // Logical world height visible through this viewport.
     protected Camera camera; // Optional camera used to build the active projection transform.
+    private boolean bound; // True while this instance owns a rendering scope awaiting restoration.
     private boolean scissorWasEnabled; // True when a scissor test was already active before beginScissor was called.
 
     /**
@@ -192,12 +193,21 @@ public abstract class Viewport {
      *
      * <p>
      * Use this when you want full control over when rendering begins and ends inside the viewport.
+     * Same-instance nesting through bind or render is rejected before state mutation. Distinct
+     * instances may nest when closed in reverse order. If apply fails, saved state is restored.
      * </p>
      */
     public void bind() {
+        if (bound) throw new IllegalStateException("Viewport is already bound");
         glGetIntegerv(GL_VIEWPORT, oldViewport);
         Window.copyProjectionMatrix(oldProjectionMatrix);
-        apply();
+        bound = true;
+        try {
+            apply();
+        } catch (RuntimeException | Error failure) {
+            unbind();
+            throw failure;
+        }
     }
 
     /**
@@ -205,11 +215,17 @@ public abstract class Viewport {
      *
      * <p>
      * This method restores the previously active engine projection matrix and viewport rectangle.
+     * Calling it without an active scope throws IllegalStateException without changing state.
      * </p>
      */
     public void unbind() {
-        Window.setProjectionMatrix(oldProjectionMatrix);
-        glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+        if (!bound) throw new IllegalStateException("Viewport is not bound");
+        try {
+            Window.setProjectionMatrix(oldProjectionMatrix);
+            glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+        } finally {
+            bound = false;
+        }
     }
 
     /**
@@ -223,21 +239,18 @@ public abstract class Viewport {
      *
      * @param function the drawing function to execute inside this viewport
      * @throws NullPointerException if {@code function} is null
+     * @throws IllegalStateException if this viewport already owns a rendering scope
      */
     public void render(DrawFunction function) {
         if (function == null) {
             throw new NullPointerException("Draw function cannot be null");
         }
 
-        glGetIntegerv(GL_VIEWPORT, oldViewport);
-        Window.copyProjectionMatrix(oldProjectionMatrix);
-
+        bind();
         try {
-            apply();
             function.draw();
         } finally {
-            Window.setProjectionMatrix(oldProjectionMatrix);
-            glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+            unbind();
         }
     }
 
