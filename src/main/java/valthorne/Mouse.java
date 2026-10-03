@@ -774,9 +774,6 @@ public final class Mouse {
      * @return signed horizontal offsets, retaining native double precision
      */
     public static double getScrollX() {
-        /*
-         * Read primitive accumulation directly without allocation or narrowing.
-         */
         return scrollX;
     }
 
@@ -788,9 +785,6 @@ public final class Mouse {
      * @return signed vertical offsets, retaining native double precision
      */
     public static double getScrollY() {
-        /*
-         * Fractional input remains available until the existing frame reset.
-         */
         return scrollY;
     }
 
