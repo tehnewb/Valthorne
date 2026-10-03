@@ -1,0 +1,38 @@
+name: Update development version
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: development-version
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: vars.VERSION_APP_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ vars.VERSION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.VERSION_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: |
+            await require('./.github/scripts/update-version.cjs').updateVersion({ github, context, core });

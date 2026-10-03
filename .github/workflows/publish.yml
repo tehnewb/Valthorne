@@ -1,0 +1,114 @@
+name: Publish automatic Maven release
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/release-request.json']
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Exact main commit containing the release request to retry'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Never cancel a publication or replace a different version waiting to publish.
+concurrency:
+  group: maven-release-${{ inputs.commit || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.policy.outputs.version }}
+      commit: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a commit on main
+        id: commit
+        shell: bash
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate publication policy and snapshot
+        id: policy
+        run: node .github/scripts/release-policy.cjs
+      - name: Verify automation
+        run: node --test .github/scripts/update-version.test.cjs .github/scripts/release-policy.test.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Verify release artifacts
+        env:
+          ALSOFT_DRIVERS: 'null'
+        run: bash ./gradlew verifyRelease -Pprototype3d=false -PeditorPrototype=false --stacktrace --console=plain
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Check whether this version is already published
+        id: central
+        env:
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          status=$(curl --silent --show-error --location --retry 3 --output /dev/null --write-out '%{http_code}' \
+            "https://repo.maven.apache.org/maven2/io/github/tehnewb/Valthorne/$RELEASE_VERSION/Valthorne-$RELEASE_VERSION.pom")
+          case "$status" in
+            200) echo 'exists=true' >> "$GITHUB_OUTPUT" ;;
+            404) echo 'exists=false' >> "$GITHUB_OUTPUT" ;;
+            *) echo "Maven Central availability check failed: HTTP $status" >&2; exit 1 ;;
+          esac
+      - name: Sign and publish to Maven Central
+        if: steps.central.outputs.exists == 'false'
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: '5152FDD3'
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ALSOFT_DRIVERS: 'null'
+        shell: bash
+        run: |
+          test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername"
+          test -n "$ORG_GRADLE_PROJECT_mavenCentralPassword"
+          test -n "$ORG_GRADLE_PROJECT_signingInMemoryKey"
+          bash ./gradlew publishAndReleaseToMavenCentral -PreleaseSigning=true \
+            -Pprototype3d=false -PeditorPrototype=false --console=plain
+      - name: Record publication result
+        env:
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.verify.outputs.commit }}
+          ALREADY_PUBLISHED: ${{ steps.central.outputs.exists }}
+        shell: bash
+        run: |
+          printf 'Maven version: %s\nSource commit: %s\nAlready published: %s\n' \
+            "$RELEASE_VERSION" "$RELEASE_COMMIT" "$ALREADY_PUBLISHED" >> "$GITHUB_STEP_SUMMARY"
