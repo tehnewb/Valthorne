@@ -321,6 +321,7 @@ public class Animation implements Drawable {
         long zeroTransitionLimit = 2L * frames.length;
 
         while (true) {
+            if (bits.get(PAUSED) || bits.get(FINISHED)) return;
             AnimationFrame frame = frames[currentIndex];
             float dur = frame == null || !Float.isFinite(frame.duration()) ? 0f : Math.max(0f, frame.duration());
 
@@ -399,10 +400,8 @@ public class Animation implements Drawable {
                 animationListener.onFrameChanged(this, from, currentIndex);
             }
 
-            if (bits.get(PAUSED) || bits.get(FINISHED)) return;
-
             AnimationFrame next = frames[currentIndex];
-            float nd = next == null || !Float.isFinite(next.duration()) ? 0f : Math.max(0f, next.duration());
+            float nd = (next == null) ? 0f : Math.max(0f, next.duration());
             if (nd > 0f) return;
         }
     }
