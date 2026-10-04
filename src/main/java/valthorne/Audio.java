@@ -3,18 +3,23 @@ package valthorne;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.ALUtil;
 import valthorne.audio.SoundData;
 import valthorne.audio.SoundPlayer;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Set;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 import static org.lwjgl.openal.ALC10.*;
+import static org.lwjgl.openal.ALC11.ALC_ALL_DEVICES_SPECIFIER;
+import static org.lwjgl.openal.ALC11.ALC_DEFAULT_ALL_DEVICES_SPECIFIER;
+import static org.lwjgl.openal.SOFTReopenDevice.alcReopenDeviceSOFT;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 /**
@@ -60,6 +65,26 @@ import static org.lwjgl.system.MemoryUtil.NULL;
  * player each frame. Instead, the audio subsystem owns that update lifecycle
  * internally and keeps OpenAL interaction isolated to a single thread.
  * </p>
+ *
+ * <h2>Output Devices</h2>
+ * <p>
+ * {@link #getDevices()} returns a fresh snapshot of available playback endpoints.
+ * Pass an exact listed name to {@link #switchDevice(String)}, or {@code null} to
+ * select the current system default. Switching blocks until the audio thread has
+ * completed the request. Drivers supporting {@code ALC_SOFT_reopen_device} retain
+ * the context, buffers, sources, playback states and streaming queues; playback
+ * may briefly pause while the endpoint is reopened. Failed switches retain the
+ * previous output. Unsupported drivers report {@code false} without recreating
+ * resources. Device queries and switching start audio lazily and allocate only
+ * when requested, never as part of the player update loop.
+ * </p>
+ * <pre>{@code
+ * List<String> devices = Audio.getDevices();
+ * if (!devices.isEmpty() && Audio.isDeviceSwitchingSupported()) {
+ *     boolean switched = Audio.switchDevice(devices.getFirst());
+ * }
+ * Audio.switchDevice(null); // Resolve the system default at the time of switching.
+ * }</pre>
  *
  * <h2>Example Usage</h2>
  *
@@ -190,6 +215,96 @@ public final class Audio {
      * </p>
      */
     private Audio() {
+    }
+
+    /**
+     * Enumerates playback outputs on the audio thread. Names are suitable for
+     * {@link #switchDevice(String)} and may change as hardware is connected or removed.
+     * Capture devices are excluded. Starts audio if necessary.
+     *
+     * @return immutable snapshot, empty if enumeration is unavailable
+     */
+    public static List<String> getDevices() {
+        /*
+         * Prefer all-device enumeration for distinct hardware endpoints, falling
+         * back to the original enumeration extension on older implementations.
+         */
+        return call(() -> {
+            int token;
+            if (alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT")) token = ALC_ALL_DEVICES_SPECIFIER;
+            else if (alcIsExtensionPresent(NULL, "ALC_ENUMERATION_EXT")) token = ALC_DEVICE_SPECIFIER;
+            else return List.of();
+            List<String> devices = ALUtil.getStringList(NULL, token);
+            return devices == null ? List.of() : List.copyOf(devices);
+        });
+    }
+
+    /**
+     * Queries the system's current default playback endpoint rather than caching
+     * the endpoint chosen at startup. Starts audio if necessary.
+     *
+     * @return default output name, or {@code null} if the driver cannot report it
+     */
+    public static String getDefaultDevice() {
+        /*
+         * Match the enumeration namespace so the reported default can be compared
+         * directly with names from getDevices.
+         */
+        return call(() -> alcGetString(NULL, alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ? ALC_DEFAULT_ALL_DEVICES_SPECIFIER : ALC_DEFAULT_DEVICE_SPECIFIER));
+    }
+
+    /**
+     * Queries the endpoint currently associated with Valthorne's playback device.
+     * Starts audio if necessary; this is independent of the system default.
+     *
+     * @return current output name, or {@code null} if the driver cannot report it
+     */
+    public static String getCurrentDevice() {
+        /*
+         * A non-null device handle requests one endpoint string, not a list;
+         * query it after queued switches have completed on the owning thread.
+         */
+        return call(() -> alcGetString(device, alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ? ALC_ALL_DEVICES_SPECIFIER : ALC_DEVICE_SPECIFIER));
+    }
+
+    /**
+     * Checks whether the active driver can switch outputs while preserving audio
+     * resources. Starts audio if necessary.
+     *
+     * @return whether the device supports {@code ALC_SOFT_reopen_device}
+     */
+    public static boolean isDeviceSwitchingSupported() {
+        /*
+         * Check the active device on its owning thread instead of relying on
+         * extension availability from an unrelated or previously opened device.
+         */
+        return call(() -> alcIsExtensionPresent(device, "ALC_SOFT_reopen_device"));
+    }
+
+    /**
+     * Synchronously moves playback to a named output, or the current system default
+     * when {@code deviceName} is {@code null}. Existing players, sources, buffers,
+     * streaming queues and listener settings remain valid. No sound is reloaded.
+     * A failed reopen leaves the previous output selected. Starts audio if necessary.
+     * Call again with {@code null} to follow a later system-default change; this
+     * method does not install an automatic device-change monitor.
+     *
+     * @param deviceName exact playback name from {@link #getDevices()}, or {@code null}
+     * @return {@code true} if reopened successfully; {@code false} if unsupported
+     *         or the requested output could not be opened
+     * @throws IllegalArgumentException if the name is blank or contains a NUL character
+     */
+    public static boolean switchDevice(String deviceName) {
+        /*
+         * Reopen in place on the audio thread so queued player operations never
+         * observe destroyed handles. Null attributes preserve device configuration.
+         */
+        if (deviceName != null && (deviceName.isBlank() || deviceName.indexOf('\0') >= 0))
+            throw new IllegalArgumentException("Device name must be nonblank and contain no NUL characters");
+        return call(() -> {
+            if (!alcIsExtensionPresent(device, "ALC_SOFT_reopen_device")) return false;
+            return alcReopenDeviceSOFT(device, deviceName, (IntBuffer) null);
+        });
     }
 
     /**

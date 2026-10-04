@@ -134,6 +134,14 @@ tasks.matching { it.name.startsWith('publish') }.configureEach {
 apply from: 'gradle/editor-boundary.gradle'
 tasks.named('test', Test) { failOnNoDiscoveredTests = false }
 
+tasks.register('verifyAudioDevices', JavaExec) {
+    group = 'verification'
+    description = 'Verifies native audio device switching and retained buffered/streamed playback state.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'valthorne.AudioDeviceVerification'
+}
+
 mavenPublishing {
     publishToMavenCentral()
 
