@@ -289,7 +289,9 @@ public class Animation implements Drawable {
      * <ul>
      *     <li>Time is scaled by {@link #speed}.</li>
      *     <li>Large deltas can advance across multiple frames in one call.</li>
-     *     <li>0-duration frames are skipped without getting stuck in an infinite loop.</li>
+     *     <li>Null frames and nonpositive or non-finite durations are skipped without consuming time.
+     *     At most twice the frame count may be skipped consecutively per update; an all-zero
+     *     cycle yields at that bound and retains its remaining elapsed time.</li>
      *     <li>A single frame remains static for every playback direction.</li>
      *     <li>If {@link #isPaused()} or {@link #isFinished()} is true, this method does nothing.</li>
      * </ul>
@@ -301,6 +303,7 @@ public class Animation implements Drawable {
      * </ul>
      *
      * @param delta elapsed seconds since last update
+     * @throws IllegalArgumentException if scaled or accumulated elapsed time is non-finite
      */
     public void update(float delta) {
         if (!visible) return;
@@ -309,18 +312,26 @@ public class Animation implements Drawable {
         if (frames.length == 1) return;
 
         float scaled = delta * speed;
+        if (!Float.isFinite(scaled) || !Float.isFinite(elapsedTime + scaled))
+            throw new IllegalArgumentException("Animation elapsed time must remain finite");
         if (scaled <= 0f) return;
 
         elapsedTime += scaled;
+        long zeroTransitions = 0;
+        long zeroTransitionLimit = 2L * frames.length;
 
         while (true) {
             AnimationFrame frame = frames[currentIndex];
-            float dur = (frame == null) ? 0f : Math.max(0f, frame.duration());
+            float dur = frame == null || !Float.isFinite(frame.duration()) ? 0f : Math.max(0f, frame.duration());
 
             if (dur > 0f && elapsedTime < dur) return;
 
-            if (dur > 0f) elapsedTime -= dur;
-            else elapsedTime = 0f;
+            if (dur > 0f) {
+                elapsedTime -= dur;
+                zeroTransitions = 0;
+            } else if (zeroTransitions++ >= zeroTransitionLimit) {
+                return;
+            }
 
             int from = currentIndex;
 
@@ -388,8 +399,10 @@ public class Animation implements Drawable {
                 animationListener.onFrameChanged(this, from, currentIndex);
             }
 
+            if (bits.get(PAUSED) || bits.get(FINISHED)) return;
+
             AnimationFrame next = frames[currentIndex];
-            float nd = (next == null) ? 0f : Math.max(0f, next.duration());
+            float nd = next == null || !Float.isFinite(next.duration()) ? 0f : Math.max(0f, next.duration());
             if (nd > 0f) return;
         }
     }
