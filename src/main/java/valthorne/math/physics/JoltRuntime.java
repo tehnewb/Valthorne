@@ -29,7 +29,7 @@ import java.util.Locale;
  * @author Albert Beaupre
  */
 public final class JoltRuntime {
-    /*
+    /**
      * Records successful completion of native loading and type registration.
      * Access is guarded by the synchronized initialization method; failures leave
      * this false even when some native setup has already occurred.
