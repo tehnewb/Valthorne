@@ -66,8 +66,8 @@ import static org.lwjgl.opengl.GL11.*;
  *
  * <h2>Coordinate system</h2>
  * <p>
- * This class assumes a bottom-left world coordinate system, matching the rest of your engine
- * and standard OpenGL-style orthographic rendering.
+ * Screen input uses bottom-left logical window coordinates. World coordinates follow
+ * the active projection, including top-left UI cameras and custom 2D transforms.
  * </p>
  *
  * <h2>Example</h2>
@@ -270,25 +270,50 @@ public abstract class Viewport {
     }
 
     /**
-     * Converts a captured pointer even after it leaves the viewport rectangle.
+     * Converts bottom-left logical window coordinates into the projection's world XY
+     * plane at Z zero, even outside the viewport rectangle. Rebuilds an assigned camera
+     * from its current state and world dimensions, matching the next apply; otherwise
+     * uses the viewport's current fallback projection. No graphics context is required.
+     * The returned vector is reused and overwritten by the next conversion.
+     *
+     * @param screenX finite horizontal logical window coordinate
+     * @param screenY finite vertical logical window coordinate, increasing upward
+     * @return reused world coordinate vector
+     * @throws IllegalArgumentException if either input is non-finite
+     * @throws IllegalStateException if the viewport has no area or the world plane cannot be unprojected
      */
     public Vector2f screenToWorldUnclipped(float screenX, float screenY) {
+        if (!Float.isFinite(screenX) || !Float.isFinite(screenY))
+            throw new IllegalArgumentException("Screen coordinates must be finite.");
         if (width <= 0 || height <= 0) throw new IllegalStateException("Viewport has no screen area.");
 
-        float vx = screenX - x;
-        float vy = screenY - y;
-
-        float wx = vx * (worldWidth / width);
-        float wy = vy * (worldHeight / height);
-
+        Matrix4f projection = projectionMatrix;
         if (camera != null) {
-            float halfW = worldWidth * 0.5f;
-            float halfH = worldHeight * 0.5f;
-
-            wx = (wx - halfW) / camera.getZoom() + camera.getCenter().x();
-            wy = (wy - halfH) / camera.getZoom() + camera.getCenter().y();
+            camera.rebuild(worldWidth, worldHeight);
+            projection = camera.getProjection();
         }
+        double nx = 2.0 * (screenX - (double) x) / width - 1.0;
+        double ny = 2.0 * (screenY - (double) y) / height - 1.0;
 
+        /*
+         * Solve the two projected XY equations on Z=0 directly. This handles affine
+         * and projective 2D transforms without allocating vectors or inverting a full
+         * 4x4 matrix. Double intermediates reduce cancellation for translated views.
+         */
+        double a = projection.m00() - nx * projection.m03();
+        double b = projection.m10() - nx * projection.m13();
+        double c = nx * projection.m33() - projection.m30();
+        double d = projection.m01() - ny * projection.m03();
+        double e = projection.m11() - ny * projection.m13();
+        double f = ny * projection.m33() - projection.m31();
+        double determinant = a * e - b * d;
+        if (determinant == 0 || !Double.isFinite(determinant))
+            throw new IllegalStateException("Projection cannot unproject the world XY plane.");
+        float wx = (float) ((c * e - b * f) / determinant);
+        float wy = (float) ((a * f - c * d) / determinant);
+        double w = projection.m03() * (double) wx + projection.m13() * (double) wy + projection.m33();
+        if (!Float.isFinite(wx) || !Float.isFinite(wy) || !Double.isFinite(w) || w == 0)
+            throw new IllegalStateException("Projection has no finite world position for these coordinates.");
         return screenToWorldCoordinates.set(wx, wy);
     }
 
