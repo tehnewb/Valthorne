@@ -1,10 +1,8 @@
 package valthorne.math.physics;
 
 import com.github.stephengold.joltjni.BoxShape;
-import com.github.stephengold.joltjni.CylinderShape;
-import com.github.stephengold.joltjni.Quat;
-import com.github.stephengold.joltjni.RotatedTranslatedShape;
 import com.github.stephengold.joltjni.Shape;
+import com.github.stephengold.joltjni.SphereShape;
 import com.github.stephengold.joltjni.Vec3;
 
 /**
@@ -12,16 +10,19 @@ import com.github.stephengold.joltjni.Vec3;
  * meters. Descriptions own no native resources and may be shared between body
  * settings and worlds. Native geometry is allocated only during body creation.
  *
- * <p>Boxes use their full width and height. Circles use a cylinder rotated so
- * its axis follows Z, preserving disk inertia and a circular XY cross section.
- * All shapes have a one-meter extrusion along Z; bodies remain centered at Z=0
- * and cannot tilt. This is constrained 3D collision detection, so native contact
+ * <p>Boxes use their full width and height with a one-meter extrusion along Z.
+ * Circles use native sphere collision geometry: its cross section at Z=0 is the
+ * exact circle, and Jolt can use specialized sphere collision algorithms. Dynamic
+ * circles scale native inertia by 5/4 to preserve the disk's Z-axis inertia,
+ * one half of mass times radius squared. Other rotational axes are locked.
+ * Bodies remain centered at Z=0 and cannot tilt. This is constrained 3D
+ * collision detection, so native contact
  * tolerances still apply. Use meter-scale dimensions rather than pixels.</p>
  */
 public final class CollisionShape2D {
 
     /**
-     * Common extrusion keeps every planar collider overlapping along Z.
+     * Rectangle half-depth keeps box geometry centered across the XY plane.
      */
     private static final float HALF_DEPTH = 0.5f;
 
@@ -101,22 +102,33 @@ public final class CollisionShape2D {
      * @return newly owned native shape
      */
     Shape createNative() {
-        if (!circle) return new BoxShape(new Vec3(width * 0.5f, height * 0.5f, HALF_DEPTH), 0);
-        float quarterTurn = (float) Math.sqrt(0.5);
-        try (CylinderShape cylinder = new CylinderShape(HALF_DEPTH, width, 0)) {
-            return new RotatedTranslatedShape(new Vec3(), new Quat(quarterTurn, 0, 0, quarterTurn), cylinder);
-        }
+        if (circle) return new SphereShape(width);
+        return new BoxShape(new Vec3(width * 0.5f, height * 0.5f, HALF_DEPTH), 0);
     }
 
     /**
-     * Tests exact containment in the centered planar descriptor geometry.
+     * Converts sphere inertia (2/5 mr²) into planar disk inertia (1/2 mr²).
+     * The unused X/Y rotational axes remain locked by the body's planar DOFs.
      *
-     * @param x shape-local horizontal coordinate in meters
-     * @param y shape-local vertical coordinate in meters
+     * @return native inertia multiplier, or one for box geometry
+     */
+    float getInertiaMultiplier() {
+        return circle ? 1.25f : 1;
+    }
+
+    /**
+     * Tests exact containment relative to the center of a rotated shape.
+     * Circles skip rotation because their containment is orientation-independent.
+     *
+     * @param x horizontal displacement from the center in meters
+     * @param y vertical displacement from the center in meters
+     * @param angle counterclockwise shape orientation in radians
      * @return whether the point is on or inside the shape boundary
      */
-    boolean contains(double x, double y) {
+    boolean contains(double x, double y, float angle) {
         if (circle) return x * x + y * y <= (double) width * width;
-        return Math.abs(x) <= width * 0.5 && Math.abs(y) <= height * 0.5;
+        double cosine = Math.cos(angle);
+        double sine = Math.sin(angle);
+        return Math.abs(cosine * x + sine * y) <= width * 0.5 && Math.abs(cosine * y - sine * x) <= height * 0.5;
     }
 }

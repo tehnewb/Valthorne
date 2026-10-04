@@ -200,7 +200,10 @@ public final class RigidBody2D implements AutoCloseable {
     public float getInterpolatedRotation() {
         check();
         float delta = angle - previousAngle;
-        float shortest = (float) Math.atan2(Math.sin(delta), Math.cos(delta));
+        // Captured angles are normalized, so at most one turn needs removal.
+        float shortest = delta;
+        if (delta > Math.PI) shortest = (float) (delta - 2.0 * Math.PI);
+        else if (delta < -Math.PI) shortest = (float) (delta + 2.0 * Math.PI);
         return previousAngle + shortest * world.getInterpolationAlpha();
     }
 
@@ -440,6 +443,34 @@ public final class RigidBody2D implements AutoCloseable {
     }
 
     /**
+     * Advances interpolation endpoints after a successful native update. Static
+     * poses change only through teleportation, which already resets both endpoints.
+     * Called only by trusted simulation code on the owning thread.
+     *
+     * @param moving whether bodies were active during this or the previous step
+     */
+    void captureStep(boolean moving) {
+        if (motion == MotionType2D.STATIC) return;
+        remember();
+        if (moving) capture();
+    }
+
+    /**
+     * Advances a moving body's interpolation endpoints from a native batch read.
+     *
+     * @param positionX horizontal center in meters
+     * @param positionY vertical center in meters
+     * @param rotationZ native quaternion Z component
+     * @param rotationW native quaternion W component
+     */
+    void captureStep(double positionX, double positionY, float rotationZ, float rotationW) {
+        remember();
+        x = (float) positionX;
+        y = (float) positionY;
+        angle = (float) Math.atan2(2.0 * rotationZ * rotationW, 1.0 - 2.0 * rotationZ * rotationZ);
+    }
+
+    /**
      * Commits the current captured pose as the previous interpolation endpoint.
      */
     void remember() {
@@ -458,9 +489,7 @@ public final class RigidBody2D implements AutoCloseable {
     boolean containsPoint(float pointX, float pointY) {
         double dx = (double) pointX - x;
         double dy = (double) pointY - y;
-        double cosine = Math.cos(angle);
-        double sine = Math.sin(angle);
-        return shape.contains(cosine * dx + sine * dy, cosine * dy - sine * dx);
+        return shape.contains(dx, dy, angle);
     }
 
     @Override

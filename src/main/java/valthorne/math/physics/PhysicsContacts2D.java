@@ -24,13 +24,18 @@ import java.util.Objects;
  * code, preventing exceptions from escaping through worker-thread JNI callbacks.</p>
  */
 final class PhysicsContacts2D implements AutoCloseable {
+    /**
+     * Private ordinal lookup avoids allocating an enum array during delivery.
+     */
+    private static final ContactType2D[] CONTACT_TYPES = ContactType2D.values();
+
     private final PhysicsWorld2D world; // Owning world used for generation-checked live-handle lookup.
     private final boolean threaded; // Whether worker callbacks need synchronized buffer publication.
     private final PhysicsContactBridge2D bridge; // Owned native callback resource, detached before closing.
     private PhysicsContactListener2D[] listeners = new PhysicsContactListener2D[0]; // Owner-thread listener snapshot, replaced only on mutation.
     private volatile boolean listening; // Publishes capture activation and body membership to native worker callbacks.
     private final ContactEvent2D view = new ContactEvent2D(); // Reused read-only event delivered to game code.
-    private final ContactType2D[] types; // Buffered transition kinds in callback arrival order.
+    private final byte[] types; // Compact transition ordinals in callback arrival order.
     private final RigidBody2D[] firstBodies; // Original first body references for each event.
     private final RigidBody2D[] secondBodies; // Original second body references for each event.
     private final int[] firstSubShapes; // Native first subshape IDs for each event.
@@ -55,7 +60,7 @@ final class PhysicsContacts2D implements AutoCloseable {
     PhysicsContacts2D(PhysicsWorld2D world, int capacity, boolean threaded) {
         this.world = world;
         this.threaded = threaded;
-        types = new ContactType2D[capacity];
+        types = new byte[capacity];
         firstBodies = new RigidBody2D[capacity];
         secondBodies = new RigidBody2D[capacity];
         firstSubShapes = new int[capacity];
@@ -214,7 +219,7 @@ final class PhysicsContacts2D implements AutoCloseable {
             overflow = true;
             return;
         }
-        types[count] = type;
+        types[count] = (byte) type.ordinal();
         firstBodies[count] = first;
         secondBodies[count] = second;
         firstSubShapes[count] = firstSubShape;
@@ -275,7 +280,7 @@ final class PhysicsContacts2D implements AutoCloseable {
         PhysicsContactListener2D[] snapshot = listeners;
         try {
             for (int i = 0; i < count; i++) {
-                view.set(types[i], firstBodies[i], secondBodies[i], firstSubShapes[i], secondSubShapes[i], normalX[i], normalY[i], penetration[i]);
+                view.set(CONTACT_TYPES[types[i]], firstBodies[i], secondBodies[i], firstSubShapes[i], secondSubShapes[i], normalX[i], normalY[i], penetration[i]);
                 for (PhysicsContactListener2D listener : snapshot) listener.onContact(view);
             }
         } finally {
@@ -290,7 +295,6 @@ final class PhysicsContacts2D implements AutoCloseable {
     void discard() {
         Arrays.fill(firstBodies, 0, count, null);
         Arrays.fill(secondBodies, 0, count, null);
-        Arrays.fill(types, 0, count, null);
         count = 0;
         int remaining = retiredCount - retiredBoundary;
         System.arraycopy(retired, retiredBoundary, retired, 0, remaining);

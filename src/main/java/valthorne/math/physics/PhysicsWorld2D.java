@@ -1,6 +1,7 @@
 package valthorne.math.physics;
 
 import com.github.stephengold.joltjni.BodyCreationSettings;
+import com.github.stephengold.joltjni.BatchBodyInterface;
 import com.github.stephengold.joltjni.BodyInterface;
 import com.github.stephengold.joltjni.BroadPhaseLayerInterfaceTable;
 import com.github.stephengold.joltjni.JobSystem;
@@ -19,6 +20,7 @@ import com.github.stephengold.joltjni.TempAllocatorImplWithMallocFallback;
 import com.github.stephengold.joltjni.Vec3;
 import com.github.stephengold.joltjni.enumerate.EActivation;
 import com.github.stephengold.joltjni.enumerate.EAllowedDofs;
+import com.github.stephengold.joltjni.enumerate.EBodyType;
 import com.github.stephengold.joltjni.enumerate.EMotionQuality;
 import com.github.stephengold.joltjni.enumerate.EMotionType;
 import com.github.stephengold.joltjni.enumerate.EOverrideMassProperties;
@@ -71,6 +73,11 @@ import java.util.Objects;
  * removal. Stepping and destination-based pose/velocity reads reuse scratch
  * values and create no per-body Java objects when contact copying is disabled.
  * Optional query, contact and joint resources are created only on first use.
+ * Worlds with at least 128 moving bodies lazily batch pose reads through two
+ * native calls, using 44 native bytes and one Java reference per moving body.
+ * Membership changes rebuild these buffers before their next use; clearing
+ * releases them. Fully sleeping worlds keep interpolation endpoints current
+ * without rereading unchanged poses after the final transition to sleep.
  * Point/bounds queries allocate no steady Java objects. Jolt JNI 6.0.0 requires
  * temporary ray/result owners for rays and borrowed wrappers/normal vectors for
  * native contacts, whose Java allocation may be eliminated by the JVM. The
@@ -129,6 +136,8 @@ public final class PhysicsWorld2D implements AutoCloseable {
     private final JoltPhysicsObject[] resources = new JoltPhysicsObject[6]; // Native owners in construction order for reverse disposal.
     private int resourceCount; // Number of native resources successfully registered for cleanup.
     private int bodyCount; // Occupied prefix length of the dense body array.
+    private int movingBodyCount; // Live nonstatic bodies eligible for batch pose reads.
+    private PhysicsPoses2D poses; // Lazily owned pose buffers; null for small or wholly static worlds.
     private final float fixedTimeStep; // Seconds simulated by each native update.
     private final int maxSubSteps; // Maximum native steps performed for one frame update.
     private final int collisionSteps; // Native collision subdivisions per fixed step.
@@ -147,6 +156,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
     private boolean closed; // Whether the world has relinquished its native resources.
     private boolean failed; // Whether an incomplete native step prohibits further simulation.
     private boolean advancing; // Whether a simulation entry point is active, including callback delivery.
+    private boolean capturePreviousActivity; // Whether the next capture must retain the final pose of newly sleeping bodies.
 
     /**
      * Constructs a world using default timing, capacities, and Y-up gravity.
@@ -406,6 +416,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
                             ? EMotionQuality.LinearCast : EMotionQuality.Discrete);
             if (settings.motion == MotionType2D.DYNAMIC) {
                 nativeSettings.setOverrideMassProperties(EOverrideMassProperties.CalculateInertia);
+                nativeSettings.setInertiaMultiplier(settings.shape.getInertiaMultiplier());
                 nativeSettings.getMassPropertiesOverride()
                         .setMass(settings.mass);
             }
@@ -421,6 +432,9 @@ public final class PhysicsWorld2D implements AutoCloseable {
         }
         handles[bodyCount++] = body;
         nativeHandles[id & BODY_INDEX_MASK] = body;
+        capturePreviousActivity = true;
+        if (settings.motion != MotionType2D.STATIC) movingBodyCount++;
+        if (poses != null) poses.invalidate();
         return body;
     }
 
@@ -665,6 +679,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
         bodies.removeBody(body.id);
         bodies.destroyBody(body.id);
         int last = --bodyCount;
+        if (body.getMotionType() != MotionType2D.STATIC) movingBodyCount--;
         if (body.index != last) {
             RigidBody2D moved = handles[last];
             handles[body.index] = moved;
@@ -673,6 +688,14 @@ public final class PhysicsWorld2D implements AutoCloseable {
         handles[last] = null;
         nativeHandles[body.id & BODY_INDEX_MASK] = null;
         body.destroyed = true;
+        if (poses != null) {
+            if (movingBodyCount < PhysicsPoses2D.MIN_BODIES) {
+                poses.close();
+                poses = null;
+            } else {
+                poses.invalidate();
+            }
+        }
     }
 
     /**
@@ -685,7 +708,12 @@ public final class PhysicsWorld2D implements AutoCloseable {
     public void clear() {
         check();
         if (advancing) throw new IllegalStateException("Cannot clear the world while stepping or delivering callbacks");
+        if (joints != null) joints.close();
         while (bodyCount != 0) destroyBody(handles[bodyCount - 1]);
+        if (poses != null) {
+            poses.close();
+            poses = null;
+        }
         accumulator = 0;
     }
 
@@ -754,12 +782,19 @@ public final class PhysicsWorld2D implements AutoCloseable {
      * update is never retried because Jolt may have partially advanced bodies.
      */
     private void simulate() {
-        for (int i = 0; i < bodyCount; i++) handles[i].remember();
         if (contacts != null) contacts.beginStep();
         try {
             int errors = system.update(fixedTimeStep, collisionSteps, allocator, jobs);
             if (contacts != null) contacts.checkCapture();
-            for (int i = 0; i < bodyCount; i++) handles[i].capture();
+            boolean active = movingBodyCount != 0 && system.getNumActiveBodies(EBodyType.RigidBody) != 0;
+            boolean capture = active || capturePreviousActivity;
+            if (capture && movingBodyCount >= PhysicsPoses2D.MIN_BODIES) {
+                if (poses == null) poses = new PhysicsPoses2D((BatchBodyInterface) bodies);
+                poses.capture(handles, bodyCount, movingBodyCount);
+            } else if (movingBodyCount != 0) {
+                for (int i = 0; i < bodyCount; i++) handles[i].captureStep(capture);
+            }
+            capturePreviousActivity = active;
             if (errors != 0)
                 throw new IllegalStateException("Jolt simulation capacity exhausted (error flags " + errors + ")");
         } catch (RuntimeException | Error failure) {
@@ -815,11 +850,20 @@ public final class PhysicsWorld2D implements AutoCloseable {
      */
     private void releaseResources() {
         Throwable failure = null;
+        if (poses != null) {
+            try {
+                poses.close();
+            } catch (RuntimeException | Error cleanupFailure) {
+                failure = cleanupFailure;
+            }
+            poses = null;
+        }
         if (joints != null) {
             try {
                 joints.close();
             } catch (RuntimeException | Error cleanupFailure) {
-                failure = cleanupFailure;
+                if (failure == null) failure = cleanupFailure;
+                else failure.addSuppressed(cleanupFailure);
             }
             joints = null;
         }
