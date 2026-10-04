@@ -19,6 +19,9 @@ import static org.lwjgl.opengl.GL43.*;
 public final class PlatformTools {
     private PlatformTools() {}
 
+    /**
+     * Release value used by PlatformTools.
+     */
     public static final int RELEASE = 0, PRESS = 1, REPEAT = 2;
 
     public static void viewport(int x, int y, int width, int height) {glViewport(x, y, width, height);}

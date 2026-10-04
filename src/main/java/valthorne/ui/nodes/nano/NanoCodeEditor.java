@@ -30,15 +30,29 @@ import static org.lwjgl.nanovg.NanoVG.*;
  */
 public class NanoCodeEditor extends NanoPanel {
 
-    /** Main foreground used when no syntax highlighter is installed. */
+    /**
+     * Main foreground used when no syntax highlighter is installed.
+     */
     public static final StyleKey<Color> TEXT_COLOR_KEY = StyleKey.of("nano.codeEditor.textColor", Color.class, new Color(0xFFE5E5E5));
-    /** Line-number foreground. */
+    /**
+     * Line-number foreground.
+     */
     public static final StyleKey<Color> GUTTER_COLOR_KEY = StyleKey.of("nano.codeEditor.gutterColor", Color.class, new Color(0xFF858585));
-    /** Editable text selection background. */
+    /**
+     * Editable text selection background.
+     */
     public static final StyleKey<Color> SELECTION_COLOR_KEY = StyleKey.of("nano.codeEditor.selectionColor", Color.class, new Color(0xFF747474));
-    /** Insertion caret foreground. */
+    /**
+     * Insertion caret foreground.
+     */
     public static final StyleKey<Color> CARET_COLOR_KEY = StyleKey.of("nano.codeEditor.caretColor", Color.class, Color.WHITE);
+    /**
+     * Line height value used by NanoCodeEditor.
+     */
     private static final int LINE_HEIGHT = 20;
+    /**
+     * Font size value used by NanoCodeEditor.
+     */
     private static final float FONT_SIZE = 14, TEXT_X = 64;
     private final TextEditModel model = new TextEditModel().multiline(true);
     private final NanoPopupMenu contextMenu = new NanoPopupMenu(); // Standard text commands for a secondary click.

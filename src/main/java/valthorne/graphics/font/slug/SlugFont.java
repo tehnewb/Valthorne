@@ -71,28 +71,28 @@ import static org.lwjgl.stb.STBTruetype.*;
  */
 public final class SlugFont implements Dimensional {
 
-    /*
+    /**
      * Fixed data-texture row width. Shader address packing and CPU row shifts assume 4096.
      */
     static final int TEXTURE_WIDTH = 4096;
 
-    /*
+    /**
      * Band-count cap read once from valthorne.slug.maxBands; defaults to 48.
      */
     private static final int MAX_BANDS_PER_AXIS = Integer.getInteger("valthorne.slug.maxBands", 48);
-    /*
+    /**
      * Em-span band density read once from valthorne.slug.bandsPerEm; defaults to 40.
      */
     private static final float BANDS_PER_EM = Float.parseFloat(System.getProperty("valthorne.slug.bandsPerEm", "40"));
-    /*
+    /**
      * Squared em-space endpoint threshold below which curve segments are omitted.
      */
     private static final float MIN_CURVE_LENGTH_SQUARED = Float.parseFloat(System.getProperty("valthorne.slug.minCurveLengthSquared", "0.00000025"));
-    /*
+    /**
      * Squared em-space flatness threshold used to simplify quadratic and cubic outlines.
      */
     private static final float QUADRATIC_FLATNESS_SQUARED = Float.parseFloat(System.getProperty("valthorne.slug.quadraticFlatnessSquared", "0.00000009"));
-    /*
+    /**
      * Em-space expansion on each band edge to retain near-boundary curves.
      */
     private static final float BAND_EPSILON = 0.00005f;

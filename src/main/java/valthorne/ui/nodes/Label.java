@@ -70,27 +70,27 @@ import valthorne.ui.theme.UITokens;
  */
 public class Label extends UINode {
 
-    /*
+    /**
      * Shared Slug outline font used by regular UI text controls.
      */
     public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
 
-    /*
+    /**
      * Logical em size shared with the theme's density-scaled font-size token.
      */
     public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
 
-    /*
+    /**
      * Empty retained layout shared by labels with no drawable text.
      */
     private static final SlugTextRun[] EMPTY_LINES = new SlugTextRun[0];
 
-    /*
+    /**
      * Style key used to resolve the text color used for rendering the label.
      */
     public static final StyleKey<Color> COLOR_KEY = StyleKey.of("color", Color.class);
 
-    /*
+    /**
      * Style key used to resolve the alignment for horizontal label coordination
      */
     public static final StyleKey<Alignment> ALIGNMENT_KEY = StyleKey.of("alignment", Alignment.class, Alignment.START);

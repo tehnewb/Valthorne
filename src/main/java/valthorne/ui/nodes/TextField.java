@@ -124,67 +124,67 @@ import valthorne.ui.behavior.TextEditing;
  */
 public class TextField extends Panel {
 
-    /*
+    /**
      * Style key used to resolve the normal background drawable.
      */
     public static final StyleKey<Drawable> BACKGROUND_KEY = StyleKey.of("background", Drawable.class);
 
-    /*
+    /**
      * Style key used to resolve the hovered background drawable.
      */
     public static final StyleKey<Drawable> HOVER_BACKGROUND_KEY = StyleKey.of("hoverBackground", Drawable.class);
 
-    /*
+    /**
      * Style key used to resolve the focused background drawable.
      */
     public static final StyleKey<Drawable> FOCUSED_BACKGROUND_KEY = StyleKey.of("focusedBackground", Drawable.class);
 
-    /*
+    /**
      * Style key used to resolve the text field font.
      */
     public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
 
-    /*
+    /**
      * Em scale shared by all regular UI text controls through the semantic size token.
      */
     public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
 
-    /*
+    /**
      * Style key used to resolve the normal text color.
      */
     public static final StyleKey<Color> COLOR_KEY = StyleKey.of("color", Color.class);
 
-    /*
+    /**
      * Style key used to resolve the placeholder text color.
      */
     public static final StyleKey<Color> PLACEHOLDER_COLOR_KEY = StyleKey.of("placeholderColor", Color.class);
 
-    /*
+    /**
      * Style key used to resolve the caret color.
      */
     public static final StyleKey<Color> CARET_COLOR_KEY = StyleKey.of("caretColor", Color.class);
 
-    /*
+    /**
      * Style key used to resolve the selection highlight color.
      */
     public static final StyleKey<Color> SELECTION_COLOR_KEY = StyleKey.of("selectionColor", Color.class);
 
-    /*
+    /**
      * Style key used to resolve horizontal text padding.
      */
     public static final StyleKey<Float> PADDING_KEY = StyleKey.of("padding", Float.class, 10f);
 
-    /*
+    /**
      * Style key used to resolve caret width.
      */
     public static final StyleKey<Float> CARET_WIDTH_KEY = StyleKey.of("caretWidth", Float.class, 2f);
 
-    /*
+    /**
      * Style key used to resolve vertical caret padding.
      */
     public static final StyleKey<Float> CARET_PADDING_Y_KEY = StyleKey.of("caretPaddingY", Float.class, 8f);
 
-    /*
+    /**
      * Style key used to resolve a small scissor expansion value.
      */
     public static final StyleKey<Float> SCISSOR_FUDGE_KEY = StyleKey.of("scissorFudge", Float.class, 4f);
@@ -194,7 +194,7 @@ public class TextField extends Panel {
      */
     public static final StyleKey<NodeAction<TextField>> ACTION_KEY = StyleKey.of("action", (Class<NodeAction<TextField>>) (Class<?>) NodeAction.class);
 
-    /*
+    /**
      * Style key used to resolve the default selection color when no explicit selection color exists.
      */
     public static final StyleKey<Color> DEFAULT_SELECTION_COLOR_KEY = StyleKey.of("defaultSelectionColor", Color.class, new Color(1f, 1f, 1f, 0.35f));

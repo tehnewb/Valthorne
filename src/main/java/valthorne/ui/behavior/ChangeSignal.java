@@ -29,7 +29,7 @@ import java.util.Objects;
  * @author Albert Beaupre
  */
 public final class ChangeSignal {
-    /*
+    /**
      * Shared empty registration snapshot, reused initially and when the final
      * listener is removed. Published registration arrays are never modified.
      */

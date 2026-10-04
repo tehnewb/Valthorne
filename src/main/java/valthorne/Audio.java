@@ -124,15 +124,15 @@ public final class Audio {
     /**
      * Dedicated thread owning OpenAL operations; volatile visibility supports dispatch checks.
      */
-    private static volatile Thread audioThread; // Dedicated thread that owns OpenAL and processes audio work
+    private static volatile Thread audioThread;
     /**
      * Native OpenAL device handle, or NULL when no device is retained.
      */
-    private static volatile long device; // Native OpenAL device handle
+    private static volatile long device;
     /**
      * Native OpenAL context handle, or NULL when no context is retained.
      */
-    private static volatile long context; // Native OpenAL context handle
+    private static volatile long context;
 
     /**
      * Immutable logical listener coordinates used by ambient sound areas.

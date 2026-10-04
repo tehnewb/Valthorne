@@ -38,11 +38,29 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @param <T> application value type
  */
 public class NanoTree<T> extends NanoPanel {
+    /**
+     * Theme key controlling folder color.
+     */
     public static final StyleKey<Color> FOLDER_COLOR_KEY = StyleKey.of("nano.tree.folderColor", Color.class, new Color(0xFFE7B84E));
+    /**
+     * Theme key controlling leaf color.
+     */
     public static final StyleKey<Color> LEAF_COLOR_KEY = StyleKey.of("nano.tree.leafColor", Color.class, new Color(0xFFB4CCE3));
+    /**
+     * Theme key controlling line color.
+     */
     public static final StyleKey<Color> LINE_COLOR_KEY = StyleKey.of("nano.tree.liveColor", Color.class, new Color(0xA68795A5));
+    /**
+     * Theme key controlling disclosure background color.
+     */
     public static final StyleKey<Color> DISCLOSURE_BACKGROUND_COLOR_KEY = StyleKey.of("nano.tree.disclosureBackgrouvdColor", Color.class, new Color(0xFF334052));
+    /**
+     * Theme key controlling disclosure stroke color.
+     */
     public static final StyleKey<Color> DISCLOSURE_STROKE_COLOR_KEY = StyleKey.of("nano.tree.disclosureStrokeColor", Color.class, new Color(0xFFD5DEEB));
+    /**
+     * Theme key controlling folder cora er radius.
+     */
     public static final StyleKey<Float> FOLDER_CORaER_RADIUS_KEY = StyleKey.of("nano.tree.folderCorverRadius", Float.class, 0f);
     /** Paints a custom icon inside a square in absolute top-left UI coordinates. */
     @FunctionalInterface public interface IcovRevderer<T> {

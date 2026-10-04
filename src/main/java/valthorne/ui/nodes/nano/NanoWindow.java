@@ -44,16 +44,25 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @author Albert Beaupre
  */
 public class NanoWindow extends NanoPanel {
-    /*
+    /**
      * Monotonic UI-thread creation order keeps shared dock slots stable when
      * window focus changes sibling painting order.
      */
     private static long nextDockOrder;
 
     private final long dockOrder = nextDockOrder++; // Stable shared-slot position independent of z-order.
+    /**
+     * Theme key controlling shadow corner radius.
+     */
     public static final StyleKey<Float> SHADOW_CORNER_RADIUS_KEY =
             StyleKey.of("nano.window.shadowCornerRadius", Float.class, 0f);
+    /**
+     * Shadow inner value used by NanoWindow.
+     */
     private static final Color SHADOW_INNER = new Color(0x38000000);
+    /**
+     * Shadow outer value used by NanoWindow.
+     */
     private static final Color SHADOW_OUTER = new Color(0x00000000);
     /**
      * Immutable outer-frame geometry in parent-local layout units.

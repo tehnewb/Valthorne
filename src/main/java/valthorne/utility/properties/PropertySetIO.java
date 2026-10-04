@@ -49,36 +49,126 @@ import java.nio.charset.StandardCharsets;
  */
 public final class PropertySetIO {
 
-    private static final int MAGIC = 0x56505250; // "VPRP"
+    /**
+     * "VPRP"
+     */
+    private static final int MAGIC = 0x56505250;
+    /**
+     * Binary property format version written and accepted by this codec.
+     */
     private static final short VERSION = 1;
+    /**
+     * Maximum property entries accepted when decoding untrusted input.
+     */
     private static final int MAX_ENTRIES = 1_000_000;
+    /**
+     * Maximum encoded text length accepted before allocating a buffer.
+     */
     private static final int MAX_TEXT_BYTES = 64 * 1024 * 1024;
 
+    /**
+     * Binary type tag identifying string property values.
+     */
     private static final byte STRING = 1;
+    /**
+     * Binary type tag identifying byte property values.
+     */
     private static final byte BYTE = 2;
+    /**
+     * Binary type tag identifying short property values.
+     */
     private static final byte SHORT = 3;
+    /**
+     * Binary type tag identifying integer property values.
+     */
     private static final byte INTEGER = 4;
+    /**
+     * Binary type tag identifying long property values.
+     */
     private static final byte LONG = 5;
+    /**
+     * Binary type tag identifying float property values.
+     */
     private static final byte FLOAT = 6;
+    /**
+     * Binary type tag identifying double property values.
+     */
     private static final byte DOUBLE = 7;
+    /**
+     * Binary type tag identifying boolean property values.
+     */
     private static final byte BOOLEAN = 8;
+    /**
+     * Binary type tag identifying character property values.
+     */
     private static final byte CHARACTER = 9;
+    /**
+     * Binary type tag identifying big integer property values.
+     */
     private static final byte BIG_INTEGER = 10;
+    /**
+     * Binary type tag identifying big decimal property values.
+     */
     private static final byte BIG_DECIMAL = 11;
+    /**
+     * Binary type tag identifying uuid value property values.
+     */
     private static final byte UUID_VALUE = 12;
+    /**
+     * Binary type tag identifying path value property values.
+     */
     private static final byte PATH_VALUE = 13;
+    /**
+     * Binary type tag identifying uri value property values.
+     */
     private static final byte URI_VALUE = 14;
+    /**
+     * Binary type tag identifying url value property values.
+     */
     private static final byte URL_VALUE = 15;
+    /**
+     * Binary type tag identifying duration property values.
+     */
     private static final byte DURATION = 16;
+    /**
+     * Binary type tag identifying period property values.
+     */
     private static final byte PERIOD = 17;
+    /**
+     * Binary type tag identifying instant property values.
+     */
     private static final byte INSTANT = 18;
+    /**
+     * Binary type tag identifying local date property values.
+     */
     private static final byte LOCAL_DATE = 19;
+    /**
+     * Binary type tag identifying local time property values.
+     */
     private static final byte LOCAL_TIME = 20;
+    /**
+     * Binary type tag identifying local date time property values.
+     */
     private static final byte LOCAL_DATE_TIME = 21;
+    /**
+     * Binary type tag identifying offset date time property values.
+     */
     private static final byte OFFSET_DATE_TIME = 22;
+    /**
+     * Binary type tag identifying zoned date time property values.
+     */
     private static final byte ZONED_DATE_TIME = 23;
+    /**
+     * Binary type tag identifying locale property values.
+     */
     private static final byte LOCALE = 24;
+    /**
+     * Binary type tag identifying currency property values.
+     */
     private static final byte CURRENCY = 25;
+    /**
+     * Binary type tag identifying charset property values.
+     */
     private static final byte CHARSET = 26;
 
     private PropertySetIO() {

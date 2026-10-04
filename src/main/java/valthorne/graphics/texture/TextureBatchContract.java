@@ -65,7 +65,7 @@ import java.util.regex.Matcher;
  */
 public final class TextureBatchContract {
 
-    /*
+    /**
      * Byte stride of packed glyph metadata followed by a world clip rectangle and flag.
      */
     public static final int GLYPH_STRIDE_BYTES = 84;

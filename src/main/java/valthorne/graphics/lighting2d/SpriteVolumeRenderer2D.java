@@ -23,11 +23,11 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
     private final int vbo; // Owned streaming vertex buffer.
     private final FloatBuffer vertices = BufferUtils.createFloatBuffer(24); // Reusable world/UV/card quad staging.
     private boolean closed; // Whether the owned GL resources were released.
-    /*
+    /**
      * Cached position/radius uniform names for the five supported light slots.
      */
     private static final String[] LIGHT_NAMES = {"u_lights[0]", "u_lights[1]", "u_lights[2]", "u_lights[3]", "u_lights[4]"};
-    /*
+    /**
      * Cached intensity uniform names paired with the position/radius slots.
      */
     private static final String[] ENERGY_NAMES = {"u_energy[0]", "u_energy[1]", "u_energy[2]", "u_energy[3]", "u_energy[4]"};

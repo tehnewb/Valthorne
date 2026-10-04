@@ -86,22 +86,22 @@ import valthorne.graphics.Color;
  */
 public class ProgressBar extends Panel {
 
-    /*
+    /**
      * Style key used to resolve the background drawable for the full progress bar area.
      */
     public static final StyleKey<Drawable> BACKGROUND_KEY = StyleKey.of("background", Drawable.class);
 
-    /*
+    /**
      * Style key used to resolve the foreground drawable for the filled portion of the bar.
      */
     public static final StyleKey<Drawable> FOREGROUND_KEY = StyleKey.of("foreground", Drawable.class);
 
-    /*
+    /**
      * Style key used to resolve the font used for percentage text rendering.
      */
     public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
 
-    /*
+    /**
      * Em scale shared by all regular UI text controls through the semantic size token.
      */
     public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;

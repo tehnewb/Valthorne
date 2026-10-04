@@ -17,6 +17,9 @@ import java.util.Objects;
  */
 public record PropertyTextOptions(List<String> headers, Map<String, String> comments) {
 
+    /**
+     * None value used by PropertyTextOptions.
+     */
     private static final PropertyTextOptions NONE = new PropertyTextOptions(List.of(), Map.of());
 
     /**

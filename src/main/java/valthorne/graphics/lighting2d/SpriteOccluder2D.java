@@ -16,6 +16,9 @@ import java.util.Objects;
  * Sprite drawing with explicit per-call transform overrides is not observed.
  */
 public final class SpriteOccluder2D extends AlphaOccluder2D {
+    /**
+     * Empty value used by SpriteOccluder2D.
+     */
     private static final AlphaShadowShape2D EMPTY = AlphaShadowShape2D.fromMask(new boolean[1], 1, 1);
     private final Sprite sprite;
     private final int cutoff, capacity;

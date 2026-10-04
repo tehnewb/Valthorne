@@ -31,12 +31,12 @@ import static org.lwjgl.nanovg.NanoVG.*;
  */
 public class NanoButton extends NanoContainer {
 
-    /*
+    /**
      * Optional gradient for the button background.
      */
     public static final StyleKey<UIGradient> BACKGROUND_GRADIENT_KEY = StyleKey.of("nano.button.backgroundGradient", UIGradient.class, null);
 
-    /*
+    /**
      * Optional gradient for the button border.
      */
     public static final StyleKey<UIGradient> BORDER_GRADIENT_KEY = StyleKey.of("nano.button.borderGradient", UIGradient.class, null);

@@ -53,7 +53,7 @@ import valthorne.graphics.GraphicsCapabilities;
  */
 public final class Window {
 
-    /*
+    /**
      * Optional render-thread clear-color policy, borrowed until restored or window shutdown.
      */
     private static UnaryOperator<Color> clearColorFilter;
@@ -81,7 +81,7 @@ public final class Window {
      */
     private static GLFWWindowCloseCallback closeCallback;
 
-    /*
+    /**
      * Owned native path-drop callback, released with the window.
      */
     private static GLFWDropCallback dropCallback;
@@ -102,6 +102,9 @@ public final class Window {
      * Owned GLFW window handle, or zero when no window is registered.
      */
     private static long address;
+    /**
+     * Shared graphics capabilities state retained by Window.
+     */
     private static GraphicsCapabilities graphicsCapabilities;
 
     /** @return actual capabilities of the initialized window, not the requested version */

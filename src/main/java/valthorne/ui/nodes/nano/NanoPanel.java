@@ -19,11 +19,11 @@ import static org.lwjgl.nanovg.NanoVG.*;
  */
 public class NanoPanel extends NanoContainer {
 
-    /*
+    /**
      * Optional gradient for the panel surface. A resolved theme may supply it.
      */
     public static final StyleKey<UIGradient> BACKGROUND_GRADIENT_KEY = StyleKey.of("nano.panel.backgroundGradient", UIGradient.class, null);
-    /*
+    /**
      * Optional gradient for the panel outline. A resolved theme may supply it.
      */
     public static final StyleKey<UIGradient> BORDER_GRADIENT_KEY = StyleKey.of("nano.panel.borderGradient", UIGradient.class, null);

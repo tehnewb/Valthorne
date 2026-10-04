@@ -42,7 +42,7 @@ import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
  */
 public class JGL {
 
-    /*
+    /**
      * Application callbacks used by the running loop; replaced only on its thread.
      */
     private static Application frameApplication;

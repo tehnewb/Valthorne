@@ -58,12 +58,12 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     public static final StyleKey<Float> LINE_SPACING_KEY = StyleKey.of("nano.label.lineSpacing", Float.class, 0f);
 
-    /*
+    /**
      * Optional theme override for horizontal alignment of each text line.
      */
     public static final StyleKey<Alignment> HORIZONTAL_ALIGNMENT_KEY = StyleKey.of("nano.label.horizontalAlignment", Alignment.class);
 
-    /*
+    /**
      * Optional theme override for vertical alignment of the complete text block.
      */
     public static final StyleKey<Alignment> VERTICAL_ALIGNMENT_KEY = StyleKey.of("nano.label.verticalAlignment", Alignment.class);
@@ -83,6 +83,9 @@ public class NanoLabel extends UINode implements NanoNode {
     private long lastPressTime;
     private float lastPressX, lastPressY;
     private int clickCount;
+    /**
+     * Selection color value used by NanoLabel.
+     */
     private static final Color SELECTION_COLOR = new Color(0x995298CE);
 
     /** Opts into read-only pointer selection and Ctrl/Cmd+C. Disabled by default. */

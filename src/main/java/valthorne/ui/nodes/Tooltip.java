@@ -65,22 +65,22 @@ import valthorne.ui.theme.UITokens;
  */
 public class Tooltip extends UINode {
 
-    /*
+    /**
      * Style key used to resolve the tooltip font.
      */
     public static final StyleKey<SlugFont> FONT_STYLE_KEY = StyleKey.of("font", SlugFont.class);
 
-    /*
+    /**
      * Em scale shared by all regular UI text controls through the semantic size token.
      */
     public static final StyleKey<Float> FONT_SIZE_KEY = UITokens.FONT_SIZE;
 
-    /*
+    /**
      * Style key used to resolve the tooltip background drawable.
      */
     public static final StyleKey<Drawable> BACKGROUND_STYLE_KEY = StyleKey.of("background", Drawable.class);
 
-    /*
+    /**
      * Style key used to resolve tooltip padding, defaulting to {@code 6f}.
      */
     public static final StyleKey<Float> PADDING_STYLE_KEY = StyleKey.of("padding", Float.class, 6f);

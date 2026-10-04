@@ -271,7 +271,7 @@ public final class Mouse {
     /**
      * Native GLFW cursor handle currently assigned to the window.
      */
-    private static long currentCursor = 0; // Native GLFW cursor handle currently assigned to the window
+    private static long currentCursor = 0;
 
     /**
      * Application-selected standard shape, or zero when a custom image cursor is selected.

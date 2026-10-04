@@ -104,7 +104,7 @@ public final class EventTypes {
      */
     public static final EventType<ThemeDataChangeEvent> THEME_DATA_CHANGE = new EventType<>(10, "theme-data-change");
 
-    /*
+    /**
      * Number of slots needed for built-in route IDs zero through thirteen. This
      * exclusive upper bound must be updated when a new built-in ID is added.
      */
@@ -122,7 +122,7 @@ public final class EventTypes {
      */
     public static final EventType<TextInputEvent> TEXT_INPUT = new EventType<>(12, "text-input");
 
-    /*
+    /**
      * Desktop path drops with owned filenames and window-relative coordinates.
      */
     public static final EventType<FileDropEvent> FILE_DROP = new EventType<>(13, "file-drop");

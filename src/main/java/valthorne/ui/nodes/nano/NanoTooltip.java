@@ -13,11 +13,29 @@ import static org.lwjgl.nanovg.NanoVG.*;
 
 /** NanoVG-rendered tooltip compatible with {@link valthorne.ui.UINode#setTooltip(Tooltip)}. */
 public class NanoTooltip extends Tooltip implements NanoNode {
+    /**
+     * Theme key controlling background color.
+     */
     public static final StyleKey<Color> BACKGROUND_COLOR_KEY = StyleKey.of("nano.tooltip.backgroundColor", Color.class, new Color(0xEE202124));
+    /**
+     * Theme key controlling border color.
+     */
     public static final StyleKey<Color> BORDER_COLOR_KEY = StyleKey.of("nano.tooltip.borderColor", Color.class, new Color(0xFF55575C));
+    /**
+     * Theme key controlling text color.
+     */
     public static final StyleKey<Color> TEXT_COLOR_KEY = StyleKey.of("nano.tooltip.textColor", Color.class, new Color(0xFFF1F3F4));
+    /**
+     * Theme key controlling padding.
+     */
     public static final StyleKey<Float> PADDING_KEY = StyleKey.of("nano.tooltip.padding", Float.class, 6f);
+    /**
+     * Theme key controlling font size.
+     */
     public static final StyleKey<Float> FONT_SIZE_KEY = StyleKey.of("nano.tooltip.fontSize", Float.class, 14f);
+    /**
+     * Theme key controlling corner radius.
+     */
     public static final StyleKey<Float> CORNER_RADIUS_KEY = StyleKey.of("nano.tooltip.cornerRadius", Float.class, 0f);
 
     private Color background = new Color(0xEE202124), border = new Color(0xFF55575C), foreground = new Color(0xFFF1F3F4);

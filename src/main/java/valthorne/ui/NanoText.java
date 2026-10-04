@@ -15,15 +15,15 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * ownership stays with the theme, and controls retain their normal text input.
  */
 public final class NanoText {
-    /*
+    /**
      * Optional inherited curve font; absent tokens preserve NanoVG text.
      */
     public static final StyleKey<SlugFont> SLUG_FONT = StyleKey.of("nano.slugFont", SlugFont.class);
-    /*
+    /**
      * Optional monospace face for editable source and line-number glyphs.
      */
     public static final StyleKey<SlugFont> SLUG_CODE_FONT = StyleKey.of("nano.slugCodeFont", SlugFont.class);
-    /*
+    /**
      * Semibold face for window captions and inspector section headings.
      */
     public static final StyleKey<SlugFont> SLUG_HEADING_FONT = StyleKey.of("nano.slugHeadingFont", SlugFont.class);

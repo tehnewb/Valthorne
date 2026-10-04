@@ -42,19 +42,19 @@ import static org.lwjgl.opengl.GL33.*;
  * @author Albert Beaupre
  */
 public final class Lighting2D implements AutoCloseable {
-    /*
+    /**
      * Instanced light-quad vertex shader source.
      */
     private static final String LIGHT_VERTEX = ShaderSources.load("lighting2d/light.vert");
-    /*
+    /**
      * Attenuation and polar-shadow fragment shader source.
      */
     private static final String LIGHT_FRAGMENT = ShaderSources.load("lighting2d/light.frag");
-    /*
+    /**
      * Vertex-ID fullscreen triangle shader source.
      */
     private static final String FULLSCREEN = ShaderSources.load("lighting2d/fullscreen.vert");
-    /*
+    /**
      * Scene/light composition shader source with exposure.
      */
     private static final String COMPOSITE = ShaderSources.load("lighting2d/composite.frag");

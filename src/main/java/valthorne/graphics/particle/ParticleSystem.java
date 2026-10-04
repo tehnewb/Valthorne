@@ -88,64 +88,64 @@ public final class ParticleSystem {
     /**
      * Power-of-two angular lookup-table length covering one full revolution.
      */
-    private static final int TRIG_LUT_SIZE = 2048;                                           // Trig LUT size (power of two).
+    private static final int TRIG_LUT_SIZE = 2048;
     /**
      * Wrap mask for angular lookup indices.
      */
-    private static final int TRIG_LUT_MASK = TRIG_LUT_SIZE - 1;                               // Trig LUT index mask.
+    private static final int TRIG_LUT_MASK = TRIG_LUT_SIZE - 1;
     /**
      * Multiplier converting degrees to angular lookup-table indices.
      */
-    private static final float DEG_TO_LUT = TRIG_LUT_SIZE / 360.0f;                           // Degrees to LUT index scale.
+    private static final float DEG_TO_LUT = TRIG_LUT_SIZE / 360.0f;
 
     /**
      * Sine samples spanning a full revolution, initialized once at class loading.
      */
-    private static final float[] SIN_LUT = new float[TRIG_LUT_SIZE];                          // Precomputed sin values (0..TAU).
+    private static final float[] SIN_LUT = new float[TRIG_LUT_SIZE];
     /**
      * Cosine samples spanning a full revolution, initialized once at class loading.
      */
-    private static final float[] COS_LUT = new float[TRIG_LUT_SIZE];                          // Precomputed cos values (0..TAU).
+    private static final float[] COS_LUT = new float[TRIG_LUT_SIZE];
     /**
      * Interleaved particle width: position2, size1, aspect2, rotation1, color4.
      */
-    private static final int FLOATS_PER_PARTICLE = 10;                                       // Interleaved float count per particle vertex.
+    private static final int FLOATS_PER_PARTICLE = 10;
     /**
      * Byte width of each particle attribute float.
      */
-    private static final int BYTES_PER_FLOAT = 4;                                            // Bytes per float.
+    private static final int BYTES_PER_FLOAT = 4;
     /**
      * Byte stride between consecutive packed particle vertices.
      */
-    private static final int STRIDE_BYTES = FLOATS_PER_PARTICLE * BYTES_PER_FLOAT;           // VBO stride in bytes.
+    private static final int STRIDE_BYTES = FLOATS_PER_PARTICLE * BYTES_PER_FLOAT;
     /**
      * Attribute location for two-component particle position.
      */
-    private static final int ATTR_POS = 0;                                                   // Attribute index for a_pos.
+    private static final int ATTR_POS = 0;
     /**
      * Attribute location for scalar particle size.
      */
-    private static final int ATTR_SIZE = 1;                                                  // Attribute index for a_size.
+    private static final int ATTR_SIZE = 1;
     /**
      * Attribute location for two-component particle aspect.
      */
-    private static final int ATTR_ASPECT = 2;                                                // Attribute index for a_aspect.
+    private static final int ATTR_ASPECT = 2;
     /**
      * Attribute location for particle rotation.
      */
-    private static final int ATTR_ROT = 3;                                                   // Attribute index for a_rot.
+    private static final int ATTR_ROT = 3;
     /**
      * Attribute location for RGBA particle color.
      */
-    private static final int ATTR_COL = 4;                                                   // Attribute index for a_col.
+    private static final int ATTR_COL = 4;
     /**
      * Bundled particle vertex-stage GLSL loaded once at class initialization.
      */
-    private static final String VERT = ShaderSources.load("particle/particle.vert");                                                                              // Vertex shader source.
+    private static final String VERT = ShaderSources.load("particle/particle.vert");
     /**
      * Bundled particle fragment-stage GLSL loaded once at class initialization.
      */
-    private static final String FRAG = ShaderSources.load("particle/particle.frag");                                                                              // Fragment shader source.
+    private static final String FRAG = ShaderSources.load("particle/particle.frag");
 
     static {
         for (int i = 0; i < TRIG_LUT_SIZE; i++) {
