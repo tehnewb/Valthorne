@@ -12,7 +12,8 @@ import static org.lwjgl.openal.ALC10.alcGetCurrentContext;
  * Native regression checks for output switching with buffered and streamed silent
  * WAV players. Exercises available endpoints, default selection, failed reopen,
  * paused and playing states, retained context ownership and subsystem restart.
- * Run with verifyAudioDevices on a machine with a working playback endpoint.
+ * Run this entry point with the test runtime classpath on a machine with a working
+ * playback endpoint.
  */
 public final class AudioDeviceVerification {
 
