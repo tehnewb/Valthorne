@@ -388,9 +388,7 @@ public class Animation implements Drawable {
                 animationListener.onFrameChanged(this, from, currentIndex);
             }
 
-            AnimationFrame next = frames[currentIndex];
-            float nd = (next == null) ? 0f : Math.max(0f, next.duration());
-            if (nd > 0f) return;
+            if (bits.get(PAUSED) || bits.get(FINISHED)) return;
         }
     }
 
