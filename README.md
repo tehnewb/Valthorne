@@ -120,6 +120,12 @@ application {
         applicationDefaultJvmArgs = ['-XstartOnFirstThread']
     }
 }
+
+// Apply these runtime options to every JavaExec task, including Gradle's run task.
+tasks.withType(JavaExec).configureEach {
+    jvmArgs '--enable-native-access=ALL-UNNAMED', // Permit classpath libraries such as LWJGL to load and call native code.
+            '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED' // Allow dependencies to use JDK internal memory APIs; prevents access errors when those APIs are used.
+}
 ```
 
 ### Maven
