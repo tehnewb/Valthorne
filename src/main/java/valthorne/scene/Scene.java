@@ -99,7 +99,6 @@ public abstract class Scene {
     protected TextureBatch batch; // The shared texture batch used to render this scene.
     private boolean paused; // Whether this scene is currently paused.
 
-    private GameScreen screen; // Controller that can replace this scene after an editor rebuild.
     private SceneWindowResizeListener windowResizeListener; // The registered resize listener that forwards events into this scene.
     private SceneKeyListener keyListener; // The registered keyboard listener that forwards events into this scene.
     private SceneMouseListener mouseListener; // The registered mouse listener that forwards press, release, drag, and move events into this scene.
@@ -107,14 +106,6 @@ public abstract class Scene {
     private boolean initialized; // Whether the shared scene infrastructure has already been initialized.
     private boolean infrastructureDisposed; // Whether the shared scene infrastructure has already been disposed.
 
-    /**
-     * Constructs a new Scene instance controlled by the specified game screen.
-     *
-     * @param screen the game screen that will control this scene, or null if no controlling screen is assigned
-     */
-    public Scene(GameScreen screen) {
-        this.screen = screen;
-    }
 
     /**
      * Initializes the common runtime fields used by all scenes.
@@ -518,21 +509,4 @@ public abstract class Scene {
         return initialized;
     }
 
-    /**
-     * Returns the game screen controlling this scene, when one is assigned.
-     *
-     * @return owning screen or null
-     */
-    public final GameScreen getGameScreen() {
-        return screen;
-    }
-
-    /**
-     * Sets the current game screen to the specified screen.
-     *
-     * @param screen the GameScreen instance to be set as the current screen
-     */
-    public void setGameScreen(GameScreen screen) {
-        this.screen = screen;
-    }
 }
