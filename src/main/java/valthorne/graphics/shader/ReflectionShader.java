@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 import valthorne.graphics.Sprite;
 import valthorne.graphics.texture.Texture;
 import valthorne.math.MathUtils;
@@ -30,7 +32,7 @@ public class ReflectionShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged reflection effect shader resource.
      */
-    private static final String FRAG_SRC = ShaderSources.load("effects/reflection.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/reflection.frag");
 
     /**
      * Creates a reflection shader using built-in GLSL 120 sources.

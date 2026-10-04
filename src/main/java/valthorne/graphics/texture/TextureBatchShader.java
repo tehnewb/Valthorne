@@ -1,5 +1,7 @@
 package valthorne.graphics.texture;
 
+import valthorne.io.file.ValthorneFiles;
+
 import valthorne.graphics.shader.Shader;
 
 /**
@@ -55,7 +57,7 @@ import valthorne.graphics.shader.Shader;
  * <pre>{@code
  * TextureBatchShader shader = new TextureBatchShader(
  *     8,
- *     ShaderSources.load("examples/batch-tint.frag.glsl")
+ *     ValthorneFiles.readString("valthorne/shaders/examples/batch-tint.frag.glsl")
  * );
  *
  * TextureBatch batch = new TextureBatch(4096, 8);

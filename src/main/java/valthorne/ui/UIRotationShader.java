@@ -1,6 +1,6 @@
 package valthorne.ui;
 
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.TextureBatchShader;
 
 import static org.lwjgl.opengl.GL11.glGetInteger;
@@ -23,7 +23,7 @@ final class UIRotationShader extends TextureBatchShader {
      * limit. Requires the root's current OpenGL context.
      */
     UIRotationShader() {
-        super(Math.min(16, glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS)), ShaderSources.load("ui/rotation.vert"), null);
+        super(Math.min(16, glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS)), ValthorneFiles.readString("valthorne/shaders/ui/rotation.vert"), null);
     }
 
     /**

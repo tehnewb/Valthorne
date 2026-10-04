@@ -4,7 +4,7 @@ import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.OpenGLStateSnapshot;
 import valthorne.graphics.shader.Shader;
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.TextureBatch;
 
 import java.nio.FloatBuffer;
@@ -38,7 +38,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     public GroundShadowRenderer2D() {
         OpenGLStateSnapshot state = new OpenGLStateSnapshot();
         try {
-            shader = new Shader(ShaderSources.load("lighting2d/ground-shadow.vert"), ShaderSources.load("lighting2d/ground-shadow.frag"));
+            shader = new Shader(ValthorneFiles.readString("valthorne/shaders/lighting2d/ground-shadow.vert"), ValthorneFiles.readString("valthorne/shaders/lighting2d/ground-shadow.frag"));
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
             glBindVertexArray(vao);

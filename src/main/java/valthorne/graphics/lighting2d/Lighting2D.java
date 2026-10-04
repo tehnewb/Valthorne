@@ -4,7 +4,7 @@ import org.lwjgl.BufferUtils;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.shader.Shader;
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
@@ -45,19 +45,19 @@ public final class Lighting2D implements AutoCloseable {
     /**
      * Instanced light-quad vertex shader source.
      */
-    private static final String LIGHT_VERTEX = ShaderSources.load("lighting2d/light.vert");
+    private static final String LIGHT_VERTEX = ValthorneFiles.readString("valthorne/shaders/lighting2d/light.vert");
     /**
      * Attenuation and polar-shadow fragment shader source.
      */
-    private static final String LIGHT_FRAGMENT = ShaderSources.load("lighting2d/light.frag");
+    private static final String LIGHT_FRAGMENT = ValthorneFiles.readString("valthorne/shaders/lighting2d/light.frag");
     /**
      * Vertex-ID fullscreen triangle shader source.
      */
-    private static final String FULLSCREEN = ShaderSources.load("lighting2d/fullscreen.vert");
+    private static final String FULLSCREEN = ValthorneFiles.readString("valthorne/shaders/lighting2d/fullscreen.vert");
     /**
      * Scene/light composition shader source with exposure.
      */
-    private static final String COMPOSITE = ShaderSources.load("lighting2d/composite.frag");
+    private static final String COMPOSITE = ValthorneFiles.readString("valthorne/shaders/lighting2d/composite.frag");
     private final Thread owner = Thread.currentThread(); // Creating OpenGL thread required for guarded operations.
     private final int capacity; // Maximum registered light count.
     private final int resolution; // Angular shadow samples per atlas row.

@@ -4,7 +4,7 @@ import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.shader.Shader;
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.Texture;
 import valthorne.io.pool.Pool;
 import valthorne.math.MathUtils;
@@ -141,11 +141,11 @@ public final class ParticleSystem {
     /**
      * Bundled particle vertex-stage GLSL loaded once at class initialization.
      */
-    private static final String VERT = ShaderSources.load("particle/particle.vert");
+    private static final String VERT = ValthorneFiles.readString("valthorne/shaders/particle/particle.vert");
     /**
      * Bundled particle fragment-stage GLSL loaded once at class initialization.
      */
-    private static final String FRAG = ShaderSources.load("particle/particle.frag");
+    private static final String FRAG = ValthorneFiles.readString("valthorne/shaders/particle/particle.frag");
 
     static {
         for (int i = 0; i < TRIG_LUT_SIZE; i++) {

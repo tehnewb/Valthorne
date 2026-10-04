@@ -4,7 +4,7 @@ import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.OpenGLStateSnapshot;
 import valthorne.graphics.shader.Shader;
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.TextureBatch;
 
 import java.nio.FloatBuffer;
@@ -40,7 +40,7 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
     public SpriteVolumeRenderer2D() {
         OpenGLStateSnapshot state = new OpenGLStateSnapshot();
         try {
-            shader = new Shader(ShaderSources.load("lighting2d/sprite-volume.vert"), ShaderSources.load("lighting2d/sprite-volume.frag"));
+            shader = new Shader(ValthorneFiles.readString("valthorne/shaders/lighting2d/sprite-volume.vert"), ValthorneFiles.readString("valthorne/shaders/lighting2d/sprite-volume.frag"));
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
             glBindVertexArray(vao);

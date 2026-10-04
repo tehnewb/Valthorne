@@ -960,7 +960,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
         check();
         if (joints != null) joints.destroyAttached(body);
         if (contacts != null) contacts.retire(body);
-        bodies.removeBody(body.id);
+        if (body.simulationEnabled) bodies.removeBody(body.id);
         bodies.destroyBody(body.id);
         int last = --bodyCount;
         if (body.getMotionType() != MotionType2D.STATIC) movingBodyCount--;

@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 import valthorne.graphics.Sprite;
 
 /**
@@ -54,7 +56,7 @@ public class GlowShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged glow effect shader resource.
      */
-    private static final String FRAG_SRC = ShaderSources.load("effects/glow.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/glow.frag");
 
     /**
      * Creates a new {@code GlowShader} using the built-in GLSL sources.

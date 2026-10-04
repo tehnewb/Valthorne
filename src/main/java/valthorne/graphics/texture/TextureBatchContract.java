@@ -1,7 +1,7 @@
 package valthorne.graphics.texture;
 
 import valthorne.graphics.shader.Shader;
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 import java.util.regex.Matcher;
 
 /**
@@ -227,7 +227,7 @@ public final class TextureBatchContract {
      * @return the default vertex shader source code
      */
     public static String defaultVertexShader() {
-        return ShaderSources.load("texture/batch.vert");
+        return ValthorneFiles.readString("valthorne/shaders/texture/batch.vert");
     }
 
     /**
@@ -348,9 +348,9 @@ public final class TextureBatchContract {
      * @return fragment source with SAMPLERS and SELECTION tokens expanded
      */
     private static String buildFragment(String resource, String selection, int maxTextureUnits) {
-        String sampler = ShaderSources.load("texture/templates/sampler.glsl");
-        String first = ShaderSources.load("texture/templates/select-" + selection + "-first.glsl");
-        String next = ShaderSources.load("texture/templates/select-" + selection + "-next.glsl");
+        String sampler = ValthorneFiles.readString("valthorne/shaders/texture/templates/sampler.glsl");
+        String first = ValthorneFiles.readString("valthorne/shaders/texture/templates/select-" + selection + "-first.glsl");
+        String next = ValthorneFiles.readString("valthorne/shaders/texture/templates/select-" + selection + "-next.glsl");
         StringBuilder samplers = new StringBuilder();
         StringBuilder branches = new StringBuilder(first);
         for (int i = 0; i < maxTextureUnits; i++) {
@@ -358,7 +358,7 @@ public final class TextureBatchContract {
             samplers.append(replaceToken(sampler, "INDEX", index));
             if (i > 0) branches.append(replaceToken(next, "INDEX", index));
         }
-        return replaceToken(replaceToken(ShaderSources.load(resource), "SAMPLERS", samplers.toString()), "SELECTION", branches.toString());
+        return replaceToken(replaceToken(ValthorneFiles.readString("valthorne/shaders/" + resource), "SAMPLERS", samplers.toString()), "SELECTION", branches.toString());
     }
     /**
      * Substitutes a template token while tolerating whitespace inserted by GLSL

@@ -1,8 +1,8 @@
 # Shader resources
 
 All Valthorne shader source lives here and is included in the library JAR.
-Java code loads UTF-8 source with `ShaderSources.load("effects/blur.frag")`,
-using paths relative to `/valthorne/shaders/` on the classpath.
+Java code loads UTF-8 source with `ValthorneFiles.readString("valthorne/shaders/effects/blur.frag")`,
+using paths relative to the classpath root, including the `valthorne/shaders/` prefix.
 
 Names use lowercase words separated by hyphens. Complete stages use `.vert`
 (vertex), `.frag` (fragment), or `.comp` (compute). Shared snippets and templates

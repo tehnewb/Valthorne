@@ -53,6 +53,7 @@ public final class RigidBody2D implements AutoCloseable {
     final CollisionShape2D shape; // Immutable geometry used for exact planar point queries and soft contacts.
     final float inverseMass; // Construction inverse mass, used only while motion is dynamic.
     private Vector2f positionDestination; // Last caller-owned destination used by a fluent position read.
+    boolean simulationEnabled = true; // Whether this body participates in native contacts and integration.
     private boolean interpolatedPosition; // Whether the pending conversion reads the interpolated pose.
     private float x; // Current captured horizontal center in meters.
     private float y; // Current captured vertical center in meters.
@@ -597,6 +598,27 @@ public final class RigidBody2D implements AutoCloseable {
     public boolean isActive() {
         check();
         return world.bodies.isActive(id);
+    }
+
+    /**
+     * Reports whether the retained native body participates in simulation.
+     * @return false after destruction or while suspended
+     */
+    public boolean isSimulationEnabled() {return !destroyed && simulationEnabled;}
+
+    /**
+     * Suspends integration and contacts without destroying the body or its velocity.
+     * Resuming wakes moving bodies; static bodies remain inactive.
+     * @param enabled requested simulation participation
+     * @return this body
+     */
+    public RigidBody2D setSimulationEnabled(boolean enabled) {
+        check();
+        if (simulationEnabled == enabled) return this;
+        if (enabled) world.bodies.addBody(id, motion == MotionType2D.STATIC ? EActivation.DontActivate : EActivation.Activate);
+        else world.bodies.removeBody(id);
+        simulationEnabled = enabled;
+        return this;
     }
 
     /**

@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 /**
  * Shared shader base for textured quad rendering with explicit attributes and uniforms.
  *
@@ -37,12 +39,12 @@ public class TexturedQuadShader extends Shader {
     /**
      * Bundled default quad vertex GLSL, loaded once.
      */
-    private static final String DEFAULT_VERTEX_SOURCE = ShaderSources.load("core/textured-quad.vert");
+    private static final String DEFAULT_VERTEX_SOURCE = ValthorneFiles.readString("valthorne/shaders/core/textured-quad.vert");
 
     /**
      * Bundled default texture-times-color fragment GLSL, loaded once.
      */
-    private static final String DEFAULT_FRAGMENT_SOURCE = ShaderSources.load("core/textured-quad.frag");
+    private static final String DEFAULT_FRAGMENT_SOURCE = ValthorneFiles.readString("valthorne/shaders/core/textured-quad.frag");
 
     /**
      * Compiles the default bundled textured-quad vertex and fragment stages.
