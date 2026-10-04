@@ -235,7 +235,7 @@ public final class LdtkMap {
         float pivotY = originY + nativeHeight * this.scaleY * .5f;
         float textureWidth = texture.getWidth();
         float textureHeight = texture.getHeight();
-        batch.drawUV(texture, x, y, cropWidth * scaleX * this.scaleX, cropHeight * scaleY * this.scaleY, bg.cropX() / textureWidth, bg.cropY() / textureHeight, (bg.cropX() + cropWidth) / textureWidth, (bg.cropY() + cropHeight) / textureHeight, rotation == 0 ? 0 : pivotX - x, rotation == 0 ? 0 : pivotY - y, rotationSine, rotationCosine, null);
+        batch.drawUV(texture, x, y, cropWidth * scaleX * this.scaleX, cropHeight * scaleY * this.scaleY, bg.cropX() / textureWidth, (textureHeight - bg.cropY() - cropHeight) / textureHeight, (bg.cropX() + cropWidth) / textureWidth, (textureHeight - bg.cropY()) / textureHeight, rotation == 0 ? 0 : pivotX - x, rotation == 0 ? 0 : pivotY - y, rotationSine, rotationCosine, null);
     }
 
     /**
@@ -272,7 +272,9 @@ public final class LdtkMap {
     }
 
     /**
-     * Emits tile placements under the prepared map orientation.
+     * Emits tile placements under the prepared map orientation. Source rows are
+     * converted from editor top-origin coordinates into the flipped image before
+     * applying saved tile flips.
      *
      * @param batch active destination batch
      * @param level placement origin
@@ -289,7 +291,7 @@ public final class LdtkMap {
         for (LdtkTile tile : tiles) {
             float x = originX + (level.worldX() + layer.pixelOffsetX() + tile.x() - nativeMinX) * scaleX;
             float y = originY + (-level.worldY() + level.height() - layer.pixelOffsetY() - tile.y() - size - nativeMinY) * scaleY;
-            float sx = tile.sourceX(), sy = tile.sourceY(), sw = size, sh = size;
+            float sx = tile.sourceX(), sy = textureHeight - tile.sourceY() - size, sw = size, sh = size;
             if (tile.flipX()) {
                 sx += size;
                 sw = -size;
