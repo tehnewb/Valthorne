@@ -12,13 +12,21 @@ import org.joml.Vector2f;
  * Center and point getters expose mutable cached storage. Setters rebuild those
  * values from the defining fields, overwriting external edits. Segment changes
  * replace the point array, so callers needing stable geometry must copy it.
+ * Position and radius updates reuse precomputed unit directions, avoiding
+ * trigonometry and allocation; default circles share their direction table.
  * </p>
  * @author Albert Beaupre
  * @since January 31st, 2026
  */
 public class Circle extends Shape {
 
+    /**
+     * Shared immutable unit directions for the default 32 perimeter samples.
+     */
+    private static final double[] DEFAULT_DIRECTIONS = createDirections(32);
+
     private final Vector2f center; // Reusable center derived from the bottom-left anchor plus radius.
+    private double[] directions; // Cached unit directions, shared for the default segment count.
     private Vector2f[] points; // Mutable perimeter samples, replaced when segment count changes.
     private float x; // bottom-left x
     private float y; // bottom-left y
@@ -39,6 +47,7 @@ public class Circle extends Shape {
         this.y = y;
         this.radius = Math.max(0f, radius);
         this.segments = Math.max(3, segments);
+        this.directions = this.segments == 32 ? DEFAULT_DIRECTIONS : createDirections(this.segments);
         this.center = new Vector2f();
         this.points = new Vector2f[this.segments];
 
@@ -140,6 +149,7 @@ public class Circle extends Shape {
         }
 
         this.segments = newSegments;
+        this.directions = newSegments == 32 ? DEFAULT_DIRECTIONS : createDirections(newSegments);
         this.points = new Vector2f[this.segments];
 
         for (int i = 0; i < this.segments; i++) {
@@ -172,23 +182,51 @@ public class Circle extends Shape {
     }
 
     /**
+     * Sets both anchor coordinates with one perimeter rebuild.
+     * @param x bounding-square left coordinate
+     * @param y bounding-square bottom coordinate
+     */
+    public void setPosition(float x, float y) {
+        this.x = x;
+        this.y = y;
+        updatePoints();
+    }
+
+    /**
      * Recomputes center and all equally spaced perimeter points from anchor, radius,
      * and sample count, reusing the current vectors.
      */
     private void updatePoints() {
-        double step = (Math.PI * 2.0) / segments;
-
         float centerX = x + radius;
         float centerY = y + radius;
 
         center.set(centerX, centerY);
 
         for (int i = 0; i < segments; i++) {
-            double angle = i * step;
-            float px = (float) (centerX + Math.cos(angle) * radius);
-            float py = (float) (centerY + Math.sin(angle) * radius);
+            float px = (float) (centerX + directions[i * 2] * radius);
+            float py = (float) (centerY + directions[i * 2 + 1] * radius);
             points[i].set(px, py);
         }
+    }
+
+    /**
+     * Computes equally spaced unit directions only when sample configuration changes.
+     * @param segments perimeter sample count, at least three
+     * @return immutable interleaved cosine/sine coordinates
+     */
+    private static double[] createDirections(int segments) {
+        /*
+         * Preserve double-precision rounding while moving transcendental work out
+         * of position and radius updates; default circles share one lookup table.
+         */
+        double[] directions = new double[segments * 2];
+        double step = (Math.PI * 2.0) / segments;
+        for (int i = 0; i < segments; i++) {
+            double angle = i * step;
+            directions[i * 2] = Math.cos(angle);
+            directions[i * 2 + 1] = Math.sin(angle);
+        }
+        return directions;
     }
 
     /**
