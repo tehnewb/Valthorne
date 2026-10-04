@@ -23,11 +23,12 @@ final class PhysicsQueries2D implements AutoCloseable {
     private final PhysicsWorld2D world; // Owning simulation and shared position/direction scratch values.
     private final ConstBroadPhaseQuery broadphase; // Borrowed conservative native query interface.
     private final ConstNarrowPhaseQuery narrowphase; // Borrowed precise native query interface.
-    private final JoltPhysicsObject[] resources = new JoltPhysicsObject[5]; // Owned query resources in construction order.
+    private final JoltPhysicsObject[] resources = new JoltPhysicsObject[6]; // Owned query resources in construction order.
     private int resourceCount; // Number of resources that must be released.
     private BroadPhaseLayerFilter broadphaseFilter; // Native filter permitting both motion partitions.
     private ObjectLayerFilter objectFilter; // Native filter permitting both object layers.
     private BodyFilter bodyFilter; // Native filter permitting all live bodies, including sensors.
+    private PhysicsRigidBodyFilter2D rigidFilter; // Lazy mixed-world ray filter excluding soft meshes.
     private AaBox bounds; // Reusable query box with Z spanning the simulation plane.
     private PhysicsQueryCollector2D collector; // Reusable callback storing primitive-ID hits.
     private final Vec3 boundScratch = new Vec3(); // Heap-only scratch for native bounds updates.
@@ -84,10 +85,15 @@ final class PhysicsQueries2D implements AutoCloseable {
     boolean raycast(float x, float y, float dx, float dy, PhysicsRayHit2D destination) {
         destination.set(null, 0, 0, 0);
         if (dx == 0 && dy == 0) return false;
+        BodyFilter filter = bodyFilter;
+        if (world.getSoftBodyCount() != 0) {
+            if (rigidFilter == null) rigidFilter = own(new PhysicsRigidBodyFilter2D(world));
+            filter = rigidFilter;
+        }
         world.positionScratch.set(x, y, 0);
         world.vectorScratch.set(dx, dy, 0);
         try (RRayCast ray = new RRayCast(world.positionScratch, world.vectorScratch); RayCastResult result = new RayCastResult()) {
-            if (!narrowphase.castRay(ray, result, broadphaseFilter, objectFilter, bodyFilter)) return false;
+            if (!narrowphase.castRay(ray, result, broadphaseFilter, objectFilter, filter)) return false;
             RigidBody2D body = world.findBody(result.getBodyId());
             if (body == null) throw new IllegalStateException("Ray hit an unowned native body");
             float fraction = result.getFraction();

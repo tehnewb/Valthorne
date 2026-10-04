@@ -27,6 +27,7 @@ import org.joml.Vector2f;
 import valthorne.math.geometry.Shape;
 
 import java.util.Objects;
+import java.util.Arrays;
 
 /**
  * Owns a Jolt simulation constrained to XY translation and Z rotation. World
@@ -126,12 +127,12 @@ public final class PhysicsWorld2D implements AutoCloseable {
     /**
      * Static bodies collide only with moving bodies; moving bodies collide with both layers.
      */
-    private static final int STATIC_LAYER = 0;
+    static final int STATIC_LAYER = 0;
 
     /**
      * Dynamic and kinematic bodies share the moving broadphase partition.
      */
-    private static final int MOVING_LAYER = 1;
+    static final int MOVING_LAYER = 1;
 
     /**
      * Jolt stores its body index in the lower 23 bits and its generation above them.
@@ -141,6 +142,8 @@ public final class PhysicsWorld2D implements AutoCloseable {
     private final Thread owner = Thread.currentThread(); // Thread permitted to access world state and native objects.
     private final RigidBody2D[] handles; // Dense live handles, sized once to the configured body limit.
     private final RigidBody2D[] nativeHandles; // Direct native-index lookup; full IDs reject stale generations.
+    private SoftBody2D[] softHandles; // Lazy dense deformable handles; null in rigid-only worlds.
+    private int softCount; // Live deformable prefix length, sharing the native body capacity.
     private PhysicsJoints2D joints; // Lazily owned native joint lifecycle; null before first joint.
     private final int maxJoints; // Copied maximum native joint count.
     private final int contactEventCapacity; // Copied size of the optional native contact buffer.
@@ -344,7 +347,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
     }
 
     /**
-     * Returns the number of bodies still owned by this world.
+     * Returns the number of rigid bodies still owned by this world.
      *
      * @return current live-body count
      */
@@ -409,13 +412,17 @@ public final class PhysicsWorld2D implements AutoCloseable {
     public RigidBody2D createBody(BodySettings2D settings) {
         check();
         Objects.requireNonNull(settings, "settings");
-        if (bodyCount == handles.length) throw new IllegalStateException("Physics body capacity reached");
+        if (bodyCount + softCount == handles.length) throw new IllegalStateException("Physics body capacity reached");
         if (settings.geometry != null) {
             if (settings.geometry.pixelWorld != null && settings.geometry.pixelWorld != this)
                 throw new IllegalArgumentException("Geometry settings belong to another world");
             for (int i = 0; i < bodyCount; i++) {
                 if (handles[i].geometry != null && handles[i].geometry.shape == settings.geometry.shape)
                     throw new IllegalArgumentException("Geometry is already attached to a live body");
+            }
+            for (int i = 0; i < softCount; i++) {
+                if (softHandles[i].geometry == settings.geometry.shape)
+                    throw new IllegalArgumentException("Geometry is already attached to a live soft body");
             }
         }
         int id = Jolt.cInvalidBodyId;
@@ -443,7 +450,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
                     .setGravityFactor(settings.gravityFactor)
                     .setAllowSleeping(settings.sleeping)
                     .setIsSensor(settings.sensor)
-                    .setCollideKinematicVsNonDynamic(settings.motion == MotionType2D.KINEMATIC)
+                    .setCollideKinematicVsNonDynamic(settings.motion != MotionType2D.STATIC)
                     .setMotionQuality(settings.continuous && !settings.sensor && settings.motion == MotionType2D.DYNAMIC
                             ? EMotionQuality.LinearCast : EMotionQuality.Discrete);
             if (settings.motion == MotionType2D.DYNAMIC) {
@@ -480,6 +487,86 @@ public final class PhysicsWorld2D implements AutoCloseable {
      */
     public RigidBody2D createBody(Shape shape) {
         return createBody(bodySettings(shape));
+    }
+
+    /**
+     * Creates a native deformable mesh, sharing this world's solver and body limit.
+     * Only convex geometry is supported. Rigid query and contact-event APIs do not
+     * enumerate soft handles; native soft/rigid collision response remains enabled.
+     * @param shape supported convex pixel geometry, not null
+     * @return newly owned soft body retaining the original perimeter vectors
+     */
+    public SoftBody2D createSoftBody(Shape shape) {
+        check();
+        Objects.requireNonNull(shape, "shape");
+        if (bodyCount + softCount == handles.length) throw new IllegalStateException("Physics body capacity reached");
+        for (int i = 0; i < bodyCount; i++) {
+            if (handles[i].geometry != null && handles[i].geometry.shape == shape)
+                throw new IllegalArgumentException("Geometry is already attached to a rigid body");
+        }
+        for (int i = 0; i < softCount; i++) {
+            if (softHandles[i].geometry == shape) throw new IllegalArgumentException("Geometry is already attached to a soft body");
+        }
+        if (softHandles == null) softHandles = new SoftBody2D[Math.min(8, handles.length)];
+        else if (softCount == softHandles.length) softHandles = Arrays.copyOf(softHandles, Math.min(handles.length, softHandles.length * 2));
+        SoftBody2D body = new SoftBody2D(this, shape, softCount);
+        softHandles[softCount++] = body;
+        return body;
+    }
+
+    /**
+     * Reports native deformable bodies; rigid bodies are counted separately.
+     * @return occupied soft-body prefix length
+     */
+    public int getSoftBodyCount() {
+        check();
+        return softCount;
+    }
+
+    /**
+     * Returns a live deformable handle without creating a collection.
+     * @param index index between zero and the soft-body count minus one
+     * @return live soft body; indices may change after removals
+     */
+    public SoftBody2D getSoftBody(int index) {
+        check();
+        Objects.checkIndex(index, softCount);
+        return softHandles[index];
+    }
+
+    /**
+     * Removes a deformable mesh and its direct capture buffer. Repeated removal
+     * is harmless; foreign-world handles are rejected before native access.
+     * @param body soft handle owned by this world, not null
+     */
+    public void destroyBody(SoftBody2D body) {
+        checkOwner();
+        Objects.requireNonNull(body, "body");
+        if (body.world != this) throw new IllegalArgumentException("Soft body belongs to another world");
+        if (body.destroyed) return;
+        check();
+        bodies.removeBody(body.id);
+        bodies.destroyBody(body.id);
+        int last = --softCount;
+        if (body.index != last) {
+            SoftBody2D moved = softHandles[last];
+            softHandles[body.index] = moved;
+            moved.index = body.index;
+        }
+        softHandles[last] = null;
+        body.release();
+    }
+
+    /**
+     * Refreshes pose batching when a body crosses the static/moving boundary.
+     * @param previous old native motion type
+     * @param current new native motion type
+     */
+    void motionChanged(MotionType2D previous, MotionType2D current) {
+        if (previous == MotionType2D.STATIC) movingBodyCount++;
+        if (current == MotionType2D.STATIC) movingBodyCount--;
+        capturePreviousActivity = true;
+        if (poses != null) poses.invalidate();
     }
 
     /**
@@ -907,6 +994,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
         if (advancing) throw new IllegalStateException("Cannot clear the world while stepping or delivering callbacks");
         if (joints != null) joints.close();
         while (bodyCount != 0) destroyBody(handles[bodyCount - 1]);
+        while (softCount != 0) destroyBody(softHandles[softCount - 1]);
         if (poses != null) {
             poses.close();
             poses = null;
@@ -997,6 +1085,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
      * @param interpolated whether to apply fractional render interpolation
      */
     private void syncGeometry(boolean interpolated) {
+        for (int i = 0; i < softCount; i++) softHandles[i].sync(interpolated);
         if (geometryCount == 0) return;
         for (int i = 0; i < bodyCount; i++) {
             RigidBody2D body = handles[i];
@@ -1012,6 +1101,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
         if (contacts != null) contacts.beginStep();
         try {
             int errors = system.update(fixedTimeStep, collisionSteps, allocator, jobs);
+            for (int i = 0; i < softCount; i++) softHandles[i].capture();
             if (contacts != null) contacts.checkCapture();
             boolean active = movingBodyCount != 0 && system.getNumActiveBodies(EBodyType.RigidBody) != 0;
             boolean capture = active || capturePreviousActivity;
@@ -1053,6 +1143,15 @@ public final class PhysicsWorld2D implements AutoCloseable {
             failure = cleanupFailure;
         }
         closed = true;
+        while (softCount != 0) {
+            try {
+                softHandles[--softCount].release();
+            } catch (RuntimeException | Error cleanupFailure) {
+                if (failure == null) failure = cleanupFailure;
+                else failure.addSuppressed(cleanupFailure);
+            }
+            softHandles[softCount] = null;
+        }
         // Invalidate remaining handles even if a native removal failed.
         while (bodyCount != 0) {
             RigidBody2D body = handles[--bodyCount];

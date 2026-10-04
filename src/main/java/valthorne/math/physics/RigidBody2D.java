@@ -1,6 +1,7 @@
 package valthorne.math.physics;
 
 import com.github.stephengold.joltjni.enumerate.EActivation;
+import com.github.stephengold.joltjni.enumerate.EMotionType;
 import org.joml.Vector2f;
 import valthorne.math.geometry.Shape;
 
@@ -16,7 +17,8 @@ import java.util.Objects;
  * every outstanding handle. Destruction is idempotent, while pose and velocity
  * operations on a destroyed handle throw. Native body IDs may be reused; the
  * handle's destroyed flag prevents stale handles from accessing replacement
- * bodies. Motion type and rotation-lock state are fixed at creation.</p>
+ * bodies. Rotation-lock state is fixed at creation. Bodies created dynamically
+ * can switch motion types without recreating their native resources.</p>
  *
  * <p>Interpolation blends the previous and current captured poses using the
  * world's fractional frame remainder, introducing the usual one-step render
@@ -43,7 +45,9 @@ public final class RigidBody2D implements AutoCloseable {
     final int id; // Native body identifier, valid only until this handle is destroyed.
     int index; // Current index in the world's dense live-handle array.
     boolean destroyed; // Whether this handle has relinquished its native body.
-    private final MotionType2D motion; // Immutable simulation response selected at construction.
+    private MotionType2D motion; // Current simulation response, including fluent motion changes.
+    private final boolean dynamicCapable; // Whether construction allocated dynamic mass and inertia.
+    private final boolean movingCapable; // Whether construction allocated native motion properties.
     private final boolean fixedRotation; // Whether angular simulation around Z is disabled.
     private final boolean sensor; // Whether collisions are overlaps without physical response.
     private final CollisionShape2D shape; // Immutable geometry used for exact planar point queries.
@@ -69,6 +73,8 @@ public final class RigidBody2D implements AutoCloseable {
         this.id = id;
         this.index = index;
         motion = settings.motion;
+        dynamicCapable = motion == MotionType2D.DYNAMIC;
+        movingCapable = motion != MotionType2D.STATIC;
         fixedRotation = settings.fixedRotation;
         sensor = settings.sensor;
         shape = settings.shape;
@@ -84,6 +90,57 @@ public final class RigidBody2D implements AutoCloseable {
     public Shape getGeometry() {
         world.checkOwner();
         return geometry == null ? null : geometry.shape;
+    }
+
+    /**
+     * Changes simulation response without replacing this body. Bodies constructed
+     * dynamically can switch between all three modes; other construction paths
+     * retain their original native mass capabilities. Static mode clears velocity.
+     * @param motion desired response, not null
+     * @return this body
+     * @throws IllegalStateException if native mass capabilities do not permit the change
+     */
+    public RigidBody2D motion(MotionType2D motion) {
+        check();
+        Objects.requireNonNull(motion, "motion");
+        if (this.motion == motion) return this;
+        if (!dynamicCapable && motion == MotionType2D.DYNAMIC || !movingCapable && motion != MotionType2D.STATIC)
+            throw new IllegalStateException("Create a dynamic body before switching motion modes");
+        world.bodies.setMotionType(id, switch (motion) {
+            case STATIC -> EMotionType.Static;
+            case KINEMATIC -> EMotionType.Kinematic;
+            case DYNAMIC -> EMotionType.Dynamic;
+        }, motion == MotionType2D.STATIC ? EActivation.DontActivate : EActivation.Activate);
+        world.bodies.setObjectLayer(id, motion == MotionType2D.STATIC ? PhysicsWorld2D.STATIC_LAYER : PhysicsWorld2D.MOVING_LAYER);
+        world.motionChanged(this.motion, motion);
+        this.motion = motion;
+        capture();
+        remember();
+        return this;
+    }
+
+    /**
+     * Sets contact friction immediately without allocating configuration objects.
+     * @param coefficient finite nonnegative friction coefficient
+     * @return this body
+     */
+    public RigidBody2D friction(float coefficient) {
+        check();
+        PhysicsValidation2D.nonnegative(coefficient, "friction");
+        world.bodies.setFriction(id, coefficient);
+        return this;
+    }
+
+    /**
+     * Sets the fraction of normal impact velocity retained after collision.
+     * @param coefficient restitution between zero and one
+     * @return this body
+     */
+    public RigidBody2D restitution(float coefficient) {
+        check();
+        PhysicsValidation2D.fraction(coefficient, "restitution");
+        world.bodies.setRestitution(id, coefficient);
+        return this;
     }
 
     /**
@@ -158,7 +215,7 @@ public final class RigidBody2D implements AutoCloseable {
     }
 
     /**
-     * Returns the immutable motion type for this body.
+     * Returns the current motion type, including fluent changes made while live.
      *
      * @return static, kinematic, or dynamic motion
      */

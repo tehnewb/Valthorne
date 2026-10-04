@@ -100,7 +100,7 @@ public final class BodySettings2D {
     }
 
     /**
-     * Selects the body's immutable motion type.
+     * Selects the initial motion type and native mass capabilities.
      *
      * @param motion desired motion type, not null
      * @return these settings
