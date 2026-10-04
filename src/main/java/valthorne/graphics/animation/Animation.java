@@ -139,6 +139,7 @@ public class Animation implements Drawable {
                 if (f != null) totalDuration += Math.max(0f, f.duration());
             }
         }
+        reset();
     }
 
     /**
@@ -640,7 +641,8 @@ public class Animation implements Drawable {
         if (frames == null || frames.length == 0) return 0f;
 
         return switch (playbackMode) {
-            case FORWARD, BIDIRECTIONAL -> getTimeForward();
+            case FORWARD -> getTimeForward();
+            case BIDIRECTIONAL -> bits.get(RETURNING) ? totalDuration - getTimeReverse() : getTimeForward();
             case REVERSE -> getTimeReverse();
         };
     }
@@ -895,33 +897,38 @@ public class Animation implements Drawable {
     /**
      * Computes the reverse timeline time where 0 means "at end".
      *
-     * <p>This returns {@code duration - forwardTime}.</p>
+     * <p>This sums the durations of frames already traversed from the last frame
+     * and the time spent in the current frame. Completed playback reports its full duration.</p>
      *
      * @return reverse time in seconds
      */
     private float getTimeReverse() {
-        return Math.max(0f, totalDuration - getTimeForward());
+        if (isFinished()) return totalDuration;
+        float acc = elapsedTime;
+        for (int i = frames.length - 1; i > currentIndex; i--) {
+            AnimationFrame frame = frames[i];
+            if (frame != null) acc += Math.max(0f, frame.duration());
+        }
+        return acc;
     }
 
     /**
      * Seeks to a reverse time position where t=0 means "at end".
      *
-     * <p>This converts reverse time into a forward remaining time and then selects the frame
-     * that contains that remaining time.</p>
+     * <p>This walks durations from the last frame toward the first. Exact boundaries
+     * select the next frame in reverse playback with zero elapsed time.</p>
      *
      * @param t reverse time in seconds (0..duration)
      */
     private void setTimeReverse(float t) {
         t = MathUtils.clamp(t, 0f, totalDuration);
 
-        float remaining = totalDuration - t;
-
         float acc = 0f;
-        for (int i = 0; i < frames.length; i++) {
+        for (int i = frames.length - 1; i >= 0; i--) {
             float d = frames[i] == null ? 0f : Math.max(0f, frames[i].duration());
-            if (acc + d >= remaining || i == frames.length - 1) {
+            if (t < acc + d || i == 0) {
                 currentIndex = (short) i;
-                elapsedTime = Math.max(0f, remaining - acc);
+                elapsedTime = Math.max(0f, t - acc);
                 return;
             }
             acc += d;
