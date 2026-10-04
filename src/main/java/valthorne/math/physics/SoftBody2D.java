@@ -36,7 +36,11 @@ import java.util.Objects;
  * kinematic mode is rejected because Jolt soft bodies have no rigid kinematic
  * trajectory. Pinning fixes an individual vertex in world space. Mass excludes
  * pinned vertices. Forces/impulses and velocities use world meters and seconds.
- * Rigid-body contacts are native, but Jolt does not solve soft/soft collisions.
+ * Native vertex contacts handle rigid geometry. Circles additionally collide
+ * against the complete deforming perimeter, with swept edge/corner checks and
+ * inverse-mass-weighted impulse sharing. This prevents circles passing between
+ * sparse vertices, including on pinned or frozen meshes. Other rigid shapes
+ * retain native vertex-sampled coverage. Jolt does not solve soft/soft collisions.
  * Existing rigid-body query and contact-event APIs enumerate rigid handles only.</p>
  *
  * <p>One packed native read captures all mesh positions per step. Native vertex
@@ -76,13 +80,13 @@ public final class SoftBody2D implements AutoCloseable {
     boolean destroyed; // Whether native ownership has ended.
     private final Body nativeBody; // Borrowed body wrapper for native sleep configuration.
     private final SoftBodyMotionProperties properties; // Borrowed native mesh properties, valid until destruction.
-    private final SoftBodyVertex[] vertices; // Cached native vertex wrappers, perimeter followed by center.
+    final SoftBodyVertex[] vertices; // Cached native vertex wrappers, perimeter followed by center.
     private final Edge[] edges; // Cached optimized edge wrappers for compliance changes.
     private SoftBodySharedSettings mesh; // Explicitly owned reference retaining the optimized native edge storage.
     private final Vector2f[] boundary; // Original perimeter vector identities, reused for rendering.
     private final boolean[] pinned; // Explicit vertex pins retained across motion changes.
-    private final float[] current; // Packed world XY positions for all vertices.
-    private final float[] previous; // Previous captured world XY positions for interpolation.
+    final float[] current; // Packed world XY positions for all vertices.
+    final float[] previous; // Previous captured world XY positions for interpolation.
     private FloatBuffer positions; // Explicitly owned direct buffer for packed native vertex capture.
     private Vector2f destination; // Lazily reused output for fluent position-to-pixel reads.
     private float originX; // Fixed native center-of-mass origin in world meters.
@@ -496,6 +500,28 @@ public final class SoftBody2D implements AutoCloseable {
             velocity.setZ(0);
             vertices[i].setVelocity(velocity);
         }
+    }
+
+    /**
+     * Corrects one movable endpoint after a continuous planar boundary contact.
+     * Native constraints receive both the corrected position and impulse velocity;
+     * pinned endpoints keep their exact positions and zero inverse mass.
+     * @param vertex perimeter endpoint index
+     * @param dx horizontal position correction
+     * @param dy vertical position correction
+     * @param velocityX horizontal velocity change
+     * @param velocityY vertical velocity change
+     */
+    void correctContact(int vertex, float dx, float dy, float velocityX, float velocityY) {
+        int offset = vertex * 2;
+        current[offset] += dx;
+        current[offset + 1] += dy;
+        world.vectorScratch.set(current[offset] - originX, current[offset + 1] - originY, 0);
+        vertices[vertex].setPosition(world.vectorScratch);
+        Vec3 velocity = vertices[vertex].getVelocity();
+        world.vectorScratch.set(velocity.getX() + velocityX, velocity.getY() + velocityY, 0);
+        vertices[vertex].setVelocity(world.vectorScratch);
+        wake();
     }
 
     /**

@@ -143,6 +143,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
     private final RigidBody2D[] handles; // Dense live handles, sized once to the configured body limit.
     private final RigidBody2D[] nativeHandles; // Direct native-index lookup; full IDs reject stale generations.
     private SoftBody2D[] softHandles; // Lazy dense deformable handles; null in rigid-only worlds.
+    private PhysicsSoftContacts2D softContacts; // Lazy continuous disk-versus-deformable boundary solver.
     private int softCount; // Live deformable prefix length, sharing the native body capacity.
     private PhysicsJoints2D joints; // Lazily owned native joint lifecycle; null before first joint.
     private final int maxJoints; // Copied maximum native joint count.
@@ -1114,6 +1115,10 @@ public final class PhysicsWorld2D implements AutoCloseable {
             capturePreviousActivity = active;
             if (errors != 0)
                 throw new IllegalStateException("Jolt simulation capacity exhausted (error flags " + errors + ")");
+            if (softCount != 0) {
+                if (softContacts == null) softContacts = new PhysicsSoftContacts2D(this);
+                softContacts.solve(softHandles, softCount, handles, bodyCount);
+            }
         } catch (RuntimeException | Error failure) {
             failed = true;
             if (contacts != null) contacts.discard();

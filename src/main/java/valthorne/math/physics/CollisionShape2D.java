@@ -144,6 +144,14 @@ public final class CollisionShape2D {
     }
 
     /**
+     * Returns the exact disk radius for planar soft-boundary contacts.
+     * @return radius in meters, or zero for another shape kind
+     */
+    float circleRadius() {
+        return circle ? width : 0;
+    }
+
+    /**
      * Tests exact containment relative to the center of a rotated shape.
      * Circles skip rotation because their containment is orientation-independent.
      *

@@ -50,14 +50,15 @@ public final class RigidBody2D implements AutoCloseable {
     private final boolean movingCapable; // Whether construction allocated native motion properties.
     private final boolean fixedRotation; // Whether angular simulation around Z is disabled.
     private final boolean sensor; // Whether collisions are overlaps without physical response.
-    private final CollisionShape2D shape; // Immutable geometry used for exact planar point queries.
+    final CollisionShape2D shape; // Immutable geometry used for exact planar point queries and soft contacts.
+    final float inverseMass; // Construction inverse mass, used only while motion is dynamic.
     private Vector2f positionDestination; // Last caller-owned destination used by a fluent position read.
     private boolean interpolatedPosition; // Whether the pending conversion reads the interpolated pose.
     private float x; // Current captured horizontal center in meters.
     private float y; // Current captured vertical center in meters.
     private float angle; // Current captured orientation in radians, normalized to [-pi, pi].
-    private float previousX; // Horizontal center captured before the latest step.
-    private float previousY; // Vertical center captured before the latest step.
+    float previousX; // Horizontal center captured before the latest step.
+    float previousY; // Vertical center captured before the latest step.
     private float previousAngle; // Orientation captured before the latest step.
 
     /**
@@ -78,6 +79,7 @@ public final class RigidBody2D implements AutoCloseable {
         fixedRotation = settings.fixedRotation;
         sensor = settings.sensor;
         shape = settings.shape;
+        inverseMass = dynamicCapable ? 1 / settings.mass : 0;
         geometry = settings.geometry;
         capture();
         remember();
@@ -620,6 +622,18 @@ public final class RigidBody2D implements AutoCloseable {
         float z = world.rotationScratch.getZ();
         float w = world.rotationScratch.getW();
         angle = (float) Math.atan2(2.0 * z * w, 1.0 - 2.0 * z * z);
+    }
+
+    /**
+     * Applies a solver position correction without resetting interpolation.
+     * @param dx horizontal correction in meters
+     * @param dy vertical correction in meters
+     */
+    void correctPosition(float dx, float dy) {
+        x += dx;
+        y += dy;
+        world.positionScratch.set(x, y, 0);
+        world.bodies.setPosition(id, world.positionScratch, EActivation.Activate);
     }
 
     /**
