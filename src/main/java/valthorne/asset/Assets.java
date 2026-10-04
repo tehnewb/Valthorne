@@ -94,6 +94,11 @@ public final class Assets {
      * Lock protecting recreation and replacement of the shared loader executor.
      */
     private static final Object SERVICE_LOCK = new Object();
+    /*
+     * Coordinates cache admission, detachment and prepared queue transitions.
+     * Resource release runs outside this lock to allow independent loading during cleanup.
+     */
+    private static final Object CACHE_LOCK = new Object();
     /**
      * Concurrent registry mapping parameter classes to asset loaders.
      */
@@ -197,16 +202,21 @@ public final class Assets {
 
         final String key = parameters.key();
 
-        // Use already cached future if present
-        return (CompletableFuture<T>) cache.computeIfAbsent(key, k ->
-                CompletableFuture.supplyAsync(() -> {
-                    AssetLoader loader = loaders.get(parameters.getClass());
-                    if (loader == null)
-                        throw new IllegalStateException("No loader for " + parameters.getClass().getName());
+        synchronized (CACHE_LOCK) {
+            /*
+             * Admission shares a boundary with clear so every removed future belongs to
+             * its cleanup snapshot. Producing work runs separately on the executor.
+             */
+            return (CompletableFuture<T>) cache.computeIfAbsent(key, k ->
+                    CompletableFuture.supplyAsync(() -> {
+                        AssetLoader loader = loaders.get(parameters.getClass());
+                        if (loader == null)
+                            throw new IllegalStateException("No loader for " + parameters.getClass().getName());
 
-                    return assetType.cast(loader.load(parameters));
-                }, ensureService())
-        );
+                        return assetType.cast(loader.load(parameters));
+                    }, ensureService())
+            );
+        }
     }
 
     /**
@@ -251,7 +261,10 @@ public final class Assets {
     public static boolean unload(String key) {
         Objects.requireNonNull(key, "key");
 
-        CompletableFuture<?> future = cache.remove(key);
+        CompletableFuture<?> future;
+        synchronized (CACHE_LOCK) {
+            future = cache.remove(key);
+        }
         if (future == null) {
             return false;
         }
@@ -269,18 +282,27 @@ public final class Assets {
      *
      * <p>
      * Loaded values are disposed when possible, incomplete futures are cancelled, and
-     * progress counters are reset so a new batch can start cleanly.
+     * progress counters are reset so a new batch can start cleanly. Cache admission and
+     * detachment share a lock: requests admitted after detachment survive this clear.
+     * Detached completed values are released on the calling thread outside the lock.
+     * Cancellation does not guarantee that an already running loader is interrupted.
      * </p>
      *
      * @return the number of cached entries removed
      */
     public static int clear() {
-        ArrayList<CompletableFuture<?>> futures = new ArrayList<>(cache.values());
+        /*
+         * Snapshot and detachment are atomic with admission and unload. Cleanup stays
+         * outside the boundary because resource code may block or submit new loads.
+         */
+        ArrayList<CompletableFuture<?>> futures;
+        synchronized (CACHE_LOCK) {
+            futures = new ArrayList<>(cache.values());
+            cache.clear();
+            prepared.clear();
+            resetProgress();
+        }
         int removed = futures.size();
-
-        cache.clear();
-        prepared.clear();
-        resetProgress();
 
         Throwable failure = null;
         for (CompletableFuture<?> future : futures) {
@@ -309,7 +331,9 @@ public final class Assets {
             executor.shutdownNow();
         }
 
-        cache.entrySet().removeIf(entry -> cancelIncomplete(entry.getValue()));
+        synchronized (CACHE_LOCK) {
+            cache.entrySet().removeIf(entry -> cancelIncomplete(entry.getValue()));
+        }
     }
 
     /**
@@ -334,8 +358,12 @@ public final class Assets {
     public static void prepare(AssetParameters params) {
         Objects.requireNonNull(params);
 
-        if (prepared.add(params))
-            preparedCount.incrementAndGet();
+        /*
+         * Preparation belongs entirely before or after the clear boundary.
+         */
+        synchronized (CACHE_LOCK) {
+            if (prepared.add(params)) preparedCount.incrementAndGet();
+        }
     }
 
     /**
@@ -366,31 +394,37 @@ public final class Assets {
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
         ExecutorService executor = ensureService();
 
-        for (AssetParameters parameters : prepared) {
-            if (!prepared.remove(parameters))
-                continue;
+        /*
+         * Keep queue claims and corresponding cache admissions on the same side of
+         * clear's detachment boundary; loader execution does not hold this lock.
+         */
+        synchronized (CACHE_LOCK) {
+            for (AssetParameters parameters : prepared) {
+                if (!prepared.remove(parameters))
+                    continue;
 
-            final String key = parameters.key();
+                final String key = parameters.key();
 
-            CompletableFuture<?> future = CompletableFuture
-                    .supplyAsync(() -> {
-                        AssetLoader loader = loaders.get(parameters.getClass());
-                        if (loader == null)
-                            throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
+                CompletableFuture<?> future = CompletableFuture
+                        .supplyAsync(() -> {
+                            AssetLoader loader = loaders.get(parameters.getClass());
+                            if (loader == null)
+                                throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
 
-                        return loader.load(parameters);
-                    }, executor)
-                    .whenComplete((_, ex) -> {
-                        if (ex != null) {
-                            ex.printStackTrace();
-                            return;
-                        }
+                            return loader.load(parameters);
+                        }, executor)
+                        .whenComplete((_, ex) -> {
+                            if (ex != null) {
+                                ex.printStackTrace();
+                                return;
+                            }
 
-                        completedCount.incrementAndGet();
-                    });
+                            completedCount.incrementAndGet();
+                        });
 
-            cache.put(key, future);
-            futures.add(future);
+                cache.put(key, future);
+                futures.add(future);
+            }
         }
 
         return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
