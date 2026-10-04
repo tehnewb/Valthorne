@@ -297,6 +297,8 @@ public class Animation implements Drawable {
      * <p>Finish behavior:</p>
      * <ul>
      *     <li>If not looping: reaching the logical endpoint sets FINISHED and PAUSED.</li>
+     *     <li>Bidirectional playback completes the return leg and finishes on frame zero;
+     *     a limited loop reports its final loop before the single finish callback.</li>
      *     <li>If loop-limited: reaching the limit sets FINISHED and PAUSED.</li>
      * </ul>
      *
@@ -362,23 +364,19 @@ public class Animation implements Drawable {
                         if (currentIndex >= frames.length) {
                             currentIndex = (short) (frames.length - 2);
                             bits.set(RETURNING);
-
-                            if (!shouldLoop()) {
-                                finishNow();
-                                return;
-                            }
                         }
                     } else {
                         currentIndex--;
                         if (currentIndex < 0) {
-                            currentIndex = 1;
-                            bits.clear(RETURNING);
-
-                            onLoopCompleted();
+                            currentIndex = 0;
                             if (!shouldLoop()) {
                                 finishNow();
                                 return;
                             }
+                            onLoopCompleted();
+                            if (isFinished()) return;
+                            currentIndex = 1;
+                            bits.clear(RETURNING);
                         }
                     }
                 }
