@@ -109,6 +109,7 @@ public abstract class Viewport {
     protected final Matrix4f projectionMatrix = new Matrix4f(); // Live projection matrix rebuilt by viewport updates.
 
     private final int[] oldViewport = new int[4]; // Previously active OpenGL viewport restored by unbind or render.
+    private final int[] scissorViewport = new int[4]; // Active physical viewport used to project world scissor bounds.
     private final int[] previousScissor = new int[4]; // Previously active OpenGL scissor rectangle restored by endScissor.
     private final float[] oldProjectionMatrix = new float[16]; // Previously active engine projection restored by unbind or render.
     private final Vector2f screenToWorldCoordinates = new Vector2f(); // Reused return vector for screen-to-world conversion.
@@ -297,7 +298,12 @@ public abstract class Viewport {
      *
      * <p>
      * The provided world-space rectangle is converted into the viewport's actual screen-space
-     * pixel rectangle. The result is then clamped to the viewport bounds. If another scissor
+     * pixel rectangle using the currently applied engine projection and physical OpenGL viewport.
+     * Apply/bind this viewport before scissoring. Camera changes take effect on the next apply.
+     * Four projected corners form axis-aligned bounds with edges rounded to nearest pixels;
+     * rotated rectangles therefore use a bounding box rather than an exact polygon clip.
+     * Rectangles crossing the projective W=0 plane or behind it are rejected.
+     * The result is then clamped to the active viewport bounds. If another scissor
      * rectangle is already active, the new rectangle is intersected with the existing scissor
      * region so nested scissoring behaves correctly.
      * </p>
@@ -311,37 +317,57 @@ public abstract class Viewport {
      * @param wy the world-space y coordinate of the scissor rectangle
      * @param ww the world-space width of the scissor rectangle
      * @param wh the world-space height of the scissor rectangle
-     * @return true if a valid scissor rectangle was applied, false if the rectangle clipped to nothing
+     * @return true if a valid scissor rectangle was applied, false for empty or unprojectable bounds
+     * @throws IllegalArgumentException if any rectangle argument is non-finite
      */
     public boolean beginScissor(float wx, float wy, float ww, float wh) {
-        float nx = wx / worldWidth;
-        float ny = wy / worldHeight;
-        float nw = ww / worldWidth;
-        float nh = wh / worldHeight;
+        if (!Float.isFinite(wx) || !Float.isFinite(wy) || !Float.isFinite(ww) || !Float.isFinite(wh))
+            throw new IllegalArgumentException("Scissor coordinates and dimensions must be finite.");
+        if (ww <= 0 || wh <= 0) return false;
 
-        int sx = (int) (x + nx * width);
-        int sy = (int) (y + ny * height);
-        int sw = (int) (nw * width);
-        int sh = (int) (nh * height);
+        Window.copyProjectionMatrix(matrixUpload);
+        glGetIntegerv(GL_VIEWPORT, scissorViewport);
+        int viewportX = scissorViewport[0];
+        int viewportY = scissorViewport[1];
+        int viewportWidth = scissorViewport[2];
+        int viewportHeight = scissorViewport[3];
+        if (viewportWidth <= 0 || viewportHeight <= 0) return false;
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
 
-        if (sx < x) {
-            sw -= x - sx;
-            sx = x;
+        /*
+         * Project all four Z=0 corners through the engine's applied matrix, so camera
+         * changes after apply do not move clipping away from the drawn content. Read
+         * the physical GL viewport to include offsets and framebuffer scaling. Rotated
+         * rectangles use their axis-aligned bounds because GL scissors are rectangular.
+         */
+        for (int corner = 0; corner < 4; corner++) {
+            double worldX = wx + ((corner & 1) == 0 ? 0.0 : ww);
+            double worldY = wy + ((corner & 2) == 0 ? 0.0 : wh);
+            double w = matrixUpload[3] * worldX + matrixUpload[7] * worldY + matrixUpload[15];
+            if (!Double.isFinite(w) || w <= 0) return false;
+            double nx = (matrixUpload[0] * worldX + matrixUpload[4] * worldY + matrixUpload[12]) / w;
+            double ny = (matrixUpload[1] * worldX + matrixUpload[5] * worldY + matrixUpload[13]) / w;
+            if (!Double.isFinite(nx) || !Double.isFinite(ny)) return false;
+            double screenX = viewportX + (nx + 1.0) * 0.5 * viewportWidth;
+            double screenY = viewportY + (ny + 1.0) * 0.5 * viewportHeight;
+            minX = Math.min(minX, screenX);
+            minY = Math.min(minY, screenY);
+            maxX = Math.max(maxX, screenX);
+            maxY = Math.max(maxY, screenY);
         }
-        if (sy < y) {
-            sh -= y - sy;
-            sy = y;
-        }
-        if (sx + sw > x + width) {
-            sw = x + width - sx;
-        }
-        if (sy + sh > y + height) {
-            sh = y + height - sy;
-        }
-
-        if (sw <= 0 || sh <= 0) {
-            return false;
-        }
+        minX = Math.max(minX, viewportX);
+        minY = Math.max(minY, viewportY);
+        maxX = Math.min(maxX, viewportX + (double) viewportWidth);
+        maxY = Math.min(maxY, viewportY + (double) viewportHeight);
+        if (maxX <= minX || maxY <= minY) return false;
+        int sx = (int) Math.round(minX);
+        int sy = (int) Math.round(minY);
+        int sw = (int) (Math.round(maxX) - sx);
+        int sh = (int) (Math.round(maxY) - sy);
+        if (sw <= 0 || sh <= 0) return false;
 
         scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
 
