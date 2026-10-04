@@ -36,13 +36,9 @@ final class PhysicsContacts2D implements AutoCloseable {
     private volatile boolean listening; // Publishes capture activation and body membership to native worker callbacks.
     private final ContactEvent2D view = new ContactEvent2D(); // Reused read-only event delivered to game code.
     private final byte[] types; // Compact transition ordinals in callback arrival order.
-    private final RigidBody2D[] firstBodies; // Original first body references for each event.
-    private final RigidBody2D[] secondBodies; // Original second body references for each event.
-    private final int[] firstSubShapes; // Native first subshape IDs for each event.
-    private final int[] secondSubShapes; // Native second subshape IDs for each event.
-    private final float[] normalX; // Copied world-normal horizontal projections.
-    private final float[] normalY; // Copied world-normal vertical projections.
-    private final float[] penetration; // Copied native penetration distances in meters.
+    private final RigidBody2D[] bodyPairs; // Interleaved first/second body references for each event.
+    private final int[] subShapePairs; // Interleaved first/second native subshape identifiers.
+    private final float[] normalsAndDepths; // Packed normal X, normal Y and penetration per event.
     private int count; // Buffered event count, protected by this monitor when workers are enabled.
     private boolean overflow; // Whether an event was rejected by the fixed buffer capacity.
     private Throwable captureFailure; // First callback-copy failure, or null after successful capture.
@@ -61,13 +57,9 @@ final class PhysicsContacts2D implements AutoCloseable {
         this.world = world;
         this.threaded = threaded;
         types = new byte[capacity];
-        firstBodies = new RigidBody2D[capacity];
-        secondBodies = new RigidBody2D[capacity];
-        firstSubShapes = new int[capacity];
-        secondSubShapes = new int[capacity];
-        normalX = new float[capacity];
-        normalY = new float[capacity];
-        penetration = new float[capacity];
+        bodyPairs = new RigidBody2D[capacity * 2];
+        subShapePairs = new int[capacity * 2];
+        normalsAndDepths = new float[capacity * 3];
         bridge = new PhysicsContactBridge2D(this);
     }
 
@@ -220,13 +212,15 @@ final class PhysicsContacts2D implements AutoCloseable {
             return;
         }
         types[count] = (byte) type.ordinal();
-        firstBodies[count] = first;
-        secondBodies[count] = second;
-        firstSubShapes[count] = firstSubShape;
-        secondSubShapes[count] = secondSubShape;
-        normalX[count] = x;
-        normalY[count] = y;
-        penetration[count] = depth;
+        int pair = count * 2;
+        int normal = count * 3;
+        bodyPairs[pair] = first;
+        bodyPairs[pair + 1] = second;
+        subShapePairs[pair] = firstSubShape;
+        subShapePairs[pair + 1] = secondSubShape;
+        normalsAndDepths[normal] = x;
+        normalsAndDepths[normal + 1] = y;
+        normalsAndDepths[normal + 2] = depth;
         count++;
     }
 
@@ -280,7 +274,9 @@ final class PhysicsContacts2D implements AutoCloseable {
         PhysicsContactListener2D[] snapshot = listeners;
         try {
             for (int i = 0; i < count; i++) {
-                view.set(CONTACT_TYPES[types[i]], firstBodies[i], secondBodies[i], firstSubShapes[i], secondSubShapes[i], normalX[i], normalY[i], penetration[i]);
+                int pair = i * 2;
+                int normal = i * 3;
+                view.set(CONTACT_TYPES[types[i]], bodyPairs[pair], bodyPairs[pair + 1], subShapePairs[pair], subShapePairs[pair + 1], normalsAndDepths[normal], normalsAndDepths[normal + 1], normalsAndDepths[normal + 2]);
                 for (PhysicsContactListener2D listener : snapshot) listener.onContact(view);
             }
         } finally {
@@ -293,8 +289,7 @@ final class PhysicsContacts2D implements AutoCloseable {
      * native step. Later removals survive until their next native END callbacks.
      */
     void discard() {
-        Arrays.fill(firstBodies, 0, count, null);
-        Arrays.fill(secondBodies, 0, count, null);
+        Arrays.fill(bodyPairs, 0, count * 2, null);
         count = 0;
         int remaining = retiredCount - retiredBoundary;
         System.arraycopy(retired, retiredBoundary, retired, 0, remaining);

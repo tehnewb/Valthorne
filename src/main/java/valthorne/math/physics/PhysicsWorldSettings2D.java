@@ -3,6 +3,7 @@ package valthorne.math.physics;
 /**
  * Fluent capacity and timing configuration copied by {@link PhysicsWorld2D}
  * during construction. Later changes affect only worlds created afterward.
+ * Rendering defaults to 64 pixels per meter, zero screen origin and Y-up.
  * Settings own no native resources and are not intended for concurrent mutation.
  *
  * <p>Defaults provide 4096 bodies, 16384 candidate pairs, 4096 contacts, a
@@ -15,6 +16,10 @@ package valthorne.math.physics;
  * contact-buffer overflow also fails the world before partial event delivery.</p>
  */
 public final class PhysicsWorldSettings2D {
+    float pixelsPerMeter = 64; // Default rendering scale; simulation continues to use meters.
+    float pixelOriginX; // Screen coordinate corresponding to world X zero.
+    float pixelOriginY; // Screen coordinate corresponding to world Y zero.
+    boolean pixelsYDown; // Whether increasing render Y points downward instead of upward.
     int maxBodies = 4096; // Maximum simultaneously owned bodies and dense handle-array capacity.
     int maxJoints = 1024; // Maximum live constraints; the handle array is allocated on first use.
     int contactEventCapacity = 8192; // Buffered native events per step when contact listening is enabled.
@@ -32,6 +37,42 @@ public final class PhysicsWorldSettings2D {
      * Creates a configuration with the documented default capacities and timing.
      */
     public PhysicsWorldSettings2D() {
+    }
+
+    /**
+     * Sets the rendering scale used by fluent position conversion and geometry creation.
+     * @param scale finite positive pixels per meter, default 64, with a finite reciprocal
+     * @return these settings
+     */
+    public PhysicsWorldSettings2D pixelsPerMeter(float scale) {
+        PhysicsValidation2D.positive(scale, "pixels per meter");
+        if (!Float.isFinite(1f / scale)) throw new IllegalArgumentException("Pixel scale reciprocal must be finite");
+        pixelsPerMeter = scale;
+        return this;
+    }
+
+    /**
+     * Sets the render coordinate of the world origin without changing physics units.
+     * @param x finite screen X origin, default zero
+     * @param y finite screen Y origin, default zero
+     * @return these settings
+     */
+    public PhysicsWorldSettings2D pixelOrigin(float x, float y) {
+        PhysicsValidation2D.finite(x, "pixel origin x");
+        PhysicsValidation2D.finite(y, "pixel origin y");
+        pixelOriginX = x;
+        pixelOriginY = y;
+        return this;
+    }
+
+    /**
+     * Selects render Y direction; native gravity and coordinates remain Y-up.
+     * @param down true for downward screen Y, false for upward Y (the default)
+     * @return these settings
+     */
+    public PhysicsWorldSettings2D pixelsYDown(boolean down) {
+        pixelsYDown = down;
+        return this;
     }
 
     /**
@@ -65,11 +106,11 @@ public final class PhysicsWorldSettings2D {
      * stepping rather than silently losing gameplay events. Collision subdivisions
      * and CCD may produce more than one event for a pair within a fixed step.
      *
-     * @param count positive maximum buffered events per step
+     * @param count positive maximum buffered events per step, at most Integer.MAX_VALUE / 3
      * @return these settings
      */
     public PhysicsWorldSettings2D contactEventCapacity(int count) {
-        if (count < 1) throw new IllegalArgumentException("Contact event capacity must be positive");
+        if (count < 1 || count > Integer.MAX_VALUE / 3) throw new IllegalArgumentException("Contact event capacity must be between 1 and " + Integer.MAX_VALUE / 3);
         contactEventCapacity = count;
         return this;
     }

@@ -91,7 +91,7 @@ final class PhysicsJoints2D implements AutoCloseable {
             settings.setPoint2(anchorSecondX, anchorSecondY, 0);
             settings.setMinDistance(minimum);
             settings.setMaxDistance(maximum);
-            return add(first, second, settings, JointType2D.DISTANCE);
+            return add(first, second, settings);
         }
     }
 
@@ -112,7 +112,7 @@ final class PhysicsJoints2D implements AutoCloseable {
             settings.setSpace(EConstraintSpace.WorldSpace);
             settings.setPoint1(anchorX, anchorY, 0);
             settings.setPoint2(anchorX, anchorY, 0);
-            return add(first, second, settings, JointType2D.PIVOT);
+            return add(first, second, settings);
         }
     }
 
@@ -122,14 +122,13 @@ final class PhysicsJoints2D implements AutoCloseable {
      * @param first first validated body
      * @param second second validated body
      * @param settings temporary native constraint description
-     * @param type relationship exposed by the handle
      * @return registered joint handle
      */
-    private PhysicsJoint2D add(RigidBody2D first, RigidBody2D second, TwoBodyConstraintSettings settings, JointType2D type) {
+    private PhysicsJoint2D add(RigidBody2D first, RigidBody2D second, TwoBodyConstraintSettings settings) {
         TwoBodyConstraint constraint = world.bodies.createConstraint(settings, first.id, second.id);
         boolean added = false;
         try {
-            PhysicsJoint2D joint = new PhysicsJoint2D(world, first, second, constraint, type, jointCount);
+            PhysicsJoint2D joint = new PhysicsJoint2D(world, first, second, constraint, jointCount);
             system.addConstraint(constraint);
             added = true;
             first.activate();

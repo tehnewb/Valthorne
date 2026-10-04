@@ -14,7 +14,6 @@ import com.github.stephengold.joltjni.ObjectVsBroadPhaseLayerFilterTable;
 import com.github.stephengold.joltjni.PhysicsSystem;
 import com.github.stephengold.joltjni.Quat;
 import com.github.stephengold.joltjni.RVec3;
-import com.github.stephengold.joltjni.Shape;
 import com.github.stephengold.joltjni.TempAllocator;
 import com.github.stephengold.joltjni.TempAllocatorImplWithMallocFallback;
 import com.github.stephengold.joltjni.Vec3;
@@ -25,6 +24,7 @@ import com.github.stephengold.joltjni.enumerate.EMotionQuality;
 import com.github.stephengold.joltjni.enumerate.EMotionType;
 import com.github.stephengold.joltjni.enumerate.EOverrideMassProperties;
 import org.joml.Vector2f;
+import valthorne.math.geometry.Shape;
 
 import java.util.Objects;
 
@@ -41,6 +41,19 @@ import java.util.Objects;
  * fixed step without changing accumulated frame time. Choose one timing entry
  * point for a game loop. Forces and torques last for the next native step only;
  * use direct stepping when applying a sustained force once per physics tick.</p>
+ *
+ * <h2>Geometry integration</h2>
+ * <p>Settings constructed from geometry retain the original render shape.
+ * Frame updates automatically write interpolated positions and degree rotations;
+ * direct steps and contact delivery write current poses. Circles, rectangles,
+ * rounded rectangles, triangles and convex polygons are supported. Pixel mappings
+ * convert corner anchors, camera origins and Y directions automatically. Set
+ * pixelsPerMeter, pixelOrigin and pixelsYDown on world settings; no separate
+ * conversion object is required. createBody(shape) accepts pixel geometry directly. Geometry
+ * dimensions and vertex counts are frozen for collision purposes: recreate the
+ * body after resizing. Moving geometry manually requires
+ * {@link RigidBody2D#setTransformFromGeometry()} to teleport physics. Geometry
+ * objects and their mappings share the world's thread confinement.</p>
  *
  * <h2>Ownership and threading</h2>
  * <p>The creating thread exclusively owns public access, including disposal.
@@ -81,7 +94,8 @@ import java.util.Objects;
  * Point/bounds queries allocate no steady Java objects. Jolt JNI 6.0.0 requires
  * temporary ray/result owners for rays and borrowed wrappers/normal vectors for
  * native contacts, whose Java allocation may be eliminated by the JVM. The
- * contact queue itself uses preallocated parallel arrays.
+ * contact queue uses four preallocated arrays with packed body pairs, subshape
+ * pairs and normal/depth values.
  * Native temporary storage uses a
  * reusable arena with malloc fallback. Creation allocates a Java handle and
  * native shape/body. If native solver capacities are exhausted, the world is
@@ -148,6 +162,12 @@ public final class PhysicsWorld2D implements AutoCloseable {
     final RVec3 positionScratch = new RVec3(); // Reusable position for owner-thread native reads and writes.
     final Quat rotationScratch = new Quat(); // Reusable orientation for owner-thread native reads and writes.
     final Vec3 vectorScratch = new Vec3(); // Reusable vector for forces, torques, and velocity reads.
+    private final float metersPerPixel; // Cached reciprocal for pixel-to-world conversion.
+    private final float verticalPixelScale; // Signed rendering scale implementing the Y direction.
+    private float pixelOriginX; // Render X coordinate of the physics world origin.
+    private float pixelOriginY; // Render Y coordinate of the physics world origin.
+    private Vector2f geometryPosition; // Lazily allocated scratch shared by all geometry bindings.
+    private int geometryCount; // Live geometry bindings; zero skips all render synchronization.
     private double accumulator; // Unsatisfied frame time, normally less than one fixed step.
     private double droppedTime; // Whole-step frame time discarded by the catch-up limit.
     private long stepCount; // Number of successfully completed fixed simulation steps.
@@ -179,6 +199,10 @@ public final class PhysicsWorld2D implements AutoCloseable {
      */
     public PhysicsWorld2D(PhysicsWorldSettings2D settings) {
         Objects.requireNonNull(settings, "settings");
+        metersPerPixel = 1 / settings.pixelsPerMeter;
+        verticalPixelScale = settings.pixelsYDown ? -settings.pixelsPerMeter : settings.pixelsPerMeter;
+        pixelOriginX = settings.pixelOriginX;
+        pixelOriginY = settings.pixelOriginY;
         handles = new RigidBody2D[settings.maxBodies];
         nativeHandles = new RigidBody2D[settings.maxBodies];
         maxJoints = settings.maxJoints;
@@ -386,14 +410,22 @@ public final class PhysicsWorld2D implements AutoCloseable {
         check();
         Objects.requireNonNull(settings, "settings");
         if (bodyCount == handles.length) throw new IllegalStateException("Physics body capacity reached");
+        if (settings.geometry != null) {
+            if (settings.geometry.pixelWorld != null && settings.geometry.pixelWorld != this)
+                throw new IllegalArgumentException("Geometry settings belong to another world");
+            for (int i = 0; i < bodyCount; i++) {
+                if (handles[i].geometry != null && handles[i].geometry.shape == settings.geometry.shape)
+                    throw new IllegalArgumentException("Geometry is already attached to a live body");
+            }
+        }
         int id = Jolt.cInvalidBodyId;
         RigidBody2D body;
-        try (Shape shape = settings.shape.createNative(); BodyCreationSettings nativeSettings = new BodyCreationSettings()) {
+        try (com.github.stephengold.joltjni.Shape shape = settings.shape.createNative(); BodyCreationSettings nativeSettings = new BodyCreationSettings()) {
             float halfAngle = settings.angle * 0.5f;
             rotationScratch.set(0, 0, (float) Math.sin(halfAngle), (float) Math.cos(halfAngle));
             boolean moving = settings.motion != MotionType2D.STATIC;
             nativeSettings.setShape(shape)
-                    .setPosition(settings.x, settings.y, 0)
+                    .setPosition(settings.positionInPixels ? worldX(settings.x) : settings.x, settings.positionInPixels ? worldY(settings.y) : settings.y, 0)
                     .setRotation(rotationScratch)
                     .setMotionType(switch (settings.motion) {
                         case STATIC -> EMotionType.Static;
@@ -423,6 +455,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
             id = bodies.createAndAddBody(nativeSettings, moving ? EActivation.Activate : EActivation.DontActivate);
             if (id == Jolt.cInvalidBodyId) throw new IllegalStateException("Jolt could not allocate a body");
             body = new RigidBody2D(this, id, bodyCount, settings);
+            if (body.geometry != null) body.geometry.sync(body, false);
         } catch (RuntimeException | Error failure) {
             if (id != Jolt.cInvalidBodyId) {
                 bodies.removeBody(id);
@@ -430,12 +463,175 @@ public final class PhysicsWorld2D implements AutoCloseable {
             }
             throw failure;
         }
+        if (body.geometry != null) geometryCount++;
         handles[bodyCount++] = body;
         nativeHandles[id & BODY_INDEX_MASK] = body;
         capturePreviousActivity = true;
         if (settings.motion != MotionType2D.STATIC) movingBodyCount++;
         if (poses != null) poses.invalidate();
         return body;
+    }
+
+    /**
+     * Creates a default dynamic body directly from pixel geometry using this world's
+     * scale, origin and Y direction. The original shape updates automatically.
+     * @param shape supported geometry shape, not null
+     * @return newly owned body retaining that shape
+     */
+    public RigidBody2D createBody(Shape shape) {
+        return createBody(bodySettings(shape));
+    }
+
+    /**
+     * Creates configurable geometry-backed settings with this world's pixel mapping.
+     * Configure optional mass, motion or material properties before createBody(settings).
+     * @param shape supported pixel geometry shape, not null
+     * @return new settings retaining the geometry and shared world mapping
+     */
+    public BodySettings2D bodySettings(Shape shape) {
+        check();
+        return new BodySettings2D(shape, this);
+    }
+
+    /**
+     * Updates the screen location of the world origin for camera movement.
+     * Geometry reflects the change on the next update, including update(0).
+     * @param x finite render X origin
+     * @param y finite render Y origin
+     * @return this world
+     */
+    public PhysicsWorld2D pixelOrigin(float x, float y) {
+        check();
+        PhysicsValidation2D.finite(x, "pixel origin x");
+        PhysicsValidation2D.finite(y, "pixel origin y");
+        pixelOriginX = x;
+        pixelOriginY = y;
+        return this;
+    }
+
+    /**
+     * Converts a length or signed displacement without applying a camera origin.
+     * @param pixels finite pixel magnitude
+     * @return equivalent meters
+     */
+    public float toMeters(float pixels) {
+        check();
+        PhysicsValidation2D.finite(pixels, "pixels");
+        float meters = pixels * metersPerPixel;
+        PhysicsValidation2D.finite(meters, "converted meters");
+        return meters;
+    }
+
+    /**
+     * Converts a length or signed displacement without applying a camera origin.
+     * @param meters finite world magnitude
+     * @return equivalent pixels
+     */
+    public float toPixels(float meters) {
+        check();
+        PhysicsValidation2D.finite(meters, "meters");
+        float pixels = meters * Math.abs(verticalPixelScale);
+        PhysicsValidation2D.finite(pixels, "converted pixels");
+        return pixels;
+    }
+
+    /**
+     * Converts a render position into world meters, supporting aliased vectors.
+     * @param x finite horizontal pixel coordinate
+     * @param y finite vertical pixel coordinate
+     * @param destination reusable output vector, not null
+     * @return the supplied vector containing world meters
+     */
+    public Vector2f toWorld(float x, float y, Vector2f destination) {
+        check();
+        Objects.requireNonNull(destination, "destination");
+        return destination.set(worldX(x), worldY(y));
+    }
+
+    /**
+     * Converts a world position into pixels, supporting aliased vectors.
+     * @param x finite horizontal world coordinate in meters
+     * @param y finite vertical world coordinate in meters
+     * @param destination reusable output vector, not null
+     * @return the supplied vector containing render pixels
+     */
+    public Vector2f toScreen(float x, float y, Vector2f destination) {
+        check();
+        Objects.requireNonNull(destination, "destination");
+        PhysicsValidation2D.finite(x, "world x");
+        PhysicsValidation2D.finite(y, "world y");
+        float screenX = (float) ((double) pixelOriginX + (double) x * Math.abs(verticalPixelScale));
+        float screenY = (float) ((double) pixelOriginY + (double) y * verticalPixelScale);
+        PhysicsValidation2D.finite(screenX, "screen x");
+        PhysicsValidation2D.finite(screenY, "screen y");
+        return destination.set(screenX, screenY);
+    }
+
+    /**
+     * Converts horizontal render position into world meters.
+     * @param pixels finite render X coordinate
+     * @return physics X coordinate
+     */
+    float worldX(float pixels) {
+        PhysicsValidation2D.finite(pixels, "pixel x");
+        float worldX = (float) (((double) pixels - pixelOriginX) * metersPerPixel);
+        PhysicsValidation2D.finite(worldX, "converted world x");
+        return worldX;
+    }
+
+    /**
+     * Converts vertical render position into world meters.
+     * @param pixels finite render Y coordinate
+     * @return physics Y coordinate
+     */
+    float worldY(float pixels) {
+        PhysicsValidation2D.finite(pixels, "pixel y");
+        float worldY = (float) (((double) pixels - pixelOriginY) * (verticalPixelScale < 0 ? -metersPerPixel : metersPerPixel));
+        PhysicsValidation2D.finite(worldY, "converted world y");
+        return worldY;
+    }
+
+    /**
+     * Describes a rectangle using full pixel dimensions, independent of origin.
+     * @param width full pixel width
+     * @param height full pixel height
+     * @return reusable collision descriptor in world meters
+     */
+    public CollisionShape2D boxPixels(float width, float height) {
+        return CollisionShape2D.box(toMeters(width), toMeters(height));
+    }
+
+    /**
+     * Describes a circle using its pixel radius, independent of origin.
+     * @param radius pixel radius
+     * @return reusable collision descriptor in world meters
+     */
+    public CollisionShape2D circlePixels(float radius) {
+        return CollisionShape2D.circle(toMeters(radius));
+    }
+
+    /**
+     * Converts geometry degrees into world radians, including the configured Y reflection.
+     * @param degrees finite geometry orientation
+     * @return counterclockwise world radians
+     */
+    float toWorldRotation(float degrees) {
+        check();
+        PhysicsValidation2D.finite(degrees, "degrees");
+        return (float) Math.toRadians(degrees) * (verticalPixelScale < 0 ? -1 : 1);
+    }
+
+    /**
+     * Converts world radians into geometry degrees, including the configured Y reflection.
+     * @param radians finite world orientation
+     * @return geometry orientation in degrees
+     */
+    float toGeometryRotation(float radians) {
+        check();
+        PhysicsValidation2D.finite(radians, "radians");
+        float degrees = (float) Math.toDegrees(radians);
+        PhysicsValidation2D.finite(degrees, "converted degrees");
+        return degrees * (verticalPixelScale < 0 ? -1 : 1);
     }
 
     /**
@@ -687,6 +883,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
         }
         handles[last] = null;
         nativeHandles[body.id & BODY_INDEX_MASK] = null;
+        if (body.geometry != null) geometryCount--;
         body.destroyed = true;
         if (poses != null) {
             if (movingBodyCount < PhysicsPoses2D.MIN_BODIES) {
@@ -720,9 +917,11 @@ public final class PhysicsWorld2D implements AutoCloseable {
     /**
      * Adds elapsed frame time and simulates bounded fixed steps. Excess whole
      * steps are discarded while the fractional remainder is preserved. Zero
-     * elapsed time performs no work when there is no existing complete step.
-     * Contact delivery follows each completed step. A thrown application callback
-     * commits that step's time, discards its remaining events and retains any
+     * elapsed time performs no native step when there is no complete step pending.
+     * Attached geometry receives the interpolated render pose, even when no step
+     * is needed, allowing camera-origin changes to take effect immediately.
+     * Contact delivery follows each completed step and sees current geometry.
+     * A thrown application callback commits that step's time, discards its remaining events and retains any
      * unprocessed frame backlog for a subsequent call.
      *
      * @param elapsedSeconds finite, nonnegative elapsed frame time in seconds
@@ -743,13 +942,17 @@ public final class PhysicsWorld2D implements AutoCloseable {
                 // Commit time before user code so a thrown callback cannot replay it.
                 accumulator -= fixedTimeStep;
                 completed++;
-                if (contacts != null) contacts.dispatch();
+                if (contacts != null) {
+                    syncGeometry(false);
+                    contacts.dispatch();
+                }
             }
             if (accumulator >= fixedTimeStep) {
                 double remainder = accumulator % fixedTimeStep;
                 droppedTime += accumulator - remainder;
                 accumulator = remainder;
             }
+            syncGeometry(true);
             return completed;
         } finally {
             advancing = false;
@@ -771,9 +974,33 @@ public final class PhysicsWorld2D implements AutoCloseable {
         advancing = true;
         try {
             simulate();
+            syncGeometry(false);
             if (contacts != null) contacts.dispatch();
         } finally {
             advancing = false;
+        }
+    }
+
+    /**
+     * Provides owner-thread scratch only when geometry integration is used.
+     * @return shared position storage, never retained by a binding
+     */
+    Vector2f geometryPosition() {
+        check();
+        if (geometryPosition == null) geometryPosition = new Vector2f();
+        return geometryPosition;
+    }
+
+    /**
+     * Updates original render shapes using shared owner-thread scratch storage. Worlds with
+     * no geometry bindings avoid the traversal entirely.
+     * @param interpolated whether to apply fractional render interpolation
+     */
+    private void syncGeometry(boolean interpolated) {
+        if (geometryCount == 0) return;
+        for (int i = 0; i < bodyCount; i++) {
+            RigidBody2D body = handles[i];
+            if (body.geometry != null) body.geometry.sync(body, interpolated);
         }
     }
 
@@ -829,6 +1056,7 @@ public final class PhysicsWorld2D implements AutoCloseable {
         // Invalidate remaining handles even if a native removal failed.
         while (bodyCount != 0) {
             RigidBody2D body = handles[--bodyCount];
+            if (body.geometry != null) geometryCount--;
             body.destroyed = true;
             nativeHandles[body.id & BODY_INDEX_MASK] = null;
             handles[bodyCount] = null;

@@ -22,7 +22,6 @@ public final class PhysicsJoint2D implements AutoCloseable {
     final TwoBodyConstraint constraint; // Native constraint reference owned until destruction.
     int index; // Current slot in the world's dense joint array.
     boolean destroyed; // Whether the native constraint has been released.
-    private final JointType2D type; // Immutable relationship selected at creation.
 
     /**
      * Wraps a successfully constructed native constraint awaiting registration.
@@ -31,15 +30,13 @@ public final class PhysicsJoint2D implements AutoCloseable {
      * @param first first attached live body
      * @param second second attached live body
      * @param constraint owned native constraint
-     * @param type relationship enforced by the constraint
      * @param index insertion slot in the dense joint array
      */
-    PhysicsJoint2D(PhysicsWorld2D world, RigidBody2D first, RigidBody2D second, TwoBodyConstraint constraint, JointType2D type, int index) {
+    PhysicsJoint2D(PhysicsWorld2D world, RigidBody2D first, RigidBody2D second, TwoBodyConstraint constraint, int index) {
         this.world = world;
         this.first = first;
         this.second = second;
         this.constraint = constraint;
-        this.type = type;
         this.index = index;
     }
 
@@ -83,7 +80,7 @@ public final class PhysicsJoint2D implements AutoCloseable {
      */
     public JointType2D getType() {
         world.checkOwner();
-        return type;
+        return constraint instanceof DistanceConstraint ? JointType2D.DISTANCE : JointType2D.PIVOT;
     }
 
     /**

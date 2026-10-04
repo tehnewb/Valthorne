@@ -1,6 +1,7 @@
 package valthorne.math.physics;
 
 import java.util.Objects;
+import valthorne.math.geometry.Shape;
 
 /**
  * Reusable fluent configuration for a planar rigid body. A world copies these
@@ -22,8 +23,10 @@ import java.util.Objects;
  * }</pre>
  */
 public final class BodySettings2D {
+    final PhysicsGeometry2D geometry; // Optional geometry snapshot, owning no native resources.
     final CollisionShape2D shape; // Immutable collision geometry retained for future body creation.
     MotionType2D motion = MotionType2D.DYNAMIC; // Simulation response of newly created bodies.
+    boolean positionInPixels; // Whether the initial center awaits conversion using the creating world.
     float x; // Initial horizontal center in meters.
     float y; // Initial vertical center in meters.
     float angle; // Initial counterclockwise orientation in radians.
@@ -49,6 +52,51 @@ public final class BodySettings2D {
      */
     public BodySettings2D(CollisionShape2D shape) {
         this.shape = Objects.requireNonNull(shape, "shape");
+        geometry = null;
+    }
+
+    /**
+     * Creates physics from a geometry shape expressed in pixels and retains that
+     * exact object for automatic rendering updates. Position, outline and degree
+     * rotation are copied now. Each shape may belong to only one live body per
+     * world; the caller must also avoid sharing it across worlds or threads.
+     * Shapes must retain their dimensions and vertex count while attached.
+     *
+     * <pre>{@code
+     * Rectangle rectangle = new Rectangle(100, 200, 64, 32);
+     * RigidBody2D body = world.createBody(world.bodySettings(rectangle).mass(2));
+     * world.update(deltaSeconds); // rectangle now contains the interpolated render pose
+     * }</pre>
+     * @param shape circle, rectangle, rounded rectangle, triangle or convex polygon
+     * @param world owning world supplying pixel configuration, not null
+     */
+    BodySettings2D(Shape shape, PhysicsWorld2D world) {
+        this(new PhysicsGeometry2D(shape, Objects.requireNonNull(world, "world")));
+    }
+
+    /**
+     * Creates geometry-backed settings from coordinates already expressed in meters.
+     * Geometry degree rotations are converted automatically to world radians.
+     * @param shape supported geometry shape, not null
+     * @return new reusable settings retaining the original shape
+     */
+    public static BodySettings2D fromGeometry(Shape shape) {
+        /*
+         * A named factory avoids ambiguity with the existing collision-descriptor constructor.
+         */
+        return new BodySettings2D(new PhysicsGeometry2D(shape, null));
+    }
+
+    /**
+     * Initializes body configuration from a validated geometry snapshot.
+     * @param geometry immutable outline and original render object
+     */
+    private BodySettings2D(PhysicsGeometry2D geometry) {
+        shape = geometry.collision();
+        this.geometry = geometry;
+        if (geometry.pixelWorld == null) position(geometry.centerX, geometry.centerY);
+        else position(geometry.pixelWorld.worldX(geometry.centerX), geometry.pixelWorld.worldY(geometry.centerY));
+        rotation(geometry.pixelWorld == null ? (float) Math.toRadians(geometry.shape.getRotation()) : geometry.pixelWorld.toWorldRotation(geometry.shape.getRotation()));
     }
 
     /**
@@ -73,8 +121,21 @@ public final class BodySettings2D {
     public BodySettings2D position(float x, float y) {
         PhysicsValidation2D.finite(x, "x");
         PhysicsValidation2D.finite(y, "y");
+        positionInPixels = false;
         this.x = x;
         this.y = y;
+        return this;
+    }
+
+    /**
+     * Sets an initial pixel center, converted using the creating world's configuration.
+     * @param x finite horizontal pixel center
+     * @param y finite vertical pixel center
+     * @return these settings
+     */
+    public BodySettings2D positionPixels(float x, float y) {
+        position(x, y);
+        positionInPixels = true;
         return this;
     }
 

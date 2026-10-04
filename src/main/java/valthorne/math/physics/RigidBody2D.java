@@ -2,6 +2,7 @@ package valthorne.math.physics;
 
 import com.github.stephengold.joltjni.enumerate.EActivation;
 import org.joml.Vector2f;
+import valthorne.math.geometry.Shape;
 
 import java.util.Objects;
 
@@ -27,8 +28,17 @@ import java.util.Objects;
  * storage and allocate no temporary vectors. Forces and torques are consumed by
  * the next native step; impulses immediately alter dynamic velocity. Native
  * maximum velocities and contact tolerances remain in effect.</p>
+ *
+ * <p>Position reads fill the supplied Vector2f and return this body for immediate
+ * pixel chaining: {@code ball.getPosition().asPixels()}. No-argument reads lazily
+ * reuse one body-owned vector; destination overloads remain available. Conversion
+ * uses the owning world's configuration and returns the same destination vector.
+ * No conversion or position wrapper is needed.
+ * Passing a destination selects the output reused by subsequent reads; each
+ * read replaces the interpolation mode.</p>
  */
 public final class RigidBody2D implements AutoCloseable {
+    final PhysicsGeometry2D geometry; // Optional immutable geometry snapshot shared with the original settings.
     final PhysicsWorld2D world; // Owning simulation and reusable owner-thread scratch storage.
     final int id; // Native body identifier, valid only until this handle is destroyed.
     int index; // Current index in the world's dense live-handle array.
@@ -37,6 +47,8 @@ public final class RigidBody2D implements AutoCloseable {
     private final boolean fixedRotation; // Whether angular simulation around Z is disabled.
     private final boolean sensor; // Whether collisions are overlaps without physical response.
     private final CollisionShape2D shape; // Immutable geometry used for exact planar point queries.
+    private Vector2f positionDestination; // Last caller-owned destination used by a fluent position read.
+    private boolean interpolatedPosition; // Whether the pending conversion reads the interpolated pose.
     private float x; // Current captured horizontal center in meters.
     private float y; // Current captured vertical center in meters.
     private float angle; // Current captured orientation in radians, normalized to [-pi, pi].
@@ -60,8 +72,46 @@ public final class RigidBody2D implements AutoCloseable {
         fixedRotation = settings.fixedRotation;
         sensor = settings.sensor;
         shape = settings.shape;
+        geometry = settings.geometry;
         capture();
         remember();
+    }
+
+    /**
+     * Returns the original geometry object, without allocating or copying it.
+     * @return attached geometry, or null when created from a collision descriptor
+     */
+    public Shape getGeometry() {
+        world.checkOwner();
+        return geometry == null ? null : geometry.shape;
+    }
+
+    /**
+     * Writes the current physics pose into attached geometry immediately. Normal
+     * frame updates do this automatically with interpolation; this method is useful
+     * after a teleport or when drawing current simulation state.
+     * @return this body
+     * @throws IllegalStateException if no geometry is attached or the body is invalid
+     */
+    public RigidBody2D syncGeometry() {
+        check();
+        if (geometry == null) throw new IllegalStateException("Body has no attached geometry");
+        geometry.sync(this, false);
+        return this;
+    }
+
+    /**
+     * Teleports this body to the attached geometry's current position and degree
+     * rotation, resetting interpolation. Use after moving a shape manually; this
+     * copies its pose only, so changing dimensions requires recreating the body.
+     * @return this body
+     * @throws IllegalStateException if no geometry is attached or the body is invalid
+     */
+    public RigidBody2D setTransformFromGeometry() {
+        check();
+        if (geometry == null) throw new IllegalStateException("Body has no attached geometry");
+        geometry.push(this);
+        return this;
     }
 
     /**
@@ -168,26 +218,98 @@ public final class RigidBody2D implements AutoCloseable {
     }
 
     /**
+     * Reads the current captured center using body-owned reusable storage.
+     * The first no-argument position read creates one Vector2f; later reads reuse
+     * it. Call asPixels() immediately to obtain that vector in render coordinates.
+     * The vector belongs to this body and subsequent no-argument reads overwrite
+     * it, so copy its coordinates when retaining a snapshot across frames. Passing
+     * a destination selects that vector for subsequent no-argument reads.
+     * @return this body for getPosition().asPixels() chaining
+     */
+    public RigidBody2D getPosition() {
+        check();
+        if (positionDestination == null) positionDestination = new Vector2f();
+        return getPosition(positionDestination);
+    }
+
+    /**
+     * Reads the interpolated center using the same body-owned reusable storage.
+     * The first no-argument read creates one Vector2f; subsequent reads allocate
+     * nothing. Call asPixels() immediately to obtain interpolated render pixels.
+     * @return this body for getInterpolatedPosition().asPixels() chaining
+     */
+    public RigidBody2D getInterpolatedPosition() {
+        check();
+        if (positionDestination == null) positionDestination = new Vector2f();
+        return getInterpolatedPosition(positionDestination);
+    }
+
+    /**
      * Copies the current captured center into caller-owned storage.
      *
      * @param destination output vector, not null
-     * @return the destination containing world meters
+     * @return this body for immediate asPixels() chaining; destination contains world meters
      */
-    public Vector2f getPosition(Vector2f destination) {
+    public RigidBody2D getPosition(Vector2f destination) {
+        copyPosition(destination, false);
+        positionDestination = destination;
+        interpolatedPosition = false;
+        return this;
+    }
+
+    /**
+     * Converts the destination from the last position read into pixels without a
+     * wrapper or temporary vector. Use immediately after getPosition(destination)
+     * or getInterpolatedPosition(destination). A subsequent read replaces the
+     * destination; use the chain before changing the simulation pose. Repeated
+     * calls recompute from the captured body pose and never double-convert pixels.
+     * @return the existing caller-owned destination containing render pixels
+     * @throws IllegalStateException if no position has been read or the body is invalid
+     */
+    public Vector2f asPixels() {
         check();
-        Objects.requireNonNull(destination, "destination");
-        return destination.set(x, y);
+        if (positionDestination == null) throw new IllegalStateException("Read a position before converting to pixels");
+        if (!interpolatedPosition) return world.toScreen(x, y, positionDestination);
+        float alpha = world.getInterpolationAlpha();
+        return world.toScreen(previousX + (x - previousX) * alpha, previousY + (y - previousY) * alpha, positionDestination);
+    }
+
+    /**
+     * Teleports from render pixels while retaining the native radian convention.
+     * @param x horizontal pixel center
+     * @param y vertical pixel center
+     * @param radians counterclockwise world rotation in radians
+     * @return this body
+     */
+    public RigidBody2D setTransformPixels(float x, float y, float radians) {
+        check();
+        return setTransform(world.worldX(x), world.worldY(y), radians);
     }
 
     /**
      * Blends captured centers using the world's frame interpolation fraction.
      *
      * @param destination output vector, not null
-     * @return the destination containing interpolated world meters
+     * @return this body for immediate asPixels() chaining; destination contains interpolated meters
      */
-    public Vector2f getInterpolatedPosition(Vector2f destination) {
+    public RigidBody2D getInterpolatedPosition(Vector2f destination) {
+        copyPosition(destination, true);
+        positionDestination = destination;
+        interpolatedPosition = true;
+        return this;
+    }
+
+    /**
+     * Copies a captured center without altering the caller's pending fluent read.
+     * Internal geometry synchronization uses this path to preserve its destination.
+     * @param destination reusable output vector, not null
+     * @param interpolated whether to blend previous and current endpoints
+     * @return the destination containing world meters
+     */
+    Vector2f copyPosition(Vector2f destination, boolean interpolated) {
         check();
         Objects.requireNonNull(destination, "destination");
+        if (!interpolated) return destination.set(x, y);
         float alpha = world.getInterpolationAlpha();
         return destination.set(previousX + (x - previousX) * alpha, previousY + (y - previousY) * alpha);
     }
@@ -228,6 +350,7 @@ public final class RigidBody2D implements AutoCloseable {
                 motion == MotionType2D.STATIC ? EActivation.DontActivate : EActivation.Activate);
         capture();
         remember();
+        if (geometry != null) geometry.sync(this, false);
         return this;
     }
 
