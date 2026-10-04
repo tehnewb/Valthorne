@@ -7,16 +7,22 @@ function bumpKind(pull) {
     const labels = new Set(pull.labels.map(label => label.name));
     const patch = labels.has('version:patch');
     const hotfix = labels.has('version:hotfix');
-    if (patch && hotfix) throw new Error(`PR #${pull.number} has conflicting version labels.`);
-    return patch ? 'patch' : hotfix ? 'hotfix' : null;
+    const feature = labels.has('version:feature');
+    if (Number(patch) + Number(hotfix) + Number(feature) > 1)
+        throw new Error(`PR #${pull.number} has conflicting version labels.`);
+    return feature ? 'feature' : patch ? 'patch' : hotfix ? 'hotfix' : null;
 }
 
-/** Advances only the last two components of an unsigned four-part version. */
+/** Advances the selected component while preserving the first version number. */
 function bumpVersion(version, kind) {
     if (!/^\d+\.\d+\.\d+\.\d+$/.test(version))
         throw new Error(`Expected a four-part version, received ${version}.`);
     const parts = version.split('.').map(part => BigInt(part));
-    if (kind === 'patch') {
+    if (kind === 'feature') {
+        parts[1] += 1n;
+        parts[2] = 0n;
+        parts[3] = 0n;
+    } else if (kind === 'patch') {
         parts[2] += 1n;
         parts[3] = 0n;
     } else if (kind === 'hotfix') {
@@ -39,7 +45,7 @@ function planUpdate(properties, state, pulls) {
     if (!/^\d+\.\d+\.\d+\.\d+$/.test(previous)) throw new Error('Invalid recorded version.');
     const previousParts = previous.split('.').map(BigInt);
     const currentParts = initial.split('.').map(BigInt);
-    const majorRelease = currentParts[0] > previousParts[0]
+    let majorRelease = currentParts[0] > previousParts[0]
             || (currentParts[0] === previousParts[0] && currentParts[1] > previousParts[1]);
     const firstDifference = currentParts.findIndex((part, index) => part !== previousParts[index]);
     if (firstDifference !== -1 && currentParts[firstDifference] < previousParts[firstDifference])
@@ -54,11 +60,12 @@ function planUpdate(properties, state, pulls) {
     for (const pull of pending) {
         const kind = bumpKind(pull);
         if (pull.labels.some(label => label.name === 'release:urgent')) {
-            if (!kind) throw new Error(`Urgent PR #${pull.number} needs a version:patch or version:hotfix label.`);
+            if (!kind) throw new Error(`Urgent PR #${pull.number} needs a version:feature, version:patch, or version:hotfix label.`);
             urgent.push(pull.number);
         }
         if (kind) {
             version = bumpVersion(version, kind);
+            if (kind === 'feature') majorRelease = true;
             bumps.push(pull.number);
         }
         processed.add(pull.number);

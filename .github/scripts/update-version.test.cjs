@@ -15,6 +15,20 @@ test('hotfix increments the fourth component; patch resets it', () => {
     assert.throws(() => bumpVersion('1.2.3-SNAPSHOT', 'patch'));
 });
 
+test('feature increments the second component, resets both trailing components, and requests publication once', () => {
+    assert.equal(bumpVersion('1.2.3.9', 'feature'), '1.3.0.0');
+    const plan = planUpdate('version=1.0.0.0\n', state, [pull(1, 'version:feature')]);
+    assert.equal(plan.version, '1.1.0.0');
+    assert.equal(plan.release.reason, 'major-or-feature-version');
+    assert.deepEqual(plan.release.pullRequests, [1]);
+    assert.equal(planUpdate(plan.properties, plan.state, [pull(1, 'version:feature')]).release, null);
+    for (const label of ['version:patch', 'version:hotfix']) {
+        const conflict = pull(2, 'version:feature');
+        conflict.labels.push({ name: label });
+        assert.throws(() => planUpdate('version=1.0.0.0\n', state, [conflict]), /conflicting/);
+    }
+});
+
 test('reconciles out-of-order merges, preserves CRLF, and is idempotent', () => {
     const pulls = [pull(3, 'version:hotfix', '2026-10-04T00:00:03Z'), pull(1, 'version:hotfix'),
         pull(2, 'version:patch', '2026-10-04T00:00:02Z'), pull(4, null)];

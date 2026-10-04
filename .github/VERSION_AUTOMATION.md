@@ -4,13 +4,16 @@ Before merging a pull request into `main`, choose at most one label:
 
 | Label | Result |
 | --- | --- |
+| `version:feature` | Increment the second number and reset the last two: `1.0.3.9` becomes `1.1.0.0`; publish automatically. |
 | `version:hotfix` | Increment the fourth number: `1.0.0.9` becomes `1.0.0.10`. |
 | `version:patch` | Increment the third number and reset the fourth: `1.0.0.9` becomes `1.0.1.0`. |
 | Neither | Record the merge without changing the version. |
 
-The first two numbers never change automatically. Increase them explicitly in
-`gradle.properties` when preparing a major or big feature release. An increase
-to either number requests automatic Maven Central publication after merge.
+The first number never changes automatically. Increase it explicitly in
+`gradle.properties` when preparing a major release. Use `version:feature` for
+big feature releases; it requests automatic Maven Central publication without
+needing `release:urgent`. An explicit increase to either of the first two
+numbers also requests publication after merge.
 Labels must be selected before
 merging and remain unchanged until the workflow processes the PR. Both labels
 together fail the run; remove the incorrect label and run the workflow again.
