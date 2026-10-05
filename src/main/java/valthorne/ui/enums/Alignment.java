@@ -52,7 +52,7 @@ import valthorne.math.geometry.Sizeable;
  * panel.setPosition(100f, 50f);
  * panel.setSize(300f, 120f);
  *
- * SlugFont label = SlugFont.load("font.ttf");
+ * SlugFont label = SlugData.load("font.ttf").asFont();
  * label.setText("Play");
  *
  * Vector2f pos = Alignment.align(panel, label, Alignment.CENTER, Alignment.CENTER);

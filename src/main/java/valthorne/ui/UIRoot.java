@@ -17,6 +17,7 @@ import valthorne.event.listeners.MouseScrollListener;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.font.SystemFonts;
 import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugData;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.behavior.TextEditing;
 import valthorne.ui.nodes.Label;
@@ -950,7 +951,8 @@ public class UIRoot extends UIContainer {
         if (disposed || nanoVGHandle == 0) return null;
         SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
         if (current != null) return current;
-        current = SlugFont.load(SystemFonts.find(code).toString(), 32, 224);
+        current = SlugData.load(SystemFonts.find(code).toString(), 32, 224)
+                .asFont();
         if (code) nanoSlugCodeFont = current;
         else nanoSlugFont = current;
         return current;
