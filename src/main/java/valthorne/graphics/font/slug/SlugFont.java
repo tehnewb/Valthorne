@@ -7,12 +7,9 @@ import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.geometry.Dimensional;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,7 +53,7 @@ import static org.lwjgl.stb.STBTruetype.*;
  * Reusable SlugTextRun layouts avoid repeated layout work while retaining live curves.
  * </p>
  * <pre>{@code
- * SlugFont font = SlugFont.load("assets/font.ttf");
+ * SlugFont font = SlugData.load("assets/font.ttf").asFont();
  * try {
  *     font.setText("Hello").setSize(32);
  *     font.setPosition(20, 60);
@@ -119,117 +116,25 @@ public final class SlugFont implements Dimensional {
     private float width; // Cached measured width of retained text.
     private float height; // Cached measured height of retained text.
 
-    /*
-     * Takes ownership of compiled glyph tables and uploaded textures, retaining the
-     * font bytes that back STB metric queries. Initializes retained-text measurement.
-     *
-     * @param info               initialized STB font information
-     * @param fontBuffer         backing bytes that must outlive info
-     * @param glyphs             compiled character table
-     * @param kerning            dense pair advances in em units
-     * @param firstCodepoint     first table codepoint
-     * @param characterCount     number of compiled entries
-     * @param emScale            font-unit to em multiplier
-     * @param ascent             ascent in em units
-     * @param descent            descent in em units
-     * @param lineGap            additional line spacing in em units
-     * @param curveTexture       owned curve texture name
-     * @param bandTexture        owned band texture name
-     */
-    private SlugFont(STBTTFontinfo info, ByteBuffer fontBuffer, SlugGlyph[] glyphs, float[] kerning, int firstCodepoint, int characterCount, float emScale, float ascent, float descent, float lineGap, int curveTexture, int bandTexture) {
-        this.info = info;
-        this.fontBuffer = fontBuffer;
-        this.glyphs = glyphs;
-        this.kerning = kerning;
-        this.firstCodepoint = firstCodepoint;
-        this.characterCount = characterCount;
-        this.emScale = emScale;
-        this.ascent = ascent;
-        this.descent = descent;
-        this.lineHeight = ascent - descent + lineGap;
-        this.fallbackAdvance = 0.25f;
-        this.curveTexture = curveTexture;
-        this.bandTexture = bandTexture;
-        recalcSize();
-    }
-
     /**
-     * Loads and uploads the 95 printable ASCII characters beginning at codepoint 32.
-     * Requires a current OpenGL context for data texture creation.
+     * Creates a font from immutable encoded data on the thread owning the current
+     * OpenGL context. Copies bytes into retained direct storage, initializes STB,
+     * compiles glyphs and kerning, and uploads two owned data textures. The data
+     * remains reusable. Texture creation preserves texture and pixel-unpack state.
      *
-     * @param path TrueType/OpenType filesystem path
-     * @return newly owned font
-     * @throws RuntimeException if reading or STB initialization fails
-     */
-    public static SlugFont load(String path) {
-        /*
-         * Use the common printable range so synchronous loads share the same compiler.
-         */
-        return load(path, 32, 95);
-    }
-
-    /**
-     * Reads a font file and compiles the requested contiguous character range,
-     * including its pairwise kerning table and GPU data textures.
-     *
-     * @param path           TrueType/OpenType filesystem path
-     * @param firstCodepoint first character to compile
-     * @param characterCount range length from 1 through 256
-     * @return newly owned font
-     * @throws IllegalArgumentException if characterCount is outside its supported range
-     * @throws RuntimeException         if reading or STB initialization fails
-     */
-    public static SlugFont load(String path, int firstCodepoint, int characterCount) {
-        /*
-         * Read encoded bytes once and preserve the I/O cause if loading fails.
-         */
-        try {
-            return load(Files.readAllBytes(Path.of(path)), firstCodepoint, characterCount);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Compiles asset-loaded font data and uploads its Slug textures. Call this on
-     * the thread that owns the current OpenGL context.
-     *
-     * @param data immutable encoded data and character-range metadata
-     * @return newly owned GPU font
+     * @param data immutable encoded font and character-range metadata
      * @throws NullPointerException if data is null
+     * @throws RuntimeException if STB cannot initialize the font
      */
-    public static SlugFont load(SlugData data) {
-        /*
-         * Snapshot asset data before compilation so worker-owned bytes cannot change it.
-         */
-        if (data == null) throw new NullPointerException("data");
-        return load(data.bytes(), data.firstCodepoint(), data.characterCount());
-    }
-
-    /**
-     * Copies source bytes into retained direct storage, initializes STB, compiles
-     * glyphs and kerning, and uploads the two owned data textures. The caller may
-     * reuse its byte array afterward. Character-count validation does not validate
-     * the first codepoint. Texture creation preserves texture and pixel-unpack state.
-     *
-     * @param fontBytes      nonnull, nonempty font data
-     * @param firstCodepoint first codepoint in the lookup table
-     * @param characterCount table length from 1 through 256
-     * @return newly owned font
-     * @throws IllegalArgumentException if bytes are absent or characterCount is invalid
-     * @throws RuntimeException         if STB cannot initialize the font
-     */
-    public static SlugFont load(byte[] fontBytes, int firstCodepoint, int characterCount) {
+    public SlugFont(SlugData data) {
         /*
          * Retain only outline textures and the STB backing bytes. TextureBatch
          * evaluates these same outlines directly, so no bitmap atlas is needed.
          */
-        if (fontBytes == null || fontBytes.length == 0) {
-            throw new IllegalArgumentException("fontBytes cannot be null or empty.");
-        }
-        if (characterCount <= 0 || characterCount > 256) {
-            throw new IllegalArgumentException("characterCount must be in the range [1, 256].");
-        }
+        if (data == null) throw new NullPointerException("data");
+        byte[] fontBytes = data.bytes();
+        int firstCodepoint = data.firstCodepoint();
+        int characterCount = data.characterCount();
 
         ByteBuffer fontBuffer = BufferUtils.createByteBuffer(fontBytes.length);
         fontBuffer.put(fontBytes).flip();
@@ -266,7 +171,20 @@ public final class SlugFont implements Dimensional {
         int curveTexture = uploadTexture(curveWriter.toBuffer(curveHeight), null);
         int bandTexture = uploadTexture(null, bandWriter.toBuffer(bandHeight));
 
-        return new SlugFont(info, fontBuffer, glyphs, kerning, firstCodepoint, characterCount, emScale, ascent, descent, lineGap, curveTexture, bandTexture);
+        this.info = info;
+        this.fontBuffer = fontBuffer;
+        this.glyphs = glyphs;
+        this.kerning = kerning;
+        this.firstCodepoint = firstCodepoint;
+        this.characterCount = characterCount;
+        this.emScale = emScale;
+        this.ascent = ascent;
+        this.descent = descent;
+        this.lineHeight = ascent - descent + lineGap;
+        this.fallbackAdvance = 0.25f;
+        this.curveTexture = curveTexture;
+        this.bandTexture = bandTexture;
+        recalcSize();
     }
 
     /**

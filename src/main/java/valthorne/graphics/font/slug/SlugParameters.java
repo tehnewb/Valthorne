@@ -9,7 +9,7 @@ import java.util.Arrays;
 /**
  * Immutable asset request for encoded Slug font data and its compiled character range.
  * Loading through {@link Assets} performs file I/O only; create the GPU
- * font later with {@link SlugFont#load(SlugData)} on the graphics-context thread.
+ * font later with {@link SlugData#asFont()} on the graphics-context thread.
  *
  * Exactly one source is present: path is nonnull for deferred file loading, or
  * bytes is nonnull for a copied in-memory source. Factories cover filesystem,

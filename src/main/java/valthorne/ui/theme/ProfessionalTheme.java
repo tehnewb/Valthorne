@@ -4,6 +4,7 @@ import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugData;
 import valthorne.graphics.texture.NinePatchTexture;
 import valthorne.graphics.texture.TextureData;
 import valthorne.ui.nodes.*;
@@ -72,7 +73,8 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         accent = new Color(light ? 0xFF285DCE : 0xFF76A5FF);
         border = new Color(light ? 0xFFBCC9DA : 0xFF3E506A);
         disabled = new Color(light ? 0xFFDDE3EC : 0xFF27303D);
-        font = SlugFont.load(SystemFonts.find(false).toString(), 32, 224);
+        font = SlugData.load(SystemFonts.find(false).toString(), 32, 224)
+                .asFont();
     }
 
     /**
