@@ -41,55 +41,32 @@ import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
  * @since October 17th, 2025
  */
 public class JGL {
-
-    /**
-     * Application callbacks used by the running loop; replaced only on its thread.
-     */
-    private static Application frameApplication;
-
-    /**
-     * Returns the current application frame callbacks.
-     *
-     * @return active callbacks, or null outside application execution
-     */
-    public static Application getFrameApplication() {
-        /*
-         * Expose the callback owner without introducing a tool dependency.
-         */
-        return frameApplication;
-    }
-
-    /**
-     * Replaces frame callbacks without initializing or disposing either owner.
-     * Call on the application thread; the original application retains shutdown ownership.
-     *
-     * @param application callbacks used for subsequent updates and rendering
-     */
-    public static void setFrameApplication(Application application) {
-        /*
-         * Frame decorators borrow the original lifecycle and must not duplicate cleanup.
-         */
-        if (application == null) throw new NullPointerException("Application cannot be null");
-        frameApplication = application;
-    }
-
-
+    
     /**
      * Shared engine event registry cleared during lifecycle reset.
      */
     private static final EventPublisher events = new EventPublisher();
+    
     /**
      * Thread-safe pending tasks drained by the application loop.
      */
     private static final BlockingDeque<Runnable> tasks = new LinkedBlockingDeque<>();
+    
+    /**
+     * Application callbacks used by the running loop; replaced only on its thread.
+     */
+    private static Application frameApplication;
+    
     /**
      * Most recently recorded frame duration in seconds.
      */
     private static float deltaTime;
+    
     /**
      * Cached frame-rate estimate stored as a short.
      */
     private static short framesPerSecond;
+    
     /**
      * Application-loop continuation flag.
      */
@@ -430,5 +407,31 @@ public class JGL {
             throw error;
         }
         throw new RuntimeException(throwable);
+    }
+
+    /**
+     * Returns the current application frame callbacks.
+     *
+     * @return active callbacks, or null outside application execution
+     */
+    public static Application getFrameApplication() {
+        /*
+         * Expose the callback owner without introducing a tool dependency.
+         */
+        return frameApplication;
+    }
+
+    /**
+     * Replaces frame callbacks without initializing or disposing either owner.
+     * Call on the application thread; the original application retains shutdown ownership.
+     *
+     * @param application callbacks used for subsequent updates and rendering
+     */
+    public static void setFrameApplication(Application application) {
+        /*
+         * Frame decorators borrow the original lifecycle and must not duplicate cleanup.
+         */
+        if (application == null) throw new NullPointerException("Application cannot be null");
+        frameApplication = application;
     }
 }
