@@ -44,37 +44,12 @@ core.*
 # Local application scratch directories are excluded from releases.
 /website/
 /src/examples/
-/src/test/
 /src/benchmark/
 /integration-tests/
 # Historical nested source snapshots must not reintroduce test folders.
 **/src/test/
 **/src/examples/
 **/src/benchmark/
-# Keep the editor's repeatable verification suite while excluding local test applications.
-!/src/test/
-/src/test/*
-!/src/test/java/
-/src/test/java/*
-!/src/test/java/valthorne/
-/src/test/java/valthorne/*
-!/src/test/java/valthorne/ui/
-/src/test/java/valthorne/ui/*
-!/src/test/java/valthorne/ui/engine/
-# Keep the renderer's pixel verification and reproducible 100,000-shape target.
-!/src/test/java/valthorne/graphics/
-/src/test/java/valthorne/graphics/*
-!/src/test/java/valthorne/graphics/bgfx/
-# Keep the native live-font batching regression.
-!/src/test/java/valthorne/graphics/font/
-/src/test/java/valthorne/graphics/font/*
-!/src/test/java/valthorne/graphics/font/slug/
-/src/test/java/valthorne/graphics/font/slug/*
-!/src/test/java/valthorne/graphics/font/slug/SlugTextureBatchVerification.java
-# Keep the 3D lighting CPU and hidden-context verification suite.
-!/src/test/java/valthorne/graphics/lighting3d/
-/src/test/java/valthorne/graphics/lighting3d/*
-!/src/test/java/valthorne/graphics/lighting3d/Lighting3DVerification.java
 /assets/
 /proto/
 /private/
@@ -125,7 +100,6 @@ $RECYCLE.BIN/
 # Local 3D prototypes: sources, native resources, browser backends, and notes.
 /.prototype3d/
 /src/main/java/valthorne/threed/
-/src/test/java/valthorne/threed/
 /portable/web/
 /portable/validation/
 
@@ -518,27 +492,13 @@ $RECYCLE.BIN/
 
 # Private editor prototype: implementation, assets, tests, and authored state.
 /src/main/java/valthorne/ui/engine/
-/src/test/java/valthorne/ui/engine/
 /.prototype-editor/
 /.valthorne/
 /docs/scene-editor.md
 /src/testFixtures/
 /src/main/resources/ui/icons/
 /src/main/resources/ui/scene-selection.png
-/src/test/
 
-# Public native rendering verification required by verifySlugTextureBatch.
-!/src/test/
-/src/test/*
-!/src/test/java/
-/src/test/java/*
-!/src/test/java/valthorne/
-/src/test/java/valthorne/*
-!/src/test/java/valthorne/graphics/
-/src/test/java/valthorne/graphics/*
-!/src/test/java/valthorne/graphics/font/
-/src/test/java/valthorne/graphics/font/*
-!/src/test/java/valthorne/graphics/font/slug/
-/src/test/java/valthorne/graphics/font/slug/*
-!/src/test/java/valthorne/graphics/font/slug/SlugTextureBatchVerification.java
+
+# All local tests remain outside Git, including previously tracked verification files.
 /src/test/
