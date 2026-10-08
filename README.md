@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.2.0.2" src="https://img.shields.io/badge/version-1.2.0.2-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.2.0.3" src="https://img.shields.io/badge/version-1.2.0.3-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -62,7 +62,7 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 
 ## Release version
 
-**Current Valthorne version: 1.2.0.2.** Versions use four numbers:
+**Current Valthorne version: 1.2.0.3.** Versions use four numbers:
 
 | Position | Meaning |
 | --- | --- |
@@ -105,7 +105,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:1.2.0.2'
+    implementation 'io.github.tehnewb:Valthorne:1.2.0.3'
 }
 
 java {
@@ -143,7 +143,7 @@ sections. Maven Central is Maven's default repository:
     <dependency>
         <groupId>io.github.tehnewb</groupId>
         <artifactId>Valthorne</artifactId>
-        <version>1.2.0.2</version>
+        <version>1.2.0.3</version>
     </dependency>
 </dependencies>
 ```
