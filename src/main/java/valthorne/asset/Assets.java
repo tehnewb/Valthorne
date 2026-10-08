@@ -171,6 +171,26 @@ public final class Assets {
     }
 
     /**
+     * Returns a consistent detached snapshot of the current prepared-loading counters.
+     * Fluent changes to the result do not affect global loading progress. Each call
+     * allocates one small snapshot; retain it when displaying several counter values.
+     *
+     * @return caller-owned current progress snapshot
+     */
+    public static AssetLoadProgress getLoadProgress() {
+        /*
+         * Copy all counters under the bookkeeping lock so callers receive one
+         * consistent observation without gaining mutable access to live state.
+         */
+        synchronized (PROGRESS_LOCK) {
+            return new AssetLoadProgress(progress.getRequests())
+                    .setProcessed(progress.getProcessed())
+                    .setPending(progress.getPending())
+                    .setFailed(progress.getFailed());
+        }
+    }
+
+    /**
      * Returns the processed fraction in the current observation, including failed and
      * cancelled requests. An observation with no requests is complete and returns one.
      *
@@ -181,7 +201,7 @@ public final class Assets {
          * Read both counters together to provide a consistent progress snapshot.
          */
         synchronized (PROGRESS_LOCK) {
-            return progress.requests == 0 ? 1f : progress.processed / (float) progress.requests;
+            return progress.getRequests() == 0 ? 1f : progress.getProcessed() / (float) progress.getRequests();
         }
     }
 
@@ -196,7 +216,7 @@ public final class Assets {
          * Failure counting shares the observation lock with completion callbacks.
          */
         synchronized (PROGRESS_LOCK) {
-            return progress.failed;
+            return progress.getFailed();
         }
     }
 
@@ -350,7 +370,7 @@ public final class Assets {
          * Work detached by reset is deliberately excluded from this observation.
          */
         synchronized (PROGRESS_LOCK) {
-            return prepared.isEmpty() && progress.pending == 0;
+            return prepared.isEmpty() && progress.getPending() == 0;
         }
     }
 
@@ -368,7 +388,7 @@ public final class Assets {
          */
         Objects.requireNonNull(params);
         synchronized (PROGRESS_LOCK) {
-            if (prepared.add(params)) progress.requests++;
+            if (prepared.add(params)) progress.setRequests(progress.getRequests() + 1);
         }
     }
 
@@ -409,7 +429,7 @@ public final class Assets {
             synchronized (PROGRESS_LOCK) {
                 if (!prepared.remove(parameters)) continue;
                 observation = progress;
-                observation.pending++;
+                observation.setPending(observation.getPending() + 1);
             }
 
             final String key = parameters.key();
@@ -427,9 +447,9 @@ public final class Assets {
             }
             CompletableFuture<?> tracked = future.whenComplete((_, ex) -> {
                 synchronized (PROGRESS_LOCK) {
-                    observation.processed++;
-                    observation.pending--;
-                    if (ex != null) observation.failed++;
+                    observation.setProcessed(observation.getProcessed() + 1);
+                    observation.setPending(observation.getPending() - 1);
+                    if (ex != null) observation.setFailed(observation.getFailed() + 1);
                 }
             });
 
