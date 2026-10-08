@@ -38,6 +38,8 @@ import java.net.URL;
  * Reads and writes the human-readable UTF-8 representation of a {@link PropertySet}.
  * Each property occupies one line in the form {@code escaped-name:type=escaped-value}
  * and may end with an optional {@code # comment} or {@code ! comment}.
+ * Empty names are supported, matching the collection and binary codec; their lines
+ * begin with the type separator, for example {@code :integer=7}.
  * Blank lines and lines whose first non-whitespace character is {@code #} or {@code !}
  * are ignored. Backslash escapes {@code \}, {@code :}, {@code =}, newline, carriage
  * return, tab, and comment-marker characters.
@@ -229,7 +231,7 @@ public final class PropertySetTextIO {
             try {
                 int colon = separator(line, ':', 0);
                 int equals = colon < 0 ? -1 : separator(line, '=', colon + 1);
-                if (colon < 1 || equals < colon + 2) throw new IllegalArgumentException("Expected name:type=value");
+                if (colon < 0 || equals < colon + 2) throw new IllegalArgumentException("Expected name:type=value");
 
                 String name = unescape(line.substring(0, colon));
                 String type = line.substring(colon + 1, equals).trim();
@@ -237,7 +239,6 @@ public final class PropertySetTextIO {
                 int comment = inlineComment(encodedValue);
                 if (comment >= 0) encodedValue = encodedValue.substring(0, comment - 1);
                 String value = unescape(encodedValue);
-                if (name.isEmpty()) throw new IllegalArgumentException("Property name cannot be empty");
                 if (properties.contains(name)) throw new IllegalArgumentException("Duplicate property name: " + name);
                 properties.set(name, decode(type, value));
             } catch (RuntimeException error) {
