@@ -69,7 +69,9 @@ public final class PropertySetTextIO {
     }
 
     /**
-     * Writes properties and optional comments to a UTF-8 text file.
+     * Writes properties and optional comments to a UTF-8 text file after encoding succeeds.
+     * Unsupported values leave existing content intact. File-system write failures
+     * may still leave a partially written file.
      *
      * @param properties properties to write
      * @param path destination path
@@ -78,9 +80,12 @@ public final class PropertySetTextIO {
      */
     public static void write(PropertySet properties, Path path, PropertyTextOptions options) throws IOException {
         Objects.requireNonNull(path, "path");
-        try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-            write(properties, writer, options);
-        }
+        /*
+         * Complete text encoding before opening the destination so unsupported
+         * values or invalid options cannot destroy an existing property file.
+         */
+        String encoded = toText(properties, options);
+        Files.writeString(path, encoded, StandardCharsets.UTF_8);
     }
 
     /**
