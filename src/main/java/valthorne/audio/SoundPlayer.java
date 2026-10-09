@@ -125,10 +125,10 @@ public class SoundPlayer {
     private boolean wantPlaying; // Whether streamed playback logically wants to remain playing
     private boolean looping; // Whether looping is enabled for this player
     private float streamedSeconds; // Number of seconds already consumed from processed stream buffers
-    private float storedVolume = 1f; // Saved volume used to restore state after unmuting
-    private boolean muted; // Whether this player is currently considered muted
+    private boolean muted; // Explicit mute state, independent of configured volume and area attenuation.
     private volatile boolean disposed; // Cross-thread flag indicating that player resources have been released.
-    private float volume = 1f, appliedGain = Float.NaN; // Configured volume and last submitted gain; NaN forces the first native update.
+    private float volume = 1f; // Configured volume, retained while explicitly muted.
+    private float appliedGain = Float.NaN; // Last submitted source gain; NaN forces the first native update.
     private SoundArea area; // Immutable ambient coverage, or null to disable area attenuation.
     private float areaGain = 1f; // Attenuation multiplier evaluated at the cached listener position.
     private Audio.ListenerPosition areaListener; // Last evaluated listener snapshot; null forces reevaluation.
@@ -159,7 +159,7 @@ public class SoundPlayer {
     /**
      * Recalculates area attenuation when the listener snapshot has changed and returns
      * the source gain applied to OpenAL. This is configured volume multiplied by area
-     * gain; it does not include listener gain or subsequent device mixing.
+     * gain, or zero while explicitly muted; it does not include listener gain or device mixing.
      *
      * @return most recently applied source gain
      */
@@ -182,12 +182,12 @@ public class SoundPlayer {
     }
 
     /**
-     * Applies configured volume multiplied by area attenuation to the OpenAL source.
+     * Applies zero gain while muted, otherwise configured volume multiplied by area attenuation.
      * An unchanged product avoids a native call. The cached value records the value
      * submitted to OpenAL; this helper must run on the audio thread with a live source.
      */
     private void applyGain() {
-        float gain = volume * areaGain;
+        float gain = muted ? 0f : volume * areaGain;
         if (gain == appliedGain) return;
         alSourcef(source, AL_GAIN, gain);
         appliedGain = gain;
@@ -441,7 +441,7 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Returns the current effective source gain.
+     * Returns configured volume, independently of mute state and area attenuation.
      * </p>
      *
      * @return the current source volume in the {@code [0, 1]} range
@@ -452,12 +452,12 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Sets the source gain.
+     * Sets configured volume without changing mute state.
      * </p>
      *
      * <p>
      * The value is clamped into the {@code [0, 1]} range before being applied to
-     * OpenAL.
+     * OpenAL unless muted. While muted, the new setting is retained for unmuting.
      * </p>
      *
      * @param volume the desired volume
@@ -729,7 +729,7 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Mutes the player while remembering the current volume so it can be restored later.
+     * Mutes the player without changing configured volume. Repeated calls are harmless.
      * </p>
      */
     public void mute() {
@@ -738,7 +738,7 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Restores the remembered volume and clears muted state.
+     * Clears mute state and applies the latest configured volume with area attenuation.
      * </p>
      */
     public void unmute() {
@@ -759,7 +759,7 @@ public class SoundPlayer {
      * Returns whether this player is currently muted.
      * </p>
      *
-     * @return {@code true} if muted or effectively silent
+     * @return {@code true} if explicitly muted; zero configured volume or area gain does not imply mute
      */
     public boolean isMuted() {
         return query(this::isMutedInternal);
@@ -767,7 +767,7 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Raises volume by the given amount.
+     * Raises configured volume by the given amount without clearing mute state.
      * </p>
      *
      * @param amount the amount to increase volume by
@@ -778,7 +778,7 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Lowers volume by the given amount.
+     * Lowers configured volume by the given amount without changing mute state.
      * </p>
      *
      * @param amount the amount to decrease volume by
@@ -1146,7 +1146,7 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Returns the current source gain.
+     * Returns configured volume independently of effective source gain.
      * </p>
      *
      * @return the current volume value
@@ -1157,12 +1157,12 @@ public class SoundPlayer {
 
     /**
      * <p>
-     * Sets the source gain.
+     * Sets configured volume without changing mute state.
      * </p>
      *
      * <p>
      * The supplied value is clamped into the range {@code [0, 1]} before being sent
-     * to OpenAL.
+     * to OpenAL unless muted. While muted, the new setting is retained for unmuting.
      * </p>
      *
      * @param volume the desired volume value
@@ -1486,93 +1486,56 @@ public class SoundPlayer {
     }
 
     /**
-     * <p>
-     * Mutes playback while remembering the current volume.
-     * </p>
-     *
-     * <p>
-     * The remembered volume is only updated when the player was not already muted.
-     * </p>
+     * Suppresses source gain without modifying configured volume.
      */
     private void muteInternal() {
-        if (!muted) {
-            storedVolume = getVolumeInternal();
-            muted = true;
-        }
-        setVolumeInternal(0f);
+        muted = true;
+        applyGain();
     }
 
     /**
-     * <p>
-     * Restores the remembered volume and clears muted state.
-     * </p>
+     * Clears mute state and applies current configured volume and area attenuation.
      */
     private void unmuteInternal() {
         muted = false;
-        setVolumeInternal(storedVolume);
+        applyGain();
     }
 
     /**
-     * <p>
-     * Toggles mute state.
-     * </p>
-     *
-     * <p>
-     * If the player is already muted or effectively silent, it un-mutes. Otherwise
-     * it stores current volume and mutes.
-     * </p>
+     * Toggles explicit mute state independently of configured volume and area gain.
      */
     private void toggleMuteInternal() {
-        if (muted || getVolumeInternal() <= 0f) {
-            unmuteInternal();
-        } else {
-            muteInternal();
-        }
+        muted = !muted;
+        applyGain();
     }
 
     /**
-     * <p>
-     * Returns whether the player is muted.
-     * </p>
+     * Returns explicit mute state. Other causes of silence do not change this flag.
      *
-     * @return {@code true} if muted or effectively silent
+     * @return whether playback is explicitly muted
      */
     private boolean isMutedInternal() {
-        return muted || getVolumeInternal() <= 0f;
+        return muted;
     }
 
     /**
-     * <p>
-     * Increases volume by the supplied amount.
-     * </p>
+     * Increases configured volume while preserving mute state; nonpositive amounts are ignored.
      *
-     * @param amount the amount to add to the current volume
+     * @param amount the amount to add to configured volume
      */
     private void volumeUpInternal(float amount) {
-        if (amount <= 0f) {
-            return;
-        }
-        muted = false;
-        setVolumeInternal(getVolumeInternal() + amount);
-        storedVolume = getVolumeInternal();
+        if (amount <= 0f) return;
+        setVolumeInternal(volume + amount);
     }
 
     /**
-     * <p>
-     * Decreases volume by the supplied amount.
-     * </p>
+     * Decreases configured volume while preserving mute state; nonpositive amounts are ignored.
      *
-     * @param amount the amount to subtract from the current volume
+     * @param amount the amount to subtract from configured volume
      */
     private void volumeDownInternal(float amount) {
-        if (amount <= 0f) {
-            return;
-        }
-        setVolumeInternal(getVolumeInternal() - amount);
-        storedVolume = getVolumeInternal();
-        if (getVolumeInternal() <= 0f) {
-            muted = true;
-        }
+        if (amount <= 0f) return;
+        setVolumeInternal(volume - amount);
     }
 
     /**
