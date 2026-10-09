@@ -19,7 +19,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -106,10 +106,10 @@ public final class Assets {
      * Atomic completed-load progress counter.
      */
     private static final AtomicInteger completedCount = new AtomicInteger(0);
-    /**
-     * Concurrent set of assets queued for prepared loading.
+    /*
+     * First queued request per cache key, matching direct-load identity semantics.
      */
-    private static final Set<AssetParameters> prepared = ConcurrentHashMap.newKeySet();
+    private static final ConcurrentMap<String, AssetParameters> prepared = new ConcurrentHashMap<>();
     /**
      * Atomic count used as the prepared-loading progress denominator.
      */
@@ -325,8 +325,8 @@ public final class Assets {
 
     /**
      * Prepares the specified asset parameters for loading by marking them as prepared.
-     * This method ensures that the given parameters are only prepared once.
-     * If the parameters are already prepared, the method returns without action.
+     * Requests are deduplicated by cache key; the first queued parameters win.
+     * Existing cached or in-flight values are reused when the batch is loaded.
      *
      * @param params The asset parameters to prepare. Must not be null.
      * @throws NullPointerException If {@code params} is null.
@@ -334,7 +334,11 @@ public final class Assets {
     public static void prepare(AssetParameters params) {
         Objects.requireNonNull(params);
 
-        if (prepared.add(params))
+        /*
+         * Queue one logical request per key even when parameter equality differs.
+         * Keeping the first request gives repeated preparation predictable ownership.
+         */
+        if (prepared.putIfAbsent(params.key(), params) == null)
             preparedCount.incrementAndGet();
     }
 
@@ -344,7 +348,7 @@ public final class Assets {
      * {@link AssetLoader}, based on the asset's {@link AssetParameters}. The progress is tracked
      * using a {@link ConcurrentLinkedQueue} of {@link CompletableFuture} instances.
      * <p>
-     * Each asset's loading result is stored in the {@code cache} using its unique key, and
+     * Each request uses the direct loading cache path, reusing existing values and in-flight loads;
      * the {@code completedCount} is incremented as each asset finishes loading. Additionally,
      * an aggregated {@link CompletableFuture} is created to represent the collective completion
      * of all the individual asset loading tasks.
@@ -361,25 +365,18 @@ public final class Assets {
      *
      * @throws IllegalStateException If no {@link AssetLoader} is registered for the given asset parameters type.
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     public static CompletableFuture<Void> load() {
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
-        ExecutorService executor = ensureService();
-
-        for (AssetParameters parameters : prepared) {
-            if (!prepared.remove(parameters))
+        /*
+         * Claim each queued key once and use the shared atomic cache path. Completion
+         * tracking belongs to the batch's dependent future, never a replacement entry.
+         */
+        for (Map.Entry<String, AssetParameters> entry : prepared.entrySet()) {
+            AssetParameters parameters = entry.getValue();
+            if (!prepared.remove(entry.getKey(), parameters))
                 continue;
 
-            final String key = parameters.key();
-
-            CompletableFuture<?> future = CompletableFuture
-                    .supplyAsync(() -> {
-                        AssetLoader loader = loaders.get(parameters.getClass());
-                        if (loader == null)
-                            throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
-
-                        return loader.load(parameters);
-                    }, executor)
+            CompletableFuture<?> future = loadAsync(parameters, Object.class)
                     .whenComplete((_, ex) -> {
                         if (ex != null) {
                             ex.printStackTrace();
@@ -389,7 +386,6 @@ public final class Assets {
                         completedCount.incrementAndGet();
                     });
 
-            cache.put(key, future);
             futures.add(future);
         }
 
