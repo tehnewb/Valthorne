@@ -28,6 +28,10 @@ package valthorne.camera;
  *     camera.rebuild(worldWidth, worldHeight);
  * </pre>
  *
+ * <p>Invalid dimensions, live center values, or unrepresentable float bounds throw
+ * IllegalArgumentException before changing the previous projection. Zero dimensions
+ * during minimization must be skipped by the caller.</p>
+ *
  * @author Albert Beaupre
  * @since November 16th, 2025
  */
@@ -46,6 +50,7 @@ public class OrthographicCamera extends Camera {
      */
     @Override
     public void rebuild(float worldWidth, float worldHeight) {
+        validateProjectionDimensions(worldWidth, worldHeight);
         float halfW = (worldWidth * 0.5f) / zoom;
         float halfH = (worldHeight * 0.5f) / zoom;
 
@@ -55,6 +60,6 @@ public class OrthographicCamera extends Camera {
         float top = center.y() + halfH;
 
         // Construct a classic orthographic projection
-        projection.setOrtho(left, right, bottom, top, -1f, 1f);
+        setOrthographicProjection(left, right, bottom, top);
     }
 }
