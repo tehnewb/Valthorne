@@ -1,6 +1,5 @@
 package valthorne.viewport;
 
-import static org.lwjgl.opengl.GL11.glViewport;
 
 /**
  * Fits a fixed logical world into a window with an optional whole-number pixel
@@ -70,9 +69,13 @@ public final class IntegerFitViewport extends FitViewport {
     }
 
     @Override
-    public void apply() {
-        super.apply();
-        glViewport(Math.round(x * framebufferScaleX), Math.round(y * framebufferScaleY), Math.round(width * framebufferScaleX), Math.round(height * framebufferScaleY));
+    protected float framebufferScaleX() {
+        return framebufferScaleX;
+    }
+
+    @Override
+    protected float framebufferScaleY() {
+        return framebufferScaleY;
     }
 
     @Override

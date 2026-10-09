@@ -160,6 +160,28 @@ public abstract class Viewport {
     public abstract void update(int screenWidth, int screenHeight);
 
     /**
+     * Returns physical framebuffer pixels per logical horizontal screen unit.
+     * Subclasses with scaled rendering override this for consistent viewport and clipping.
+     *
+     * @return horizontal framebuffer scale, one for ordinary viewports
+     */
+    protected float framebufferScaleX() {
+        return 1f;
+    }
+
+    /**
+     * Returns physical framebuffer pixels per logical vertical screen unit.
+     * Logical pointer conversion continues to use the unscaled screen rectangle.
+     *
+     * @return vertical framebuffer scale, one for ordinary viewports
+     */
+    protected float framebufferScaleY() {
+        return 1f;
+    }
+
+
+
+    /**
      * Applies this viewport's OpenGL viewport rectangle and projection state.
      *
      * <p>
@@ -170,7 +192,7 @@ public abstract class Viewport {
      * </p>
      */
     public void apply() {
-        glViewport(x, y, width, height);
+        glViewport(Math.round(x * framebufferScaleX()), Math.round(y * framebufferScaleY()), Math.round(width * framebufferScaleX()), Math.round(height * framebufferScaleY()));
 
         float[] matrixData;
 
@@ -327,7 +349,8 @@ public abstract class Viewport {
      * The provided world-space rectangle is converted into the viewport's actual screen-space
      * pixel rectangle. The result is then clamped to the viewport bounds. If another scissor
      * rectangle is already active, the new rectangle is intersected with the existing scissor
-     * region so nested scissoring behaves correctly.
+     * region so nested scissoring behaves correctly. Framebuffer scaling uses the same
+     * rounded physical screen rectangle as apply; logical pointer conversion is unchanged.
      * </p>
      *
      * <p>
@@ -344,6 +367,12 @@ public abstract class Viewport {
      * @return true if a valid scissor rectangle was applied, false if the rectangle clipped to nothing
      */
     public boolean beginScissor(float wx, float wy, float ww, float wh) {
+        float scaleX = framebufferScaleX();
+        float scaleY = framebufferScaleY();
+        int x = Math.round(this.x * scaleX);
+        int y = Math.round(this.y * scaleY);
+        int width = Math.round(this.width * scaleX);
+        int height = Math.round(this.height * scaleY);
         float nx = wx / worldWidth;
         float ny = wy / worldHeight;
         float nw = ww / worldWidth;
