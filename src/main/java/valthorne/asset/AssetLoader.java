@@ -17,7 +17,9 @@ public interface AssetLoader<P extends AssetParameters, T> {
      * Loads asset data using the given parameters. This operation performs the work
      * synchronously on the calling thread; scheduling and cache reuse belong to
      * {@link Assets}. Loading failures may be reported as runtime exceptions, which
-     * complete an asynchronous asset request exceptionally. Concrete implementations
+     * complete an asynchronous asset request exceptionally. A value returned after delivery
+     * cancellation is released on the producing worker; cleanup must be safe there or
+     * dispatch to the resource's owning thread. Concrete implementations
      * define validation and ownership of the returned data.
      *
      * @param parameters the parameters required to configure and execute the asset loading process
