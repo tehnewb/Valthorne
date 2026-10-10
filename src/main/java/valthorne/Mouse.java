@@ -408,17 +408,25 @@ public final class Mouse {
      * restored. If the window address is invalid, the method returns without changes.
      * </p>
      *
+     * Creation failure preserves the previous application cursor and metadata.
+     *
      * @param shape one of the supported {@code CURSOR_*} shape constants
+     * @throws IllegalStateException if GLFW cannot create the replacement cursor
      */
     public static void setCursor(int shape) {
         long win = Window.getAddress();
         if (win == 0) return;
 
-        if (currentCursor != 0) glfwDestroyCursor(currentCursor);
-
-        currentCursor = glfwCreateStandardCursor(shape);
+        /*
+         * Keep the owned cursor and its metadata until native replacement creation succeeds.
+         */
+        long next = glfwCreateStandardCursor(shape);
+        if (next == 0) throw new IllegalStateException("Failed to create standard GLFW cursor: " + shape);
+        long previous = currentCursor;
+        currentCursor = next;
         currentCursorShape = shape;
-        glfwSetCursor(win, overrideCursor != 0 ? overrideCursor : currentCursor);
+        glfwSetCursor(win, overrideCursor != 0 ? overrideCursor : next);
+        if (previous != 0) glfwDestroyCursor(previous);
     }
 
     /**
@@ -484,7 +492,9 @@ public final class Mouse {
      * </p>
      *
      * <p>
-     * The previous application cursor is destroyed before the new one is assigned.
+     * The previous application cursor is destroyed only after replacement creation succeeds.
+     * Creation failure preserves the previous cursor and metadata; temporary image storage
+     * is released on both successful and exceptional paths.
      * A temporary UI override remains visible and retains this image cursor for restoration.
      * </p>
      *
@@ -501,30 +511,28 @@ public final class Mouse {
         if (data == null) throw new NullPointerException("data");
         if (data.buffer() == null) throw new IllegalStateException("TextureData.buffer() is null");
 
-        if (currentCursor != 0) {
-            glfwDestroyCursor(currentCursor);
-            currentCursor = 0;
+        /*
+         * Scope temporary image storage across native creation so failures release it
+         * without destroying the currently owned application cursor.
+         */
+        long next;
+        try (GLFWImage image = malloc()) {
+            image.width(data.width());
+            image.height(data.height());
+            image.pixels(data.buffer());
+            hotY = data.height() - hotY - 1;
+            if (hotX < 0) hotX = 0;
+            if (hotY < 0) hotY = 0;
+            if (hotX >= data.width()) hotX = data.width() - 1;
+            if (hotY >= data.height()) hotY = data.height() - 1;
+            next = glfwCreateCursor(image, hotX, hotY);
         }
-
-        GLFWImage img = malloc();
-        img.width(data.width());
-        img.height(data.height());
-        img.pixels(data.buffer());
-
-        hotY = data.height() - hotY - 1;
-
-        if (hotX < 0) hotX = 0;
-        if (hotY < 0) hotY = 0;
-        if (hotX >= data.width()) hotX = data.width() - 1;
-        if (hotY >= data.height()) hotY = data.height() - 1;
-
-        currentCursor = glfwCreateCursor(img, hotX, hotY);
-        img.free();
-
-        if (currentCursor == 0) throw new RuntimeException("Failed to create GLFW cursor from TextureData");
-
+        if (next == 0) throw new IllegalStateException("Failed to create GLFW cursor from TextureData");
+        long previous = currentCursor;
+        currentCursor = next;
         currentCursorShape = 0;
-        glfwSetCursor(win, overrideCursor != 0 ? overrideCursor : currentCursor);
+        glfwSetCursor(win, overrideCursor != 0 ? overrideCursor : next);
+        if (previous != 0) glfwDestroyCursor(previous);
     }
 
     /**
