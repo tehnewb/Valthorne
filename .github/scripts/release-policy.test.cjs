@@ -14,3 +14,9 @@ test('accepts only a matching release snapshot and known reason', () => {
         version: '2.0.0.0', reason: 'major-or-feature-version', pullRequests: []
     }), '2.0.0.0');
 });
+
+test('accepts an explicitly requested manual release while rejecting version mismatches', () => {
+    const request = { version: '1.2.3.0', reason: 'manual-release', pullRequests: [] };
+    assert.equal(validateRelease('version=1.2.3.0\n', request), '1.2.3.0');
+    assert.throws(() => validateRelease('version=1.2.4.0\n', request), /exact/);
+});
