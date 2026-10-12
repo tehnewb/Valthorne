@@ -63,6 +63,9 @@ import java.util.Objects;
  * </ul>
  *
  * <p>
+ * Buffered natural completion is retained independently of the stopped native offset.
+ * Terminal time/progress report duration/one until replay, stop, rewind or seek.
+ * Initial and manually stopped buffered sources are not finished.
  * For streaming sounds, {@link #update()} must be called from the audio system so
  * processed buffers can be unqueued, timed correctly, refilled, and requeued. In
  * Valthorne, that update lifecycle is handled by {@link Audio}, so engine users
@@ -122,6 +125,8 @@ public class SoundPlayer {
     private final ByteBuffer streamChunk; // Temporary byte buffer used when reading streamed audio chunks
 
     private SoundStream stream; // Active stream reader used when streaming playback is enabled
+    private boolean bufferedStarted; // A buffered play/resume request not cleared by stop, rewind or completion.
+    private boolean bufferedFinished; // Natural buffered completion retained after OpenAL resets its offset.
     private boolean wantPlaying; // Whether streamed playback logically wants to remain playing
     private boolean looping; // Whether looping is enabled for this player
     private float streamedSeconds; // Number of seconds already consumed from processed stream buffers
@@ -411,7 +416,9 @@ public class SoundPlayer {
      * </p>
      *
      * <p>
-     * For fully buffered sounds, this is read directly from OpenAL. For streamed
+     * For fully buffered sounds, natural completion reports duration even after OpenAL
+     * resets its stopped offset. Replay, stop, rewind and seeking clear terminal completion.
+     * Active positions are read directly from OpenAL. For streamed
      * sounds, the value is reconstructed from {@link #streamedSeconds} plus the
      * source's current buffer offset.
      * </p>
@@ -883,6 +890,7 @@ public class SoundPlayer {
     private void updateInternal() {
         if (disposed) return;
         if (area != null) updateArea();
+        if (!streaming) refreshBufferedCompletion();
         if (!streaming || !wantPlaying) {
             return;
         }
@@ -947,6 +955,8 @@ public class SoundPlayer {
             return;
         }
 
+        bufferedStarted = true;
+        bufferedFinished = false;
         alSourcePlay(source);
     }
 
@@ -990,6 +1000,10 @@ public class SoundPlayer {
 
             wantPlaying = true;
         }
+        if (!streaming) {
+            bufferedStarted = true;
+            bufferedFinished = false;
+        }
         alSourcePlay(source);
     }
 
@@ -1032,6 +1046,8 @@ public class SoundPlayer {
             return;
         }
 
+        bufferedStarted = false;
+        bufferedFinished = false;
         alSourceRewind(source);
     }
 
@@ -1085,6 +1101,8 @@ public class SoundPlayer {
      */
     private float getCurrentTimeInternal() {
         if (!streaming) {
+            refreshBufferedCompletion();
+            if (bufferedFinished && !looping) return Math.max(0f, duration());
             return alGetSourcef(source, AL_SEC_OFFSET);
         }
 
@@ -1119,6 +1137,8 @@ public class SoundPlayer {
      */
     private void setCurrentTimeInternal(float seconds) {
         if (!streaming) {
+            refreshBufferedCompletion();
+            bufferedFinished = false;
             alSourcef(source, AL_SEC_OFFSET, clampTime(seconds));
             return;
         }
@@ -1398,12 +1418,26 @@ public class SoundPlayer {
     }
 
     /**
+     * Observes natural buffered completion on the audio thread. Only an outstanding
+     * play/resume request can complete; initial, manually stopped and rewound sources
+     * cannot. The terminal flag survives OpenAL resetting the stopped source offset.
+     */
+    private void refreshBufferedCompletion() {
+        if (bufferedStarted && !looping && alGetSourcei(source, AL_SOURCE_STATE) == AL_STOPPED) {
+            bufferedStarted = false;
+            bufferedFinished = true;
+        }
+    }
+
+    /**
      * <p>
      * Returns whether playback has fully completed.
      * </p>
      *
      * <p>
-     * Looping sounds are never considered finished. Streamed sounds are only finished
+     * Looping sounds are never considered finished. Buffered sounds finish only after a
+     * play/resume request naturally stops; manual stop and rewind clear completion.
+     * Streamed sounds are only finished
      * when the source is not actively playing, there are no playable queued buffers,
      * and the playback time has reached the sound duration.
      * </p>
@@ -1422,7 +1456,8 @@ public class SoundPlayer {
             return state != AL_PLAYING && Math.max(0, queued - processed) == 0 && getCurrentTimeInternal() >= duration();
         }
 
-        return isStoppedInternal() && getCurrentTimeInternal() >= duration();
+        refreshBufferedCompletion();
+        return bufferedFinished;
     }
 
     /**
