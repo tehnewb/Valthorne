@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 
 import static org.lwjgl.openal.AL10.*;
 import static org.lwjgl.openal.AL11.AL_SEC_OFFSET;
+import static org.lwjgl.openal.AL11.AL_SAMPLE_OFFSET;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -114,6 +115,7 @@ public class SoundPlayer {
     private static final int STREAM_BUFFER_SIZE = 64 * 1024;
 
     private final SoundData data; // Sound data definition backing this player
+    private final int bufferedFrames; // Uploaded PCM frame count; zero for streams or empty buffers.
     private final int source; // OpenAL source used to perform playback
     private final int buffer; // Single OpenAL buffer used for non-streaming playback
     private final boolean streaming; // Whether this player is operating in streaming mode
@@ -227,6 +229,7 @@ public class SoundPlayer {
         this.streaming = data.streaming();
 
         if (streaming) {
+            this.bufferedFrames = 0;
             this.buffer = 0;
             this.streamBuffers = new int[STREAM_BUFFER_COUNT];
             this.streamBufferDurations = new float[STREAM_BUFFER_COUNT];
@@ -254,6 +257,7 @@ public class SoundPlayer {
             ByteBuffer pcm = data.data().duplicate();
             pcm.position(0);
             alBufferData(buffer, format, pcm, data.sampleRate());
+            this.bufferedFrames = alGetBufferi(buffer, AL_SIZE) / (data.channels() * (data.bitsPerSample() / 8));
             alSourcei(source, AL_BUFFER, buffer);
         }
 
@@ -428,7 +432,9 @@ public class SoundPlayer {
      * </p>
      *
      * <p>
-     * The requested time is clamped to a valid range before being applied. For streamed
+     * Buffered positions are quantized to sample frames and clamped to the last uploaded
+     * frame, including exact-end and beyond-end requests. Playing/paused state is retained;
+     * {@link #getCurrentTime()} reports the actual native position. For streamed
      * sounds, seeking rebuilds stream state and may resume or re-pause playback
      * depending on the state before the seek.
      * </p>
@@ -1109,7 +1115,10 @@ public class SoundPlayer {
      * </p>
      *
      * <p>
-     * For fully buffered sounds, this uses {@code AL_SEC_OFFSET}. For streamed sounds,
+     * For fully buffered sounds, this uses whole sample frames clamped to the final
+     * uploaded frame, preserving playing or paused state. End/beyond-end requests
+     * report that actual frame position rather than the invalid inclusive endpoint.
+     * Empty buffered sounds have no seekable frames. For streamed sounds,
      * the method must rebuild the stream so playback can resume from the requested
      * position. If playback was active before the seek, the method restores either the
      * playing or paused state after the new stream is prepared.
@@ -1119,7 +1128,10 @@ public class SoundPlayer {
      */
     private void setCurrentTimeInternal(float seconds) {
         if (!streaming) {
-            alSourcef(source, AL_SEC_OFFSET, clampTime(seconds));
+            float target = clampTime(seconds);
+            if (bufferedFrames == 0) return;
+            int frame = (int) Math.min((double) target * data.sampleRate(), bufferedFrames - 1);
+            alSourcei(source, AL_SAMPLE_OFFSET, frame);
             return;
         }
 
