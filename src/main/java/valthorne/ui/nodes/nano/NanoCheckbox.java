@@ -208,140 +208,158 @@ public class NanoCheckbox extends UINode implements NanoNode {
 
     /**
      * Retains a non-null color for the normal background without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox backgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.backgroundColor = color;
+            setStyle(BACKGROUND_COLOR_KEY, this.backgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the hovered background without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox hoverBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverBackgroundColor = color;
+            setStyle(HOVER_BACKGROUND_COLOR_KEY, this.hoverBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the focused background without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox focusedBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedBackgroundColor = color;
+            setStyle(FOCUSED_BACKGROUND_COLOR_KEY, this.focusedBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the normal border without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox borderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.borderColor = color;
+            setStyle(BORDER_COLOR_KEY, this.borderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the hovered border without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox hoverBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverBorderColor = color;
+            setStyle(HOVER_BORDER_COLOR_KEY, this.hoverBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the focused border without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox focusedBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedBorderColor = color;
+            setStyle(FOCUSED_BORDER_COLOR_KEY, this.focusedBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the checkmark without copying it.
-     * Null keeps the previous value, and resolved styles may later replace it.
+     * Null keeps the previous value, and local overrides take precedence over theme values.
      *
      * @param color paint color reference, or null
      * @return this checkbox
      */
     public NanoCheckbox checkmarkColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.checkmarkColor = color;
+            setStyle(CHECKMARK_COLOR_KEY, this.checkmarkColor);
+        }
         return this;
     }
 
     /**
      * Sets the corner radius, clamping negatives to zero.
-     * There is no upper clamp; resolved layout styles can replace this value.
+     * There is no upper clamp; the local override takes precedence over theme values.
      *
      * @param cornerRadius finite requested value in UI units
      * @return this checkbox
      */
     public NanoCheckbox cornerRadius(float cornerRadius) {
         this.cornerRadius = Math.max(0f, cornerRadius);
+        setStyle(CORNER_RADIUS_KEY, this.cornerRadius);
         return this;
     }
 
     /**
      * Sets the border stroke width, clamping negatives to zero.
-     * There is no upper clamp; resolved layout styles can replace this value.
+     * There is no upper clamp; the local override takes precedence over theme values.
      *
      * @param borderWidth finite requested value in UI units
      * @return this checkbox
      */
     public NanoCheckbox borderWidth(float borderWidth) {
         this.borderWidth = Math.max(0f, borderWidth);
+        setStyle(BORDER_WIDTH_KEY, this.borderWidth);
         return this;
     }
 
     /**
      * Sets the checkmark width/height fraction, clamping negatives to zero.
-     * There is no upper clamp; resolved layout styles can replace this value.
+     * There is no upper clamp; the local override takes precedence over theme values.
      *
      * @param checkmarkScale finite requested value in fractions of node dimensions
      * @return this checkbox
      */
     public NanoCheckbox checkmarkScale(float checkmarkScale) {
         this.checkmarkScale = Math.max(0f, checkmarkScale);
+        setStyle(CHECKMARK_SCALE_KEY, this.checkmarkScale);
         return this;
     }
 
     /**
      * Sets the checkmark stroke thickness, clamping negatives to zero.
-     * There is no upper clamp; resolved layout styles can replace this value.
+     * There is no upper clamp; the local override takes precedence over theme values.
      *
      * @param checkmarkThickness finite requested value in UI units
      * @return this checkbox
      */
     public NanoCheckbox checkmarkThickness(float checkmarkThickness) {
         this.checkmarkThickness = Math.max(0f, checkmarkThickness);
+        setStyle(CHECKMARK_THICKNESS_KEY, this.checkmarkThickness);
         return this;
     }
 
@@ -376,44 +394,42 @@ public class NanoCheckbox extends UINode implements NanoNode {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
 
-        if (style != null) {
-            Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
-            Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
-            Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
-            Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
-            Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
-            Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
-            Color resolvedCheckmarkColor = style.get(CHECKMARK_COLOR_KEY);
-            Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
-            Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
-            Float resolvedCheckmarkScale = style.get(CHECKMARK_SCALE_KEY);
-            Float resolvedCheckmarkThickness = style.get(CHECKMARK_THICKNESS_KEY);
+        Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
+        Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
+        Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
+        Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
+        Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
+        Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
+        Color resolvedCheckmarkColor = style.get(CHECKMARK_COLOR_KEY);
+        Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
+        Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
+        Float resolvedCheckmarkScale = style.get(CHECKMARK_SCALE_KEY);
+        Float resolvedCheckmarkThickness = style.get(CHECKMARK_THICKNESS_KEY);
 
-            if (resolvedBackgroundColor != null)
-                backgroundColor = resolvedBackgroundColor;
-            if (resolvedHoverBackgroundColor != null)
-                hoverBackgroundColor = resolvedHoverBackgroundColor;
-            if (resolvedFocusedBackgroundColor != null)
-                focusedBackgroundColor = resolvedFocusedBackgroundColor;
-            if (resolvedBorderColor != null)
-                borderColor = resolvedBorderColor;
-            if (resolvedHoverBorderColor != null)
-                hoverBorderColor = resolvedHoverBorderColor;
-            if (resolvedFocusedBorderColor != null)
-                focusedBorderColor = resolvedFocusedBorderColor;
-            if (resolvedCheckmarkColor != null)
-                checkmarkColor = resolvedCheckmarkColor;
-            if (resolvedCornerRadius != null)
-                cornerRadius = Math.max(0f, resolvedCornerRadius);
-            if (resolvedBorderWidth != null)
-                borderWidth = Math.max(0f, resolvedBorderWidth);
-            if (resolvedCheckmarkScale != null)
-                checkmarkScale = Math.max(0f, resolvedCheckmarkScale);
-            if (resolvedCheckmarkThickness != null)
-                checkmarkThickness = Math.max(0f, resolvedCheckmarkThickness);
-        }
+        if (resolvedBackgroundColor != null)
+            backgroundColor = resolvedBackgroundColor;
+        if (resolvedHoverBackgroundColor != null)
+            hoverBackgroundColor = resolvedHoverBackgroundColor;
+        if (resolvedFocusedBackgroundColor != null)
+            focusedBackgroundColor = resolvedFocusedBackgroundColor;
+        if (resolvedBorderColor != null)
+            borderColor = resolvedBorderColor;
+        if (resolvedHoverBorderColor != null)
+            hoverBorderColor = resolvedHoverBorderColor;
+        if (resolvedFocusedBorderColor != null)
+            focusedBorderColor = resolvedFocusedBorderColor;
+        if (resolvedCheckmarkColor != null)
+            checkmarkColor = resolvedCheckmarkColor;
+        if (resolvedCornerRadius != null)
+            cornerRadius = Math.max(0f, resolvedCornerRadius);
+        if (resolvedBorderWidth != null)
+            borderWidth = Math.max(0f, resolvedBorderWidth);
+        if (resolvedCheckmarkScale != null)
+            checkmarkScale = Math.max(0f, resolvedCheckmarkScale);
+        if (resolvedCheckmarkThickness != null)
+            checkmarkThickness = Math.max(0f, resolvedCheckmarkThickness);
 
         super.applyLayout();
     }

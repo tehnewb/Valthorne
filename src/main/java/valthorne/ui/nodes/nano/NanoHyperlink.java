@@ -297,10 +297,8 @@ public class NanoHyperlink extends UINode implements NanoNode {
             nvgFontFace(vg, fontName);
             nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 
-            float[] bounds = new float[4];
-            nvgTextBounds(vg, 0f, 0f, text == null ? "" : text, bounds);
-            measuredTextWidth = Math.max(0f, bounds[2] - bounds[0]);
-            measuredTextHeight = Math.max(0f, bounds[3] - bounds[1]);
+            measuredTextWidth = NanoText.measureTextWidth(this, vg, fontName, fontSize, text);
+            measuredTextHeight = NanoText.measureTextHeight(this, vg, fontName, fontSize);
         } else {
             measuredTextWidth = Math.max(0f, (text == null ? 0 : text.length()) * fontSize * 0.56f);
             measuredTextHeight = fontSize;
@@ -354,74 +352,40 @@ public class NanoHyperlink extends UINode implements NanoNode {
         nvgFontFace(vg, fontName);
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         nvgFillColor(vg, NanoUtility.color1(drawColor));
-        NanoText.draw(this, vg, x, textY, text, fontSize, drawColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        NanoText.draw(this, vg, fontName, x, textY, text, fontSize, drawColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
-        float[] bounds = new float[4];
-        nvgTextBounds(vg, x, textY, text == null ? "" : text, bounds);
-        measuredTextWidth = Math.max(0f, bounds[2] - bounds[0]);
-        measuredTextHeight = Math.max(0f, bounds[3] - bounds[1]);
+        measuredTextWidth = NanoText.measureTextWidth(this, vg, fontName, fontSize, text);
+        measuredTextHeight = NanoText.measureTextHeight(this, vg, fontName, fontSize);
 
         if ((underlineAlways || isHovered() || isFocused() || isPressed()) && measuredTextWidth > 0f) {
-            float underlineY = bounds[3] + Math.max(1f, underlineThickness * 0.5f);
+            float underlineY = textY + measuredTextHeight * 0.5f + Math.max(1f, underlineThickness * 0.5f);
             nvgBeginPath(vg);
             nvgStrokeWidth(vg, underlineThickness);
             nvgStrokeColor(vg, NanoUtility.color2(drawColor));
-            nvgMoveTo(vg, bounds[0], underlineY);
-            nvgLineTo(vg, bounds[2], underlineY);
+            nvgMoveTo(vg, x, underlineY);
+            nvgLineTo(vg, x + measuredTextWidth, underlineY);
             nvgStroke(vg);
         }
     }
 
     /**
-     * Restores hardcoded appearance defaults, then overlays nonnull resolved style values. Colors are retained by reference; numeric sizes have lower bounds but no explicit finiteness validation. Blank font names keep the default. Called during drawing, layout and style invalidation.
+     * Resolves appearance from local overrides, matching rules, tokens, and key defaults without allocating fallback colors. Colors are retained by reference; numeric sizes have lower bounds but no explicit finiteness validation. Blank font names keep the default. Called during drawing, layout and style invalidation.
      */
     private void refreshStyleCache() {
-        ResolvedStyle style = getStyle();
-
-        color = new Color(0xFF4DA3FF);
-        hoverColor = new Color(0xFF7FBEFF);
-        focusedColor = new Color(0xFFA9D1FF);
-        pressedColor = new Color(0xFF2E7FD1);
-        disabledColor = new Color(0xFF6E6E6E);
-        visitedColor = new Color(0xFFC08CFF);
-
-        fontSize = 18f;
-        underlineThickness = 1.5f;
-        paddingX = 0f;
-        paddingY = 0f;
-        underlineAlways = false;
-        fontName = "default";
-
-        if (style == null)
-            return;
-
-        Color resolvedColor = style.get(COLOR_KEY);
-        Color resolvedHoverColor = style.get(HOVER_COLOR_KEY);
-        Color resolvedFocusedColor = style.get(FOCUSED_COLOR_KEY);
-        Color resolvedPressedColor = style.get(PRESSED_COLOR_KEY);
-        Color resolvedDisabledColor = style.get(DISABLED_COLOR_KEY);
-        Color resolvedVisitedColor = style.get(VISITED_COLOR_KEY);
-
-        Float resolvedFontSize = style.get(FONT_SIZE_KEY);
-        Float resolvedUnderlineThickness = style.get(UNDERLINE_THICKNESS_KEY);
-        Float resolvedPaddingX = style.get(PADDING_X_KEY);
-        Float resolvedPaddingY = style.get(PADDING_Y_KEY);
-        Boolean resolvedUnderlineAlways = style.get(UNDERLINE_ALWAYS_KEY);
+        ResolvedStyle style = getStyleOrDefaults();
+        color = style.get(COLOR_KEY);
+        hoverColor = style.get(HOVER_COLOR_KEY);
+        focusedColor = style.get(FOCUSED_COLOR_KEY);
+        pressedColor = style.get(PRESSED_COLOR_KEY);
+        disabledColor = style.get(DISABLED_COLOR_KEY);
+        visitedColor = style.get(VISITED_COLOR_KEY);
+        fontSize = Math.max(1f, style.get(FONT_SIZE_KEY));
+        underlineThickness = Math.max(0f, style.get(UNDERLINE_THICKNESS_KEY));
+        paddingX = Math.max(0f, style.get(PADDING_X_KEY));
+        paddingY = Math.max(0f, style.get(PADDING_Y_KEY));
+        underlineAlways = style.get(UNDERLINE_ALWAYS_KEY);
         String resolvedFontName = style.get(FONT_NAME_KEY);
-
-        if (resolvedColor != null) color = resolvedColor;
-        if (resolvedHoverColor != null) hoverColor = resolvedHoverColor;
-        if (resolvedFocusedColor != null) focusedColor = resolvedFocusedColor;
-        if (resolvedPressedColor != null) pressedColor = resolvedPressedColor;
-        if (resolvedDisabledColor != null) disabledColor = resolvedDisabledColor;
-        if (resolvedVisitedColor != null) visitedColor = resolvedVisitedColor;
-
-        if (resolvedFontSize != null) fontSize = Math.max(1f, resolvedFontSize);
-        if (resolvedUnderlineThickness != null) underlineThickness = Math.max(0f, resolvedUnderlineThickness);
-        if (resolvedPaddingX != null) paddingX = Math.max(0f, resolvedPaddingX);
-        if (resolvedPaddingY != null) paddingY = Math.max(0f, resolvedPaddingY);
-        if (resolvedUnderlineAlways != null) underlineAlways = resolvedUnderlineAlways;
-        if (resolvedFontName != null && !resolvedFontName.isBlank()) fontName = resolvedFontName;
+        fontName = resolvedFontName == null || resolvedFontName.isBlank() ? "default" : resolvedFontName;
     }
 
     /**

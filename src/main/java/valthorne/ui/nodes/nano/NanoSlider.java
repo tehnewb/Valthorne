@@ -180,157 +180,196 @@ public class NanoSlider extends UINode implements NanoNode {
 
     /**
      * Retains a non-null track color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider trackColor(Color color) {
-        if (color != null) this.trackColor = color;
+        if (color != null) {
+            this.trackColor = color;
+            setStyle(TRACK_COLOR_KEY, this.trackColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null hover track color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider hoverTrackColor(Color color) {
-        if (color != null) this.hoverTrackColor = color;
+        if (color != null) {
+            this.hoverTrackColor = color;
+            setStyle(HOVER_TRACK_COLOR_KEY, this.hoverTrackColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null focused track color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider focusedTrackColor(Color color) {
-        if (color != null) this.focusedTrackColor = color;
+        if (color != null) {
+            this.focusedTrackColor = color;
+            setStyle(FOCUSED_TRACK_COLOR_KEY, this.focusedTrackColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null disabled track color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider disabledTrackColor(Color color) {
-        if (color != null) this.disabledTrackColor = color;
+        if (color != null) {
+            this.disabledTrackColor = color;
+            setStyle(DISABLED_TRACK_COLOR_KEY, this.disabledTrackColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null fill color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider fillColor(Color color) {
-        if (color != null) this.fillColor = color;
+        if (color != null) {
+            this.fillColor = color;
+            setStyle(FILL_COLOR_KEY, this.fillColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null hover fill color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider hoverFillColor(Color color) {
-        if (color != null) this.hoverFillColor = color;
+        if (color != null) {
+            this.hoverFillColor = color;
+            setStyle(HOVER_FILL_COLOR_KEY, this.hoverFillColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null focused fill color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider focusedFillColor(Color color) {
-        if (color != null) this.focusedFillColor = color;
+        if (color != null) {
+            this.focusedFillColor = color;
+            setStyle(FOCUSED_FILL_COLOR_KEY, this.focusedFillColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null disabled fill color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider disabledFillColor(Color color) {
-        if (color != null) this.disabledFillColor = color;
+        if (color != null) {
+            this.disabledFillColor = color;
+            setStyle(DISABLED_FILL_COLOR_KEY, this.disabledFillColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null thumb color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider thumbColor(Color color) {
-        if (color != null) this.thumbColor = color;
+        if (color != null) {
+            this.thumbColor = color;
+            setStyle(THUMB_COLOR_KEY, this.thumbColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null hover thumb color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider hoverThumbColor(Color color) {
-        if (color != null) this.hoverThumbColor = color;
+        if (color != null) {
+            this.hoverThumbColor = color;
+            setStyle(HOVER_THUMB_COLOR_KEY, this.hoverThumbColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null focused thumb color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider focusedThumbColor(Color color) {
-        if (color != null) this.focusedThumbColor = color;
+        if (color != null) {
+            this.focusedThumbColor = color;
+            setStyle(FOCUSED_THUMB_COLOR_KEY, this.focusedThumbColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null pressed thumb color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider pressedThumbColor(Color color) {
-        if (color != null) this.pressedThumbColor = color;
+        if (color != null) {
+            this.pressedThumbColor = color;
+            setStyle(PRESSED_THUMB_COLOR_KEY, this.pressedThumbColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null disabled thumb color without copying it. Null keeps the current
-     * reference; resolved styles may replace the value during layout.
+     * reference; the local override remains authoritative during layout.
      *
      * @param color mutable paint color, or null
      * @return this slider
      */
     public NanoSlider disabledThumbColor(Color color) {
-        if (color != null) this.disabledThumbColor = color;
+        if (color != null) {
+            this.disabledThumbColor = color;
+            setStyle(DISABLED_THUMB_COLOR_KEY, this.disabledThumbColor);
+        }
         return this;
     }
 
@@ -618,43 +657,41 @@ public class NanoSlider extends UINode implements NanoNode {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
-        if (style != null) {
-            Color resolvedTrackColor = style.get(TRACK_COLOR_KEY);
-            Color resolvedHoverTrackColor = style.get(HOVER_TRACK_COLOR_KEY);
-            Color resolvedFocusedTrackColor = style.get(FOCUSED_TRACK_COLOR_KEY);
-            Color resolvedDisabledTrackColor = style.get(DISABLED_TRACK_COLOR_KEY);
-            Color resolvedFillColor = style.get(FILL_COLOR_KEY);
-            Color resolvedHoverFillColor = style.get(HOVER_FILL_COLOR_KEY);
-            Color resolvedFocusedFillColor = style.get(FOCUSED_FILL_COLOR_KEY);
-            Color resolvedDisabledFillColor = style.get(DISABLED_FILL_COLOR_KEY);
-            Color resolvedThumbColor = style.get(THUMB_COLOR_KEY);
-            Color resolvedHoverThumbColor = style.get(HOVER_THUMB_COLOR_KEY);
-            Color resolvedFocusedThumbColor = style.get(FOCUSED_THUMB_COLOR_KEY);
-            Color resolvedPressedThumbColor = style.get(PRESSED_THUMB_COLOR_KEY);
-            Color resolvedDisabledThumbColor = style.get(DISABLED_THUMB_COLOR_KEY);
-            Float resolvedTrackHeight = style.get(TRACK_HEIGHT_KEY);
-            Float resolvedThumbSize = style.get(THUMB_SIZE_KEY);
-            Float resolvedTrackCornerRadius = style.get(TRACK_CORNER_RADIUS_KEY);
-            Float resolvedThumbCornerRadius = style.get(THUMB_CORNER_RADIUS_KEY);
-            if (resolvedTrackColor != null) trackColor = resolvedTrackColor;
-            if (resolvedHoverTrackColor != null) hoverTrackColor = resolvedHoverTrackColor;
-            if (resolvedFocusedTrackColor != null) focusedTrackColor = resolvedFocusedTrackColor;
-            if (resolvedDisabledTrackColor != null) disabledTrackColor = resolvedDisabledTrackColor;
-            if (resolvedFillColor != null) fillColor = resolvedFillColor;
-            if (resolvedHoverFillColor != null) hoverFillColor = resolvedHoverFillColor;
-            if (resolvedFocusedFillColor != null) focusedFillColor = resolvedFocusedFillColor;
-            if (resolvedDisabledFillColor != null) disabledFillColor = resolvedDisabledFillColor;
-            if (resolvedThumbColor != null) thumbColor = resolvedThumbColor;
-            if (resolvedHoverThumbColor != null) hoverThumbColor = resolvedHoverThumbColor;
-            if (resolvedFocusedThumbColor != null) focusedThumbColor = resolvedFocusedThumbColor;
-            if (resolvedPressedThumbColor != null) pressedThumbColor = resolvedPressedThumbColor;
-            if (resolvedDisabledThumbColor != null) disabledThumbColor = resolvedDisabledThumbColor;
-            if (resolvedTrackHeight != null) trackHeight = Math.max(0f, resolvedTrackHeight);
-            if (resolvedThumbSize != null) thumbSize = Math.max(0f, resolvedThumbSize);
-            if (resolvedTrackCornerRadius != null) trackCornerRadius = Math.max(0f, resolvedTrackCornerRadius);
-            if (resolvedThumbCornerRadius != null) thumbCornerRadius = Math.max(0f, resolvedThumbCornerRadius);
-        }
+        ResolvedStyle style = getStyleOrDefaults();
+        Color resolvedTrackColor = style.get(TRACK_COLOR_KEY);
+        Color resolvedHoverTrackColor = style.get(HOVER_TRACK_COLOR_KEY);
+        Color resolvedFocusedTrackColor = style.get(FOCUSED_TRACK_COLOR_KEY);
+        Color resolvedDisabledTrackColor = style.get(DISABLED_TRACK_COLOR_KEY);
+        Color resolvedFillColor = style.get(FILL_COLOR_KEY);
+        Color resolvedHoverFillColor = style.get(HOVER_FILL_COLOR_KEY);
+        Color resolvedFocusedFillColor = style.get(FOCUSED_FILL_COLOR_KEY);
+        Color resolvedDisabledFillColor = style.get(DISABLED_FILL_COLOR_KEY);
+        Color resolvedThumbColor = style.get(THUMB_COLOR_KEY);
+        Color resolvedHoverThumbColor = style.get(HOVER_THUMB_COLOR_KEY);
+        Color resolvedFocusedThumbColor = style.get(FOCUSED_THUMB_COLOR_KEY);
+        Color resolvedPressedThumbColor = style.get(PRESSED_THUMB_COLOR_KEY);
+        Color resolvedDisabledThumbColor = style.get(DISABLED_THUMB_COLOR_KEY);
+        Float resolvedTrackHeight = style.get(TRACK_HEIGHT_KEY);
+        Float resolvedThumbSize = style.get(THUMB_SIZE_KEY);
+        Float resolvedTrackCornerRadius = style.get(TRACK_CORNER_RADIUS_KEY);
+        Float resolvedThumbCornerRadius = style.get(THUMB_CORNER_RADIUS_KEY);
+        if (resolvedTrackColor != null) trackColor = resolvedTrackColor;
+        if (resolvedHoverTrackColor != null) hoverTrackColor = resolvedHoverTrackColor;
+        if (resolvedFocusedTrackColor != null) focusedTrackColor = resolvedFocusedTrackColor;
+        if (resolvedDisabledTrackColor != null) disabledTrackColor = resolvedDisabledTrackColor;
+        if (resolvedFillColor != null) fillColor = resolvedFillColor;
+        if (resolvedHoverFillColor != null) hoverFillColor = resolvedHoverFillColor;
+        if (resolvedFocusedFillColor != null) focusedFillColor = resolvedFocusedFillColor;
+        if (resolvedDisabledFillColor != null) disabledFillColor = resolvedDisabledFillColor;
+        if (resolvedThumbColor != null) thumbColor = resolvedThumbColor;
+        if (resolvedHoverThumbColor != null) hoverThumbColor = resolvedHoverThumbColor;
+        if (resolvedFocusedThumbColor != null) focusedThumbColor = resolvedFocusedThumbColor;
+        if (resolvedPressedThumbColor != null) pressedThumbColor = resolvedPressedThumbColor;
+        if (resolvedDisabledThumbColor != null) disabledThumbColor = resolvedDisabledThumbColor;
+        if (resolvedTrackHeight != null) trackHeight = Math.max(0f, resolvedTrackHeight);
+        if (resolvedThumbSize != null) thumbSize = Math.max(0f, resolvedThumbSize);
+        if (resolvedTrackCornerRadius != null) trackCornerRadius = Math.max(0f, resolvedTrackCornerRadius);
+        if (resolvedThumbCornerRadius != null) thumbCornerRadius = Math.max(0f, resolvedThumbCornerRadius);
         if (vertical) {
             if (getLayout().getWidth().isAuto()) getLayout().width(Math.max(trackHeight, thumbSize));
             if (getLayout().getHeight().isAuto()) getLayout().height(160);

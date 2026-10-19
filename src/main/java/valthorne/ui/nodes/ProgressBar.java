@@ -302,33 +302,21 @@ public class ProgressBar extends Panel {
      * The current style is resolved and used to update the background drawable,
      * foreground drawable, and optional font. With percentage display enabled,
      * the cached string is refreshed; otherwise this control's cached text is
-     * cleared. If no style exists,
-     * all resolved visual references are cleared.
+     * cleared. Missing values restore key defaults, and an absent font uses the
+     * root's default font when attached.
      * </p>
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
 
-        if (style != null) {
-            background = style.get(BACKGROUND_KEY);
-            foreground = style.get(FOREGROUND_KEY);
-            font = style.get(FONT_KEY);
-            if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
-            fontSize = style.get(FONT_SIZE_KEY);
-            if (!Float.isFinite(fontSize) || fontSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
-
-            if (font != null) {
-                if (displayPercentage)
-                    displayText = String.format("%.2f%%", getPercentage() * 100f);
-                else
-                    displayText = "";
-            }
-        } else {
-            background = null;
-            foreground = null;
-            font = null;
-        }
+        background = style.get(BACKGROUND_KEY);
+        foreground = style.get(FOREGROUND_KEY);
+        font = style.get(FONT_KEY);
+        if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
+        fontSize = style.get(FONT_SIZE_KEY);
+        if (!Float.isFinite(fontSize) || fontSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
+        displayText = displayPercentage && font != null ? String.format("%.2f%%", getPercentage() * 100f) : "";
 
         super.applyLayout();
     }
