@@ -515,6 +515,12 @@ public class ScrollPanel extends UIContainer {
         refreshStyleCache();
     }
 
+    @Override
+    protected void applyLayout() {
+        refreshStyleCache();
+        super.applyLayout();
+    }
+
     /**
      * <p>
      * Transforms child hit-test X coordinates by the current horizontal scroll offset.
