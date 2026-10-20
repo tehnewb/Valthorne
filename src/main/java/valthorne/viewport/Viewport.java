@@ -9,6 +9,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector2f;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER_BINDING;
 
 /**
  * Base 2D viewport abstraction responsible for mapping a logical world area into a screen-space
@@ -114,10 +115,10 @@ public abstract class Viewport {
     private final int[] previousScissor = new int[4]; // Previously active OpenGL scissor rectangle restored by endScissor.
     private final float[] oldProjectionMatrix = new float[16]; // Previously active engine projection restored by unbind or render.
     private final Vector2f screenToWorldCoordinates = new Vector2f(); // Reused return vector for screen-to-world conversion.
-    protected int x; // X position of this viewport in actual screen pixels.
-    protected int y; // Y position of this viewport in actual screen pixels.
-    protected int width; // Width of this viewport in actual screen pixels.
-    protected int height; // Height of this viewport in actual screen pixels.
+    protected int x; // X position in logical window coordinates, or target pixels for offscreen rendering.
+    protected int y; // Y position in logical window coordinates, or target pixels for offscreen rendering.
+    protected int width; // Logical window width, or offscreen target width in pixels.
+    protected int height; // Logical window height, or offscreen target height in pixels.
     protected float worldWidth; // Logical world width visible through this viewport.
     protected float worldHeight; // Logical world height visible through this viewport.
     protected Camera camera; // Optional camera used to build the active projection transform.
@@ -154,8 +155,8 @@ public abstract class Viewport {
      *     <li>Updating {@link #projectionMatrix} to match the intended world-space projection</li>
      * </ul>
      *
-     * @param screenWidth  the current window width in pixels
-     * @param screenHeight the current window height in pixels
+     * @param screenWidth current logical window width, or offscreen target pixel width
+     * @param screenHeight current logical window height, or offscreen target pixel height
      */
     public abstract void update(int screenWidth, int screenHeight);
 
@@ -167,10 +168,22 @@ public abstract class Viewport {
      * then updates the engine-managed projection matrix. If a camera is present, the camera is
      * rebuilt using the current world size and its projection matrix is applied. Otherwise the
      * fallback viewport projection is used.
+     * Window-target rectangles are converted from logical coordinates to framebuffer
+     * pixels at application time, including scale-only changes. Offscreen targets use
+     * their supplied pixel coordinates without applying the window's scale. Projection
+     * and pointer conversion retain the original logical rectangle. Rounded edges are
+     * shared by adjacent viewports to avoid gaps at fractional framebuffer scales.
      * </p>
      */
     public void apply() {
-        glViewport(x, y, width, height);
+        boolean windowTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0;
+        float scaleX = getFramebufferScaleX(windowTarget);
+        float scaleY = getFramebufferScaleY(windowTarget);
+        int left = Math.round(x * scaleX);
+        int bottom = Math.round(y * scaleY);
+        int right = Math.round((x + (float) width) * scaleX);
+        int top = Math.round((y + (float) height) * scaleY);
+        glViewport(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
 
         float[] matrixData;
 
@@ -182,6 +195,29 @@ public abstract class Viewport {
         }
 
         Window.setProjectionMatrix(matrixData);
+    }
+
+    /**
+     * Returns horizontal drawable pixels per viewport coordinate. A zero-sized window
+     * framebuffer produces zero scale while preserving logical layout and input sizes.
+     * Subclasses may override for explicitly configured target mappings.
+     *
+     * @param windowTarget whether drawing targets the window's default framebuffer
+     * @return horizontal conversion scale
+     */
+    protected float getFramebufferScaleX(boolean windowTarget) {
+        return windowTarget && Window.getWidth() > 0 ? (float) Window.getFramebufferWidth() / Window.getWidth() : 1f;
+    }
+
+    /**
+     * Returns vertical drawable pixels per viewport coordinate independently of X.
+     * Offscreen target coordinates are already pixels and use a scale of one.
+     *
+     * @param windowTarget whether drawing targets the window's default framebuffer
+     * @return vertical conversion scale
+     */
+    protected float getFramebufferScaleY(boolean windowTarget) {
+        return windowTarget && Window.getHeight() > 0 ? (float) Window.getFramebufferHeight() / Window.getHeight() : 1f;
     }
 
     /**
@@ -372,6 +408,17 @@ public abstract class Viewport {
         if (sw <= 0 || sh <= 0) {
             return false;
         }
+
+        boolean windowTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0;
+        float scaleX = getFramebufferScaleX(windowTarget);
+        float scaleY = getFramebufferScaleY(windowTarget);
+        int right = Math.round((sx + (float) sw) * scaleX);
+        int top = Math.round((sy + (float) sh) * scaleY);
+        sx = Math.round(sx * scaleX);
+        sy = Math.round(sy * scaleY);
+        sw = right - sx;
+        sh = top - sy;
+        if (sw <= 0 || sh <= 0) return false;
 
         boolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
 
