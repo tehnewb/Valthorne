@@ -50,10 +50,9 @@ import valthorne.viewport.Viewport;
  *
  * <h2>Rendering behavior</h2>
  * <p>
- * {@link #drawScene()} first clears the window to black, then wraps scene content in a
- * {@link TextureBatch} begin/end cycle. It calls {@link #draw(TextureBatch)} so subclasses can
- * draw scene content, then draws the scene UI with its own batch. This keeps the common render
- * path in one place and avoids duplicating batch begin/end code
+ * {@link #drawScene()} wraps the scene render flow in a single {@link TextureBatch} begin/end cycle.
+ * It first calls {@link #draw(TextureBatch)} so subclasses can draw scene content, then it draws the
+ * scene UI. This keeps the common render path in one place and avoids duplicating batch begin/end code
  * in every controller.
  * </p>
  *
@@ -156,9 +155,9 @@ public abstract class Scene {
      * Draws the complete scene using the shared batch.
      *
      * <p>
-     * This method first clears the window to black, before checking scene resources or binding
-     * the viewport. It then begins the scene batch, calls the subclass render method, ends that
-     * batch, and draws the scene UI using the UI root's own rendering flow.
+     * This method provides the standard render flow for a scene. It begins the scene batch, calls the
+     * subclass render method so world and scene-specific content can be drawn, then draws the scene UI,
+     * and finally ends the batch.
      * </p>
      *
      * <p>
