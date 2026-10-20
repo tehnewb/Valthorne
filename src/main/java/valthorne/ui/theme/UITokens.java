@@ -46,7 +46,7 @@ public final class UITokens {
      * This does not automatically update a widget's concrete radius property.
      */
     public static final StyleKey<Float> RADIUS = StyleKey.of("ui.radius", Float.class, 0f);
-    /*
+    /**
      * Logical world units per em for regular Slug text controls, defaulting to 16.
      * Their FONT_SIZE_KEY aliases share this token without mutating the borrowed font.
      */

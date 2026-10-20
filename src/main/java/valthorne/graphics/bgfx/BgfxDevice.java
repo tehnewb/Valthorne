@@ -26,7 +26,7 @@ import static org.lwjgl.glfw.GLFWNativeX11.glfwGetX11Window;
  * Windows, macOS and Linux/X11 use the existing desktop OpenGL backend.
  */
 public final class BgfxDevice implements AutoCloseable {
-    /*
+    /**
      * bgfx has a process-wide runtime; render-thread confinement needs no lock.
      */
     private static BgfxDevice active;

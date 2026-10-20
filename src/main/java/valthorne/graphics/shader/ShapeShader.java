@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.Color;
@@ -33,12 +35,12 @@ public class ShapeShader extends Shader {
     /**
      * Bundled polygon vertex source loaded once at class initialization.
      */
-    private static final String VERT_SRC = ShaderSources.load("core/shape.vert");
+    private static final String VERT_SRC = ValthorneFiles.readString("valthorne/shaders/core/shape.vert");
 
     /**
      * Bundled solid-color fragment source loaded once at class initialization.
      */
-    private static final String FRAG_SRC = ShaderSources.load("core/shape.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/core/shape.frag");
 
     /**
      * Attribute location for two-float polygon positions.

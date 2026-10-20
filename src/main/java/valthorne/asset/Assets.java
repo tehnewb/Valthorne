@@ -353,6 +353,8 @@ public final class Assets {
      * is thrown.
      * <p>
      * Optional completion actions can be performed after the entire batch of assets finishes loading.
+     * Completion does not request process-wide garbage collection; heap collection policy belongs
+     * to the application and JVM. Native resource disposal remains explicit.
      * <p>
      * This method is typically called after preparing assets using the {@link #prepare(AssetParameters)}
      * method. It ensures that all prepared assets are processed in an asynchronous and thread-safe manner.
@@ -391,9 +393,7 @@ public final class Assets {
             futures.add(future);
         }
 
-        return CompletableFuture
-                .allOf(futures.toArray(CompletableFuture[]::new))
-                .whenComplete((_, _) -> System.gc());
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
     }
 
     /**

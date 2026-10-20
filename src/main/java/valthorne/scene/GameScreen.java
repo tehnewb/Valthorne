@@ -79,7 +79,6 @@ public class GameScreen implements Application {
             return;
         }
 
-        this.currentScene.setGameScreen(this);
         this.currentScene.initializeFields();
     }
 
@@ -164,7 +163,6 @@ public class GameScreen implements Application {
             return;
         }
 
-        scene.setGameScreen(this);
         scene.initializeFields();
     }
 
@@ -176,7 +174,6 @@ public class GameScreen implements Application {
      */
     public void replaceSceneAfterPreparation(Scene replacement) {
         Objects.requireNonNull(replacement);
-        replacement.setGameScreen(this);
         try {
             replacement.initializeFields();
         } catch (RuntimeException | Error failure) {

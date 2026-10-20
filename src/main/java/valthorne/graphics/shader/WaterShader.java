@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 import valthorne.graphics.Sprite;
 
 /**
@@ -60,7 +62,7 @@ public class WaterShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged water effect shader resource.
      */
-    public static final String FRAG_SRC = ShaderSources.load("effects/water.frag");
+    public static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/water.frag");
 
     /**
      * Creates a new {@code WaterShader} using the built-in GLSL sources.

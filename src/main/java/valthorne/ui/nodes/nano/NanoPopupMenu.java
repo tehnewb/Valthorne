@@ -39,14 +39,20 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @author Albert Beaupre
  */
 public class NanoPopupMenu extends NanoContainer {
-    /*
+    /**
      * Shows typical editor context menus without hiding their final commands;
      * larger menus continue to scroll within the root's available height.
      */
     private static final int MAX_VISIBLE_ROWS = 10;
 
+    /**
+     * Theme key controlling checkbox corner radius.
+     */
     public static final StyleKey<Float> CHECKBOX_CORNER_RADIUS_KEY =
             StyleKey.of("nano.popupmenu.checkboxCornerRadius", Float.class, 0f);
+    /**
+     * Theme key controlling indicator color.
+     */
     public static final StyleKey<Color> INDICATOR_COLOR_KEY =
             StyleKey.of("nano.popupmenu.indicatorColor", Color.class, new Color(0xFFD0D0D0));
     /**

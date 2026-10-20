@@ -38,6 +38,8 @@ import java.net.URL;
  * Reads and writes the human-readable UTF-8 representation of a {@link PropertySet}.
  * Each property occupies one line in the form {@code escaped-name:type=escaped-value}
  * and may end with an optional {@code # comment} or {@code ! comment}.
+ * Empty names are supported, matching the collection and binary codec; their lines
+ * begin with the type separator, for example {@code :integer=7}.
  * Blank lines and lines whose first non-whitespace character is {@code #} or {@code !}
  * are ignored. Backslash escapes {@code \}, {@code :}, {@code =}, newline, carriage
  * return, tab, and comment-marker characters.
@@ -67,7 +69,9 @@ public final class PropertySetTextIO {
     }
 
     /**
-     * Writes properties and optional comments to a UTF-8 text file.
+     * Writes properties and optional comments to a UTF-8 text file after encoding succeeds.
+     * Unsupported values leave existing content intact. File-system write failures
+     * may still leave a partially written file.
      *
      * @param properties properties to write
      * @param path destination path
@@ -76,9 +80,12 @@ public final class PropertySetTextIO {
      */
     public static void write(PropertySet properties, Path path, PropertyTextOptions options) throws IOException {
         Objects.requireNonNull(path, "path");
-        try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-            write(properties, writer, options);
-        }
+        /*
+         * Complete text encoding before opening the destination so unsupported
+         * values or invalid options cannot destroy an existing property file.
+         */
+        String encoded = toText(properties, options);
+        Files.writeString(path, encoded, StandardCharsets.UTF_8);
     }
 
     /**
@@ -229,7 +236,7 @@ public final class PropertySetTextIO {
             try {
                 int colon = separator(line, ':', 0);
                 int equals = colon < 0 ? -1 : separator(line, '=', colon + 1);
-                if (colon < 1 || equals < colon + 2) throw new IllegalArgumentException("Expected name:type=value");
+                if (colon < 0 || equals < colon + 2) throw new IllegalArgumentException("Expected name:type=value");
 
                 String name = unescape(line.substring(0, colon));
                 String type = line.substring(colon + 1, equals).trim();
@@ -237,7 +244,6 @@ public final class PropertySetTextIO {
                 int comment = inlineComment(encodedValue);
                 if (comment >= 0) encodedValue = encodedValue.substring(0, comment - 1);
                 String value = unescape(encodedValue);
-                if (name.isEmpty()) throw new IllegalArgumentException("Property name cannot be empty");
                 if (properties.contains(name)) throw new IllegalArgumentException("Duplicate property name: " + name);
                 properties.set(name, decode(type, value));
             } catch (RuntimeException error) {

@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 /**
  * Time-based flash shader.
  *
@@ -48,7 +50,7 @@ public class FlashShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged flash effect shader resource.
      */
-    private static final String FRAG_SRC = ShaderSources.load("effects/flash.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/flash.frag");
 
     /**
      * Creates a new {@code FlashShader} using the built-in GLSL sources.

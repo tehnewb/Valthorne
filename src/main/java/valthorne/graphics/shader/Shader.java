@@ -4,6 +4,7 @@ import org.lwjgl.opengl.GL20;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL31.GL_INVALID_INDEX;
@@ -17,12 +18,10 @@ import static org.lwjgl.opengl.GL31.glUniformBlockBinding;
  * <h2>Example</h2>
  * <pre>{@code
  * // Build
- * Shader shader = new Shader(VERT_SRC, FRAG_SRC);
- *
- * // Optional: lock attribute indices BEFORE the first link (or call reload() after changing bindings)
- * shader.bindAttribLocation(0, "a_pos");
- * shader.bindAttribLocation(1, "a_uv");
- * shader.reload();
+ * Shader shader = new Shader(VERT_SRC, FRAG_SRC, attributes -> {
+ *     attributes.bindAttribLocation(0, "a_pos");
+ *     attributes.bindAttribLocation(1, "a_uv");
+ * });
  *
  * // Use
  * shader.bind();
@@ -72,15 +71,9 @@ public class Shader {
      *
      * <p>This constructor compiles both stages and links them into a program immediately.</p>
      *
-     * <p>If you need explicit attribute locations, call {@link #bindAttribLocation(int, String)}
-     * <b>before</b> linking. Since this constructor links immediately, the typical pattern is:</p>
-     *
-     * <pre>{@code
-     * Shader s = new Shader(v, f);
-     * s.bindAttribLocation(0, "a_pos");
-     * s.bindAttribLocation(1, "a_uv");
-     * s.reload(); // apply bindings by relinking
-     * }</pre>
+     * <p>For explicit attribute locations before the first link, use
+     * {@link #Shader(String, String, Consumer)}. Bindings changed after construction
+     * require an explicit {@link #reload()} to take effect.</p>
      *
      * @param vertexSource   GLSL vertex shader source (must not be null)
      * @param fragmentSource GLSL fragment shader source (must not be null)
@@ -88,12 +81,29 @@ public class Shader {
      * @throws IllegalStateException if compilation or linking fails
      */
     public Shader(String vertexSource, String fragmentSource) {
+        this(vertexSource, fragmentSource, null);
+    }
+
+    /**
+     * Creates a program with optional attribute bindings configured before its first
+     * compilation and link. The callback may call bindAttribLocation, but must not
+     * use a program that has not yet been built. Existing immediate-build constructors
+     * retain their behavior, and later explicit reloads remain supported.
+     *
+     * @param vertexSource nonnull vertex shader source
+     * @param fragmentSource nonnull fragment shader source
+     * @param configureAttributes pre-link attribute configuration, or null
+     * @throws NullPointerException if either source is null
+     * @throws IllegalStateException if compilation or linking fails
+     */
+    public Shader(String vertexSource, String fragmentSource, Consumer<Shader> configureAttributes) {
         if (vertexSource == null) throw new NullPointerException("vertexSource");
         if (fragmentSource == null) throw new NullPointerException("fragmentSource");
 
         this.vertexSource = vertexSource;
         this.fragmentSource = fragmentSource;
 
+        if (configureAttributes != null) configureAttributes.accept(this);
         buildProgram();
     }
 

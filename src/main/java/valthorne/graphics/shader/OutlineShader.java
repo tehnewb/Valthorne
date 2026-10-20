@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 import valthorne.graphics.Sprite;
 
 /**
@@ -51,7 +53,7 @@ public class OutlineShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged outline effect shader resource.
      */
-    private static final String FRAG_SRC = ShaderSources.load("effects/outline.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/outline.frag");
 
     /**
      * Compiles and links the packaged outline fragment program with the shared

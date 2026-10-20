@@ -19,9 +19,9 @@ The preferred style is:
 - Detailed class-level Javadoc for substantial systems
 - Practical usage examples for large APIs
 - Thorough Javadocs for non-overriding methods
-- No Javadoc on fields
+- Javadoc above static fields; no Javadoc on non-static fields
 - Concise right-side comments on non-static fields
-- Multi-line block comments above static fields
+- Multi-line Javadoc comments (`/** ... */`) above static fields
 - Compact early-return conditionals when appropriate
 - Braces for multi-statement blocks
 - Vertically formatted fluent method chains when they are not inside parentheses
@@ -1287,7 +1287,7 @@ Javadoc is used where required for:
 - Constructors
 - Non-overriding methods
 
-**Fields never use Javadoc.**
+**Non-static fields never use Javadoc. Static fields require multi-line Javadoc (`/** ... */`) directly above them.**
 
 ## Block Comments
 
@@ -1301,7 +1301,6 @@ Block comments use:
 
 Block comments are specifically required for:
 
-- Static fields, directly above the field
 - Static methods, inside the method body
 
 Block comments may also be used elsewhere for genuinely useful implementation explanations.
@@ -1342,7 +1341,7 @@ Exceptions:
 
 - `@Override` methods do not require method documentation.
 - Fields follow their exclusive field-comment rules.
-- Fields never use Javadoc.
+- Non-static fields never use Javadoc. Static fields require multi-line Javadoc (`/** ... */`) directly above them.
 
 ---
 
@@ -1509,13 +1508,13 @@ Do not add meaningless filler.
 
 Fields have exclusive documentation rules.
 
-**Fields never use Javadoc.**
+**Non-static fields never use Javadoc. Static fields require multi-line Javadoc (`/** ... */`) directly above them.**
 
 There are exactly two field-documentation styles:
 
 ```text
 STATIC FIELD
-    → multi-line /* ... */ comment directly above
+    → multi-line /** ... */ Javadoc directly above
 
 NON-STATIC FIELD
     → // comment directly to the right
@@ -1527,7 +1526,7 @@ A field must not use both forms.
 
 # Static Field Documentation
 
-Every static field requires a meaningful multi-line block comment directly above it.
+Every static field requires a meaningful multi-line Javadoc comment directly above it. The opening delimiter must be `/**`, not `/*`. No trailing `//` comment is permitted.
 
 This includes:
 
@@ -1544,7 +1543,7 @@ This includes:
 ### Correct
 
 ```java
-/*
+/**
  * Maximum number of scheduled actions that may execute in one update.
  */
 private static final int MAX_ACTIONS = 64;
@@ -1553,7 +1552,7 @@ private static final int MAX_ACTIONS = 64;
 ### Wrong
 
 ```java
-/**
+/*
  * Maximum number of scheduled actions.
  */
 private static final int MAX_ACTIONS = 64;
@@ -1572,9 +1571,9 @@ private static final int MAX_ACTIONS = 64; // Maximum actions.
 private static final int MAX_ACTIONS = 64;
 ```
 
-The block comment is the static field's complete documentation.
+The Javadoc comment is the static field's complete documentation.
 
-Do not add field Javadoc or a duplicate right-side comment.
+Do not add a plain `/* ... */` block or any right-side `//` comment to a static field.
 
 ---
 
@@ -1636,8 +1635,7 @@ For non-static fields:
 IS STATIC?
 
 YES
-    → NO JAVADOC
-    → MULTI-LINE BLOCK COMMENT DIRECTLY ABOVE
+    → MULTI-LINE JAVADOC (`/** ... */`) DIRECTLY ABOVE
     → NO DUPLICATE RIGHT-SIDE DOCUMENTATION
 
 NO
@@ -1821,9 +1819,9 @@ All Java code must follow these rules:
 
 **Fields are grouped logically.**
 
-**Fields never use Javadoc.**
+**Non-static fields never use Javadoc. Static fields require multi-line Javadoc (`/** ... */`) directly above them.**
 
-**Static fields use a multi-line block comment directly above them.**
+**Static fields use a multi-line Javadoc (`/** ... */`) directly above them, with no trailing `//` comment.**
 
 **Non-static fields use a meaningful right-side line comment.**
 
@@ -1897,9 +1895,9 @@ All code should follow these principles:
 
 **Do not add method Javadoc to `@Override` methods merely to satisfy documentation rules.**
 
-**Fields never use Javadoc.**
+**Non-static fields never use Javadoc. Static fields require multi-line Javadoc (`/** ... */`) directly above them.**
 
-**Static fields use multi-line block comments above them.**
+**Static fields use multi-line Javadoc (`/** ... */`) above them, with no trailing `//` comment.**
 
 **Non-static fields use right-side line comments.**
 

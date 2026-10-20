@@ -1,169 +1,226 @@
 package valthorne;
 
-import org.lwjgl.openal.AL;
-import org.lwjgl.openal.ALC;
-import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.ALUtil;
+import valthorne.audio.AudioState;
 import valthorne.audio.SoundData;
 import valthorne.audio.SoundPlayer;
 
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Set;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.LockSupport;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 
 import static org.lwjgl.openal.ALC10.*;
+import static org.lwjgl.openal.ALC11.ALC_ALL_DEVICES_SPECIFIER;
+import static org.lwjgl.openal.ALC11.ALC_DEFAULT_ALL_DEVICES_SPECIFIER;
+import static org.lwjgl.openal.SOFTReopenDevice.alcReopenDeviceSOFT;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 /**
- * <p>
- * {@code Audio} is the central audio runtime manager for Valthorne. It owns the
- * OpenAL device and context, runs a dedicated audio thread, executes audio-bound
- * tasks on that thread, tracks active {@link SoundPlayer} instances, and ensures
- * that OpenAL operations happen from the correct execution context.
- * </p>
+ * Owns Valthorne's asynchronous audio lifecycle and delegates native operations to
+ * a dedicated OpenAL thread. Engine startup starts that thread and returns without
+ * waiting for device discovery or context creation. Requests submitted during startup
+ * are held by that session until it is ready, or completed exceptionally if startup
+ * fails or shutdown intervenes. Native handles never migrate to another session.
  *
- * <p>
- * This class is intentionally static and non-instantiable. It behaves like a global
- * subsystem that is started once, kept alive while the engine is running, and then
- * disposed when audio is no longer needed. Internally, it creates a daemon thread
- * dedicated to audio work. That thread:
- * </p>
- *
- * <ul>
- *     <li>opens the OpenAL device</li>
- *     <li>creates and activates the OpenAL context</li>
- *     <li>drains queued audio tasks</li>
- *     <li>updates all registered {@link SoundPlayer} instances</li>
- *     <li>disposes registered players during shutdown</li>
- * </ul>
- *
- * <p>
- * The public API is designed around safe thread delegation. Code outside the audio
- * thread can submit work through {@link #run(Runnable)}, synchronously execute work
- * through {@link #sync(Runnable)}, or return values from audio-thread operations
- * through {@link #call(Callable)}. This allows the rest of the engine to create,
- * destroy, and manipulate audio resources without directly owning the OpenAL thread.
- * </p>
- *
- * <p>
- * Sound playback objects are represented by {@link SoundPlayer}. New players are
- * typically created through {@link #load(String)}, {@link #load(byte[])}, or
- * {@link #create(SoundData)}. Once created, they are automatically registered so
- * the audio thread can call {@link SoundPlayer#update()} each cycle.
- * </p>
- *
- * <p>
- * This design avoids forcing engine users to manually update every individual sound
- * player each frame. Instead, the audio subsystem owns that update lifecycle
- * internally and keeps OpenAL interaction isolated to a single thread.
- * </p>
- *
- * <h2>Example Usage</h2>
+ * <p>{@link #startAsync()}, {@link #submitAsync(Callable)}, {@link #createAsync(SoundData)},
+ * and {@link #loadAsync(String)} provide nonblocking startup and resource creation.
+ * Existing {@link #call(Callable)}, {@link #sync(Runnable)}, {@link #create(SoundData)},
+ * load methods, and device queries remain synchronous: they intentionally wait for
+ * readiness and their result. Use asynchronous methods from application startup or
+ * rendering callbacks to avoid delaying a frame.</p>
  *
  * <pre>{@code
- * Audio.init();
- *
- * SoundPlayer player = Audio.load("audio/music/theme.ogg");
- * player.play();
- *
- * Audio.run(() -> {
+ * Audio.loadAsync("audio/music/theme.ogg").thenAccept(player -> {
  *     player.setLooping(true);
- *     player.setGain(0.6f);
+ *     player.play();
+ * }).exceptionally(failure -> {
+ *     failure.printStackTrace();
+ *     return null;
  * });
- *
- * boolean onAudioThread = Audio.isAudioThread();
- *
- * Audio.destroy(player);
- * Audio.dispose();
+ * // Continue rendering immediately; callbacks normally run on the audio thread.
  * }</pre>
  *
- * <p>
- * This example demonstrates the intended full usage of the class: startup,
- * resource creation, queued audio-thread work, state inspection, cleanup of
- * players, and subsystem shutdown.
- * </p>
+ * <p>Completion callbacks must not block waiting for work that needs the audio thread.
+ * Use an asynchronous completion executor for unrelated long-running work. Loading
+ * decodes on the common worker pool and creates native resources on the captured
+ * audio session; a late decode cannot silently restart a stopped session.</p>
  *
- * @author Albert Beaupre
- * @since December 5th, 2025
+ * <p>Initialization failures are exposed through readiness, {@link #getFailure()},
+ * and queued request outcomes, and are reported to standard error. They do not abort
+ * the JGL rendering loop. An explicit {@link #startAsync()} can retry a failed session
+ * after its native teardown completes. {@link #shutdownAsync()} closes admission
+ * immediately; native cleanup stays on the owner, including when shutdown occurs
+ * during a slow driver call. Engine disposal waits for that cleanup.</p>
  */
 public final class Audio {
-
     /**
-     * Shared lock used to guard initialization and shutdown of the audio thread.
+     * Serializes publication of new audio sessions; never held while waiting for a driver.
      */
     private static final Object LOCK = new Object();
 
     /**
-     * Queue of tasks that must execute on the dedicated audio thread.
+     * Current session, retained after termination so failures remain observable.
      */
-    private static final ConcurrentLinkedQueue<Runnable> TASKS = new ConcurrentLinkedQueue<>();
+    private static volatile AudioRuntime runtime;
 
     /**
-     * Registry of all active sound players that should be updated by the audio thread.
+     * Latest immutable listener coordinates for ambient attenuation.
      */
-    private static final Set<SoundPlayer> PLAYERS = ConcurrentHashMap.newKeySet();
+    private static volatile ListenerPosition listenerPosition = new ListenerPosition(0, 0, 0);
 
     /**
-     * Cached player iteration array rebuilt after registry changes on the audio thread.
-     */
-    private static SoundPlayer[] playerSnapshot = new SoundPlayer[0];
-
-    /**
-     * Whether player registration changes require rebuilding the iteration snapshot.
-     */
-    private static boolean playersChanged;
-
-    /**
-     * Flag indicating whether the audio run loop should continue processing.
-     */
-    private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
-
-    /**
-     * Dedicated thread owning OpenAL operations; volatile visibility supports dispatch checks.
-     */
-    private static volatile Thread audioThread; // Dedicated thread that owns OpenAL and processes audio work
-    /**
-     * Native OpenAL device handle, or NULL when no device is retained.
-     */
-    private static volatile long device; // Native OpenAL device handle
-    /**
-     * Native OpenAL context handle, or NULL when no context is retained.
-     */
-    private static volatile long context; // Native OpenAL context handle
-
-    /**
-     * Immutable logical listener coordinates used by ambient sound areas.
-     * Publishing a new snapshot triggers area-gain reevaluation without changing
-     * OpenAL's panning transform. Use the same world-coordinate units as the sound areas.
+     * Immutable logical listener coordinates in the same units as ambient sound areas.
+     * Retained as a member type for compatibility with existing Audio.ListenerPosition users.
      *
-     * @param x listener horizontal coordinate
-     * @param y listener vertical coordinate
-     * @param z listener depth coordinate
-     * @author Albert Beaupre
+     * @param x horizontal world coordinate
+     * @param y vertical world coordinate
+     * @param z depth world coordinate
      */
     public record ListenerPosition(float x, float y, float z) {
     }
 
     /**
-     * Latest immutable ambient listener coordinates, published atomically across threads.
+     * Prevents construction of this static subsystem facade.
      */
-    private static volatile ListenerPosition listenerPosition = new ListenerPosition(0, 0, 0);
+    private Audio() {
+    }
 
     /**
-     * Publishes the listener position used for ambient-zone attenuation without
-     * waiting for the audio thread. Identical coordinates retain the existing snapshot
-     * so sound players can skip redundant calculations. This does not set OpenAL's
-     * spatial listener transform.
+     * Starts audio without waiting for native initialization. Repeated calls share
+     * the pending or ready session. A terminated failed session may be retried explicitly;
+     * a session still stopping is returned with its existing readiness outcome.
      *
-     * @param x finite horizontal world coordinate
-     * @param y finite vertical world coordinate
-     * @param z finite depth world coordinate
-     * @throws IllegalArgumentException if any coordinate is infinite or NaN
+     * @return read-only readiness stage, exceptional on startup failure or early shutdown
+     */
+    public static CompletionStage<Void> startAsync() {
+        /*
+         * Thread publication is serialized, but OpenAL work belongs entirely to the
+         * new worker. Returning a minimal stage prevents callers from completing readiness.
+         */
+        synchronized (LOCK) {
+            AudioRuntime current = runtime;
+            if (current == null || current.terminated().isDone()) {
+                current = new AudioRuntime();
+                runtime = current;
+                current.start();
+            }
+            return current.ready().minimalCompletionStage();
+        }
+    }
+
+    /**
+     * Exposes readiness of the current session, starting it lazily if necessary.
+     * Unlike startAsync(), this does not retry a failed session.
+     *
+     * @return read-only readiness stage for the captured current session
+     */
+    public static CompletionStage<Void> whenReady() {
+        /*
+         * Keep failure observation tied to the current session rather than replacing
+         * a failed startup merely because another caller wants to observe readiness.
+         */
+        return ensureStarted().ready().minimalCompletionStage();
+    }
+
+    /**
+     * Returns whether the current session has a usable native context.
+     *
+     * @return true only while the current session is READY
+     */
+    public static boolean isReady() {
+        /*
+         * Read one published session so this query never starts or waits for audio.
+         */
+        AudioRuntime current = runtime;
+        return current != null && current.state() == AudioState.READY;
+    }
+
+    /**
+     * Reads the current lifecycle state without starting audio or waiting for the driver.
+     *
+     * @return NOT_STARTED before the first request, otherwise the current session state
+     */
+    public static AudioState getState() {
+        /*
+         * Terminal sessions remain published until an explicit or lazy restart.
+         */
+        AudioRuntime current = runtime;
+        return current == null ? AudioState.NOT_STARTED : current.state();
+    }
+
+    /**
+     * Returns the current session's recorded lifecycle failure without blocking.
+     *
+     * @return startup, runtime, or cleanup failure, or null if none is recorded
+     */
+    public static Throwable getFailure() {
+        /*
+         * Throwable publication is independent of command outcomes and survives teardown.
+         */
+        AudioRuntime current = runtime;
+        return current == null ? null : current.failure();
+    }
+
+    /**
+     * Starts the engine-owned audio worker without waiting for its readiness stage.
+     * Startup failure is observable through the public asynchronous lifecycle API.
+     */
+    static void init() {
+        /*
+         * JGL calls this after window creation; it must never await device/context setup.
+         */
+        startAsync();
+    }
+
+    /**
+     * Requests shutdown without joining the worker. Pending commands are rejected by
+     * the captured session; an in-flight command may finish before native teardown.
+     * A slow native startup call must return before its handles can be safely released.
+     *
+     * @return read-only stage completing after native teardown, exceptional on lifecycle failure
+     */
+    public static CompletionStage<Void> shutdownAsync() {
+        /*
+         * Stopping the captured session cannot affect a later replacement session.
+         */
+        AudioRuntime current = runtime;
+        if (current == null) return CompletableFuture.<Void>completedFuture(null).minimalCompletionStage();
+        current.stop();
+        return current.terminated().minimalCompletionStage();
+    }
+
+    /**
+     * Stops the captured engine session and waits for its owner to release native
+     * resources. No lock is held while joining, and audio-thread shutdown never joins itself.
+     * Interruption is restored after cleanup rather than allowing premature restart.
+     */
+    static void dispose() {
+        /*
+         * Synchronous engine teardown preserves native ownership until the worker exits.
+         */
+        AudioRuntime current = runtime;
+        if (current == null) return;
+        current.stop();
+        current.awaitTermination();
+    }
+
+    /**
+     * Publishes finite listener coordinates without touching OpenAL or waiting for readiness.
+     * Equal coordinates retain the old snapshot to avoid redundant area-gain work.
+     *
+     * @param x finite horizontal coordinate
+     * @param y finite vertical coordinate
+     * @param z finite depth coordinate
+     * @throws IllegalArgumentException if any coordinate is nonfinite
      */
     public static void setListenerPosition(float x, float y, float z) {
+        /*
+         * Ambient positions are logical game state and need no native-context admission.
+         */
         if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z))
             throw new IllegalArgumentException("Listener coordinates must be finite");
         ListenerPosition current = listenerPosition;
@@ -172,251 +229,72 @@ public final class Audio {
     }
 
     /**
-     * Returns the latest published ambient-zone listener position. The immutable
-     * snapshot can be retained across threads; a later position change publishes a
-     * new object without modifying this one.
+     * Returns the latest immutable ambient listener snapshot.
      *
-     * @return current logical listener snapshot
+     * @return logical world coordinates
      */
-    public static ListenerPosition getListenerPosition() {return listenerPosition;}
-
-    /**
-     * <p>
-     * Private constructor to prevent instantiation.
-     * </p>
-     *
-     * <p>
-     * {@code Audio} is a static subsystem and should never be constructed directly.
-     * </p>
-     */
-    private Audio() {
+    public static ListenerPosition getListenerPosition() {
+        /*
+         * A volatile snapshot permits audio updates without sharing mutable coordinates.
+         */
+        return listenerPosition;
     }
 
     /**
-     * <p>
-     * Initializes the audio subsystem and starts the dedicated audio thread if it is
-     * not already running.
-     * </p>
+     * Submits an audio-thread operation without waiting for initialization or execution.
+     * Early work belongs to the captured session and is rejected if that session fails
+     * or stops. Cancelling its returned future skips work still queued; work already
+     * executing may finish. Callbacks normally execute on the completing thread.
      *
-     * <p>
-     * This method is package-private because it is intended to be controlled by the
-     * engine bootstrap process rather than arbitrary external code. Initialization is
-     * synchronized so only one thread can start the subsystem. The method creates a
-     * daemon thread, waits for it to finish its initial OpenAL setup, and then either
-     * returns successfully or throws an exception if startup failed.
-     * </p>
-     *
-     * <p>
-     * If initialization has already happened, the method returns immediately without
-     * recreating the audio thread or OpenAL context.
-     * </p>
-     *
-     * @throws IllegalStateException if OpenAL device or context creation fails
+     * @param callable nonnull native/audio operation
+     * @param <T> result type
+     * @return independent result future
      */
-    static void init() {
-        synchronized (LOCK) {
-            if (audioThread != null) {
-                return;
-            }
-
-            CountDownLatch started = new CountDownLatch(1);
-            AtomicReference<Throwable> failure = new AtomicReference<>();
-
-            RUNNING.set(true);
-
-            audioThread = new Thread(() -> runLoop(started, failure), "Valthorne-Audio");
-            audioThread.setDaemon(true);
-            audioThread.start();
-
-            await(started);
-
-            Throwable throwable = failure.get();
-            if (throwable != null) {
-                audioThread = null;
-                RUNNING.set(false);
-                throw new IllegalStateException("Failed to initialize audio", throwable);
-            }
-        }
+    public static <T> CompletableFuture<T> submitAsync(Callable<T> callable) {
+        /*
+         * Queue admission and session shutdown are coordinated inside AudioRuntime.
+         */
+        Objects.requireNonNull(callable, "callable");
+        return ensureStarted().submit(callable);
     }
 
     /**
-     * <p>
-     * Shuts down the audio subsystem and waits for the dedicated audio thread to exit.
-     * </p>
+     * Queues a command without waiting for readiness. Null is ignored for compatibility;
+     * failures of this fire-and-forget API are reported to standard error. Use submitAsync
+     * when a caller needs to handle a command's outcome explicitly.
      *
-     * <p>
-     * This method is package-private because it is part of subsystem lifecycle
-     * management. Shutdown is synchronized so that thread state transitions are safe.
-     * The method stops the run loop, unparks the audio thread if it is sleeping, and
-     * joins it when shutdown is requested from a different thread. After the thread
-     * exits, the shared thread reference is cleared.
-     * </p>
-     *
-     * <p>
-     * If the subsystem is not running, this method returns without doing anything.
-     * </p>
-     */
-    static void dispose() {
-        Thread thread;
-
-        synchronized (LOCK) {
-            thread = audioThread;
-            if (thread == null) {
-                resetState();
-                return;
-            }
-
-            RUNNING.set(false);
-            LockSupport.unpark(thread);
-        }
-
-        if (Thread.currentThread() != thread) {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        synchronized (LOCK) {
-            audioThread = null;
-        }
-
-        resetState();
-    }
-
-    /**
-     * <p>
-     * Loads sound data from a file path and creates a managed {@link SoundPlayer}
-     * for it.
-     * </p>
-     *
-     * <p>
-     * This is a convenience method that first loads {@link SoundData} from the given
-     * path and then delegates to {@link #create(SoundData)} so the resulting player
-     * is created on the audio thread and registered for automatic updates.
-     * </p>
-     *
-     * @param path the path to the sound resource
-     * @return a newly created and registered sound player
-     */
-    public static SoundPlayer load(String path) {
-        return create(SoundData.load(path));
-    }
-
-    /**
-     * <p>
-     * Loads sound data from raw encoded bytes and creates a managed
-     * {@link SoundPlayer} for it.
-     * </p>
-     *
-     * <p>
-     * This is a convenience method that first decodes {@link SoundData} from the
-     * provided byte array and then delegates to {@link #create(SoundData)} so the
-     * resulting player is created on the audio thread and registered for updates.
-     * </p>
-     *
-     * @param data encoded sound data bytes
-     * @return a newly created and registered sound player
-     */
-    public static SoundPlayer load(byte[] data) {
-        return create(SoundData.load(data));
-    }
-
-    /**
-     * <p>
-     * Creates a new {@link SoundPlayer} from already prepared {@link SoundData}.
-     * </p>
-     *
-     * <p>
-     * The actual player construction happens on the audio thread through
-     * {@link #call(Callable)} so OpenAL resource creation remains thread-safe.
-     * After creation, the player is added to the tracked player list so the audio
-     * subsystem updates it automatically during each loop iteration.
-     * </p>
-     *
-     * @param data the sound data used to create the player
-     * @return the newly created and registered sound player
-     */
-    public static SoundPlayer create(SoundData data) {
-        return call(() -> {
-            SoundPlayer player = new SoundPlayer(data);
-            PLAYERS.add(player);
-            playersChanged = true;
-            return player;
-        });
-    }
-
-    /**
-     * <p>
-     * Destroys a managed {@link SoundPlayer} and removes it from the update registry.
-     * </p>
-     *
-     * <p>
-     * If the provided player is {@code null}, this method returns immediately. When
-     * a valid player is provided, destruction is queued onto the audio thread so
-     * OpenAL cleanup happens safely and consistently.
-     * </p>
-     *
-     * @param player the player to destroy
-     */
-    public static void destroy(SoundPlayer player) {
-        if (player == null) {
-            return;
-        }
-
-        run(() -> {
-            PLAYERS.remove(player);
-            playersChanged = true;
-            player.dispose();
-        });
-    }
-
-    /**
-     * <p>
-     * Queues an asynchronous task to run on the audio thread.
-     * </p>
-     *
-     * <p>
-     * If the subsystem has not been started yet, it is started automatically through
-     * {@link #ensureStarted()}. If the current thread is already the audio thread,
-     * the runnable executes immediately. Otherwise the runnable is added to the task
-     * queue and the audio thread is unparked so it can process the work promptly.
-     * </p>
-     *
-     * @param runnable the task to execute on the audio thread
+     * @param runnable audio-thread work, or null to do nothing
      */
     public static void run(Runnable runnable) {
-        if (runnable == null) {
-            return;
-        }
-
-        ensureStarted();
-
-        if (isAudioThread()) {
+        /*
+         * Keep commands asynchronous even while the native device is still opening.
+         */
+        if (runnable == null) return;
+        AudioRuntime current = ensureStarted();
+        if (current.isAudioThread()) {
+            if (current.state() != AudioState.READY) throw new IllegalStateException("Audio session is not ready", current.failure());
             runnable.run();
             return;
         }
-
-        TASKS.add(runnable);
-        LockSupport.unpark(audioThread);
+        current.submit(() -> {
+            runnable.run();
+            return null;
+        }).whenComplete((result, failure) -> {
+            if (failure != null) failure.printStackTrace();
+        });
     }
 
     /**
-     * <p>
-     * Executes a runnable synchronously on the audio thread and blocks until it
-     * completes.
-     * </p>
+     * Executes a command synchronously, deliberately waiting for readiness and completion.
+     * Audio-thread calls execute inline. Prefer run or submitAsync on the rendering thread.
      *
-     * <p>
-     * This method is a convenience wrapper around {@link #call(Callable)} for
-     * callers that do not need a return value. The runnable is executed on the
-     * audio thread whether the caller is already on that thread or not.
-     * </p>
-     *
-     * @param runnable the task to execute synchronously on the audio thread
+     * @param runnable nonnull operation
      */
     public static void sync(Runnable runnable) {
+        /*
+         * Preserve the established blocking API while providing explicit nonblocking alternatives.
+         */
+        Objects.requireNonNull(runnable, "runnable");
         call(() -> {
             runnable.run();
             return null;
@@ -424,395 +302,335 @@ public final class Audio {
     }
 
     /**
-     * <p>
-     * Executes a callable on the audio thread and returns its result.
-     * </p>
+     * Runs an operation synchronously on the audio thread. Startup failure and shutdown
+     * complete queued results exceptionally instead of leaving a waiter blocked forever.
+     * Interruption restores the caller's interrupt flag and cancels unexecuted work.
      *
-     * <p>
-     * If the current thread is already the audio thread, the callable is invoked
-     * immediately. Otherwise a {@link FutureTask} is enqueued and the calling thread
-     * blocks until the result is available.
-     * </p>
-     *
-     * <p>
-     * Checked exceptions thrown by the callable are wrapped in
-     * {@link RuntimeException}. Runtime exceptions are rethrown directly.
-     * </p>
-     *
-     * @param callable the task to execute
-     * @param <T>      the result type
-     * @return the result produced by the callable
-     * @throws RuntimeException if execution fails or waiting for the result fails
+     * @param callable nonnull operation
+     * @param <T> result type
+     * @return operation result
+     * @throws RuntimeException if interrupted or the operation/session fails
      */
     public static <T> T call(Callable<T> callable) {
-        ensureStarted();
+        /*
+         * This is the only command API that waits; bootstrap and asynchronous submission do not.
+         */
+        return awaitResult(submitAsync(callable));
+    }
 
-        if (isAudioThread()) {
-            try {
-                return callable.call();
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        FutureTask<T> future = new FutureTask<>(() -> {
-            try {
-                return callable.call();
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-
-        TASKS.add(future);
-        LockSupport.unpark(audioThread);
-
+    /**
+     * Waits for one captured session's command without resubmitting it to a replacement.
+     *
+     * @param result command outcome
+     * @param <T> result type
+     * @return completed command value
+     * @throws RuntimeException if the wait is interrupted or command execution fails
+     */
+    private static <T> T awaitResult(CompletableFuture<T> result) {
+        /*
+         * Session identity is fixed before this wait, including for synchronous creation.
+         */
         try {
-            return future.get();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            return result.get();
+        } catch (InterruptedException failure) {
+            result.cancel(false);
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted waiting for audio", failure);
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof RuntimeException runtimeFailure) throw runtimeFailure;
+            if (cause instanceof Error error) throw error;
+            throw new IllegalStateException("Audio operation failed", cause);
         }
     }
 
     /**
-     * <p>
-     * Returns whether the current thread is the dedicated audio thread.
-     * </p>
+     * Creates a managed player after the current session becomes ready, without blocking.
+     * SoundData and its borrowed PCM storage must remain valid until creation completes.
      *
-     * <p>
-     * This check is useful when enforcing thread ownership rules for OpenAL-backed
-     * operations or when deciding whether a task should execute immediately or be
-     * queued for later processing.
-     * </p>
-     *
-     * @return {@code true} if the current thread is the audio thread
+     * @param data prepared nonnull sound data
+     * @return completion with the session-owned player
      */
-    public static boolean isAudioThread() {
-        return Thread.currentThread() == audioThread;
+    public static CompletableFuture<SoundPlayer> createAsync(SoundData data) {
+        /*
+         * Resource construction and registration are one operation on the owning worker.
+         */
+        Objects.requireNonNull(data, "data");
+        AudioRuntime current = ensureStarted();
+        return current.submit(() -> createPlayer(current, data));
     }
 
     /**
-     * <p>
-     * Registers a {@link SoundPlayer} with the audio subsystem so it will be updated
-     * each loop iteration.
-     * </p>
+     * Decodes a path on the common worker pool, then creates a player on the captured
+     * audio session. A stopped session is never restarted by delayed decode completion.
      *
-     * <p>
-     * If the player is {@code null}, the method returns immediately. If the current
-     * thread is already the audio thread, registration happens immediately. Otherwise
-     * registration is queued through {@link #run(Runnable)}. Duplicate registration
-     * is avoided by checking whether the player already exists in the tracked list.
-     * </p>
-     *
-     * @param player the player to register
+     * @param path nonnull sound path
+     * @return completion with a managed player or decode/lifecycle failure
      */
-    public static void register(SoundPlayer player) {
-        if (player == null) {
-            return;
-        }
-
-        if (isAudioThread()) {
-            if (!PLAYERS.contains(player)) {
-                PLAYERS.add(player);
-                playersChanged = true;
-            }
-            return;
-        }
-
-        run(() -> {
-            if (!PLAYERS.contains(player)) {
-                PLAYERS.add(player);
-                playersChanged = true;
-            }
-        });
+    public static CompletableFuture<SoundPlayer> loadAsync(String path) {
+        /*
+         * Capture lifecycle identity before scheduling decoding, which can outlive shutdown.
+         */
+        Objects.requireNonNull(path, "path");
+        AudioRuntime current = ensureStarted();
+        return CompletableFuture.supplyAsync(() -> SoundData.load(path))
+                .thenCompose(data -> current.submit(() -> createPlayer(current, data)));
     }
 
     /**
-     * <p>
-     * Unregisters a {@link SoundPlayer} from the audio subsystem.
-     * </p>
+     * Decodes encoded bytes on the common worker pool and creates a managed player
+     * on the captured session. The caller must not mutate bytes until decoding completes.
      *
-     * <p>
-     * This removes the player from the automatic update list but does not, by itself,
-     * guarantee full resource destruction unless caller logic also disposes it.
-     * </p>
-     *
-     * <p>
-     * If the current thread is already the audio thread, removal happens immediately.
-     * Otherwise it is queued for execution on the audio thread.
-     * </p>
-     *
-     * @param player the player to unregister
+     * @param bytes nonnull borrowed encoded bytes
+     * @return completion with a managed player or decode/lifecycle failure
      */
-    public static void unregister(SoundPlayer player) {
-        if (player == null) {
-            return;
-        }
-
-        if (isAudioThread()) {
-            PLAYERS.remove(player);
-            playersChanged = true;
-            return;
-        }
-
-        run(() -> {if (PLAYERS.remove(player)) playersChanged = true;});
+    public static CompletableFuture<SoundPlayer> loadAsync(byte[] bytes) {
+        /*
+         * Keep potentially expensive media probing and decoding off the caller's frame thread.
+         */
+        Objects.requireNonNull(bytes, "bytes");
+        AudioRuntime current = ensureStarted();
+        return CompletableFuture.supplyAsync(() -> SoundData.load(bytes))
+                .thenCompose(data -> current.submit(() -> createPlayer(current, data)));
     }
 
     /**
-     * <p>
-     * Verifies that the current thread is the audio thread.
-     * </p>
+     * Synchronously decodes a path and waits for native player creation.
      *
-     * <p>
-     * This helper is intended for internal or closely related audio classes that must
-     * enforce OpenAL thread ownership. If called from any thread other than the audio
-     * thread, an {@link IllegalStateException} is thrown.
-     * </p>
-     *
-     * @throws IllegalStateException if called from a non-audio thread
+     * @param path sound path
+     * @return managed player
      */
-    static void assertAudioThread() {
-        if (!isAudioThread()) {
-            throw new IllegalStateException("Audio operation must run on the audio thread");
-        }
+    public static SoundPlayer load(String path) {
+        /*
+         * Retain blocking behavior for callers that require an immediately usable player.
+         */
+        return create(SoundData.load(path));
     }
 
     /**
-     * <p>
-     * Ensures that the audio subsystem has been initialized.
-     * </p>
+     * Synchronously decodes bytes and waits for native player creation.
      *
-     * <p>
-     * If the audio thread has not yet been created, this method triggers startup by
-     * calling {@link #init()}. If audio is already running, nothing happens.
-     * </p>
+     * @param bytes encoded sound bytes
+     * @return managed player
      */
-    private static void ensureStarted() {
-        if (audioThread == null) {
-            init();
-        }
+    public static SoundPlayer load(byte[] bytes) {
+        /*
+         * Buffered and streaming loaders retain their existing detection behavior.
+         */
+        return create(SoundData.load(bytes));
     }
 
     /**
-     * <p>
-     * Runs the dedicated audio thread loop.
-     * </p>
+     * Synchronously creates and registers a player on the audio thread.
      *
-     * <p>
-     * This method performs the full native audio lifecycle for the subsystem:
-     * </p>
-     *
-     * <ul>
-     *     <li>open the OpenAL device</li>
-     *     <li>create the OpenAL context</li>
-     *     <li>make that context current on the thread</li>
-     *     <li>create LWJGL OpenAL capabilities</li>
-     *     <li>drain queued tasks and update players while running</li>
-     *     <li>dispose registered players when shutting down</li>
-     *     <li>always release OpenAL resources in the {@code finally} block</li>
-     * </ul>
-     *
-     * <p>
-     * If any failure occurs during startup, it is recorded into {@code failure} and
-     * the startup latch is released so the initializing thread can react properly.
-     * </p>
-     *
-     * @param started latch used to signal initialization completion
-     * @param failure reference used to publish startup failure information
+     * @param data prepared nonnull sound data
+     * @return managed player
      */
-    private static void runLoop(CountDownLatch started, AtomicReference<Throwable> failure) {
+    public static SoundPlayer create(SoundData data) {
+        /*
+         * Capture the session before waiting so a shutdown cannot redirect this creation.
+         */
+        return awaitResult(createAsync(data));
+    }
+
+    /**
+     * Constructs and registers one player while its session owns the current context.
+     *
+     * @param current owning session
+     * @param data prepared sound data
+     * @return registered player
+     */
+    private static SoundPlayer createPlayer(AudioRuntime current, SoundData data) {
+        /*
+         * Registration ensures teardown owns the player even if a result is abandoned.
+         */
+        SoundPlayer player = new SoundPlayer(data);
         try {
-            device = alcOpenDevice((ByteBuffer) null);
-            if (device == NULL) {
-                throw new IllegalStateException("Failed to open OpenAL device");
-            }
-
-            context = alcCreateContext(device, (IntBuffer) null);
-            if (context == NULL) {
-                throw new IllegalStateException("Failed to create OpenAL context");
-            }
-
-            alcMakeContextCurrent(context);
-
-            ALCCapabilities capabilities = ALC.createCapabilities(device);
-            AL.createCapabilities(capabilities);
-
-            started.countDown();
-
-            while (RUNNING.get()) {
-                drainTasks();
-                updatePlayers();
-                drainTasks();
-                if (PLAYERS.isEmpty() && TASKS.isEmpty()) LockSupport.park();
-                else LockSupport.parkNanos(5_000_000L);
-            }
-
-            drainTasks();
-            disposePlayers();
-        } catch (Throwable throwable) {
-            failure.set(throwable);
-            started.countDown();
-        } finally {
-            shutdownOpenAL();
-        }
-    }
-
-    /**
-     * <p>
-     * Updates all currently registered {@link SoundPlayer} instances.
-     * </p>
-     *
-     * <p>
-     * The method iterates over the player list, skips null references, and calls
-     * {@link SoundPlayer#update()} on each valid player. Failures from individual
-     * players are caught and printed so one broken player does not prevent the rest
-     * of the audio subsystem from continuing.
-     * </p>
-     */
-    private static void updatePlayers() {
-        if (playersChanged) {
-            playerSnapshot = PLAYERS.toArray(SoundPlayer[]::new);
-            playersChanged = false;
-        }
-        for (SoundPlayer player : playerSnapshot) {
-            if (player == null) {
-                continue;
-            }
-
-            try {
-                player.update();
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * <p>
-     * Disposes all currently registered {@link SoundPlayer} instances.
-     * </p>
-     *
-     * <p>
-     * This method is used during shutdown so every remaining player has a chance to
-     * release its resources. Exceptions from individual players are caught and printed,
-     * then the registry is cleared after iteration completes.
-     * </p>
-     */
-    private static void disposePlayers() {
-        for (SoundPlayer player : PLAYERS) {
-            if (player == null) {
-                continue;
-            }
-
+            current.register(player);
+            return player;
+        } catch (RuntimeException | Error failure) {
             try {
                 player.dispose();
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
+            } catch (RuntimeException | Error cleanup) {
+                failure.addSuppressed(cleanup);
             }
-        }
-
-        PLAYERS.clear();
-    }
-
-    /**
-     * <p>
-     * Drains and executes all queued audio-thread tasks.
-     * </p>
-     *
-     * <p>
-     * Tasks are polled from {@link #TASKS} until the queue becomes empty. This method
-     * is called multiple times during each loop iteration so queued work can run both
-     * before and after player updates.
-     * </p>
-     */
-    private static void drainTasks() {
-        Runnable task;
-
-        while ((task = TASKS.poll()) != null) {
-            try {
-                task.run();
-            } catch (RuntimeException failure) {
-                // A failed asynchronous user command must not strand future callers.
-                failure.printStackTrace();
-            }
+            throw failure;
         }
     }
 
     /**
-     * <p>
-     * Shuts down OpenAL resources owned by the audio subsystem.
-     * </p>
+     * Queues managed player disposal; null is ignored. Native cleanup stays on the owner.
      *
-     * <p>
-     * The current context is first cleared from the thread. The OpenAL context is
-     * then destroyed if valid, followed by closing the device if valid. Finally,
-     * the queued task list is cleared even if shutdown work throws unexpectedly.
-     * </p>
+     * @param player player to dispose
      */
-    private static void shutdownOpenAL() {
-        try {
-            alcMakeContextCurrent(NULL);
+    public static void destroy(SoundPlayer player) {
+        /*
+         * SoundPlayer disposal unregisters itself on the audio thread.
+         */
+        if (player != null) run(player::dispose);
+    }
 
-            if (context != NULL) {
-                alcDestroyContext(context);
-                context = NULL;
-            }
+    /**
+     * Reports whether the caller owns the current session's audio thread.
+     *
+     * @return true on the current native owner, including its teardown callbacks
+     */
+    public static boolean isAudioThread() {
+        /*
+         * Session replacement is prohibited until prior native teardown has completed.
+         */
+        AudioRuntime current = runtime;
+        return current != null && current.isAudioThread();
+    }
 
-            if (device != NULL) {
-                alcCloseDevice(device);
-                device = NULL;
+    /**
+     * Registers a player for automatic updates, delegating to the current session.
+     *
+     * @param player player to register, or null to ignore
+     */
+    public static void register(SoundPlayer player) {
+        /*
+         * Registry mutations share the same owner as native playback updates.
+         */
+        if (player == null) return;
+        AudioRuntime current = ensureStarted();
+        if (current.isAudioThread()) current.register(player);
+        else current.submit(() -> {
+            current.register(player);
+            return null;
+        }).whenComplete((result, failure) -> {
+            if (failure != null) failure.printStackTrace();
+        });
+    }
+
+    /**
+     * Removes a player from automatic updates without disposing its native resources.
+     *
+     * @param player player to remove, or null to ignore
+     */
+    public static void unregister(SoundPlayer player) {
+        /*
+         * Inline dispatch permits player disposal to unregister during owner-thread teardown.
+         */
+        if (player == null) return;
+        AudioRuntime current = ensureStarted();
+        if (current.isAudioThread()) current.unregister(player);
+        else current.submit(() -> {
+            current.unregister(player);
+            return null;
+        }).whenComplete((result, failure) -> {
+            if (failure != null) failure.printStackTrace();
+        });
+    }
+
+    /**
+     * Enforces native ownership for engine-side operations requiring the current context.
+     *
+     * @throws IllegalStateException if called outside the current audio thread
+     */
+    static void assertAudioThread() {
+        /*
+         * No implicit startup or blocking is permitted as part of an ownership assertion.
+         */
+        if (!isAudioThread()) throw new IllegalStateException("Audio operation must run on the audio thread");
+    }
+
+    /**
+     * Publishes a lazy session when none exists or a previous shutdown has finished.
+     * A failed session remains observable and rejects work until explicitly restarted.
+     *
+     * @return current session accepting or rejecting this request
+     */
+    private static AudioRuntime ensureStarted() {
+        /*
+         * The fast path requires only volatile reads; native initialization never holds LOCK.
+         */
+        AudioRuntime current = runtime;
+        if (current != null && current.state() != AudioState.STOPPED) return current;
+        synchronized (LOCK) {
+            current = runtime;
+            if (current == null || current.state() == AudioState.STOPPED && current.terminated().isDone()) {
+                current = new AudioRuntime();
+                runtime = current;
+                current.start();
             }
-        } finally {
-            TASKS.clear();
+            return current;
         }
     }
 
     /**
-     * Clears Java-side run-loop state and native-handle references after teardown or
-     * failed initialization. Pending tasks and registered players are discarded; this
-     * helper does not itself dispose players or destroy native OpenAL resources.
-     * The logical ambient listener position is retained.
+     * Enumerates playback endpoint names synchronously after readiness.
+     *
+     * @return immutable device-name snapshot, empty if enumeration is unsupported
      */
-    private static void resetState() {
-        RUNNING.set(false);
-        TASKS.clear();
-        PLAYERS.clear();
-        playerSnapshot = new SoundPlayer[0];
-        playersChanged = false;
-        device = NULL;
-        context = NULL;
+    public static List<String> getDevices() {
+        /*
+         * Enumeration uses the active audio worker and matches the switching namespace.
+         */
+        return call(() -> {
+            int token;
+            if (alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT")) token = ALC_ALL_DEVICES_SPECIFIER;
+            else if (alcIsExtensionPresent(NULL, "ALC_ENUMERATION_EXT")) token = ALC_DEVICE_SPECIFIER;
+            else return List.of();
+            List<String> devices = ALUtil.getStringList(NULL, token);
+            return devices == null ? List.of() : List.copyOf(devices);
+        });
     }
 
     /**
-     * <p>
-     * Waits for the given latch while preserving interruption state.
-     * </p>
+     * Queries the system's current default playback name synchronously.
      *
-     * <p>
-     * This helper repeatedly waits until the latch completes. If interruption occurs,
-     * the method remembers that fact, continues waiting, and restores the interrupted
-     * status on the current thread once waiting has completed.
-     * </p>
-     *
-     * @param latch the latch to wait on
+     * @return current default output name, or null if unavailable
      */
-    private static void await(CountDownLatch latch) {
-        boolean interrupted = false;
+    public static String getDefaultDevice() {
+        /*
+         * Resolve system defaults at query time rather than retaining a startup snapshot.
+         */
+        return call(() -> alcGetString(NULL, alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ? ALC_DEFAULT_ALL_DEVICES_SPECIFIER : ALC_DEFAULT_DEVICE_SPECIFIER));
+    }
 
-        while (true) {
-            try {
-                latch.await();
-                break;
-            } catch (InterruptedException e) {
-                interrupted = true;
-            }
-        }
+    /**
+     * Queries the active session's playback endpoint synchronously.
+     *
+     * @return current endpoint name, or null if unavailable
+     */
+    public static String getCurrentDevice() {
+        /*
+         * The executing worker and native handle always belong to the captured session.
+         */
+        return call(() -> alcGetString(runtime.device(), alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ? ALC_ALL_DEVICES_SPECIFIER : ALC_DEVICE_SPECIFIER));
+    }
 
-        if (interrupted) {
-            Thread.currentThread().interrupt();
-        }
+    /**
+     * Queries support for resource-preserving output switching synchronously.
+     *
+     * @return whether the active device supports ALC_SOFT_reopen_device
+     */
+    public static boolean isDeviceSwitchingSupported() {
+        /*
+         * Extension support belongs to the current native device, not a previous session.
+         */
+        return call(() -> alcIsExtensionPresent(runtime.device(), "ALC_SOFT_reopen_device"));
+    }
+
+    /**
+     * Synchronously switches the current device without recreating players. Null
+     * selects the system default. Unsupported or failed reopen returns false.
+     *
+     * @param deviceName exact endpoint name, or null for the system default
+     * @return whether the device was reopened successfully
+     * @throws IllegalArgumentException if a nonnull name is blank or contains NUL
+     */
+    public static boolean switchDevice(String deviceName) {
+        /*
+         * Reopening remains serialized with all source, buffer, and listener operations.
+         */
+        if (deviceName != null && (deviceName.isBlank() || deviceName.indexOf('\0') >= 0))
+            throw new IllegalArgumentException("Device name must be nonblank and contain no NUL characters");
+        return call(() -> {
+            long device = runtime.device();
+            if (!alcIsExtensionPresent(device, "ALC_SOFT_reopen_device")) return false;
+            return alcReopenDeviceSOFT(device, deviceName, (IntBuffer) null);
+        });
     }
 }

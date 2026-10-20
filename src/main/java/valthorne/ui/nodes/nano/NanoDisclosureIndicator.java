@@ -15,15 +15,15 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * or per-frame allocation and stays centered within its header's height.
  */
 public final class NanoDisclosureIndicator extends NanoPanel {
-    /*
+    /**
      * Muted neutral triangle remains legible on charcoal section headers.
      */
     private static final Color NORMAL = new Color(0xFF999999);
-    /*
+    /**
      * Hover feedback highlights the disclosure together with its header.
      */
     private static final Color HOVERED = new Color(0xFFCCCCCC);
-    /*
+    /**
      * Disabled headers retain a quieter disclosure without changing geometry.
      */
     private static final Color DISABLED = new Color(0xFF555555);

@@ -68,7 +68,7 @@ import valthorne.graphics.Color;
  * @see NanoNode
  */
 public final class UIRenderContext {
-    /*
+    /**
      * Preview opacity that keeps content visible while exposing items beneath it.
      */
     private static final float DRAG_OPACITY = 0.82f;

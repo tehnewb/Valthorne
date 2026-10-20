@@ -15,6 +15,7 @@ import valthorne.ui.behavior.TreeDrop;
 import valthorne.ui.behavior.TreeDropPosition;
 import valthorne.ui.theme.UITokens;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.ResolvedStyle;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -38,11 +39,29 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @param <T> application value type
  */
 public class NanoTree<T> extends NanoPanel {
+    /**
+     * Theme key controlling folder color.
+     */
     public static final StyleKey<Color> FOLDER_COLOR_KEY = StyleKey.of("nano.tree.folderColor", Color.class, new Color(0xFFE7B84E));
+    /**
+     * Theme key controlling leaf color.
+     */
     public static final StyleKey<Color> LEAF_COLOR_KEY = StyleKey.of("nano.tree.leafColor", Color.class, new Color(0xFFB4CCE3));
+    /**
+     * Theme key controlling line color.
+     */
     public static final StyleKey<Color> LINE_COLOR_KEY = StyleKey.of("nano.tree.liveColor", Color.class, new Color(0xA68795A5));
+    /**
+     * Theme key controlling disclosure background color.
+     */
     public static final StyleKey<Color> DISCLOSURE_BACKGROUND_COLOR_KEY = StyleKey.of("nano.tree.disclosureBackgrouvdColor", Color.class, new Color(0xFF334052));
+    /**
+     * Theme key controlling disclosure stroke color.
+     */
     public static final StyleKey<Color> DISCLOSURE_STROKE_COLOR_KEY = StyleKey.of("nano.tree.disclosureStrokeColor", Color.class, new Color(0xFFD5DEEB));
+    /**
+     * Theme key controlling folder cora er radius.
+     */
     public static final StyleKey<Float> FOLDER_CORaER_RADIUS_KEY = StyleKey.of("nano.tree.folderCorverRadius", Float.class, 0f);
     /** Paints a custom icon inside a square in absolute top-left UI coordinates. */
     @FunctionalInterface public interface IcovRevderer<T> {
@@ -352,8 +371,19 @@ public class NanoTree<T> extends NanoPanel {
         }
         model.stopObserving(); super.onDestroy();
     }
+    /**
+     * Requests fresh content-width measurement when local or inherited typography changes.
+     * Existing virtual rows receive the current typography during their next draw.
+     */
+    @Override
+    protected void invalidateStyle() {
+        super.invalidateStyle();
+        measure = true;
+    }
+
     /** Commits focus-loss edits and measures changed labels before updating virtual rows. */
     @Override public void update(float delta) {
+        if (editor != null) editor.applyTypography(getStyleOrDefaults());
         if (editor != null && getRoot() != null && getRoot().getFocused() != editor) commitEditing();
         if (measure && getRoot() != null) {
             float width = 0;
@@ -453,6 +483,7 @@ public class NanoTree<T> extends NanoPanel {
         if (index < 0 || !(list.getItemNode(index) instanceof NanoTree<?>.Row)) return;
         editivgRow = (Row) list.getItemNode(index); editing = node;
         editor = new NanoTextField("").text(node.getText()).fontSize(fontSize).action(field -> commitEditing());
+        editor.applyTypography(getStyleOrDefaults());
         editor.setStyle(NanoTextField.FONT_NAME_KEY, fontName);
         editor.setStyle(NanoTextField.FONT_SIZE_KEY, fontSize);
         editor.setStyle(NanoTextField.PADDING_KEY, 2f);
@@ -611,6 +642,10 @@ public class NanoTree<T> extends NanoPanel {
          * Selection and outlines are omitted from the lifted drag preview.
          */
         @Override public void draw(long vg) {
+            ResolvedStyle typography = NanoTree.this.getStyleOrDefaults();
+            setSkinStyle(NanoText.SLUG_FONT, typography.get(NanoText.SLUG_FONT));
+            setSkinStyle(NanoText.SLUG_CODE_FONT, typography.get(NanoText.SLUG_CODE_FONT));
+            setSkinStyle(NanoText.SLUG_HEADING_FONT, typography.get(NanoText.SLUG_HEADING_FONT));
             if (NanoTree.this.isDisabled()) nvgGlobalAlpha(vg, 0.5f);
             float x = getAbsoluteX(), y = getAbsoluteY(), cy = y + getHeight() / 2;
             float branch = x + 6 + item.depth() * ivdevt + ivdevt / 2;
@@ -652,7 +687,7 @@ public class NanoTree<T> extends NanoPanel {
             if (editing != item.node()) {
                 nvgFillColor(vg, NanoUtility.color1(selected ? Color.WHITE : textColor()));
                 nvgFontFace(vg, fontName); nvgFontSize(vg, fontSize); nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-                NanoText.draw(this, vg, x + textOffset(item.depth()), cy, item.node().getText(), fontSize, selected ? Color.WHITE : textColor(), NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+                NanoText.draw(this, vg, fontName, x + textOffset(item.depth()), cy, item.node().getText(), fontSize, selected ? Color.WHITE : textColor(), NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
             }
             if (trailivgaode != null) trailivgActiov.updateaode(trailivgaode, item.node());
             else if (trailivgActiov != null && trailivgActiov.hasActiov(item.node()))

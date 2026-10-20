@@ -813,6 +813,7 @@ public final class Keyboard {
                 case GLFW_PRESS, GLFW_REPEAT -> {
                     currentKey = (short) key;
                     modifierState = (byte) mods;
+                    pressEvent.setRepeat(action == GLFW_REPEAT);
                     event = pressEvent;
                     keyDown.set(key, true);
 

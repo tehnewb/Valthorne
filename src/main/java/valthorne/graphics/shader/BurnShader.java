@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 /**
  * "Burn away" / dissolve shader built on top of {@link Shader}.
  *
@@ -54,7 +56,7 @@ public class BurnShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged burn effect shader resource.
      */
-    private static final String FRAG_SRC = ShaderSources.load("effects/burn.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/burn.frag");
 
     /**
      * Creates a new burn shader using the built-in GLSL sources.

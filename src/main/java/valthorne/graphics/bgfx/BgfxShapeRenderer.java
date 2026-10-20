@@ -33,7 +33,7 @@ import static org.lwjgl.opengl.GL33.*;
  * }</pre>
  */
 public class BgfxShapeRenderer implements AutoCloseable {
-    /*
+    /**
      * Solid shapes use vertex colors and conventional source-alpha compositing.
      * Alpha channels use source-over rather than squaring the source alpha.
      */

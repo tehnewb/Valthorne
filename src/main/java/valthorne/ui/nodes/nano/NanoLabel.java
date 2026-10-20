@@ -58,12 +58,12 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     public static final StyleKey<Float> LINE_SPACING_KEY = StyleKey.of("nano.label.lineSpacing", Float.class, 0f);
 
-    /*
+    /**
      * Optional theme override for horizontal alignment of each text line.
      */
     public static final StyleKey<Alignment> HORIZONTAL_ALIGNMENT_KEY = StyleKey.of("nano.label.horizontalAlignment", Alignment.class);
 
-    /*
+    /**
      * Optional theme override for vertical alignment of the complete text block.
      */
     public static final StyleKey<Alignment> VERTICAL_ALIGNMENT_KEY = StyleKey.of("nano.label.verticalAlignment", Alignment.class);
@@ -83,6 +83,9 @@ public class NanoLabel extends UINode implements NanoNode {
     private long lastPressTime;
     private float lastPressX, lastPressY;
     private int clickCount;
+    /**
+     * Selection color value used by NanoLabel.
+     */
     private static final Color SELECTION_COLOR = new Color(0x995298CE);
 
     /** Opts into read-only pointer selection and Ctrl/Cmd+C. Disabled by default. */
@@ -215,15 +218,21 @@ public class NanoLabel extends UINode implements NanoNode {
      * Sets independent horizontal and vertical text alignment. Horizontal alignment
      * applies to each line; vertical alignment applies to the complete text block.
      * Explicit dimensions provide space for alignment beyond intrinsic text size.
-     * Resolved theme values may override either axis during layout.
+     * Each nonnull axis becomes a local style override during layout.
      *
      * @param horizontal horizontal alignment, or null to retain its current value
      * @param vertical vertical alignment, or null to retain its current value
      * @return this label
      */
     public NanoLabel alignment(Alignment horizontal, Alignment vertical) {
-        if (horizontal != null) horizontalAlignment = horizontal;
-        if (vertical != null) verticalAlignment = vertical;
+        if (horizontal != null) {
+            horizontalAlignment = horizontal;
+            setStyle(HORIZONTAL_ALIGNMENT_KEY, horizontal);
+        }
+        if (vertical != null) {
+            verticalAlignment = vertical;
+            setStyle(VERTICAL_ALIGNMENT_KEY, vertical);
+        }
         return this;
     }
 
@@ -243,7 +252,10 @@ public class NanoLabel extends UINode implements NanoNode {
      * @return this label
      */
     public NanoLabel horizontalAlignment(Alignment horizontal) {
-        if (horizontal != null) horizontalAlignment = horizontal;
+        if (horizontal != null) {
+            horizontalAlignment = horizontal;
+            setStyle(HORIZONTAL_ALIGNMENT_KEY, horizontal);
+        }
         return this;
     }
 
@@ -263,7 +275,10 @@ public class NanoLabel extends UINode implements NanoNode {
      * @return this label
      */
     public NanoLabel verticalAlignment(Alignment vertical) {
-        if (vertical != null) verticalAlignment = vertical;
+        if (vertical != null) {
+            verticalAlignment = vertical;
+            setStyle(VERTICAL_ALIGNMENT_KEY, vertical);
+        }
         return this;
     }
 
@@ -325,7 +340,10 @@ public class NanoLabel extends UINode implements NanoNode {
      * @return this label
      */
     public NanoLabel fontName(String fontName) {
-        if (fontName != null && !fontName.isBlank()) this.fontName = fontName;
+        if (fontName != null && !fontName.isBlank()) {
+            this.fontName = fontName;
+            setStyle(FONT_NAME_KEY, this.fontName);
+        }
         markLayoutDirty();
         return this;
     }
@@ -341,13 +359,14 @@ public class NanoLabel extends UINode implements NanoNode {
 
     /**
      * Sets text size with a minimum of one and marks layout dirty. Supply a finite
-     * value; Math.max does not reject NaN. Resolved styles can later replace it.
+     * value; Math.max does not reject NaN. The local override takes precedence over theme values.
      *
      * @param fontSize requested size in UI units
      * @return this label
      */
     public NanoLabel fontSize(float fontSize) {
         this.fontSize = Math.max(1f, fontSize);
+        setStyle(FONT_SIZE_KEY, this.fontSize);
         markLayoutDirty();
         return this;
     }
@@ -364,13 +383,16 @@ public class NanoLabel extends UINode implements NanoNode {
 
     /**
      * Retains a non-null color without copying it or dirtying geometry. Null leaves
-     * the current value unchanged; style application can replace the reference.
+     * the current value unchanged; the local override takes precedence over theme values.
      *
      * @param color text color reference, or null to retain the current value
      * @return this label
      */
     public NanoLabel color(Color color) {
-        if (color != null) this.color = color;
+        if (color != null) {
+            this.color = color;
+            setStyle(COLOR_KEY, this.color);
+        }
         return this;
     }
 
@@ -392,6 +414,7 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     public NanoLabel tabSize(float tabSize) {
         this.tabSize = Math.max(1f, tabSize);
+        setStyle(TAB_SIZE_KEY, this.tabSize);
         markLayoutDirty();
         return this;
     }
@@ -407,15 +430,39 @@ public class NanoLabel extends UINode implements NanoNode {
 
     /**
      * Sets nonnegative extra line spacing and marks layout dirty. No spacing is
-     * added after the last line; resolved styles may replace this value.
+     * added after the last line; the local override takes precedence over theme values.
      *
      * @param lineSpacing finite requested extra distance in UI units
      * @return this label
      */
     public NanoLabel lineSpacing(float lineSpacing) {
         this.lineSpacing = Math.max(0f, lineSpacing);
+        setStyle(LINE_SPACING_KEY, this.lineSpacing);
         markLayoutDirty();
         return this;
+    }
+
+    /**
+     * Supplies a composite button's current caption appearance below explicit label styles.
+     * Does not turn resolved theme or state values into local overrides.
+     *
+     * @param name current button font name
+     * @param size current button font size
+     * @param tint current state tint
+     * @param ownerStyle current composite typography, below direct caption overrides
+     */
+    final void applyCaptionStyle(String name, float size, Color tint, ResolvedStyle ownerStyle) {
+        setSkinStyle(FONT_NAME_KEY, name);
+        setSkinStyle(FONT_SIZE_KEY, size);
+        setSkinStyle(COLOR_KEY, tint);
+        setSkinStyle(NanoText.SLUG_FONT, ownerStyle.get(NanoText.SLUG_FONT));
+        setSkinStyle(NanoText.SLUG_CODE_FONT, ownerStyle.get(NanoText.SLUG_CODE_FONT));
+        setSkinStyle(NanoText.SLUG_HEADING_FONT, ownerStyle.get(NanoText.SLUG_HEADING_FONT));
+        ResolvedStyle style = getStyleOrDefaults();
+        String resolvedName = style.get(FONT_NAME_KEY);
+        if (resolvedName != null && !resolvedName.isBlank()) fontName = resolvedName;
+        fontSize = Math.max(1f, style.get(FONT_SIZE_KEY));
+        color = style.get(COLOR_KEY);
     }
 
     /**
@@ -463,25 +510,25 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
+        horizontalAlignment = Alignment.START;
+        verticalAlignment = Alignment.START;
 
-        if (style != null) {
-            String resolvedFontName = style.get(FONT_NAME_KEY);
-            Float resolvedFontSize = style.get(FONT_SIZE_KEY);
-            Color resolvedColor = style.get(COLOR_KEY);
-            Float resolvedTabSize = style.get(TAB_SIZE_KEY);
-            Float resolvedLineSpacing = style.get(LINE_SPACING_KEY);
-            Alignment resolvedHorizontalAlignment = style.get(HORIZONTAL_ALIGNMENT_KEY);
-            Alignment resolvedVerticalAlignment = style.get(VERTICAL_ALIGNMENT_KEY);
+        String resolvedFontName = style.get(FONT_NAME_KEY);
+        Float resolvedFontSize = style.get(FONT_SIZE_KEY);
+        Color resolvedColor = style.get(COLOR_KEY);
+        Float resolvedTabSize = style.get(TAB_SIZE_KEY);
+        Float resolvedLineSpacing = style.get(LINE_SPACING_KEY);
+        Alignment resolvedHorizontalAlignment = style.get(HORIZONTAL_ALIGNMENT_KEY);
+        Alignment resolvedVerticalAlignment = style.get(VERTICAL_ALIGNMENT_KEY);
 
-            if (resolvedFontName != null && !resolvedFontName.isBlank()) fontName = resolvedFontName;
-            if (resolvedFontSize != null) fontSize = Math.max(1f, resolvedFontSize);
-            if (resolvedColor != null) color = resolvedColor;
-            if (resolvedTabSize != null) tabSize = Math.max(1f, resolvedTabSize);
-            if (resolvedLineSpacing != null) lineSpacing = Math.max(0f, resolvedLineSpacing);
-            if (resolvedHorizontalAlignment != null) horizontalAlignment = resolvedHorizontalAlignment;
-            if (resolvedVerticalAlignment != null) verticalAlignment = resolvedVerticalAlignment;
-        }
+        if (resolvedFontName != null && !resolvedFontName.isBlank()) fontName = resolvedFontName;
+        if (resolvedFontSize != null) fontSize = Math.max(1f, resolvedFontSize);
+        if (resolvedColor != null) color = resolvedColor;
+        if (resolvedTabSize != null) tabSize = Math.max(1f, resolvedTabSize);
+        if (resolvedLineSpacing != null) lineSpacing = Math.max(0f, resolvedLineSpacing);
+        if (resolvedHorizontalAlignment != null) horizontalAlignment = resolvedHorizontalAlignment;
+        if (resolvedVerticalAlignment != null) verticalAlignment = resolvedVerticalAlignment;
 
         String normalized = normalizeText(text);
         String[] lines = splitLines(normalized);
@@ -556,7 +603,7 @@ public class NanoLabel extends UINode implements NanoNode {
                     nvgFillColor(vg, NanoUtility.color1(color));
                 }
             }
-            NanoText.draw(this, vg, lineX, y + i * (lineHeight + lineSpacing), lines[i], fontSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+            NanoText.draw(this, vg, fontName, lineX, y + i * (lineHeight + lineSpacing), lines[i], fontSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             offset += lines[i].length() + 1;
         }
     }
@@ -583,7 +630,7 @@ public class NanoLabel extends UINode implements NanoNode {
         float textY = y + blockOffset(lines.length, lineHeight, lineSpacing * scale, getHeight() * scale);
         for (int index = 0; index < lines.length; index++) {
             float lineX = x + lineOffset(vg, lines[index], projectedSize, getWidth() * scale);
-            NanoText.draw(this, vg, lineX, textY + index * (lineHeight + lineSpacing * scale), lines[index], projectedSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+            NanoText.draw(this, vg, fontName, lineX, textY + index * (lineHeight + lineSpacing * scale), lines[index], projectedSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
         }
     }
 

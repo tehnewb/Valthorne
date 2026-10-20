@@ -200,6 +200,12 @@ public abstract class UINode implements Dimensional {
     private UIRoot root; // Root UI tree that this node belongs to.
     private ThemeData theme; // Optional local theme override for this node.
     private String styleName; // Optional named style used during theme resolution.
+    /**
+     * Shared read-only-by-convention fallback used only by built-in style application.
+     */
+    private static final ResolvedStyle DEFAULT_STYLE = new ResolvedStyle(new StyleMap());
+
+    private StyleMap skinStyle; // Composite-owned resolved inputs, below explicit local overrides.
     private StyleMap styleOverrides; // Per-node style overrides layered on top of the theme.
     private ResolvedStyle cachedStyle; // Cached resolved style for the current theme and state.
     private long yogaMemoryAddress; // Native Yoga node pointer used for layout calculations.
@@ -804,20 +810,53 @@ public abstract class UINode implements Dimensional {
      * theme, style name, or overrides change. Local overrides also work without a theme.
      * </p>
      *
-     * @return the resolved style, or null when neither a theme nor local overrides exist
+     * @return the resolved style, or null when neither a theme, composite inputs, nor local overrides exist
      */
     protected final ResolvedStyle getStyle() {
+        if (cachedStyle != null) return cachedStyle;
         ThemeData theme = getTheme();
-
-        if (theme == null) {
-            if (styleOverrides == null) return null;
-            if (cachedStyle == null) cachedStyle = new ResolvedStyle(styleOverrides.copy());
-            return cachedStyle;
+        StyleMap overrides = styleOverrides;
+        if (skinStyle != null) {
+            overrides = skinStyle.copy();
+            if (styleOverrides != null) overrides.putAll(styleOverrides);
         }
-
-        if (cachedStyle == null) cachedStyle = theme.resolve(getClass(), styleName, getStyleState(), styleOverrides);
-
+        if (theme == null) {
+            if (overrides == null) return null;
+            cachedStyle = new ResolvedStyle(overrides.copy());
+        } else cachedStyle = theme.resolve(getClass(), styleName, getStyleState(), overrides);
         return cachedStyle;
+    }
+
+    /**
+     * Returns resolved values or key defaults for built-in appearance synchronization.
+     * Unlike getStyle(), this also permits restoring fallback values after removing a theme.
+     *
+     * @return nonnull computed style or the shared empty fallback; do not mutate it
+     */
+    protected final ResolvedStyle getStyleOrDefaults() {
+        ResolvedStyle style = getStyle();
+        return style == null ? DEFAULT_STYLE : style;
+    }
+
+    /**
+     * Supplies a composite control's computed child appearance without creating a user override.
+     * Values outrank the child's theme but remain below its explicit setters and setStyle calls.
+     * Null removes that composite input. Unchanged values do not schedule another style pass.
+     *
+     * @param key child appearance key
+     * @param value computed value, or null to restore the child's theme
+     * @param <T> key value type
+     */
+    protected final <T> void setSkinStyle(StyleKey<T> key, T value) {
+        if (skinStyle == null) {
+            if (value == null) return;
+            skinStyle = new StyleMap();
+        }
+        boolean present = skinStyle.contains(key);
+        if (!present && value == null || present && Objects.equals(skinStyle.get(key), value)) return;
+        skinStyle.set(key, value);
+        invalidateStyle();
+        if (key.affectsLayout()) markLayoutDirty();
     }
 
     /**
@@ -848,7 +887,11 @@ public abstract class UINode implements Dimensional {
      *
      * <p>
      * Overrides are stored locally in a {@link StyleMap} and layered on top of the resolved theme
-     * values. Setting an override invalidates the cached style so the new value can be used.
+     * values. Style-backed fluent setters write this same map: the latest setter or setStyle
+     * call for a key wins, including across interactive state changes. Constructor defaults
+     * are not overrides. Null removes the override. Clearing it restores the current theme,
+     * composite appearance input, or widget fallback on the next style/layout pass.
+     * Setting an override invalidates the cached style so the new value can be used.
      * </p>
      *
      * @param key   the style key to override
@@ -867,7 +910,9 @@ public abstract class UINode implements Dimensional {
      * Removes a previously applied local style override.
      *
      * <p>
-     * If no override map exists, the method does nothing.
+     * Overrides set by fluent appearance setters are removed as well. The next style pass
+     * restores the current theme, composite input, or fallback. If no override map exists,
+     * the method does nothing.
      * </p>
      *
      * @param key the style key whose override should be removed
@@ -884,7 +929,8 @@ public abstract class UINode implements Dimensional {
      *
      * <p>
      * If no overrides exist, the method does nothing. Clearing overrides invalidates the cached style
-     * so theme values can be re-resolved without local replacements.
+     * so theme values can be re-resolved without local replacements, including those written
+     * by fluent setters. Composite-owned inputs remain dynamic and are not removed.
      * </p>
      */
     public final void clearStyles() {

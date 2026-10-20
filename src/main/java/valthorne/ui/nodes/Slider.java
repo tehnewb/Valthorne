@@ -492,6 +492,7 @@ public class Slider extends Panel {
      */
     public Slider trackHeight(float trackHeight) {
         this.trackHeight = Math.max(0f, trackHeight);
+        setStyle(TRACK_HEIGHT_KEY, this.trackHeight);
         markLayoutDirty();
         return this;
     }
@@ -521,6 +522,7 @@ public class Slider extends Panel {
      */
     public Slider thumbWidth(float thumbWidth) {
         this.thumbWidth = Math.max(0f, thumbWidth);
+        setStyle(THUMB_WIDTH_KEY, this.thumbWidth);
         markLayoutDirty();
         return this;
     }
@@ -550,6 +552,7 @@ public class Slider extends Panel {
      */
     public Slider thumbHeight(float thumbHeight) {
         this.thumbHeight = Math.max(0f, thumbHeight);
+        setStyle(THUMB_HEIGHT_KEY, this.thumbHeight);
         markLayoutDirty();
         return this;
     }
@@ -569,7 +572,9 @@ public class Slider extends Panel {
      */
     public Slider thumbSize(float width, float height) {
         this.thumbWidth = Math.max(0f, width);
+        setStyle(THUMB_WIDTH_KEY, this.thumbWidth);
         this.thumbHeight = Math.max(0f, height);
+        setStyle(THUMB_HEIGHT_KEY, this.thumbHeight);
         markLayoutDirty();
         return this;
     }
@@ -595,6 +600,7 @@ public class Slider extends Panel {
      */
     public Slider thumbOffsetY(float thumbOffsetY) {
         this.thumbOffsetY = thumbOffsetY;
+        setStyle(THUMB_OFFSET_Y_KEY, this.thumbOffsetY);
         return this;
     }
 
@@ -901,23 +907,21 @@ public class Slider extends Panel {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
 
-        if (style != null) {
-            Float resolvedTrackHeight = style.get(TRACK_HEIGHT_KEY);
-            Float resolvedThumbWidth = style.get(THUMB_WIDTH_KEY);
-            Float resolvedThumbHeight = style.get(THUMB_HEIGHT_KEY);
-            Float resolvedThumbOffsetY = style.get(THUMB_OFFSET_Y_KEY);
+        Float resolvedTrackHeight = style.get(TRACK_HEIGHT_KEY);
+        Float resolvedThumbWidth = style.get(THUMB_WIDTH_KEY);
+        Float resolvedThumbHeight = style.get(THUMB_HEIGHT_KEY);
+        Float resolvedThumbOffsetY = style.get(THUMB_OFFSET_Y_KEY);
 
-            if (resolvedTrackHeight != null)
-                trackHeight = Math.max(0f, resolvedTrackHeight);
-            if (resolvedThumbWidth != null)
-                thumbWidth = Math.max(0f, resolvedThumbWidth);
-            if (resolvedThumbHeight != null)
-                thumbHeight = Math.max(0f, resolvedThumbHeight);
-            if (resolvedThumbOffsetY != null)
-                thumbOffsetY = resolvedThumbOffsetY;
-        }
+        if (resolvedTrackHeight != null)
+            trackHeight = Math.max(0f, resolvedTrackHeight);
+        if (resolvedThumbWidth != null)
+            thumbWidth = Math.max(0f, resolvedThumbWidth);
+        if (resolvedThumbHeight != null)
+            thumbHeight = Math.max(0f, resolvedThumbHeight);
+        if (resolvedThumbOffsetY != null)
+            thumbOffsetY = resolvedThumbOffsetY;
 
         if (vertical) {
             if (getLayout().getWidth().isAuto())

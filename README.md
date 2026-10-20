@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/releases/latest"><img alt="Version 1.0.0.0" src="https://img.shields.io/badge/version-1.0.0.0-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.2.4.4" src="https://img.shields.io/badge/version-1.2.4.4-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -23,19 +23,46 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 
 ## Features
 
-- Application lifecycle, scenes, input events, state machines, and fixed-rate ticks.
-- Textures, sprites, atlases, batching, shaders, cameras, viewports, animation,
-  particles, and batched 2D lighting.
-- Bitmap fonts and live Slug curve fonts. Regular UI uses Slug; Nano controls
-  use NanoVG. Default fonts are loaded from installed system fonts.
-- Retained UI trees, layout, themes, tables, trees, virtual lists, and text editing.
-- Tiled and LDtk maps, asset loading, primitive collections, pooling, geometry,
-  serialization, compression, and file dialogs.
-- Buffered and streaming WAV, OGG, and MP3 audio.
+- **Application and scenes:** Desktop window creation, application lifecycle
+  callbacks, scene switching, and scene-level input listeners.
+- **Input and events:** Keyboard, mouse, scrolling, dragging, file-drop events,
+  and an event publishing system.
+- **State machines and scheduling:** Conditional state transitions, guards,
+  transition actions, fixed-rate ticks, and delayed and repeating actions.
+- **2D rendering:** Textures, sprites, texture atlases, sprite culling, batched
+  drawing, nine-patch textures, framebuffers, and geometric primitives.
+- **Shaders and effects:** Custom shaders, compute shaders, and effects including
+  blur, glow, outlines, flashing, water, and reflections.
+- **Cameras and viewports:** Orthographic cameras and fit, fill, stretch, screen,
+  and integer-fit viewports for different resolutions and pixel-art scaling.
+- **Animation and particles:** Frame-based animation with playback modes and
+  listeners, plus particle emitters with box, circle, cone, and line spawning.
+- **2D lighting:** Batched lights and ground-shadow rendering.
+- **Fonts and vector drawing:** Bitmap fonts, live Slug curve fonts, and NanoVG
+  drawing. Regular UI uses Slug; Nano controls use NanoVG. Default fonts are
+  loaded from installed system fonts.
+- **UI layout and styling:** Retained UI trees, Yoga layout, themes, gradients,
+  borders, scrolling, and a UI inspector.
+- **UI controls:** Buttons, checkboxes, radio groups, sliders, number spinners,
+  progress bars, combo boxes, color pickers, tabs, split panes, menus, tooltips,
+  and modal windows.
+- **Data and editing interfaces:** Tables, directory trees, virtual lists,
+  file explorers and choosers, text fields, and a NanoVG code editor.
+- **2D physics:** Jolt-backed planar rigid and soft bodies, gravity, forces,
+  impulses, sensors, collision filtering, contact events, ray and area queries,
+  distance and pivot joints, and interpolated geometry updates.
+- **Maps and assets:** Tiled and LDtk map loading, tile sets, map layers and
+  objects, and configurable asset loaders.
+- **Audio:** OpenAL playback with buffered and streaming WAV, OGG, and MP3 audio,
+  sound sources, and sound areas.
+- **Game data and utilities:** Artemis ECS integration, primitive collections,
+  object pooling, geometry, dynamic byte buffers, property sets, serialization,
+  compression, encryption, hashing, and native file dialogs.
+- **Plugins:** Asynchronous discovery and loading of plugins from JAR files.
 
 ## Release version
 
-**Valthorne 1.0.0.0 is the official initial release.** Versions use four numbers:
+**Current Valthorne version: 1.2.4.4.** Versions use four numbers:
 
 | Position | Meaning |
 | --- | --- |
@@ -46,7 +73,20 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 
 When a number increases, the numbers to its right reset to zero.
 
+Merged pull requests can update the development version automatically with
+`version:feature` (second number), `version:patch` (third number), or
+`version:hotfix` (fourth number). Unlabeled PRs
+leave it unchanged. See [automatic version setup](.github/VERSION_AUTOMATION.md)
+for the owner-controlled GitHub App configuration and release behavior.
+The `version:feature` label publishes automatically after release checks pass.
+Adding `release:urgent` alongside a version label also requests automatic Maven
+Central publication. Increasing the first or second version number explicitly
+also requests publication; routine version bumps do not.
+
 ## Getting started
+
+The version references on this page and the wiki track `gradle.properties` on
+`main`. A development version may not yet be published to Maven Central.
 
 Install JDK 25 and add Valthorne to your application's build. The dependency
 includes its runtime native libraries transitively.
@@ -65,7 +105,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:1.0.0.0'
+    implementation 'io.github.tehnewb:Valthorne:1.2.4.4'
 }
 
 java {
@@ -79,6 +119,12 @@ application {
     if (System.getProperty('os.name').startsWith('Mac')) {
         applicationDefaultJvmArgs = ['-XstartOnFirstThread']
     }
+}
+
+// Apply these runtime options to every JavaExec task, including Gradle's run task.
+tasks.withType(JavaExec).configureEach {
+    jvmArgs '--enable-native-access=ALL-UNNAMED', // Permit classpath libraries such as LWJGL to load and call native code.
+            '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED' // Allow dependencies to use JDK internal memory APIs; prevents access errors when those APIs are used.
 }
 ```
 
@@ -97,7 +143,7 @@ sections. Maven Central is Maven's default repository:
     <dependency>
         <groupId>io.github.tehnewb</groupId>
         <artifactId>Valthorne</artifactId>
-        <version>1.0.0.0</version>
+        <version>1.2.4.4</version>
     </dependency>
 </dependencies>
 ```

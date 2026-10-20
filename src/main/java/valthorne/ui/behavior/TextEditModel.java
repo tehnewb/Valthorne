@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * @author Albert Beaupre
  */
 public final class TextEditModel {
-    /*
+    /**
      * Extended grapheme matcher used to build UTF-16 cursor boundaries for non-ASCII text.
      */
     private static final Pattern GRAPHEME = Pattern.compile("\\X");

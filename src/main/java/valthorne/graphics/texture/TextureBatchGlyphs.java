@@ -8,7 +8,7 @@ import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugGlyph;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.shader.Shader;
-import valthorne.graphics.shader.ShaderSources;
+import valthorne.io.file.ValthorneFiles;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
@@ -336,7 +336,7 @@ final class TextureBatchGlyphs {
             projection = new Matrix4f();
             matrix = new float[16];
             transform = new Matrix4f();
-            shader = new Shader(ShaderSources.load("font/slug.vert"), ShaderSources.load("font/slug.frag"));
+            shader = new Shader(ValthorneFiles.readString("valthorne/shaders/font/slug.vert"), ValthorneFiles.readString("valthorne/shaders/font/slug.frag"));
             shader.bind();
             shader.setUniform1i("u_curveTexture", 0);
             shader.setUniform1i("u_bandTexture", 1);

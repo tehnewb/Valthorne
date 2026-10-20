@@ -6,12 +6,16 @@ import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
+import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.ResolvedStyle;
 
 import java.util.Objects;
 
 /**
  * Retained Slug text for regular or NanoVG UI containers. Text and size changes refresh
- * a reusable glyph layout and the node's measured dimensions. All drawing evaluates
+ * a reusable glyph layout and the node's measured dimensions. Size and tint setters
+ * are local style overrides; clearing them restores theme or fallback values.
+ * All drawing evaluates
  * live curves through the ordinary texture batch, including composed UI transforms.
  * The font is borrowed and must outlive all labels using it. GPU operations require
  * their owning graphics-context thread.
@@ -26,6 +30,17 @@ import java.util.Objects;
  * @author Albert Beaupre
  */
 public final class SlugLabel extends UINode {
+    /**
+     * Shared regular-UI tint key; absent values use white.
+     */
+    public static final StyleKey<Color> COLOR_KEY = Label.COLOR_KEY;
+
+    /**
+     * Shared logical em-size key. Constructor and size setter values are explicit
+     * overrides; clearing them restores the current theme or key default.
+     */
+    public static final StyleKey<Float> FONT_SIZE_KEY = Label.FONT_SIZE_KEY;
+
     private final SlugFont font; // Borrowed live-curve font, which must outlive this label.
     private final SlugTextRun run; // Owned reusable CPU glyph layout borrowing the font.
     private Color color = Color.WHITE; // Borrowed mutable tint applied to subsequent draws.
@@ -41,6 +56,7 @@ public final class SlugLabel extends UINode {
     public SlugLabel(SlugFont font, String text, float size) {
         this.font = Objects.requireNonNull(font, "font");
         run = font.createRun(text, size);
+        setStyle(FONT_SIZE_KEY, size);
         measure();
     }
 
@@ -79,6 +95,7 @@ public final class SlugLabel extends UINode {
      */
     public SlugLabel size(float size) {
         run.rebuild(run.text(), size);
+        setStyle(FONT_SIZE_KEY, size);
         measure();
         return this;
     }
@@ -97,7 +114,27 @@ public final class SlugLabel extends UINode {
      */
     public SlugLabel color(Color color) {
         this.color = Objects.requireNonNull(color, "color");
+        setStyle(COLOR_KEY, color);
         return this;
+    }
+
+    /**
+     * Applies resolved size and tint without feeding theme values through public
+     * setters. The constructor's borrowed font remains owned by its caller.
+     *
+     * @throws IllegalArgumentException if the resolved size is negative or nonfinite
+     */
+    @Override
+    protected void applyLayout() {
+        ResolvedStyle style = getStyleOrDefaults();
+        float size = style.get(FONT_SIZE_KEY);
+        if (run.size() != size) {
+            run.rebuild(run.text(), size);
+            measure();
+        }
+        Color resolvedColor = style.get(COLOR_KEY);
+        color = resolvedColor == null ? Color.WHITE : resolvedColor;
+        super.applyLayout();
     }
 
     /**

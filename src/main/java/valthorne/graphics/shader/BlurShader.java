@@ -1,5 +1,7 @@
 package valthorne.graphics.shader;
 
+import valthorne.io.file.ValthorneFiles;
+
 import valthorne.graphics.Sprite;
 
 /**
@@ -50,7 +52,7 @@ public class BlurShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged blur effect shader resource.
      */
-    private static final String FRAG_SRC = ShaderSources.load("effects/blur.frag");
+    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/blur.frag");
 
     /**
      * Creates a new blur shader using the built-in GLSL sources.

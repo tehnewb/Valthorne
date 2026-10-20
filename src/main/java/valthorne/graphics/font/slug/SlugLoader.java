@@ -2,13 +2,9 @@ package valthorne.graphics.font.slug;
 
 import valthorne.asset.AssetLoader;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 /**
  * Loads immutable, CPU-only {@link SlugData} for the shared asset service. GPU
- * compilation is intentionally deferred to {@link SlugFont#load(SlugData)} because
+ * compilation is intentionally deferred to {@link SlugData#asFont()} because
  * asset workers do not own Valthorne's OpenGL context.
  *
  * @author Albert Beaupre
@@ -24,17 +20,8 @@ public final class SlugLoader implements AssetLoader<SlugParameters, SlugData> {
     @Override
     public SlugData load(SlugParameters parameters) {
         if (parameters == null) throw new NullPointerException("parameters");
-        byte[] bytes;
         String path = parameters.path();
-        if (path != null) {
-            try {
-                bytes = Files.readAllBytes(Path.of(path));
-            } catch (IOException exception) {
-                throw new IllegalStateException("Unable to read Slug font: " + path, exception);
-            }
-        } else {
-            bytes = parameters.bytes();
-        }
-        return new SlugData(bytes, parameters.firstCodepoint(), parameters.characterCount());
+        if (path != null) return SlugData.load(path, parameters.firstCodepoint(), parameters.characterCount());
+        return SlugData.load(parameters.bytes(), parameters.firstCodepoint(), parameters.characterCount());
     }
 }

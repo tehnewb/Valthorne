@@ -350,11 +350,25 @@ public class NanoTextField extends UINode implements NanoNode {
      * @return this field
      */
     public NanoTextField fontName(String fontName) {
-        if (fontName != null && !fontName.isBlank())
+        if (fontName != null && !fontName.isBlank()) {
             this.fontName = fontName;
+            setStyle(FONT_NAME_KEY, this.fontName);
+        }
         fontLoaded = false;
         markLayoutDirty();
         return this;
+    }
+
+    /**
+     * Supplies an owning composite's semantic font choices without creating local
+     * overrides. Explicit font choices on this field continue to take precedence.
+     *
+     * @param style current owning composite style
+     */
+    final void applyTypography(ResolvedStyle style) {
+        setSkinStyle(NanoText.SLUG_FONT, style.get(NanoText.SLUG_FONT));
+        setSkinStyle(NanoText.SLUG_CODE_FONT, style.get(NanoText.SLUG_CODE_FONT));
+        setSkinStyle(NanoText.SLUG_HEADING_FONT, style.get(NanoText.SLUG_HEADING_FONT));
     }
 
     /**
@@ -366,6 +380,7 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     public NanoTextField fontSize(float fontSize) {
         this.fontSize = Math.max(1f, fontSize);
+        setStyle(FONT_SIZE_KEY, this.fontSize);
         markLayoutDirty();
         return this;
     }
@@ -379,6 +394,7 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     public NanoTextField padding(float padding) {
         this.padding = Math.max(0f, padding);
+        setStyle(PADDING_KEY, this.padding);
         markLayoutDirty();
         return this;
     }
@@ -392,6 +408,7 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     public NanoTextField cornerRadius(float cornerRadius) {
         this.cornerRadius = Math.max(0f, cornerRadius);
+        setStyle(CORNER_RADIUS_KEY, this.cornerRadius);
         return this;
     }
 
@@ -404,136 +421,157 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     public NanoTextField borderWidth(float borderWidth) {
         this.borderWidth = Math.max(0f, borderWidth);
+        setStyle(BORDER_WIDTH_KEY, this.borderWidth);
         return this;
     }
 
     /**
      * Retains a non-null background color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param backgroundColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField backgroundColor(Color backgroundColor) {
-        if (backgroundColor != null)
+        if (backgroundColor != null) {
             this.backgroundColor = backgroundColor;
+            setStyle(BACKGROUND_COLOR_KEY, this.backgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null hover background color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param hoverBackgroundColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField hoverBackgroundColor(Color hoverBackgroundColor) {
-        if (hoverBackgroundColor != null)
+        if (hoverBackgroundColor != null) {
             this.hoverBackgroundColor = hoverBackgroundColor;
+            setStyle(HOVER_BACKGROUND_COLOR_KEY, this.hoverBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null focused background color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param focusedBackgroundColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField focusedBackgroundColor(Color focusedBackgroundColor) {
-        if (focusedBackgroundColor != null)
+        if (focusedBackgroundColor != null) {
             this.focusedBackgroundColor = focusedBackgroundColor;
+            setStyle(FOCUSED_BACKGROUND_COLOR_KEY, this.focusedBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null border color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param borderColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField borderColor(Color borderColor) {
-        if (borderColor != null)
+        if (borderColor != null) {
             this.borderColor = borderColor;
+            setStyle(BORDER_COLOR_KEY, this.borderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null hover border color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param hoverBorderColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField hoverBorderColor(Color hoverBorderColor) {
-        if (hoverBorderColor != null)
+        if (hoverBorderColor != null) {
             this.hoverBorderColor = hoverBorderColor;
+            setStyle(HOVER_BORDER_COLOR_KEY, this.hoverBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null focused border color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param focusedBorderColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField focusedBorderColor(Color focusedBorderColor) {
-        if (focusedBorderColor != null)
+        if (focusedBorderColor != null) {
             this.focusedBorderColor = focusedBorderColor;
+            setStyle(FOCUSED_BORDER_COLOR_KEY, this.focusedBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null text color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param textColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField textColor(Color textColor) {
-        if (textColor != null)
+        if (textColor != null) {
             this.textColor = textColor;
+            setStyle(TEXT_COLOR_KEY, this.textColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null placeholder color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param placeholderColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField placeholderColor(Color placeholderColor) {
-        if (placeholderColor != null)
+        if (placeholderColor != null) {
             this.placeholderColor = placeholderColor;
+            setStyle(PLACEHOLDER_COLOR_KEY, this.placeholderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null caret color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param caretColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField caretColor(Color caretColor) {
-        if (caretColor != null)
+        if (caretColor != null) {
             this.caretColor = caretColor;
+            setStyle(CARET_COLOR_KEY, this.caretColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null selection color without copying it. Null keeps the current
-     * reference; resolved style application may overwrite it.
+     * reference; the local override remains authoritative during style application.
      *
      * @param selectionColor mutable paint color, or null
      * @return this field
      */
     public NanoTextField selectionColor(Color selectionColor) {
-        if (selectionColor != null)
+        if (selectionColor != null) {
             this.selectionColor = selectionColor;
+            setStyle(SELECTION_COLOR_KEY, this.selectionColor);
+        }
         return this;
     }
 
@@ -681,82 +719,80 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
 
-        if (style != null) {
-            Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
-            Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
-            Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
-            Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
-            Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
-            Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
-            Color resolvedTextColor = style.get(TEXT_COLOR_KEY);
-            Color resolvedPlaceholderColor = style.get(PLACEHOLDER_COLOR_KEY);
-            Color resolvedCaretColor = style.get(CARET_COLOR_KEY);
-            Color resolvedSelectionColor = style.get(SELECTION_COLOR_KEY);
-            Color resolvedDefaultSelectionColor = style.get(DEFAULT_SELECTION_COLOR_KEY);
-            String resolvedFontName = style.get(FONT_NAME_KEY);
-            Float resolvedFontSize = style.get(FONT_SIZE_KEY);
-            Float resolvedPadding = style.get(PADDING_KEY);
-            Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
-            Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
-            Float resolvedCaretWidth = style.get(CARET_WIDTH_KEY);
-            Float resolvedCaretPadY = style.get(CARET_PADDING_Y_KEY);
-            Float resolvedScissorFudge = style.get(SCISSOR_FUDGE_KEY);
+        Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
+        Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
+        Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
+        Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
+        Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
+        Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
+        Color resolvedTextColor = style.get(TEXT_COLOR_KEY);
+        Color resolvedPlaceholderColor = style.get(PLACEHOLDER_COLOR_KEY);
+        Color resolvedCaretColor = style.get(CARET_COLOR_KEY);
+        Color resolvedSelectionColor = style.get(SELECTION_COLOR_KEY);
+        Color resolvedDefaultSelectionColor = style.get(DEFAULT_SELECTION_COLOR_KEY);
+        String resolvedFontName = style.get(FONT_NAME_KEY);
+        Float resolvedFontSize = style.get(FONT_SIZE_KEY);
+        Float resolvedPadding = style.get(PADDING_KEY);
+        Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
+        Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
+        Float resolvedCaretWidth = style.get(CARET_WIDTH_KEY);
+        Float resolvedCaretPadY = style.get(CARET_PADDING_Y_KEY);
+        Float resolvedScissorFudge = style.get(SCISSOR_FUDGE_KEY);
 
-            if (resolvedBackgroundColor != null)
-                backgroundColor = resolvedBackgroundColor;
-            if (resolvedHoverBackgroundColor != null)
-                hoverBackgroundColor = resolvedHoverBackgroundColor;
-            if (resolvedFocusedBackgroundColor != null)
-                focusedBackgroundColor = resolvedFocusedBackgroundColor;
-            if (resolvedBorderColor != null)
-                borderColor = resolvedBorderColor;
-            if (resolvedHoverBorderColor != null)
-                hoverBorderColor = resolvedHoverBorderColor;
-            if (resolvedFocusedBorderColor != null)
-                focusedBorderColor = resolvedFocusedBorderColor;
-            if (resolvedTextColor != null)
-                textColor = resolvedTextColor;
-            if (resolvedPlaceholderColor != null)
-                placeholderColor = resolvedPlaceholderColor;
-            if (resolvedCaretColor != null)
-                caretColor = resolvedCaretColor;
-            if (resolvedSelectionColor != null)
-                selectionColor = resolvedSelectionColor;
-            if (resolvedDefaultSelectionColor != null)
-                defaultSelectionColor = resolvedDefaultSelectionColor;
-            if (resolvedFontName != null && !resolvedFontName.isBlank()) {
-                if (!resolvedFontName.equals(fontName))
-                    fontLoaded = false;
-                fontName = resolvedFontName;
-            }
-            if (resolvedFontSize != null)
-                fontSize = Math.max(1f, resolvedFontSize);
-            if (resolvedPadding != null)
-                padding = Math.max(0f, resolvedPadding);
-            if (resolvedCornerRadius != null)
-                cornerRadius = Math.max(0f, resolvedCornerRadius);
-            if (resolvedBorderWidth != null)
-                borderWidth = Math.max(0f, resolvedBorderWidth);
-            if (resolvedCaretWidth != null)
-                caretWidth = Math.max(0f, resolvedCaretWidth);
-            if (resolvedCaretPadY != null)
-                caretPadY = resolvedCaretPadY;
-            if (resolvedScissorFudge != null)
-                scissorFudge = resolvedScissorFudge;
-
-            String measured = getDisplayText();
-            String fallback = placeholder == null ? "" : placeholder;
-            float measuredWidth = Math.max(measureTextWidth(measured), measureTextWidth(fallback)) + padding * 2f;
-            float measuredHeight = NanoText.measureTextHeight(this, this.getRoot().getNanoVGHandle(), fontName, fontSize) + padding * 2f;
-
-            if (getLayout().getWidth().isAuto())
-                getLayout().width(measuredWidth);
-
-            if (getLayout().getHeight().isAuto())
-                getLayout().height(measuredHeight);
+        if (resolvedBackgroundColor != null)
+            backgroundColor = resolvedBackgroundColor;
+        if (resolvedHoverBackgroundColor != null)
+            hoverBackgroundColor = resolvedHoverBackgroundColor;
+        if (resolvedFocusedBackgroundColor != null)
+            focusedBackgroundColor = resolvedFocusedBackgroundColor;
+        if (resolvedBorderColor != null)
+            borderColor = resolvedBorderColor;
+        if (resolvedHoverBorderColor != null)
+            hoverBorderColor = resolvedHoverBorderColor;
+        if (resolvedFocusedBorderColor != null)
+            focusedBorderColor = resolvedFocusedBorderColor;
+        if (resolvedTextColor != null)
+            textColor = resolvedTextColor;
+        if (resolvedPlaceholderColor != null)
+            placeholderColor = resolvedPlaceholderColor;
+        if (resolvedCaretColor != null)
+            caretColor = resolvedCaretColor;
+        if (resolvedSelectionColor != null)
+            selectionColor = resolvedSelectionColor;
+        if (resolvedDefaultSelectionColor != null)
+            defaultSelectionColor = resolvedDefaultSelectionColor;
+        if (resolvedFontName != null && !resolvedFontName.isBlank()) {
+            if (!resolvedFontName.equals(fontName))
+                fontLoaded = false;
+            fontName = resolvedFontName;
         }
+        if (resolvedFontSize != null)
+            fontSize = Math.max(1f, resolvedFontSize);
+        if (resolvedPadding != null)
+            padding = Math.max(0f, resolvedPadding);
+        if (resolvedCornerRadius != null)
+            cornerRadius = Math.max(0f, resolvedCornerRadius);
+        if (resolvedBorderWidth != null)
+            borderWidth = Math.max(0f, resolvedBorderWidth);
+        if (resolvedCaretWidth != null)
+            caretWidth = Math.max(0f, resolvedCaretWidth);
+        if (resolvedCaretPadY != null)
+            caretPadY = resolvedCaretPadY;
+        if (resolvedScissorFudge != null)
+            scissorFudge = resolvedScissorFudge;
+
+        String measured = getDisplayText();
+        String fallback = placeholder == null ? "" : placeholder;
+        float measuredWidth = Math.max(measureTextWidth(measured), measureTextWidth(fallback)) + padding * 2f;
+        float measuredHeight = NanoText.measureTextHeight(this, (getRoot() == null ? 0L : getRoot().getNanoVGHandle()), fontName, fontSize) + padding * 2f;
+
+        if (getLayout().getWidth().isAuto())
+            getLayout().width(measuredWidth);
+
+        if (getLayout().getHeight().isAuto())
+            getLayout().height(measuredHeight);
 
         super.applyLayout();
         updateScroll();
@@ -839,7 +875,7 @@ public class NanoTextField extends UINode implements NanoNode {
         }
 
         nvgFillColor(vg, fg);
-        NanoText.draw(this, vg, drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        NanoText.draw(this, vg, fontName, drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
         if (isFocused() && caretVisible) {
             float caretX = drawX + measureTextWidth(visibleText, 0, Math.min(caretIndex, visibleText.length()));

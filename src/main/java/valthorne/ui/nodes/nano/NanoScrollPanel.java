@@ -769,81 +769,29 @@ public class NanoScrollPanel extends NanoContainer {
     }
 
     /**
-     * Restores local paint defaults, allocating fresh fallback colors, then replaces
+     * Resolves local overrides, theme rules, and key defaults, then replaces
      * non-null values from the resolved style. Dimensions are clamped nonnegative.
-     * Called during drawing as well as layout/style invalidation; this is not a
-     * one-time or allocation-free cache initialization.
+     * Called during drawing as well as layout/style invalidation without allocating
+     * replacement fallback colors. The same defaults apply with or without a theme.
      */
     private void refreshStyleCache() {
-        ResolvedStyle style = getStyle();
-
-        backgroundColor = new Color(0xFF242424);
-        borderColor = new Color(0xFF000000);
-        borderWidth = 1f;
-
-        horizontalBarBackgroundColor = new Color(0xFF2A2A2A);
-        horizontalBarForegroundColor = new Color(0xFF5A5A5A);
-        horizontalBarHoverForegroundColor = new Color(0xFF6A6A6A);
-        horizontalBarPressedForegroundColor = new Color(0xFF7A7A7A);
-
-        verticalBarBackgroundColor = new Color(0xFF2A2A2A);
-        verticalBarForegroundColor = new Color(0xFF5A5A5A);
-        verticalBarHoverForegroundColor = new Color(0xFF6A6A6A);
-        verticalBarPressedForegroundColor = new Color(0xFF7A7A7A);
-
-        horizontalBarHeight = 8f;
-        verticalBarWidth = 8f;
-        barPadding = 4f;
-        minThumbSize = 18f;
-        cornerRadius = 0f;
-
-        if (style == null) return;
-
-        Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
-        Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
-
-        Color resolvedHorizontalBarBackgroundColor = style.get(HORIZONTAL_BAR_BACKGROUND_COLOR_KEY);
-        Color resolvedHorizontalBarForegroundColor = style.get(HORIZONTAL_BAR_FOREGROUND_COLOR_KEY);
-        Color resolvedHorizontalBarHoverForegroundColor = style.get(HORIZONTAL_BAR_HOVER_FOREGROUND_COLOR_KEY);
-        Color resolvedHorizontalBarPressedForegroundColor = style.get(HORIZONTAL_BAR_PRESSED_FOREGROUND_COLOR_KEY);
-
-        Color resolvedVerticalBarBackgroundColor = style.get(VERTICAL_BAR_BACKGROUND_COLOR_KEY);
-        Color resolvedVerticalBarForegroundColor = style.get(VERTICAL_BAR_FOREGROUND_COLOR_KEY);
-        Color resolvedVerticalBarHoverForegroundColor = style.get(VERTICAL_BAR_HOVER_FOREGROUND_COLOR_KEY);
-        Color resolvedVerticalBarPressedForegroundColor = style.get(VERTICAL_BAR_PRESSED_FOREGROUND_COLOR_KEY);
-
-        Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
-        Float resolvedHorizontalBarHeight = style.get(HORIZONTAL_BAR_HEIGHT_KEY);
-        Float resolvedVerticalBarWidth = style.get(VERTICAL_BAR_WIDTH_KEY);
-        Float resolvedBarPadding = style.get(BAR_PADDING_KEY);
-        Float resolvedMinThumbSize = style.get(MIN_THUMB_SIZE_KEY);
-        Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
-
-        if (resolvedBackgroundColor != null) backgroundColor = resolvedBackgroundColor;
-        if (resolvedBorderColor != null) borderColor = resolvedBorderColor;
-
-        if (resolvedHorizontalBarBackgroundColor != null)
-            horizontalBarBackgroundColor = resolvedHorizontalBarBackgroundColor;
-        if (resolvedHorizontalBarForegroundColor != null)
-            horizontalBarForegroundColor = resolvedHorizontalBarForegroundColor;
-        if (resolvedHorizontalBarHoverForegroundColor != null)
-            horizontalBarHoverForegroundColor = resolvedHorizontalBarHoverForegroundColor;
-        if (resolvedHorizontalBarPressedForegroundColor != null)
-            horizontalBarPressedForegroundColor = resolvedHorizontalBarPressedForegroundColor;
-
-        if (resolvedVerticalBarBackgroundColor != null) verticalBarBackgroundColor = resolvedVerticalBarBackgroundColor;
-        if (resolvedVerticalBarForegroundColor != null) verticalBarForegroundColor = resolvedVerticalBarForegroundColor;
-        if (resolvedVerticalBarHoverForegroundColor != null)
-            verticalBarHoverForegroundColor = resolvedVerticalBarHoverForegroundColor;
-        if (resolvedVerticalBarPressedForegroundColor != null)
-            verticalBarPressedForegroundColor = resolvedVerticalBarPressedForegroundColor;
-
-        if (resolvedBorderWidth != null) borderWidth = Math.max(0f, resolvedBorderWidth);
-        if (resolvedHorizontalBarHeight != null) horizontalBarHeight = Math.max(0f, resolvedHorizontalBarHeight);
-        if (resolvedVerticalBarWidth != null) verticalBarWidth = Math.max(0f, resolvedVerticalBarWidth);
-        if (resolvedBarPadding != null) barPadding = Math.max(0f, resolvedBarPadding);
-        if (resolvedMinThumbSize != null) minThumbSize = Math.max(0f, resolvedMinThumbSize);
-        if (resolvedCornerRadius != null) cornerRadius = Math.max(0f, resolvedCornerRadius);
+        ResolvedStyle style = getStyleOrDefaults();
+        backgroundColor = style.get(BACKGROUND_COLOR_KEY);
+        borderColor = style.get(BORDER_COLOR_KEY);
+        horizontalBarBackgroundColor = style.get(HORIZONTAL_BAR_BACKGROUND_COLOR_KEY);
+        horizontalBarForegroundColor = style.get(HORIZONTAL_BAR_FOREGROUND_COLOR_KEY);
+        horizontalBarHoverForegroundColor = style.get(HORIZONTAL_BAR_HOVER_FOREGROUND_COLOR_KEY);
+        horizontalBarPressedForegroundColor = style.get(HORIZONTAL_BAR_PRESSED_FOREGROUND_COLOR_KEY);
+        verticalBarBackgroundColor = style.get(VERTICAL_BAR_BACKGROUND_COLOR_KEY);
+        verticalBarForegroundColor = style.get(VERTICAL_BAR_FOREGROUND_COLOR_KEY);
+        verticalBarHoverForegroundColor = style.get(VERTICAL_BAR_HOVER_FOREGROUND_COLOR_KEY);
+        verticalBarPressedForegroundColor = style.get(VERTICAL_BAR_PRESSED_FOREGROUND_COLOR_KEY);
+        borderWidth = Math.max(0f, style.get(BORDER_WIDTH_KEY));
+        horizontalBarHeight = Math.max(0f, style.get(HORIZONTAL_BAR_HEIGHT_KEY));
+        verticalBarWidth = Math.max(0f, style.get(VERTICAL_BAR_WIDTH_KEY));
+        barPadding = Math.max(0f, style.get(BAR_PADDING_KEY));
+        minThumbSize = Math.max(0f, style.get(MIN_THUMB_SIZE_KEY));
+        cornerRadius = Math.max(0f, style.get(CORNER_RADIUS_KEY));
     }
 
     /**

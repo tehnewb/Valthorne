@@ -9,15 +9,15 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * context or font ownership is transferred; callers balance their own frame.
  */
 public final class Canvas2D {
-    /*
+    /**
      * NanoVG horizontal alignment bit for left-aligned text.
      */
     public static final int ALIGN_LEFT = 1;
-    /*
+    /**
      * NanoVG horizontal alignment bit for centered text.
      */
     public static final int ALIGN_CENTER = 2;
-    /*
+    /**
      * NanoVG vertical alignment bit for top-aligned text.
      */
     public static final int ALIGN_TOP = 8;
