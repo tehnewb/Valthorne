@@ -6,6 +6,7 @@ import valthorne.Window;
 import valthorne.camera.Camera;
 import valthorne.camera.OrthographicCamera;
 import valthorne.event.events.*;
+import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UIRoot;
 import valthorne.viewport.ScreenViewport;
@@ -165,6 +166,7 @@ public abstract class Scene {
      * </p>
      */
     protected void drawScene() {
+        Window.clear(Color.BLACK);
         if (batch == null)
             return;
 
