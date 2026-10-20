@@ -99,19 +99,19 @@ public final class Window {
      * Native logical-size callback reference that updates projection and publishes resize events.
      */
     private static GLFWWindowSizeCallback sizeCallback;
-    /*
+    /**
      * Owned pixel-size callback, independent of logical window layout changes.
      */
     private static GLFWFramebufferSizeCallback framebufferCallback;
-    /*
+    /**
      * Last framebuffer pixel width; zero when minimized or uninitialized.
      */
     private static int framebufferWidth;
-    /*
+    /**
      * Last framebuffer pixel height; zero when minimized or uninitialized.
      */
     private static int framebufferHeight;
-    /*
+    /**
      * Reused pixel-size notification; listeners must copy its values during delivery.
      */
     private static final FramebufferResizeEvent framebufferResizeEvent = new FramebufferResizeEvent();

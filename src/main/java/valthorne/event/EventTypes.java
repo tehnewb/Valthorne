@@ -127,7 +127,7 @@ public final class EventTypes {
      */
     public static final EventType<FileDropEvent> FILE_DROP = new EventType<>(13, "file-drop");
 
-    /*
+    /**
      * Framebuffer pixel-size changes, including scaling without a logical window resize.
      */
     public static final EventType<FramebufferResizeEvent> FRAMEBUFFER_RESIZE = new EventType<>(14, "framebuffer-resize");
