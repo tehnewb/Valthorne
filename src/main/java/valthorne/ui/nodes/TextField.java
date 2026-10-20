@@ -725,7 +725,9 @@ public class TextField extends Panel {
      * </p>
      *
      * <p>
-     * The currently resolved background is drawn first. If no font is available,
+     * The focused background takes precedence over the hover background, with
+     * missing state backgrounds falling through to the next available background.
+     * If no font is available,
      * rendering stops there. Otherwise a scissor region is established for the inner
      * text area, selection is drawn if present, then text and caret are rendered,
      * and finally scissoring is ended.
@@ -735,8 +737,9 @@ public class TextField extends Panel {
      */
     @Override
     public void draw(TextureBatch batch) {
-        ResolvedStyle style = getStyle();
-        Drawable drawBackground = style != null ? style.get(BACKGROUND_KEY) : null;
+        Drawable drawBackground = background;
+        if (isFocused() && focusedBackground != null) drawBackground = focusedBackground;
+        else if (isHovered() && hoverBackground != null) drawBackground = hoverBackground;
 
         if (drawBackground != null)
             drawBackground.draw(batch, getRenderX(), getRenderY(), getWidth(), getHeight());

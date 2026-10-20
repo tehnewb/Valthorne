@@ -8,7 +8,6 @@ import valthorne.graphics.texture.TextureBatch;
 import org.joml.Vector2f;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
-import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 
 /**
@@ -327,39 +326,7 @@ public class NanoModal extends NanoPanel {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
-
-        if (style != null) {
-            Color dialogBackgroundColor = style.get(DIALOG_BACKGROUND_COLOR_KEY);
-            Color dialogHoverBackgroundColor = style.get(DIALOG_HOVER_BACKGROUND_COLOR_KEY);
-            Color dialogFocusedBackgroundColor = style.get(DIALOG_FOCUSED_BACKGROUND_COLOR_KEY);
-            Color dialogPressedBackgroundColor = style.get(DIALOG_PRESSED_BACKGROUND_COLOR_KEY);
-            Color dialogDisabledBackgroundColor = style.get(DIALOG_DISABLED_BACKGROUND_COLOR_KEY);
-
-            Color dialogBorderColor = style.get(DIALOG_BORDER_COLOR_KEY);
-            Color dialogHoverBorderColor = style.get(DIALOG_HOVER_BORDER_COLOR_KEY);
-            Color dialogFocusedBorderColor = style.get(DIALOG_FOCUSED_BORDER_COLOR_KEY);
-            Color dialogPressedBorderColor = style.get(DIALOG_PRESSED_BORDER_COLOR_KEY);
-            Color dialogDisabledBorderColor = style.get(DIALOG_DISABLED_BORDER_COLOR_KEY);
-
-            Float dialogCornerRadius = style.get(DIALOG_CORNER_RADIUS_KEY);
-            Float dialogBorderWidth = style.get(DIALOG_BORDER_WIDTH_KEY);
-
-            if (dialogBackgroundColor != null) dialog.backgroundColor(dialogBackgroundColor);
-            if (dialogHoverBackgroundColor != null) dialog.hoverBackgroundColor(dialogHoverBackgroundColor);
-            if (dialogFocusedBackgroundColor != null) dialog.focusedBackgroundColor(dialogFocusedBackgroundColor);
-            if (dialogPressedBackgroundColor != null) dialog.pressedBackgroundColor(dialogPressedBackgroundColor);
-            if (dialogDisabledBackgroundColor != null) dialog.disabledBackgroundColor(dialogDisabledBackgroundColor);
-
-            if (dialogBorderColor != null) dialog.borderColor(dialogBorderColor);
-            if (dialogHoverBorderColor != null) dialog.hoverBorderColor(dialogHoverBorderColor);
-            if (dialogFocusedBorderColor != null) dialog.focusedBorderColor(dialogFocusedBorderColor);
-            if (dialogPressedBorderColor != null) dialog.pressedBorderColor(dialogPressedBorderColor);
-            if (dialogDisabledBorderColor != null) dialog.disabledBorderColor(dialogDisabledBorderColor);
-
-            if (dialogCornerRadius != null) dialog.cornerRadius(dialogCornerRadius);
-            if (dialogBorderWidth != null) dialog.borderWidth(dialogBorderWidth);
-        }
+        dialog.applyDialogStyle(getStyleOrDefaults());
 
         super.applyLayout();
     }

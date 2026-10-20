@@ -24,7 +24,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
  *
  * <p>Automatic dimensions are replaced with measured text plus padding during
  * layout. Later text/font changes dirty layout but do not restore those dimensions
- * to auto. Colors and registered fonts are borrowed; styles may overwrite local
+ * to auto. Colors and registered fonts are borrowed; explicit setters override theme
  * paint settings. Render through the root-managed NanoVG lifecycle.</p>
  *
  * @author Albert Beaupre
@@ -52,7 +52,7 @@ public class NanoButton extends NanoContainer {
         if (label == null) {
             label = new NanoLabel(text);
             label.setClickable(false);
-            label.fontName(fontName).fontSize(fontSize);
+            label.applyCaptionStyle(fontName, fontSize, textColor, getStyleOrDefaults());
             getLayout().itemsCenter().justifyCenter();
             add(label);
         }
@@ -266,8 +266,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton fontName(String fontName) {
-        if (fontName != null && !fontName.isBlank())
+        if (fontName != null && !fontName.isBlank()) {
             this.fontName = fontName;
+            setStyle(FONT_NAME_KEY, this.fontName);
+        }
         markLayoutDirty();
         return this;
     }
@@ -281,6 +283,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton fontSize(float fontSize) {
         this.fontSize = Math.max(1f, fontSize);
+        setStyle(FONT_SIZE_KEY, this.fontSize);
         markLayoutDirty();
         return this;
     }
@@ -294,6 +297,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton paddingX(float paddingX) {
         this.paddingX = Math.max(0f, paddingX);
+        setStyle(PADDING_X_KEY, this.paddingX);
         markLayoutDirty();
         return this;
     }
@@ -307,6 +311,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton paddingY(float paddingY) {
         this.paddingY = Math.max(0f, paddingY);
+        setStyle(PADDING_Y_KEY, this.paddingY);
         markLayoutDirty();
         return this;
     }
@@ -320,6 +325,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton cornerRadius(float cornerRadius) {
         this.cornerRadius = Math.max(0f, cornerRadius);
+        setStyle(CORNER_RADIUS_KEY, this.cornerRadius);
         return this;
     }
 
@@ -332,6 +338,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton borderWidth(float borderWidth) {
         this.borderWidth = Math.max(0f, borderWidth);
+        setStyle(BORDER_WIDTH_KEY, this.borderWidth);
         return this;
     }
 
@@ -343,8 +350,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton backgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.backgroundColor = color;
+            setStyle(BACKGROUND_COLOR_KEY, this.backgroundColor);
+        }
         return this;
     }
 
@@ -356,6 +365,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton backgroundGradient(UIGradient gradient) {
         backgroundGradient = gradient;
+        setStyle(BACKGROUND_GRADIENT_KEY, gradient);
         return this;
     }
 
@@ -367,6 +377,7 @@ public class NanoButton extends NanoContainer {
      */
     public NanoButton borderGradient(UIGradient gradient) {
         borderGradient = gradient;
+        setStyle(BORDER_GRADIENT_KEY, gradient);
         return this;
     }
 
@@ -378,8 +389,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton hoverBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverBackgroundColor = color;
+            setStyle(HOVER_BACKGROUND_COLOR_KEY, this.hoverBackgroundColor);
+        }
         return this;
     }
 
@@ -391,8 +404,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton focusedBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedBackgroundColor = color;
+            setStyle(FOCUSED_BACKGROUND_COLOR_KEY, this.focusedBackgroundColor);
+        }
         return this;
     }
 
@@ -404,8 +419,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton pressedBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.pressedBackgroundColor = color;
+            setStyle(PRESSED_BACKGROUND_COLOR_KEY, this.pressedBackgroundColor);
+        }
         return this;
     }
 
@@ -417,8 +434,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton disabledBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.disabledBackgroundColor = color;
+            setStyle(DISABLED_BACKGROUND_COLOR_KEY, this.disabledBackgroundColor);
+        }
         return this;
     }
 
@@ -430,8 +449,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton borderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.borderColor = color;
+            setStyle(BORDER_COLOR_KEY, this.borderColor);
+        }
         return this;
     }
 
@@ -443,8 +464,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton hoverBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverBorderColor = color;
+            setStyle(HOVER_BORDER_COLOR_KEY, this.hoverBorderColor);
+        }
         return this;
     }
 
@@ -456,8 +479,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton focusedBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedBorderColor = color;
+            setStyle(FOCUSED_BORDER_COLOR_KEY, this.focusedBorderColor);
+        }
         return this;
     }
 
@@ -469,8 +494,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton pressedBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.pressedBorderColor = color;
+            setStyle(PRESSED_BORDER_COLOR_KEY, this.pressedBorderColor);
+        }
         return this;
     }
 
@@ -482,8 +509,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton disabledBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.disabledBorderColor = color;
+            setStyle(DISABLED_BORDER_COLOR_KEY, this.disabledBorderColor);
+        }
         return this;
     }
 
@@ -495,8 +524,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton textColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.textColor = color;
+            setStyle(TEXT_COLOR_KEY, this.textColor);
+        }
         return this;
     }
 
@@ -508,8 +539,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton hoverTextColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverTextColor = color;
+            setStyle(HOVER_TEXT_COLOR_KEY, this.hoverTextColor);
+        }
         return this;
     }
 
@@ -521,8 +554,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton focusedTextColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedTextColor = color;
+            setStyle(FOCUSED_TEXT_COLOR_KEY, this.focusedTextColor);
+        }
         return this;
     }
 
@@ -534,8 +569,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton pressedTextColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.pressedTextColor = color;
+            setStyle(PRESSED_TEXT_COLOR_KEY, this.pressedTextColor);
+        }
         return this;
     }
 
@@ -547,8 +584,10 @@ public class NanoButton extends NanoContainer {
      * @return this button
      */
     public NanoButton disabledTextColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.disabledTextColor = color;
+            setStyle(DISABLED_TEXT_COLOR_KEY, this.disabledTextColor);
+        }
         return this;
     }
 
@@ -633,89 +672,91 @@ public class NanoButton extends NanoContainer {
     /**
      * Applies non-null theme paint/font/padding values, measures text plus padding,
      * and replaces dimensions still marked auto. Then delegates base layout.
-     * Resolved styles may overwrite local setters; missing native context uses
+     * Local setters override resolved theme values; missing native context uses
      * approximate text metrics through the measurement helpers.
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
+        backgroundGradient = null;
+        borderGradient = null;
 
-        if (style != null) {
-            UIGradient resolvedBackgroundGradient = style.get(BACKGROUND_GRADIENT_KEY);
-            UIGradient resolvedBorderGradient = style.get(BORDER_GRADIENT_KEY);
-            if (resolvedBackgroundGradient != null) backgroundGradient = resolvedBackgroundGradient;
-            if (resolvedBorderGradient != null) borderGradient = resolvedBorderGradient;
-            Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
-            Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
-            Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
-            Color resolvedPressedBackgroundColor = style.get(PRESSED_BACKGROUND_COLOR_KEY);
-            Color resolvedDisabledBackgroundColor = style.get(DISABLED_BACKGROUND_COLOR_KEY);
+        UIGradient resolvedBackgroundGradient = style.get(BACKGROUND_GRADIENT_KEY);
+        UIGradient resolvedBorderGradient = style.get(BORDER_GRADIENT_KEY);
+        if (resolvedBackgroundGradient != null) backgroundGradient = resolvedBackgroundGradient;
+        if (resolvedBorderGradient != null) borderGradient = resolvedBorderGradient;
+        Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
+        Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
+        Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
+        Color resolvedPressedBackgroundColor = style.get(PRESSED_BACKGROUND_COLOR_KEY);
+        Color resolvedDisabledBackgroundColor = style.get(DISABLED_BACKGROUND_COLOR_KEY);
 
-            Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
-            Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
-            Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
-            Color resolvedPressedBorderColor = style.get(PRESSED_BORDER_COLOR_KEY);
-            Color resolvedDisabledBorderColor = style.get(DISABLED_BORDER_COLOR_KEY);
+        Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
+        Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
+        Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
+        Color resolvedPressedBorderColor = style.get(PRESSED_BORDER_COLOR_KEY);
+        Color resolvedDisabledBorderColor = style.get(DISABLED_BORDER_COLOR_KEY);
 
-            Color resolvedTextColor = style.get(TEXT_COLOR_KEY);
-            Color resolvedHoverTextColor = style.get(HOVER_TEXT_COLOR_KEY);
-            Color resolvedFocusedTextColor = style.get(FOCUSED_TEXT_COLOR_KEY);
-            Color resolvedPressedTextColor = style.get(PRESSED_TEXT_COLOR_KEY);
-            Color resolvedDisabledTextColor = style.get(DISABLED_TEXT_COLOR_KEY);
+        Color resolvedTextColor = style.get(TEXT_COLOR_KEY);
+        Color resolvedHoverTextColor = style.get(HOVER_TEXT_COLOR_KEY);
+        Color resolvedFocusedTextColor = style.get(FOCUSED_TEXT_COLOR_KEY);
+        Color resolvedPressedTextColor = style.get(PRESSED_TEXT_COLOR_KEY);
+        Color resolvedDisabledTextColor = style.get(DISABLED_TEXT_COLOR_KEY);
 
-            String resolvedFontName = style.get(FONT_NAME_KEY);
-            Float resolvedFontSize = style.get(FONT_SIZE_KEY);
-            Float resolvedPaddingX = style.get(PADDING_X_KEY);
-            Float resolvedPaddingY = style.get(PADDING_Y_KEY);
-            Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
-            Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
+        String resolvedFontName = style.get(FONT_NAME_KEY);
+        Float resolvedFontSize = style.get(FONT_SIZE_KEY);
+        Float resolvedPaddingX = style.get(PADDING_X_KEY);
+        Float resolvedPaddingY = style.get(PADDING_Y_KEY);
+        Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
+        Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
 
-            if (resolvedBackgroundColor != null)
-                backgroundColor = resolvedBackgroundColor;
-            if (resolvedHoverBackgroundColor != null)
-                hoverBackgroundColor = resolvedHoverBackgroundColor;
-            if (resolvedFocusedBackgroundColor != null)
-                focusedBackgroundColor = resolvedFocusedBackgroundColor;
-            if (resolvedPressedBackgroundColor != null)
-                pressedBackgroundColor = resolvedPressedBackgroundColor;
-            if (resolvedDisabledBackgroundColor != null)
-                disabledBackgroundColor = resolvedDisabledBackgroundColor;
+        if (resolvedBackgroundColor != null)
+            backgroundColor = resolvedBackgroundColor;
+        if (resolvedHoverBackgroundColor != null)
+            hoverBackgroundColor = resolvedHoverBackgroundColor;
+        if (resolvedFocusedBackgroundColor != null)
+            focusedBackgroundColor = resolvedFocusedBackgroundColor;
+        if (resolvedPressedBackgroundColor != null)
+            pressedBackgroundColor = resolvedPressedBackgroundColor;
+        if (resolvedDisabledBackgroundColor != null)
+            disabledBackgroundColor = resolvedDisabledBackgroundColor;
 
-            if (resolvedBorderColor != null)
-                borderColor = resolvedBorderColor;
-            if (resolvedHoverBorderColor != null)
-                hoverBorderColor = resolvedHoverBorderColor;
-            if (resolvedFocusedBorderColor != null)
-                focusedBorderColor = resolvedFocusedBorderColor;
-            if (resolvedPressedBorderColor != null)
-                pressedBorderColor = resolvedPressedBorderColor;
-            if (resolvedDisabledBorderColor != null)
-                disabledBorderColor = resolvedDisabledBorderColor;
+        if (resolvedBorderColor != null)
+            borderColor = resolvedBorderColor;
+        if (resolvedHoverBorderColor != null)
+            hoverBorderColor = resolvedHoverBorderColor;
+        if (resolvedFocusedBorderColor != null)
+            focusedBorderColor = resolvedFocusedBorderColor;
+        if (resolvedPressedBorderColor != null)
+            pressedBorderColor = resolvedPressedBorderColor;
+        if (resolvedDisabledBorderColor != null)
+            disabledBorderColor = resolvedDisabledBorderColor;
 
-            if (resolvedTextColor != null)
-                textColor = resolvedTextColor;
-            if (resolvedHoverTextColor != null)
-                hoverTextColor = resolvedHoverTextColor;
-            if (resolvedFocusedTextColor != null)
-                focusedTextColor = resolvedFocusedTextColor;
-            if (resolvedPressedTextColor != null)
-                pressedTextColor = resolvedPressedTextColor;
-            if (resolvedDisabledTextColor != null)
-                disabledTextColor = resolvedDisabledTextColor;
+        if (resolvedTextColor != null)
+            textColor = resolvedTextColor;
+        if (resolvedHoverTextColor != null)
+            hoverTextColor = resolvedHoverTextColor;
+        if (resolvedFocusedTextColor != null)
+            focusedTextColor = resolvedFocusedTextColor;
+        if (resolvedPressedTextColor != null)
+            pressedTextColor = resolvedPressedTextColor;
+        if (resolvedDisabledTextColor != null)
+            disabledTextColor = resolvedDisabledTextColor;
 
-            if (resolvedFontName != null && !resolvedFontName.isBlank())
-                fontName = resolvedFontName;
-            if (resolvedFontSize != null)
-                fontSize = Math.max(1f, resolvedFontSize);
-            if (resolvedPaddingX != null)
-                paddingX = Math.max(0f, resolvedPaddingX);
-            if (resolvedPaddingY != null)
-                paddingY = Math.max(0f, resolvedPaddingY);
-            if (resolvedCornerRadius != null)
-                cornerRadius = Math.max(0f, resolvedCornerRadius);
-            if (resolvedBorderWidth != null)
-                borderWidth = Math.max(0f, resolvedBorderWidth);
-        }
+        if (resolvedFontName != null && !resolvedFontName.isBlank())
+            fontName = resolvedFontName;
+        if (resolvedFontSize != null)
+            fontSize = Math.max(1f, resolvedFontSize);
+        if (resolvedPaddingX != null)
+            paddingX = Math.max(0f, resolvedPaddingX);
+        if (resolvedPaddingY != null)
+            paddingY = Math.max(0f, resolvedPaddingY);
+        if (resolvedCornerRadius != null)
+            cornerRadius = Math.max(0f, resolvedCornerRadius);
+        if (resolvedBorderWidth != null)
+            borderWidth = Math.max(0f, resolvedBorderWidth);
+
+        if (label != null) label.applyCaptionStyle(fontName, fontSize, textColor, getStyleOrDefaults());
 
         float measuredWidth = measureTextWidth(text) + paddingX * 2f;
         float measuredHeight = measureTextHeight() + paddingY * 2f;
@@ -806,9 +847,9 @@ public class NanoButton extends NanoContainer {
             nvgFontFace(vg, fontName);
             nvgTextAlign(vg, (leftAligned ? NVG_ALIGN_LEFT : NVG_ALIGN_CENTER) | NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, NanoUtility.color1(drawText));
-            NanoText.draw(this, vg, leftAligned ? x + paddingX * scale : x + width * 0.5f, y + height * 0.5f, text, fontSize * scale, drawText, (leftAligned ? NVG_ALIGN_LEFT : NVG_ALIGN_CENTER) | NVG_ALIGN_MIDDLE);
+            NanoText.draw(this, vg, fontName, leftAligned ? x + paddingX * scale : x + width * 0.5f, y + height * 0.5f, text, fontSize * scale, drawText, (leftAligned ? NVG_ALIGN_LEFT : NVG_ALIGN_CENTER) | NVG_ALIGN_MIDDLE);
         }
-        if (label != null) label.color(drawText);
+        if (label != null) label.applyCaptionStyle(fontName, fontSize, drawText, getStyleOrDefaults());
     }
 
     /**

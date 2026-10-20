@@ -5,6 +5,7 @@ import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.NinePatchTexture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
+import valthorne.ui.theme.StyleKey;
 
 /**
  * <p>
@@ -53,8 +54,15 @@ import valthorne.ui.UINode;
  */
 public class Image extends UINode {
 
+    /**
+     * Shared regular-UI tint key. Explicit color setters override theme values;
+     * an absent tint restores this image's original white tint.
+     */
+    public static final StyleKey<Color> COLOR_KEY = Label.COLOR_KEY;
+
     private Texture texture; // Texture currently displayed by this image node
     private Color color = new Color(1, 1, 1, 1); // Mutable image tint applied when drawing the texture.
+    private final Color defaultColor = color; // Original tint restored when no style supplies one.
     private NinePatchTexture ninePatch; // Optional borrowed-texture nine-slice renderer owned by this node.
     private boolean ninePatchEnabled; // Nine-slice mode retained while this UI node is detached.
     private int patchLeft; // Fixed source pixels along the left edge.
@@ -258,15 +266,29 @@ public class Image extends UINode {
     }
 
     /**
-     * Sets the color of this image node.
+     * Sets a local tint override for regular and nine-slice rendering.
+     * Null removes the override; the next style pass restores theme or white tint.
      *
      * @param color the color to apply to this image node
      * @return this image node, allowing for fluent configuration
      */
     public Image color(Color color) {
         this.color = color;
+        setStyle(COLOR_KEY, color);
         if (ninePatch != null) ninePatch.setColor(color);
         return this;
+    }
+
+    /**
+     * Applies the resolved tint to ordinary and nine-slice drawing without registering
+     * a new local override. Clearing the color override restores theme or white tint.
+     */
+    @Override
+    protected void applyLayout() {
+        Color resolvedColor = getStyleOrDefaults().get(COLOR_KEY);
+        color = resolvedColor == null ? defaultColor : resolvedColor;
+        if (ninePatch != null) ninePatch.setColor(color);
+        super.applyLayout();
     }
 
     /**

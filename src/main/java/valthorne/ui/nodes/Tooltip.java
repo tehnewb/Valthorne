@@ -159,22 +159,17 @@ public class Tooltip extends UINode {
      *
      * <p>
      * The current style is resolved and used to update the font, background, and
-     * padding. If no style exists, all resolved visual references are cleared and
-     * padding is reset to its default. If both a font and non-null text are available,
+     * padding. Missing values restore key defaults, and an absent font uses the
+     * root's default font when attached. If a font and non-null text are available,
      * the tooltip computes its width and height from the text size plus padding.
      * </p>
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
         font = null;
         background = null;
         padding = 6f;
-
-        if (style == null) {
-            super.applyLayout();
-            return;
-        }
 
         font = style.get(FONT_STYLE_KEY);
         if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
