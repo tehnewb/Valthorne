@@ -5,6 +5,11 @@ on:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      visual_harness:
+        description: 'Base64 ZIP of local visual sources and Gradle init script (kept outside Git)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -14,6 +19,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  visual:
+    if: github.event_name == 'workflow_dispatch' && inputs.visual_harness != ''
+    name: Visual / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      ALSOFT_DRIVERS: 'null'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore supplied local harness
+        env:
+          VISUAL_HARNESS: ${{ inputs.visual_harness }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, io, os, pathlib, zipfile
+          root = pathlib.Path('.codex-temp/ci-visual').resolve()
+          with zipfile.ZipFile(io.BytesIO(base64.b64decode(os.environ['VISUAL_HARNESS'], validate=True))) as archive:
+              for entry in archive.infolist():
+                  target = (root / entry.filename).resolve()
+                  if not target.is_relative_to(root):
+                      raise ValueError('Harness archive contains an escaping path')
+              archive.extractall(root)
+          PY
+      - name: Install Linux display and fonts
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dri mesa-utils fonts-dejavu-core
+      - name: Render scenes and check pixels
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/reports/pr28
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            export VISUAL_FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+            xvfb-run -a -s '-screen 0 1920x1440x24' bash ./gradlew runVisualCi -I .codex-temp/ci-visual/visual.gradle -Pprototype3d=false -PeditorPrototype=false --console=plain --stacktrace 2>&1 | tee build/reports/pr28/visual-ci.log
+          else
+            export VISUAL_FONT=/System/Library/Fonts/Supplemental/Arial.ttf
+            bash ./gradlew runVisualCi -I .codex-temp/ci-visual/visual.gradle -Pprototype3d=false -PeditorPrototype=false --console=plain --stacktrace 2>&1 | tee build/reports/pr28/visual-ci.log
+          fi
+      - name: Retain screenshots, supplied sources, and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-${{ matrix.os }}
+          path: |
+            build/reports/pr28/
+            .codex-temp/ci-visual/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
   build:
     name: Build / ${{ matrix.os }}
     strategy:
