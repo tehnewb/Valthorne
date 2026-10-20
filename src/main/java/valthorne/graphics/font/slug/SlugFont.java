@@ -138,6 +138,23 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
+     * Copies the exact encoded source for an independently owned native UI face.
+     * This cold-path operation performs no OpenGL calls and never exposes mutable
+     * STB backing storage. Existing outline drawing and ownership remain independent.
+     *
+     * @return independent TrueType/OpenType source bytes
+     * @throws IllegalStateException if the font has been disposed
+     */
+    public byte[] copyEncodedData() {
+        if (disposed) throw new IllegalStateException("Font is disposed");
+        ByteBuffer source = fontBuffer.asReadOnlyBuffer();
+        source.position(0);
+        byte[] result = new byte[source.remaining()];
+        source.get(result);
+        return result;
+    }
+
+    /**
      * Compiles outlines and metrics from reusable encoded font data. When upload is
      * deferred, construction and measurement perform no OpenGL calls; the first
      * {@link #bindTextures()} call uploads the prepared data on the graphics thread.
@@ -481,7 +498,9 @@ public final class SlugFont implements Dimensional {
                 addLine(curves, currentX, currentY, startX, startY);
             }
         } finally {
-            stbtt_FreeShape(info, vertices);
+            // CFF fonts can allocate a non-null shape with zero vertices (for example, space).
+            // Free its native allocation without the buffer overload's minimum-length check.
+            nstbtt_FreeShape(info.address(), vertices.address());
         }
 
         return curves;

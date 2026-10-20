@@ -6,9 +6,11 @@ import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.directwrite.DirectWriteSelection;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
+import valthorne.ui.UIText;
 import valthorne.graphics.texture.TextureData;
 import valthorne.math.MathUtils;
 import org.joml.Vector2f;
@@ -694,8 +696,8 @@ public class TextField extends Panel {
             if (font != null) {
                 String measured = getDisplayText();
                 String fallback = placeholder == null ? "" : placeholder;
-                float measuredWidth = Math.max(font.getWidth(measured, fontSize), font.getWidth(fallback, fontSize)) + padding * 2f;
-                float measuredHeight = font.getHeight("Ay", fontSize) + padding * 2f;
+                float measuredWidth = Math.max(UIText.width(this, font, measured, fontSize), UIText.width(this, font, fallback, fontSize)) + padding * 2f;
+                float measuredHeight = UIText.height(this, font, "Ay", fontSize) + padding * 2f;
 
                 if (getLayout().getWidth().isAuto())
                     getLayout().width(measuredWidth);
@@ -803,19 +805,19 @@ public class TextField extends Panel {
         boolean empty = visibleText.isEmpty();
 
         float drawX = getRenderX() + padding + textOffsetX;
-        float drawY = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
+        float drawY = getRenderY() + (getHeight() - (UIText.ascent(this, font, fontSize) - UIText.descent(this, font, fontSize))) * .5f - UIText.descent(this, font, fontSize);
         if (empty) {
             if (!placeholder.isEmpty()) {
                 if (placeholderRun == null || placeholderRun.font() != font)
                     placeholderRun = font.createRun(placeholder, fontSize);
                 else placeholderRun.rebuild(placeholder, fontSize);
-                placeholderRun.draw(batch, getRenderX() + padding, drawY, placeholderColor);
+                UIText.draw(this, batch, placeholderRun, font, placeholder, getRenderX() + padding, drawY, fontSize, placeholderColor);
             }
             return;
         }
         if (textRun == null || textRun.font() != font) textRun = font.createRun(visibleText, fontSize);
         else textRun.rebuild(visibleText, fontSize);
-        textRun.draw(batch, drawX, drawY, textColor);
+        UIText.draw(this, batch, textRun, font, visibleText, drawX, drawY, fontSize, textColor);
     }
 
     /**
@@ -843,6 +845,12 @@ public class TextField extends Panel {
         float selectionY = getRenderY() + (getHeight() - selectionH) * 0.5f;
 
         Color drawSelectionColor = selectionColor != null ? selectionColor : defaultSelectionColor;
+        DirectWriteSelection nativeSelection = UIText.selection(this, font, getDisplayText(), fontSize, a, b);
+        if (nativeSelection != null) {
+            for (int index = 0; index < nativeSelection.size(); index++)
+                batch.draw(getCaretPixel(), drawX + nativeSelection.left(index), selectionY, nativeSelection.width(index), selectionH, drawSelectionColor);
+            return;
+        }
         batch.draw(getCaretPixel(), x1, selectionY, x2 - x1, selectionH, drawSelectionColor);
     }
 
@@ -1138,10 +1146,10 @@ public class TextField extends Panel {
      * @return the rendered width up to the given index
      */
     private float getTextWidthUpTo(int index) {
-        if (font == null || index <= 0) return 0f;
+        if (font == null || index < 0) return 0f;
 
         String visibleText = getDisplayText();
-        return font.getWidth(visibleText, 0, Math.min(index, visibleText.length()), fontSize);
+        return UIText.caretX(this, font, visibleText, fontSize, Math.min(index, visibleText.length()));
     }
 
     /**
@@ -1162,9 +1170,9 @@ public class TextField extends Panel {
         if (font == null) return text.length();
 
         float local = mouseX - (getRenderX() + padding + textOffsetX);
-        if (local <= 0f) return 0;
-
         String visibleText = getDisplayText();
+        if (UIText.usesWindows(this)) return UIText.hitTest(this, font, visibleText, fontSize, local);
+        if (local <= 0f) return 0;
         int length = visibleText.length();
 
         for (int i = editor.next(0); i <= length && i > 0; i = i == length ? length + 1 : editor.next(i)) {
@@ -1228,7 +1236,7 @@ public class TextField extends Panel {
             return;
         }
 
-        float textWidth = font.getWidth(getDisplayText(), fontSize);
+        float textWidth = UIText.width(this, font, getDisplayText(), fontSize);
         float caretX = getTextWidthUpTo(caretIndex);
 
         if (textWidth <= available) {

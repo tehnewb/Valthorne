@@ -462,6 +462,14 @@ public final class TextureBatch {
     }
 
     /**
+     * Borrows the batch's current default tint for renderers that prepare their own
+     * colored pixel data. Per-draw tint overrides still take precedence.
+     *
+     * @return mutable borrowed default tint
+     */
+    public Color getColor() { return color; }
+
+    /**
      * Returns the current multiplier applied to every queued sprite's final
      * alpha, including sprites with their own tint.
      *

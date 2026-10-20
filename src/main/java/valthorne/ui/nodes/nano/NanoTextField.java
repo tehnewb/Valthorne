@@ -1,6 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.ui.NanoText;
+import valthorne.graphics.font.directwrite.DirectWriteSelection;
 
 import org.lwjgl.nanovg.NVGColor;
 import valthorne.Keyboard;
@@ -869,7 +870,10 @@ public class NanoTextField extends UINode implements NanoNode {
             float selectionY = y + (height - selectionH) * 0.5f;
 
             nvgBeginPath(vg);
-            nvgRect(vg, x1, selectionY, Math.max(0f, x2 - x1), selectionH);
+            DirectWriteSelection nativeSelection = NanoText.selection(this, fontName, visibleText, fontSize, a, b);
+            if (nativeSelection == null) nvgRect(vg, x1, selectionY, Math.max(0f, x2 - x1), selectionH);
+            else for (int index = 0; index < nativeSelection.size(); index++)
+                nvgRect(vg, drawX + nativeSelection.left(index), selectionY, nativeSelection.width(index), selectionH);
             nvgFillColor(vg, aux);
             nvgFill(vg);
         }
@@ -878,7 +882,7 @@ public class NanoTextField extends UINode implements NanoNode {
         NanoText.draw(this, vg, fontName, drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
         if (isFocused() && caretVisible) {
-            float caretX = drawX + measureTextWidth(visibleText, 0, Math.min(caretIndex, visibleText.length()));
+            float caretX = drawX + NanoText.caretX(this, vg, fontName, visibleText, fontSize, Math.min(caretIndex, visibleText.length()));
             float caretH = Math.max(0f, height - caretPadY * 2f);
             float caretY1 = y + (height - caretH) * 0.5f;
             float caretY2 = caretY1 + caretH;
@@ -1160,6 +1164,8 @@ public class NanoTextField extends UINode implements NanoNode {
     private int getIndexAtMouseX(float mouseX) {
         String visibleText = getDisplayText();
         float local = mouseX - (getAbsoluteX() + padding + textOffsetX);
+        int nativeIndex = NanoText.nativeHitTest(this, fontName, visibleText, fontSize, local);
+        if (nativeIndex >= 0) return nativeIndex;
         if (local <= 0f)
             return 0;
 
@@ -1208,7 +1214,7 @@ public class NanoTextField extends UINode implements NanoNode {
 
         String visibleText = getDisplayText();
         float textWidth = measureTextWidth(visibleText);
-        float caretX = measureTextWidth(visibleText, 0, Math.min(caretIndex, visibleText.length()));
+        float caretX = NanoText.caretX(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, visibleText, fontSize, Math.min(caretIndex, visibleText.length()));
 
         if (textWidth <= available) {
             textOffsetX = 0f;

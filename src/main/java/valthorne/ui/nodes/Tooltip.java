@@ -5,6 +5,7 @@ import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
+import valthorne.ui.UIText;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
 import valthorne.ui.theme.UITokens;
@@ -188,8 +189,8 @@ public class Tooltip extends UINode {
 
         if (run == null || run.font() != font) run = font.createRun(text, fontSize);
         else run.rebuild(text, fontSize);
-        float width = run.width() + padding * 2f;
-        float height = run.height() + padding * 2f;
+        float width = UIText.width(this, font, text, fontSize) + padding * 2f;
+        float height = UIText.height(this, font, text, fontSize) + padding * 2f;
 
         getLayout()
                 .width(width)
@@ -222,7 +223,7 @@ public class Tooltip extends UINode {
         if (font == null || text == null || text.isBlank())
             return;
 
-        run.draw(batch, getRenderX() + padding, getRenderY() + getHeight() - padding - font.ascent() * fontSize, getStyle() == null ? null : getStyle().get(Label.COLOR_KEY));
+        UIText.draw(this, batch, run, font, text, getRenderX() + padding, getRenderY() + getHeight() - padding - UIText.ascent(this, font, fontSize), fontSize, getStyle() == null ? null : getStyle().get(Label.COLOR_KEY));
     }
 
     /**

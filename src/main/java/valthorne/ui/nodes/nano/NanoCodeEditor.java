@@ -1,6 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.ui.NanoText;
+import valthorne.graphics.font.directwrite.DirectWriteSelection;
 
 import valthorne.Keyboard;
 import valthorne.Mouse;
@@ -176,6 +177,20 @@ public class NanoCodeEditor extends NanoPanel {
         return NanoText.measureTextWidth(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, FONT_SIZE, visible(text));
     }
 
+    /**
+     * Measures a caret in the fully shaped displayed line, retaining native kerning
+     * and expanding source tabs consistently with painting.
+     *
+     * @param line source line index
+     * @param offset raw UTF-16 position relative to the source line
+     * @return logical horizontal caret coordinate
+     */
+    private float caretX(int line, int offset) {
+        String text = lineText(line);
+        int position = visible(text.substring(0, offset)).length();
+        return NanoText.caretX(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, visible(text), FONT_SIZE, position);
+    }
+
     private void revealCaret() {
         NanoScrollPanel panel = scroll();
         if (panel == null) return;
@@ -183,7 +198,7 @@ public class NanoCodeEditor extends NanoPanel {
         float top = line * LINE_HEIGHT, bottom = top + LINE_HEIGHT;
         if (top < panel.getScrollY()) panel.scrollY(top);
         else if (bottom > panel.getScrollY() + panel.getHeight()) panel.scrollY(bottom - panel.getHeight());
-        float x = TEXT_X + width(model.text().substring(starts.get(line), model.caret()));
+        float x = TEXT_X + caretX(line, model.caret() - starts.get(line));
         if (x < panel.getScrollX() + TEXT_X) panel.scrollX(Math.max(0, x - TEXT_X));
         else if (x > panel.getScrollX() + panel.getWidth() - 12) panel.scrollX(x - panel.getWidth() + 12);
     }
@@ -193,6 +208,13 @@ public class NanoCodeEditor extends NanoPanel {
         int line = Math.clamp((int) ((point.y() - getAbsoluteY()) / LINE_HEIGHT), 0, starts.size() - 1);
         String value = lineText(line);
         float x = point.x() - getAbsoluteX() - TEXT_X;
+        int nativePosition = NanoText.nativeHitTest(this, fontName, visible(value), FONT_SIZE, x);
+        if (nativePosition >= 0) {
+            int raw = 0;
+            int displayed = 0;
+            while (raw < value.length() && displayed < nativePosition) displayed += value.charAt(raw++) == '\t' ? 4 : 1;
+            return starts.get(line) + raw;
+        }
         if (x <= 0) return starts.get(line);
         int index = 0;
         while (index < value.length()) {
@@ -314,10 +336,14 @@ public class NanoCodeEditor extends NanoPanel {
             int begin = Math.max(model.start(), starts.get(line));
             int end = Math.min(model.end(), lineEnd(line));
             if (begin < end) {
-                float left = x + TEXT_X + width(model.text().substring(starts.get(line), begin));
-                float right = x + TEXT_X + width(model.text().substring(starts.get(line), end));
+                float left = x + TEXT_X + caretX(line, begin - starts.get(line));
+                float right = x + TEXT_X + caretX(line, end - starts.get(line));
                 nvgBeginPath(vg);
-                nvgRect(vg, left, top - 1, Math.max(1, right - left), LINE_HEIGHT);
+                DirectWriteSelection nativeSelection = NanoText.selection(this, fontName, visible(value), FONT_SIZE,
+                        visible(value.substring(0, begin - starts.get(line))).length(), visible(value.substring(0, end - starts.get(line))).length());
+                if (nativeSelection == null) nvgRect(vg, left, top - 1, Math.max(1, right - left), LINE_HEIGHT);
+                else for (int index = 0; index < nativeSelection.size(); index++)
+                    nvgRect(vg, x + TEXT_X + nativeSelection.left(index), top - 1, nativeSelection.width(index), LINE_HEIGHT);
                 nvgFillColor(vg, NanoUtility.color1(selectionColor));
                 nvgFill(vg);
             }
@@ -337,7 +363,7 @@ public class NanoCodeEditor extends NanoPanel {
         if (isFocused() && (blink % 1f) < 0.5f) {
             int line = lineAt(model.caret());
             if (line >= first && line < last) {
-                float cursor = x + TEXT_X + width(model.text().substring(starts.get(line), model.caret()));
+                float cursor = x + TEXT_X + caretX(line, model.caret() - starts.get(line));
                 nvgBeginPath(vg);
                 nvgRect(vg, cursor, y + line * LINE_HEIGHT + 2, 1.5f, FONT_SIZE + 3);
                 nvgFillColor(vg, NanoUtility.color1(caretColor));

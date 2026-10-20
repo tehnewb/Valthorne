@@ -4,6 +4,7 @@ import valthorne.graphics.Drawable;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
+import valthorne.ui.UIText;
 import valthorne.math.MathUtils;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
@@ -360,9 +361,9 @@ public class ProgressBar extends Panel {
         if (displayPercentage && font != null) {
             if (run == null || run.font() != font) run = font.createRun(displayText, fontSize);
             else run.rebuild(displayText, fontSize);
-            float textX = getRenderX() + (getWidth() - run.width()) * 0.5f;
-            float textY = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
-            run.draw(batch, textX, textY, getStyle() != null && getStyle().get(Label.COLOR_KEY) != null
+            float textX = getRenderX() + (getWidth() - UIText.width(this, font, displayText, fontSize)) * 0.5f;
+            float textY = getRenderY() + (getHeight() - (UIText.ascent(this, font, fontSize) - UIText.descent(this, font, fontSize))) * .5f - UIText.descent(this, font, fontSize);
+            UIText.draw(this, batch, run, font, displayText, textX, textY, fontSize, getStyle() != null && getStyle().get(Label.COLOR_KEY) != null
                     ? getStyle().get(Label.COLOR_KEY) : Color.WHITE);
         }
     }

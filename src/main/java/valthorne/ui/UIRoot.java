@@ -17,6 +17,7 @@ import valthorne.event.listeners.MouseScrollListener;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.font.SystemFonts;
 import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.slug.SlugData;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.behavior.TextEditing;
@@ -162,6 +163,9 @@ public class UIRoot extends UIContainer {
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
     private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
+    private boolean windowsTextEnabled = DirectWriteBackend.isSupported(); // Native Windows UI text; scalable text remains available by opting out.
+    private WindowsUIText windowsText; // Lazily owned native shaping, raster, and GPU caches for this root.
+    private Map<String, SlugFont> namedTextFonts; // Optional borrowed exact-file faces for custom Nano text names.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
     private Set<UINode> externallyPresentedNodes; // Top-level nodes painted and picked by an external editor; allocated only when needed.
@@ -924,6 +928,11 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigFree(yogaConfig);
         if (batch != null) batch.dispose();
         if (rotationShader != null) rotationShader.dispose();
+        if (windowsText != null) {
+            windowsText.close();
+            windowsText = null;
+        }
+        if (namedTextFonts != null) namedTextFonts.clear();
         if (nanoSlugFont != null) {
             nanoSlugFont.dispose();
             nanoSlugFont = null;
@@ -1722,6 +1731,90 @@ public class UIRoot extends UIContainer {
      * @return borrowed proportional font, or null before graphics initialization
      */
     public SlugFont getDefaultFont() {return getNanoTextFont(false);}
+
+    /**
+     * Selects Microsoft's native shaping and grayscale rasterization for ordinary
+     * Windows UI text. Rotated/zoomed UI and explicit SlugLabel nodes retain curves;
+     * other operating systems always retain the existing renderer. Set this before
+     * laying out controls so their dimensions and caret metrics use the same backend.
+     *
+     * @param enabled whether eligible Windows UI text should use DirectWrite
+     */
+    public void setWindowsTextEnabled(boolean enabled) {
+        windowsTextEnabled = enabled && DirectWriteBackend.isSupported();
+        invalidateTextLayout(this);
+    }
+
+    /**
+     * Reports the root's native Windows text policy before transform eligibility.
+     *
+     * @return whether DirectWrite is enabled on this Windows root
+     */
+    public boolean isWindowsTextEnabled() { return windowsTextEnabled; }
+
+    /**
+     * Associates a custom Nano font name with an exact encoded source for consistent
+     * native Windows and scalable non-Windows UI typography. Fonts are borrowed and
+     * must outlive controls using the name. This avoids substituting a similarly
+     * named system face for custom NanoVG-only handles, which expose no font bytes.
+     *
+     * @param name nonblank name used by Nano label/button/editor fontName properties
+     * @param font borrowed source font, or null to remove the association
+     */
+    public void registerTextFont(String name, SlugFont font) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A text font name is required");
+        if (font == null) {
+            if (namedTextFonts != null) namedTextFonts.remove(name);
+        } else {
+            if (namedTextFonts == null) namedTextFonts = new HashMap<>();
+            namedTextFonts.put(name, font);
+        }
+        invalidateTextLayout(this);
+    }
+
+    /**
+     * Resolves a borrowed explicitly registered exact-file font.
+     *
+     * @param name Nano control font name
+     * @return borrowed source face, or null when only a NanoVG handle is registered
+     */
+    SlugFont registeredTextFont(String name) { return namedTextFonts == null ? null : namedTextFonts.get(name); }
+
+    /**
+     * Borrows the lazy native cache owner for UI text measurement and drawing.
+     *
+     * @return owned Windows text resources
+     */
+    WindowsUIText windowsText() {
+        if (windowsText == null) windowsText = new WindowsUIText(this);
+        return windowsText;
+    }
+
+    /**
+     * Reloads Windows font smoothing/rendering preferences and invalidates cached
+     * raster images. Call on the root's rendering thread after Windows text settings
+     * change; pending root draws are flushed before their textures are released.
+     *
+     * @param monitor HMONITOR for the destination display, or zero for defaults
+     */
+    public void refreshWindowsTextSettings(long monitor) {
+        if (windowsText == null) return;
+        if (renderContext != null) batch.flush();
+        windowsText.refresh(monitor);
+        invalidateTextLayout(this);
+    }
+
+    /**
+     * Invalidates intrinsic text measurements throughout a root after its backend
+     * policy changes, including descendants with independent themes.
+     *
+     * @param node subtree whose typography may have changed
+     */
+    private void invalidateTextLayout(UINode node) {
+        node.markLayoutDirty();
+        if (node instanceof UIContainer container)
+            for (int index = 0; index < container.size(); index++) invalidateTextLayout(container.get(index));
+    }
 
     /**
      * One modal input boundary and the focus target that preceded it. Both nodes
