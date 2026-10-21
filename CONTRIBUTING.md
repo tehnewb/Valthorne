@@ -30,13 +30,6 @@ Pull requests are the fastest way to get improvements merged. A good PR usually:
 * References related issues when applicable
 * Includes tests or verification notes for behavior changes
 
-Before opening a pull request, please run:
-
-```bash
-./gradlew -Pprototype3d=false -PeditorPrototype=false build
-./gradlew -Pprototype3d=false -PeditorPrototype=false verifyRelease verifySlugTextureBatch
-```
-
 Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources,
 and Javadoc; `verifyRelease` additionally checks publication artifacts and metadata.
 The native Slug check verifies rendering in a hidden graphics context. Record
