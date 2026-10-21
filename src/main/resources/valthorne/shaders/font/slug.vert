@@ -12,8 +12,9 @@ layout(location = 8) in float a_clipEnabled;
 
 uniform mat4 u_mvp;
 uniform vec4 u_textTransform;
+uniform bool u_linearColor;
 
-out vec4 v_color;
+flat out vec4 v_color;
 out vec2 v_texCoord;
 flat out vec4 v_sampleOrigin;
 flat out vec4 v_banding;
@@ -39,7 +40,11 @@ void main() {
     );
     v_banding = a_band;
     v_pixelsPerEm = a_pixelsPerEm;
-    v_color = a_color;
+    vec3 color = a_color.rgb;
+    if (u_linearColor) {
+        color = mix(color / 12.92, pow((color + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), color));
+    }
+    v_color = vec4(color, a_color.a);
     v_world = world;
     v_clipRect = a_clipRect;
     v_clipEnabled = a_clipEnabled;
