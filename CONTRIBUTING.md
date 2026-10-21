@@ -9,8 +9,6 @@ key or publication account is needed. See [README.md](README.md) for build comma
 
 Please search existing issues and pull requests before opening a new one. If you are not sure whether an idea belongs in an issue yet, start a discussion first.
 
-If you want a place to jump in, look for labels such as `good first issue` and `help wanted`.
-
 ## Reporting Issues
 
 Bug reports and feature requests are both welcome. Helpful reports usually include:
