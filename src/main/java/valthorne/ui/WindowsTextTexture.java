@@ -1,5 +1,6 @@
 package valthorne.ui;
 
+import valthorne.graphics.font.directwrite.DirectWriteAntialiasMode;
 import valthorne.graphics.font.directwrite.DirectWriteImage;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureData;
@@ -9,6 +10,7 @@ import valthorne.graphics.texture.TextureData;
  * TextureData borrows JVM-owned pixel bytes, which must never be freed with STB.
  */
 final class WindowsTextTexture {
+    final DirectWriteAntialiasMode antialiasMode; // Native target mode retained with the cached pixels.
     final Texture texture; // Owned OpenGL texture; disposed only after pending batch draws flush.
     final int width; // Physical raster width.
     final int height; // Physical raster height.
@@ -21,6 +23,7 @@ final class WindowsTextTexture {
      * @param image native raster with bottom-up straight RGBA bytes
      */
     WindowsTextTexture(DirectWriteImage image) {
+        antialiasMode = image.antialiasMode();
         width = image.width();
         height = image.height();
         left = image.left();

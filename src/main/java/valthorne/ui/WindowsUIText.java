@@ -6,6 +6,7 @@ import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.directwrite.DirectWriteFace;
 import valthorne.graphics.font.directwrite.DirectWriteImage;
 import valthorne.graphics.font.directwrite.DirectWriteLayout;
+import valthorne.graphics.font.directwrite.DirectWriteRenderingSettings;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.texture.TextureBatch;
 
@@ -25,6 +26,8 @@ import static org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window;
  * texels (plus the corresponding retained CPU texture data). Coordinates are mapped
  * to physical framebuffer pixels before native rasterization, including subpixel
  * phase. Existing batch clipping, translation, opacity, and painter order remain active.
+ * Native output is display-encoded and must be submitted after scene tone mapping;
+ * the batch prevents a second framebuffer sRGB conversion and preserves source-over alpha.
  */
 final class WindowsUIText implements AutoCloseable {
     /**
@@ -78,7 +81,7 @@ final class WindowsUIText implements AutoCloseable {
 
     /**
      * Draws genuine transparent native grayscale text on an axis-aligned UI surface.
-     * Unsupported projections return false so callers retain scalable outline drawing.
+     * Unsupported projections report a fallback reason so callers retain scalable outline drawing.
      *
      * @param batch active texture batch
      * @param font borrowed UI source font
@@ -88,19 +91,22 @@ final class WindowsUIText implements AutoCloseable {
      * @param size logical em size
      * @param color optional explicit foreground, or null for the batch tint
      * @param background explicit final opaque RGB background, or -1 for transparent grayscale
-     * @return whether this method handled the draw
+     * @return NONE when handled, or the reason scalable rendering is required
      */
-    boolean draw(TextureBatch batch, SlugFont font, String text, float x, float baseline, float size, Color color, int background) {
+    UITextFallbackReason draw(TextureBatch batch, SlugFont font, String text, float x, float baseline, float size, Color color, int background) {
         var projection = Window.getProjectionMatrix();
-        if (projection[1] != 0 || projection[4] != 0 || projection[0] <= 0 || projection[5] <= 0) return false;
+        if (projection[1] != 0 || projection[4] != 0 || projection[0] <= 0 || projection[5] <= 0) return UITextFallbackReason.UNSUPPORTED_PROJECTION;
         glGetIntegerv(GL_VIEWPORT, viewport);
         var rootViewport = root.getViewport();
         float worldWidth = rootViewport == null ? Window.getWidth() : rootViewport.getWorldWidth();
         float worldHeight = rootViewport == null ? Window.getHeight() : rootViewport.getWorldHeight();
         float sx = viewport[2] / worldWidth;
         float sy = viewport[3] / worldHeight;
-        if (!Float.isFinite(sx) || !Float.isFinite(sy) || sx > 16 || sy > 16) return false;
-        if (sx <= 0 || sy <= 0) return true;
+        if (!Float.isFinite(sx) || !Float.isFinite(sy) || sx > 16 || sy > 16) return UITextFallbackReason.UNSUPPORTED_SCALE;
+        if (sx <= 0 || sy <= 0) {
+            root.recordTextRendering(UITextRenderingMode.NOT_DRAWN, UITextFallbackReason.EMPTY_VIEWPORT, sx, sy);
+            return UITextFallbackReason.NONE;
+        }
         DirectWriteLayout layout = layout(font, text, size);
         float physicalX = viewport[0] + (x + batch.getTranslationX()) * sx + (projection[12] + 1) * viewport[2] * .5f;
         float physicalTop = viewport[1] + (baseline + layout.baseline() + batch.getTranslationY()) * sy + (projection[13] + 1) * viewport[3] * .5f;
@@ -113,7 +119,10 @@ final class WindowsUIText implements AutoCloseable {
         int cropTop = Math.max(0, fullTop - viewport[1] - viewport[3]);
         int cropWidth = Math.min(rasterBounds[2] - cropLeft, viewport[0] + viewport[2] - fullLeft - cropLeft);
         int cropHeight = Math.min(rasterBounds[3] - cropTop, fullTop - cropTop - viewport[1]);
-        if (cropWidth <= 0 || cropHeight <= 0) return true;
+        if (cropWidth <= 0 || cropHeight <= 0) {
+            root.recordTextRendering(UITextRenderingMode.NOT_DRAWN, UITextFallbackReason.OUTSIDE_VIEWPORT, sx, sy);
+            return UITextFallbackReason.NONE;
+        }
         Color selected = color == null ? batch.getColor() : color;
         int rgba = selected.getRed() << 24 | selected.getGreen() << 16 | selected.getBlue() << 8 | selected.getAlpha();
         lookup.set(faces.get(font), text, size, sx, sy, phaseX, phaseY, rgba, backend.revision(), background, cropLeft, cropTop, cropWidth, cropHeight);
@@ -154,9 +163,23 @@ final class WindowsUIText implements AutoCloseable {
         }
         float left = x - (cached.left + phaseX) / sx;
         float top = baseline + layout.baseline() + (cached.top + phaseY) / sy;
-        batch.draw(cached.texture, left, top - cached.height / sy, cached.width / sx, cached.height / sy, Color.WHITE);
-        return true;
+        batch.drawEncoded(cached.texture, left, top - cached.height / sy, cached.width / sx, cached.height / sy);
+        UITextRenderingMode mode = switch (cached.antialiasMode) {
+            case DEFAULT -> UITextRenderingMode.DIRECTWRITE_DEFAULT;
+            case CLEARTYPE -> UITextRenderingMode.DIRECTWRITE_CLEARTYPE;
+            case GRAYSCALE -> UITextRenderingMode.DIRECTWRITE_GRAYSCALE;
+            case ALIASED -> UITextRenderingMode.DIRECTWRITE_ALIASED;
+        };
+        root.recordTextRendering(mode, UITextFallbackReason.NONE, sx, sy);
+        return UITextFallbackReason.NONE;
     }
+
+    /**
+     * Borrows the most recently refreshed native rendering-settings snapshot.
+     *
+     * @return installed Windows rendering preferences
+     */
+    DirectWriteRenderingSettings settings() { return backend.settings(); }
 
     /**
      * Refreshes native system/monitor settings after the caller flushes text draws.

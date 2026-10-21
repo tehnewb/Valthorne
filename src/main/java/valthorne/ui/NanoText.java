@@ -122,7 +122,11 @@ public final class NanoText {
          */
         SlugFont font = font(node, name);
         UIRoot root = node.getRoot();
-        if (font == null || root == null || root.getRenderContext() == null) return nvgText(vg, x, y, text);
+        if (font == null || root == null || root.getRenderContext() == null) {
+            float end = nvgText(vg, x, y, text);
+            if (root != null) root.recordTextRendering(UITextRenderingMode.NANOVG, font == null ? UITextFallbackReason.NANOVG_ONLY_FONT : UITextFallbackReason.NO_RENDER_CONTEXT, 0, 0);
+            return end;
+        }
         float width = UIText.width(node, font, text, size);
         float left = x - ((align & NVG_ALIGN_CENTER) != 0 ? width * .5f : (align & NVG_ALIGN_RIGHT) != 0 ? width : 0);
         float baseline = y;

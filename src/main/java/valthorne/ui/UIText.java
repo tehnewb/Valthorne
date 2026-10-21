@@ -1,6 +1,7 @@
 package valthorne.ui;
 
 import valthorne.graphics.Color;
+import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.directwrite.DirectWriteSelection;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugTextRun;
@@ -25,6 +26,10 @@ public final class UIText {
      */
     public static final StyleKey<Color> OPAQUE_BACKGROUND_KEY = StyleKey.of("text.nativeOpaqueBackground", Color.class);
     /**
+     * Stable platform eligibility avoids repeating operating-system string work per draw.
+     */
+    private static final boolean WINDOWS_SUPPORTED = DirectWriteBackend.isSupported();
+    /**
      * Prevents construction of the typography facade.
      */
     private UIText() {}
@@ -40,13 +45,29 @@ public final class UIText {
          * Physical DPI scaling is supported. World camera zoom and node rotations
          * intentionally preserve live outline rendering instead of scaling bitmaps.
          */
+        return fallbackReason(node) == UITextFallbackReason.NONE;
+    }
+
+    /**
+     * Determines the transform/policy fallback without initializing native resources.
+     *
+     * @param node owning UI node
+     * @return NONE for native eligibility, otherwise the relevant fallback reason
+     */
+    private static UITextFallbackReason fallbackReason(UINode node) {
+        /*
+         * Keep measurement and drawing eligibility identical while retaining a
+         * precise reason for diagnostics on an actual text submission.
+         */
         UIRoot root = node.getRoot();
-        if (root == null || !root.isWindowsTextEnabled()) return false;
+        if (root == null) return UITextFallbackReason.DETACHED;
+        if (!WINDOWS_SUPPORTED) return UITextFallbackReason.NON_WINDOWS;
+        if (!root.isWindowsTextEnabled()) return UITextFallbackReason.DISABLED;
         var viewport = root.getViewport();
-        if (viewport != null && viewport.getCamera() != null && viewport.getCamera().getZoom() != 1) return false;
+        if (viewport != null && viewport.getCamera() != null && viewport.getCamera().getZoom() != 1) return UITextFallbackReason.CAMERA_ZOOM;
         for (UINode current = node; current != null; current = current.getParent())
-            if (current.getRotation() != 0) return false;
-        return true;
+            if (current.getRotation() != 0) return UITextFallbackReason.ROTATION;
+        return UITextFallbackReason.NONE;
     }
 
     /**
@@ -210,8 +231,14 @@ public final class UIText {
         Color opaque = node.getStyleOrDefaults().get(OPAQUE_BACKGROUND_KEY);
         if (opaque != null && opaque.getAlpha() == 255 && batch.getOpacityMultiplier() == 1)
             background = opaque.getRed() << 16 | opaque.getGreen() << 8 | opaque.getBlue();
-        if (usesWindows(node) && node.getRoot().windowsText().draw(batch, font, text, x, baseline, size, color, background)) return;
+        UITextFallbackReason reason = fallbackReason(node);
+        UIRoot root = node.getRoot();
+        if (reason == UITextFallbackReason.NONE) {
+            reason = root.windowsText().draw(batch, font, text, x, baseline, size, color, background);
+            if (reason == UITextFallbackReason.NONE) return;
+        }
         if (run != null) run.draw(batch, x, baseline, color);
         else font.draw(batch, text, x, baseline, size, color);
+        if (root != null) root.recordTextRendering(UITextRenderingMode.SLUG, reason, 0, 0);
     }
 }

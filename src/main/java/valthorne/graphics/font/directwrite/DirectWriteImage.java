@@ -39,6 +39,7 @@ public final class DirectWriteImage {
     private final int left; // Physical margin from image left to the layout origin before subpixel phase.
     private final int top; // Physical margin from image top to the layout origin before subpixel phase.
     private final boolean opaque; // Whether ClearType-safe opaque composition was requested.
+    private final DirectWriteAntialiasMode antialiasMode; // Actual mode queried from the configured native target.
 
     /**
      * Renders a shaped layout with native DPI, rendering parameters, and target alpha.
@@ -111,6 +112,14 @@ public final class DirectWriteImage {
             brush = output.get(ADDRESS, 0);
             com.call(target, TARGET_SET_TEXT_ANTIALIAS, null, new MemoryLayout[]{INT}, backend.antialiasMode(opaque && allowClearType));
             com.call(target, TARGET_SET_TEXT_PARAMS, null, new MemoryLayout[]{ADDRESS}, backend.renderingParams());
+            int nativeMode = (int) com.call(target, TARGET_GET_TEXT_ANTIALIAS, INT, new MemoryLayout[0]);
+            antialiasMode = switch (nativeMode) {
+                case 0 -> DirectWriteAntialiasMode.DEFAULT;
+                case 1 -> DirectWriteAntialiasMode.CLEARTYPE;
+                case 2 -> DirectWriteAntialiasMode.GRAYSCALE;
+                case 3 -> DirectWriteAntialiasMode.ALIASED;
+                default -> throw new IllegalStateException("Unknown native text antialiasing mode: " + nativeMode);
+            };
             if (opaque) setColor(color, (background >>> 16) & 255, (background >>> 8) & 255, background & 255, 255);
             else setColor(color, 0, 0, 0, 0);
             com.call(target, TARGET_BEGIN, null, new MemoryLayout[0]);
@@ -203,4 +212,13 @@ public final class DirectWriteImage {
      * @return true for opaque native output, including eligible native ClearType
      */
     public boolean opaque() { return opaque; }
+
+    /**
+     * Returns the mode reported by Direct2D after configuring this image's target.
+     * The rendering-parameters mode can further control native glyph rasterization;
+     * callers should inspect the backend settings when diagnosing system overrides.
+     *
+     * @return configured native target antialiasing mode
+     */
+    public DirectWriteAntialiasMode antialiasMode() { return antialiasMode; }
 }

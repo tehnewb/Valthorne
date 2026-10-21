@@ -147,6 +147,10 @@ final class WindowsTextAbi {
      */
     static final int TARGET_SET_TEXT_ANTIALIAS = 34;
     /**
+     * ID2D1RenderTarget GetTextAntialiasMode slot for reporting the configured target mode.
+     */
+    static final int TARGET_GET_TEXT_ANTIALIAS = 35;
+    /**
      * ID2D1RenderTarget SetTextRenderingParams slot.
      */
     static final int TARGET_SET_TEXT_PARAMS = 36;

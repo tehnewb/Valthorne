@@ -165,6 +165,10 @@ public class UIRoot extends UIContainer {
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
     private boolean windowsTextEnabled = DirectWriteBackend.isSupported(); // Native Windows UI text; scalable text remains available by opting out.
     private WindowsUIText windowsText; // Lazily owned native shaping, raster, and GPU caches for this root.
+    private UITextRenderingMode lastTextMode = UITextRenderingMode.NOT_DRAWN; // Renderer and native target mode of the latest text submission.
+    private UITextFallbackReason lastTextFallback = UITextFallbackReason.NONE; // Why that submission bypassed native drawing or produced no pixels.
+    private float lastTextScaleX; // Physical framebuffer pixels per DIP of the latest native submission.
+    private float lastTextScaleY; // Vertical physical framebuffer pixels per DIP of the latest native submission.
     private Map<String, SlugFont> namedTextFonts; // Optional borrowed exact-file faces for custom Nano text names.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
@@ -1751,6 +1755,34 @@ public class UIRoot extends UIContainer {
      * @return whether DirectWrite is enabled on this Windows root
      */
     public boolean isWindowsTextEnabled() { return windowsTextEnabled; }
+
+    /**
+     * Snapshots the most recent text submission through the shared UI typography
+     * facade. This reports the target mode actually queried from Direct2D, including
+     * cached rasters, rather than ClearType eligibility. It does not summarize every
+     * control or direct world-font draw. Read on this root's rendering thread after
+     * the control of interest draws; each explicit query allocates one snapshot.
+     *
+     * @return last renderer, fallback reason, physical scaling, and native settings
+     */
+    public UITextDiagnostics getTextRenderingDiagnostics() {
+        return new UITextDiagnostics(lastTextMode, lastTextFallback, lastTextScaleX, lastTextScaleY, windowsText == null ? null : windowsText.settings());
+    }
+
+    /**
+     * Records the last text submission without allocating diagnostic objects.
+     *
+     * @param mode renderer and native target mode
+     * @param reason fallback or skipped-drawing reason
+     * @param scaleX native physical pixels per DIP, or zero for a fallback
+     * @param scaleY native vertical pixels per DIP, or zero for a fallback
+     */
+    void recordTextRendering(UITextRenderingMode mode, UITextFallbackReason reason, float scaleX, float scaleY) {
+        lastTextMode = mode;
+        lastTextFallback = reason;
+        lastTextScaleX = scaleX;
+        lastTextScaleY = scaleY;
+    }
 
     /**
      * Associates a custom Nano font name with an exact encoded source for consistent

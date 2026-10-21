@@ -47,6 +47,7 @@ public final class DirectWriteBackend implements AutoCloseable {
     private final MemorySegment wic; // Owned IWICImagingFactory for transparent premultiplied bitmap targets.
     private final List<DirectWriteFace> faces = new ArrayList<>(); // Fonts released before the factory/apartment.
     private MemorySegment renderingParams = MemorySegment.NULL; // Current monitor/system rendering parameters.
+    private DirectWriteRenderingSettings settings; // Immutable diagnostic values captured only when native preferences change.
     private boolean smoothing; // Snapshot of Windows' font smoothing preference.
     private boolean clearType; // Whether Windows requests ClearType for eligible opaque targets.
     private int revision; // Invalidates cached rasters when monitor or system parameters change.
@@ -162,12 +163,14 @@ public final class DirectWriteBackend implements AutoCloseable {
                 boolean nextClearType = value.get(INT, 0) == 2;
                 long fingerprint = renderingFingerprint(candidate, scope);
                 if (renderingParams.address() == 0 || fingerprint != settingsFingerprint || smoothing != nextSmoothing || clearType != nextClearType) {
+                    DirectWriteRenderingSettings nextSettings = readSettings(candidate, scope, nextSmoothing, nextClearType);
                     com.release(renderingParams);
                     renderingParams = candidate;
                     candidate = MemorySegment.NULL;
                     settingsFingerprint = fingerprint;
                     smoothing = nextSmoothing;
                     clearType = nextClearType;
+                    settings = nextSettings;
                     revision++;
                 }
             } finally {
@@ -224,6 +227,48 @@ public final class DirectWriteBackend implements AutoCloseable {
      * @return current settings generation
      */
     public int revision() { return revision; }
+
+    /**
+     * Borrows the immutable diagnostic snapshot for the current native preferences.
+     * Reading this accessor does not poll Windows or change raster-cache generations.
+     *
+     * @return installed native gamma, contrast, mode, geometry, and smoothing values
+     */
+    public DirectWriteRenderingSettings settings() { requireOpen(); return settings; }
+
+    /**
+     * Captures unmodified native properties after a rendering-settings change.
+     *
+     * @param parameters candidate native parameters
+     * @param scope temporary interface-query storage
+     * @param nextSmoothing system smoothing preference
+     * @param nextClearType system ClearType preference
+     * @return immutable native property snapshot
+     */
+    private DirectWriteRenderingSettings readSettings(MemorySegment parameters, Arena scope, boolean nextSmoothing, boolean nextClearType) {
+        float gamma = (float) com.call(parameters, 3, FLOAT, new MemoryLayout[0]);
+        float contrast = (float) com.call(parameters, 4, FLOAT, new MemoryLayout[0]);
+        float level = (float) com.call(parameters, 5, FLOAT, new MemoryLayout[0]);
+        int geometry = (int) com.call(parameters, 6, INT, new MemoryLayout[0]);
+        int mode = (int) com.call(parameters, 7, INT, new MemoryLayout[0]);
+        float grayscale = Float.NaN;
+        int gridFit = -1;
+        int extendedMode = -1;
+        MemorySegment output = scope.allocate(ADDRESS);
+        int status = (int) com.call(parameters, UNKNOWN_QUERY, INT, new MemoryLayout[]{ADDRESS, ADDRESS}, guid(scope, "b7924baa-391b-412a-8c5c-e44cc2d867dc"), output);
+        if (status != 0x80004002) {
+            check(status, "QueryInterface(IDWriteRenderingParams3)");
+            MemorySegment extended = output.get(ADDRESS, 0);
+            try {
+                grayscale = (float) com.call(extended, 8, FLOAT, new MemoryLayout[0]);
+                gridFit = (int) com.call(extended, 9, INT, new MemoryLayout[0]);
+                extendedMode = (int) com.call(extended, 10, INT, new MemoryLayout[0]);
+            } finally {
+                com.release(extended);
+            }
+        }
+        return new DirectWriteRenderingSettings(gamma, contrast, grayscale, level, geometry, mode, gridFit, extendedMode, nextSmoothing, nextClearType);
+    }
 
     /**
      * Borrows the native COM owner for related backend objects.

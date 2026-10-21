@@ -46,6 +46,12 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * state. Fonts are borrowed and must remain alive until queued text is flushed.
  * No raster atlas or per-draw scratch allocation is used by the text path.
  * </p>
+ * <p>
+ * Native pre-rendered display pixels can use {@link #drawEncoded(Texture, float, float, float, float)}.
+ * These submissions preserve their encoded colors and coverage on display targets,
+ * restore framebuffer conversion/blend state after drawing, and remain grouped
+ * separately from ordinary sprites. Submit them after HDR scene tone mapping.
+ * </p>
  *
  * <p>
  * Instead of immediately sending every individual sprite to the GPU, this class stores
@@ -115,6 +121,9 @@ public final class TextureBatch {
     private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
     private TextureBatchGlyphs glyphs; // Lazily owned live-outline implementation sharing the sprite buffers.
     private float opacityMultiplier = 1f; // Multiplies final per-sprite alpha for temporary translucent rendering.
+    private boolean encodedSubmission; // Whether the current submission contains final display-encoded pixels.
+    private boolean encodedInstances; // Whether queued instances require display-space blending without sRGB conversion.
+    private int[] encodedBlendValue; // Lazily allocated native query storage avoids per-flush temporary IntBuffer views.
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
@@ -1327,6 +1336,38 @@ public final class TextureBatch {
     }
 
     /**
+     * Queues final display-encoded RGBA pixels, such as native operating-system text,
+     * with neutral tint and the current opacity, translation, and clip. The source
+     * texture must return encoded RGB samples rather than perform sRGB decoding.
+     * Submit after scene tone mapping to a display-encoded destination; this is not
+     * linear-light HDR composition. Native coverage and encoded colors are blended
+     * as supplied, without an additional framebuffer sRGB conversion.
+     *
+     * <p>Consecutive encoded images remain batched. Ordinary and encoded submissions
+     * flush at their boundary. During the encoded GPU draw, framebuffer sRGB conversion
+     * is disabled and destination alpha uses source-over factors so translucent glyph
+     * edges do not punch alpha holes in an opaque surface. Previous blend factors and
+     * framebuffer conversion are restored before returning.
+     * As with other batch operations, flush before changing external GL state.</p>
+     *
+     * @param tex prepared display-encoded straight-alpha texture
+     * @param x destination left in logical units
+     * @param y destination bottom in logical units
+     * @param w destination width in logical units
+     * @param h destination height in logical units
+     */
+    public void drawEncoded(Texture tex, float x, float y, float w, float h) {
+        if (encodedBlendValue == null) encodedBlendValue = new int[1];
+        boolean previous = encodedSubmission;
+        encodedSubmission = true;
+        try {
+            draw(tex, x, y, w, h, Color.WHITE);
+        } finally {
+            encodedSubmission = previous;
+        }
+    }
+
+    /**
      * <p>
      * Queues a pixel-space source region from a {@link Texture} for rendering without
      * a tint override.
@@ -1665,6 +1706,10 @@ public final class TextureBatch {
         }
 
         finishGlyphs();
+        if (encodedInstances != encodedSubmission) {
+            if (instanceCount != 0) flush();
+            encodedInstances = encodedSubmission;
+        }
         if (instanceCount >= maxSprites) {
             flush();
         }
@@ -1955,7 +2000,29 @@ public final class TextureBatch {
         glBufferSubData(GL_ARRAY_BUFFER, 0, instanceBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
+        boolean restoreSrgb = encodedInstances && glIsEnabled(GL_FRAMEBUFFER_SRGB);
+        int sourceRgb = 0;
+        int destinationRgb = 0;
+        int sourceAlpha = 0;
+        int destinationAlpha = 0;
+        if (encodedInstances) {
+            glGetIntegerv(GL_BLEND_SRC_RGB, encodedBlendValue);
+            sourceRgb = encodedBlendValue[0];
+            glGetIntegerv(GL_BLEND_DST_RGB, encodedBlendValue);
+            destinationRgb = encodedBlendValue[0];
+            glGetIntegerv(GL_BLEND_SRC_ALPHA, encodedBlendValue);
+            sourceAlpha = encodedBlendValue[0];
+            glGetIntegerv(GL_BLEND_DST_ALPHA, encodedBlendValue);
+            destinationAlpha = encodedBlendValue[0];
+            glBlendFuncSeparate(sourceRgb, destinationRgb, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        }
+        if (restoreSrgb) glDisable(GL_FRAMEBUFFER_SRGB);
+        try {
+            glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
+        } finally {
+            if (restoreSrgb) glEnable(GL_FRAMEBUFFER_SRGB);
+            if (encodedInstances) glBlendFuncSeparate(sourceRgb, destinationRgb, sourceAlpha, destinationAlpha);
+        }
         totalDrawCalls++;
 
         instanceBuffer.clear();
