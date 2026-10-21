@@ -35,24 +35,24 @@ public final class SlugShape {
     private float selectionSize; // World/logical em size of the cached rectangles.
 
     /**
-     * Copies completed cold-path staging into compact retained arrays.
+     * Adopts completed staging arrays when already compact, copying only excess capacity.
      *
      * @param builder completed layout whose native scratch has no retained ownership
      */
     SlugShape(SlugShapeBuilder builder) {
         text = builder.text;
-        glyphs = Arrays.copyOf(builder.glyphs, builder.glyphCount);
-        xs = Arrays.copyOf(builder.xs, builder.glyphCount);
-        ys = Arrays.copyOf(builder.ys, builder.glyphCount);
+        glyphs = builder.glyphs.length == builder.glyphCount ? builder.glyphs : Arrays.copyOf(builder.glyphs, builder.glyphCount);
+        xs = builder.xs.length == builder.glyphCount ? builder.xs : Arrays.copyOf(builder.xs, builder.glyphCount);
+        ys = builder.ys.length == builder.glyphCount ? builder.ys : Arrays.copyOf(builder.ys, builder.glyphCount);
         carets = builder.carets;
         caretLines = builder.caretLines;
         boundaries = builder.boundaries;
-        starts = Arrays.copyOf(builder.clusterStarts, builder.clusterCount);
-        ends = Arrays.copyOf(builder.clusterEnds, builder.clusterCount);
-        lefts = Arrays.copyOf(builder.clusterLefts, builder.clusterCount);
-        widths = Arrays.copyOf(builder.clusterWidths, builder.clusterCount);
-        clusterLines = Arrays.copyOf(builder.clusterLines, builder.clusterCount);
-        clusterRtl = Arrays.copyOf(builder.clusterRtl, builder.clusterCount);
+        starts = builder.clusterStarts.length == builder.clusterCount ? builder.clusterStarts : Arrays.copyOf(builder.clusterStarts, builder.clusterCount);
+        ends = builder.clusterEnds.length == builder.clusterCount ? builder.clusterEnds : Arrays.copyOf(builder.clusterEnds, builder.clusterCount);
+        lefts = builder.clusterLefts.length == builder.clusterCount ? builder.clusterLefts : Arrays.copyOf(builder.clusterLefts, builder.clusterCount);
+        widths = builder.clusterWidths.length == builder.clusterCount ? builder.clusterWidths : Arrays.copyOf(builder.clusterWidths, builder.clusterCount);
+        clusterLines = builder.clusterLines.length == builder.clusterCount ? builder.clusterLines : Arrays.copyOf(builder.clusterLines, builder.clusterCount);
+        clusterRtl = builder.clusterRtl.length == builder.clusterCount ? builder.clusterRtl : Arrays.copyOf(builder.clusterRtl, builder.clusterCount);
         width = builder.width;
         lineHeight = builder.lineHeight;
         height = text.isEmpty() ? 0 : builder.lines * lineHeight;

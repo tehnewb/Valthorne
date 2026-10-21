@@ -7,9 +7,12 @@ uniform sampler2D u_curveTexture;
 uniform usampler2D u_bandTexture;
 uniform bool u_linearColor;
 uniform bool u_hintedUi;
+uniform sampler2D u_coverageTexture;
+uniform bool u_writeCoverage;
 
 in vec4 v_color;
 in vec2 v_texCoord;
+flat in vec4 v_sampleOrigin;
 flat in vec4 v_banding;
 flat in ivec4 v_glyph;
 flat in float v_pixelsPerEm;
@@ -97,9 +100,7 @@ float calcCoverage(float xcov, float ycov, float xwgt, float ywgt, int flags) {
     return 1.0 - abs(1.0 - fract(coverage * 0.5) * 2.0);
 }
 
-float slugRender(vec2 renderCoord, vec4 bandTransform, ivec4 glyphData) {
-    vec2 pixelsPerEm = v_pixelsPerEm > 0.0 ? vec2(v_pixelsPerEm) : 1.0 / max(fwidth(renderCoord), vec2(1.0e-6));
-
+float slugRender(vec2 renderCoord, vec4 bandTransform, ivec4 glyphData, vec2 pixelsPerEm) {
     ivec2 bandMax = glyphData.zw;
     bandMax.y &= 0x00FF;
 
@@ -164,13 +165,27 @@ float slugRender(vec2 renderCoord, vec4 bandTransform, ivec4 glyphData) {
 }
 
 void main() {
-    // Evaluate derivatives before clipping makes neighboring fragments diverge.
-    float coverage = slugRender(v_texCoord, v_banding, v_glyph);
-    if (u_hintedUi) coverage = uiCoverage(coverage, v_color.rgb);
+#ifndef SLUG_CACHED_COVERAGE
+    // Keep the integer baseline separate from its exact fractional phase. This
+    // gives live and atlas draws identical coordinates despite viewport offsets.
+    vec2 renderCoord = v_pixelsPerEm > 0.0 ? (floor(gl_FragCoord.xy) - v_sampleOrigin.xy + (vec2(0.5) - v_sampleOrigin.zw)) / v_pixelsPerEm : v_texCoord;
+    // Derivatives precede divergent clipping; rejected fragments skip curve work.
+    vec2 pixelsPerEm = v_pixelsPerEm > 0.0 ? vec2(v_pixelsPerEm) : 1.0 / max(fwidth(renderCoord), vec2(1.0e-6));
+#endif
     if (v_clipEnabled > 0.5 && (v_world.x < v_clipRect.x || v_world.y < v_clipRect.y ||
         v_world.x > v_clipRect.x + v_clipRect.z || v_world.y > v_clipRect.y + v_clipRect.w)) {
         discard;
     }
+#ifdef SLUG_CACHED_COVERAGE
+    float coverage = texelFetch(u_coverageTexture, ivec2(floor(v_texCoord)), 0).r;
+#else
+    float coverage = slugRender(renderCoord, v_banding, v_glyph, pixelsPerEm);
+    if (u_writeCoverage) {
+        fragColor = vec4(coverage, 0.0, 0.0, 1.0);
+        return;
+    }
+#endif
+    if (u_hintedUi) coverage = uiCoverage(coverage, v_color.rgb);
     if (coverage <= 0.001) {
         discard;
     }

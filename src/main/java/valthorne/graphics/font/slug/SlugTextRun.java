@@ -10,7 +10,9 @@ import java.util.Arrays;
  *
  * <p>Use this for fair live-rendering benchmarks and for text that is drawn repeatedly. The run
  * removes per-frame layout, newline handling, tab handling, and kerning lookups. It still renders
- * live Slug curves every frame; it does not cache text into a texture.</p>
+ * Slug coverage with its original outlines. TextureBatch may reuse exact glyph
+ * coverage and packed run geometry at unchanged sampling positions; this run
+ * itself owns no GPU textures or batch-specific cached state.</p>
  *
  * <pre>{@code
  * SlugTextRun run = font.createRun("The quick brown fox", 36f);
@@ -32,6 +34,7 @@ public final class SlugTextRun {
     private int count; // Number of drawable glyphs.
     private String text; // Source text.
     private float size; // World units per em.
+    private long revision; // Increments whenever layout geometry is rebuilt.
     private float width; // Measured width.
     private float height; // Measured height.
     private float minX; // Minimum outline X relative to the run baseline.
@@ -67,6 +70,7 @@ public final class SlugTextRun {
             throw new IllegalArgumentException("Size must be finite and nonnegative");
         String normalized = text == null ? "" : text;
         if (glyphs != null && this.size == size && normalized.equals(this.text)) return;
+        revision++;
         this.text = text == null ? "" : text;
         this.size = size;
 
@@ -122,7 +126,7 @@ public final class SlugTextRun {
     /**
      * Queues this retained layout in an ordinary texture batch. Glyphs remain
      * resolution independent and inherit batch translation, clipping and opacity.
-     * Reuses layout arrays without allocating per-frame scratch or raster atlases.
+     * Warm submissions reuse layout arrays; the batch owns any coverage cache.
      *
      * @param batch active destination texture batch
      * @param x baseline X before batch translation
@@ -141,6 +145,27 @@ public final class SlugTextRun {
      */
     public String text() {
         return text;
+    }
+
+    /**
+     * Returns the layout generation used to invalidate retained drawing geometry.
+     * Rebuilding unchanged text at the same size leaves this value unchanged.
+     *
+     * @return generation incremented whenever glyph offsets are rebuilt
+     */
+    public long revision() {
+        return revision;
+    }
+
+    /**
+     * Checks whether reusing this immediate layout would retain reasonably sized
+     * staging arrays. Large-to-small replacements instead release excess capacity.
+     *
+     * @param characters replacement source length within the font's cache limit
+     * @return true when retained glyph capacity is at most twice the requested size
+     */
+    boolean canReuse(int characters) {
+        return glyphs.length <= Math.max(8, characters) * 2;
     }
 
     /**

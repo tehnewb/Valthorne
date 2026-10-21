@@ -346,7 +346,8 @@ public final class SlugFont implements Dimensional {
     /**
      * Borrows a prepared immediate-draw run, avoiding repeated shaping, geometry
      * lookup, and temporary glyph arrays on stable frames. The borrowed run may be
-     * rebuilt by a later call with another size; use createRun for independently
+     * rebuilt by a later size change or reused for another text after eviction;
+     * use createRun for independently
      * retained or caller-modified layouts. Cache limits match the shaped text cache.
      *
      * @param text nonnull UTF-16 text
@@ -356,12 +357,21 @@ public final class SlugFont implements Dimensional {
     public SlugTextRun cachedRun(String text, float size) {
         if (isDisposed()) throw new IllegalStateException("Slug font is disposed");
         if (text == null) throw new NullPointerException("text");
+        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Invalid font size");
         SlugTextRun result = cachedRuns.get(text);
         if (result != null) {
             result.rebuild(text, size);
             return result;
         }
-        result = createRun(text, size);
+        if (text.length() <= MAX_SHAPE_CHARACTERS && !cachedRuns.isEmpty() && (cachedRuns.size() >= MAX_SHAPES || runCharacters + text.length() > MAX_SHAPE_CHARACTERS)) {
+            var eldest = cachedRuns.pollFirstEntry();
+            runCharacters -= eldest.getKey().length();
+            if (eldest.getValue().canReuse(text.length())) {
+                result = eldest.getValue();
+                result.rebuild(text, size);
+            }
+        }
+        if (result == null) result = createRun(text, size);
         if (text.length() <= MAX_SHAPE_CHARACTERS) {
             cachedRuns.put(text, result);
             runCharacters += text.length();
@@ -562,8 +572,9 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Assigns overlapping curves to each expanded axis band, then sorts each list
+     * Assigns crossing curves to each expanded axis band, then sorts each list
      * by descending maximum extent on the perpendicular axis for shader traversal.
+     * Constant ray-axis curves are omitted because their root code is always zero.
      *
      * @param curves         source quadratic segments
      * @param curveLocations matching packed curve texture addresses
@@ -587,6 +598,8 @@ public final class SlugFont implements Dimensional {
 
             for (int i = 0; i < curves.size(); i++) {
                 SlugCurve curve = curves.get(i);
+                // Constant ray-axis coordinates cannot contribute a crossing.
+                if (horizontal ? curve.p1y() == curve.p2y() && curve.p2y() == curve.p3y() : curve.p1x() == curve.p2x() && curve.p2x() == curve.p3x()) continue;
                 float cmin = horizontal ? curve.minY() : curve.minX();
                 float cmax = horizontal ? curve.maxY() : curve.maxX();
                 if (cmax >= bandMin && cmin <= bandMax) {

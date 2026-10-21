@@ -17,9 +17,11 @@ import static org.lwjgl.system.MemoryUtil.memFree;
 import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
 
 /**
- * Cold-path Unicode paragraph/script analysis and HarfBuzz layout assembly. The
- * mutable arrays become independent immutable SlugShape storage after shaping;
- * native UTF-16 scratch is released before build returns. Directional runs are
+ * Unicode paragraph/script analysis and HarfBuzz layout assembly. This builder
+ * is single-use: completed arrays transfer to immutable SlugShape storage;
+ * native UTF-16 scratch is borrowed from the face, with oversized input released
+ * before build returns. Printable ASCII still uses full HarfBuzz shaping while
+ * avoiding unnecessary bidi, script and grapheme itemization. Directional runs are
  * reordered visually while their cluster indices retain absolute UTF-16 positions.
  */
 final class SlugShapeBuilder {
@@ -42,7 +44,7 @@ final class SlugShapeBuilder {
     int lines = 1; // Number of logical lines, including a trailing empty line.
     float width; // Largest line advance in em units.
     private final SlugNativeFace face; // Borrowed native face and reusable HarfBuzz scratch.
-    private ByteBuffer utf16; // Temporary absolute-indexed UTF-16 native input.
+    private ByteBuffer utf16; // Borrowed or temporary absolute-indexed UTF-16 native input.
     private float penX; // Current visual pen X in em units.
     private int line; // Current logical line number.
 
@@ -78,10 +80,23 @@ final class SlugShapeBuilder {
      * @return immutable normalized layout
      */
     SlugShape build() {
-        utf16 = memAlloc(Math.max(2, Math.multiplyExact(text.length(), 2)));
+        int bytes = Math.max(2, Math.multiplyExact(text.length(), 2));
+        ByteBuffer borrowed = face == null ? null : face.textScratch(text.length());
+        utf16 = borrowed == null ? memAlloc(bytes) : borrowed;
         try {
-            for (int i = 0; i < text.length(); i++) utf16.putChar(i * 2, text.charAt(i));
+            boolean printableAscii = !text.isEmpty();
+            for (int i = 0; i < text.length(); i++) {
+                char character = text.charAt(i);
+                utf16.putChar(i * 2, character);
+                printableAscii &= character >= ' ' && character <= '~';
+            }
             utf16.limit(text.length() * 2);
+            if (printableAscii) {
+                Arrays.fill(boundaries, true);
+                shapeSegment(0, text.length(), false);
+                width = penX;
+                return new SlugShape(this);
+            }
             BreakIterator graphemes = BreakIterator.getCharacterInstance(Locale.ROOT);
             graphemes.setText(text);
             for (int index = graphemes.first(); index != BreakIterator.DONE; index = graphemes.next()) boundaries[index] = true;
@@ -106,7 +121,7 @@ final class SlugShapeBuilder {
             }
             return new SlugShape(this);
         } finally {
-            memFree(utf16);
+            if (borrowed == null) memFree(utf16);
             utf16 = null;
         }
     }
@@ -214,7 +229,7 @@ final class SlugShapeBuilder {
         long buffer = face.buffer();
         hb_buffer_add_utf16(buffer, utf16, start, end - start);
         hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-        hb_buffer_set_language(buffer, hb_language_from_string("und"));
+        hb_buffer_set_language(buffer, SlugNativeFace.LANGUAGE_UND);
         hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
         hb_buffer_guess_segment_properties(buffer);
         hb_shape(face.font(), buffer, null);
@@ -222,12 +237,9 @@ final class SlugShapeBuilder {
         hb_glyph_info_t.Buffer info = hb_buffer_get_glyph_infos(buffer);
         hb_glyph_position_t.Buffer positions = hb_buffer_get_glyph_positions(buffer);
         if (info == null || positions == null) return;
-        int[] logicalClusters = new int[info.remaining() + 1];
-        for (int i = 0; i < info.remaining(); i++) logicalClusters[i] = info.get(i).cluster();
-        logicalClusters[info.remaining()] = end;
-        Arrays.sort(logicalClusters);
         float inverseEm = 1f / face.unitsPerEm();
         int firstGlyph = 0;
+        int previousClusterEnd = end;
         while (firstGlyph < info.remaining()) {
             int cluster = info.get(firstGlyph).cluster();
             float left = penX;
@@ -241,9 +253,10 @@ final class SlugShapeBuilder {
                 glyphCount++;
                 limit++;
             }
-            int logicalEnd = Arrays.binarySearch(logicalClusters, cluster);
-            while (logicalEnd < logicalClusters.length && logicalClusters[logicalEnd] <= cluster) logicalEnd++;
-            addCluster(cluster, logicalEnd < logicalClusters.length ? logicalClusters[logicalEnd] : end, left, penX - left, rtl);
+            // MONOTONE_GRAPHEMES guarantees ascending LTR or descending RTL clusters.
+            int logicalEnd = rtl ? previousClusterEnd : limit < info.remaining() ? info.get(limit).cluster() : end;
+            addCluster(cluster, logicalEnd, left, penX - left, rtl);
+            previousClusterEnd = cluster;
             firstGlyph = limit;
         }
     }

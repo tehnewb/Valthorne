@@ -145,16 +145,20 @@ public final class SlugGlyph {
      * TextureBatch supplies the clipped rectangle and coverage scale; immutable
      * glyph metadata supplies the packed outline and band references. No temporary
      * objects are created. The caller must provide enough remaining capacity.
+     * The four sample floats hold em-space bounds for derivative coverage, an
+     * integer physical baseline followed by its fractional phase for uniform
+     * live coverage, or atlas texel bounds for cached coverage. TextureBatch
+     * selects the corresponding shader mode and owns this packed-record contract.
      *
      * @param target native-order instance storage
      * @param x0 rectangle minimum world X
      * @param y0 rectangle minimum world Y
      * @param x1 rectangle maximum world X
      * @param y1 rectangle maximum world Y
-     * @param tx0 rectangle minimum outline X in em units
-     * @param ty0 rectangle minimum outline Y in em units
-     * @param tx1 rectangle maximum outline X in em units
-     * @param ty1 rectangle maximum outline Y in em units
+     * @param tx0 first horizontal sample value for the selected pipeline mode
+     * @param ty0 first vertical sample value for the selected pipeline mode
+     * @param tx1 second horizontal sample value for the selected pipeline mode
+     * @param ty1 second vertical sample value for the selected pipeline mode
      * @param pixelsPerEm positive uniform scale, or negative for derivative coverage
      * @param rgba packed normalized color bytes in RGBA order
      */

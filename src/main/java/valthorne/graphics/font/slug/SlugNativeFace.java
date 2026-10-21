@@ -10,6 +10,8 @@ import java.util.List;
 import static org.lwjgl.util.freetype.FreeType.*;
 import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
 import static org.lwjgl.util.harfbuzz.OpenType.hb_ot_font_set_funcs;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * Owns one FreeType memory face and HarfBuzz OpenType shaping font over borrowed,
@@ -20,6 +22,15 @@ import static org.lwjgl.util.harfbuzz.OpenType.hb_ot_font_set_funcs;
  * hand ownership to another thread only while no call is in progress.
  */
 final class SlugNativeFace implements AutoCloseable {
+    /**
+     * Interned HarfBuzz language shared by language-neutral shaping runs.
+     */
+    static final long LANGUAGE_UND = hb_language_from_string("und");
+    /**
+     * Maximum reusable native UTF-16 scratch; larger inputs use temporary storage.
+     */
+    private static final int MAX_TEXT_SCRATCH_BYTES = 64 * 1024;
+    private ByteBuffer textScratch; // Owned bounded native UTF-16 staging reused across changing strings.
     private final ByteBuffer bytes; // Borrowed immutable source retained while native faces reference its memory.
     private long library; // Lazily owned FreeType library; world-only shaping does not initialize it.
     private FT_Face face; // Lazily owned hinted FreeType face borrowing the parent font's storage.
@@ -99,6 +110,27 @@ final class SlugNativeFace implements AutoCloseable {
     long buffer() { hb_buffer_reset(buffer); return buffer; }
 
     /**
+     * Borrows bounded UTF-16 staging for a shaping operation. Large sources return
+     * null so their peak allocation can be released immediately by the caller.
+     *
+     * @param characters UTF-16 source length
+     * @return native-order staging with the requested limit, or null for large inputs
+     */
+    ByteBuffer textScratch(int characters) {
+        if (characters > MAX_TEXT_SCRATCH_BYTES / 2) return null;
+        int needed = Math.max(2, characters * 2);
+        if (textScratch == null || textScratch.capacity() < needed) {
+            int capacity = Math.min(MAX_TEXT_SCRATCH_BYTES, Math.max(256, Integer.highestOneBit(needed - 1) << 1));
+            ByteBuffer replacement = memAlloc(capacity);
+            if (textScratch != null) memFree(textScratch);
+            textScratch = replacement;
+        }
+        textScratch.clear();
+        textScratch.limit(characters * 2);
+        return textScratch;
+    }
+
+    /**
      * Returns the design-unit divisor for glyph offsets and advances.
      *
      * @return units per em
@@ -174,6 +206,10 @@ final class SlugNativeFace implements AutoCloseable {
         if (closed) return;
         closed = true;
         if (outline != null) outline.close();
+        if (textScratch != null) {
+            memFree(textScratch);
+            textScratch = null;
+        }
         hb_buffer_destroy(buffer);
         hb_font_destroy(font);
         if (face != null) {
