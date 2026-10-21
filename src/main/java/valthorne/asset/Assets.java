@@ -197,16 +197,11 @@ public final class Assets {
 
         final String key = parameters.key();
 
-        // Use already cached future if present
-        return (CompletableFuture<T>) cache.computeIfAbsent(key, k ->
-                CompletableFuture.supplyAsync(() -> {
-                    AssetLoader loader = loaders.get(parameters.getClass());
-                    if (loader == null)
-                        throw new IllegalStateException("No loader for " + parameters.getClass().getName());
-
-                    return assetType.cast(loader.load(parameters));
-                }, ensureService())
-        );
+        /*
+         * The cache owns delivery, while the executor owns producing work. Cancellation
+         * abandons delivery without losing a value returned by an already running loader.
+         */
+        return (CompletableFuture<T>) cache.computeIfAbsent(key, k -> submitLoad(parameters, assetType, ensureService()));
     }
 
     /**
@@ -240,8 +235,10 @@ public final class Assets {
      * Removes the cached value associated with the specified key and disposes it when possible.
      *
      * <p>
-     * If the cached future is still in flight it is cancelled and removed. If it has already
-     * completed successfully, the loaded asset is asked to dispose itself before the cache
+     * If the cached future is still in flight it is cancelled and removed. A loader already
+     * running may finish later; its abandoned result is released on its producing worker.
+     * If it has already
+     * completed successfully, the loaded asset is asked to dispose itself on the calling thread before the cache
      * entry is forgotten.
      * </p>
      *
@@ -269,7 +266,8 @@ public final class Assets {
      *
      * <p>
      * Loaded values are disposed when possible, incomplete futures are cancelled, and
-     * progress counters are reset so a new batch can start cleanly.
+     * progress counters are reset so a new batch can start cleanly. Already running loaders
+     * release abandoned results on their producing workers; this method does not wait for them.
      * </p>
      *
      * @return the number of cached entries removed
@@ -296,9 +294,9 @@ public final class Assets {
 
     /**
      * Shuts down the internal service responsible for managing asset-related operations.
-     * This method ensures that any ongoing asset management tasks are stopped and the
-     * associated resources are cleaned up. After invoking this method, the asset manager
-     * should no longer be used.
+     * Requests executor shutdown and interruption without waiting for running loaders.
+     * Cancelled deliveries release any late result on the producing worker. Loaders may
+     * ignore interruption; completed cached values still require explicit unload or clear.
      * <p>
      * It is typically called during the disposal or termination process of an application
      * or context that relies on the assets, to safely release resources.
@@ -372,14 +370,9 @@ public final class Assets {
 
             final String key = parameters.key();
 
-            CompletableFuture<?> future = CompletableFuture
-                    .supplyAsync(() -> {
-                        AssetLoader loader = loaders.get(parameters.getClass());
-                        if (loader == null)
-                            throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
-
-                        return loader.load(parameters);
-                    }, executor)
+            CompletableFuture<?> future = submitLoad(parameters, Object.class, executor);
+            cache.put(key, future);
+            CompletableFuture<?> tracked = future
                     .whenComplete((_, ex) -> {
                         if (ex != null) {
                             ex.printStackTrace();
@@ -389,11 +382,52 @@ public final class Assets {
                         completedCount.incrementAndGet();
                     });
 
-            cache.put(key, future);
-            futures.add(future);
+            futures.add(tracked);
         }
 
         return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
+    }
+
+    /**
+     * Schedules production independently of result cancellation. A successfully produced
+     * value belongs to the delivery future only if completion succeeds; otherwise it is
+     * released on the producing worker. Loaders must return values whose cleanup is safe
+     * there, or whose cleanup implementation dispatches to their owning resource thread.
+     * Cleanup failures for abandoned values propagate to the worker's uncaught handler.
+     *
+     * @param parameters request identifying the loader and its input
+     * @param assetType expected result type, or Object for an untyped batch request
+     * @param executor service that owns the producing task
+     * @return delivery future; cancellation does not interrupt a running loader
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static CompletableFuture<Object> submitLoad(AssetParameters parameters, Class<?> assetType, ExecutorService executor) {
+        /*
+         * A manually completed delivery future lets the worker retain ownership until
+         * successful publication. CompletableFuture cancellation cannot discard the value.
+         */
+        CompletableFuture<Object> delivery = new CompletableFuture<>();
+        executor.execute(() -> {
+            if (delivery.isCancelled()) return;
+            Object value = null;
+            try {
+                AssetLoader loader = loaders.get(parameters.getClass());
+                if (loader == null)
+                    throw new IllegalStateException("No loader for " + parameters.getClass().getName());
+                value = loader.load(parameters);
+                assetType.cast(value);
+            } catch (Throwable failure) {
+                Throwable cleanup = disposeAssetValue(value);
+                if (cleanup != null && cleanup != failure) failure.addSuppressed(cleanup);
+                if (!delivery.completeExceptionally(failure)) rethrowUnchecked(failure);
+                return;
+            }
+            if (!delivery.complete(value)) {
+                Throwable failure = disposeAssetValue(value);
+                if (failure != null) rethrowUnchecked(failure);
+            }
+        });
+        return delivery;
     }
 
     /**
