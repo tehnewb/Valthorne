@@ -55,7 +55,7 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
   objects, and configurable asset loaders.
 - **Audio:** OpenAL playback with buffered and streaming WAV, OGG, and MP3 audio,
   sound sources, and sound areas.
-- **Game data and utilities:** Artemis ECS integration, primitive collections,
+- **Game data and utilities:** Primitive collections,
   object pooling, geometry, dynamic byte buffers, property sets, serialization,
   compression, encryption, hashing, and native file dialogs.
 - **Plugins:** Asynchronous discovery and loading of plugins from JAR files.
