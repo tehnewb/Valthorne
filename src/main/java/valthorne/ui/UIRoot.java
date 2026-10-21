@@ -1,6 +1,7 @@
 package valthorne.ui;
 
 import org.joml.Vector2f;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.yoga.Yoga;
 import valthorne.JGL;
@@ -15,7 +16,7 @@ import valthorne.event.listeners.KeyListener;
 import valthorne.event.listeners.MouseListener;
 import valthorne.event.listeners.MouseScrollListener;
 import valthorne.event.listeners.WindowResizeListener;
-import valthorne.graphics.font.SystemFonts;
+import valthorne.graphics.font.DefaultFonts;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.slug.SlugData;
@@ -32,12 +33,12 @@ import valthorne.ui.theme.ThemeData;
 import valthorne.ui.theme.ThemeDataChangeEvent;
 import valthorne.viewport.Viewport;
 
-import java.nio.file.Path;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
 
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
-import static org.lwjgl.nanovg.NanoVG.nvgCreateFont;
+import static org.lwjgl.nanovg.NanoVG.nvgCreateFontMem;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
 import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
 import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
@@ -161,8 +162,12 @@ public class UIRoot extends UIContainer {
     private final List<FocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
-    private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
-    private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
+    private SlugFont nanoSlugFont; // Root-owned ordinary UI face; bundled JetBrains Mono unless explicitly overridden.
+    private SlugFont nanoSlugCodeFont; // Root-owned code override; null when code shares the ordinary font.
+    private SlugData defaultFontData; // Immutable ordinary font selection pinned when this root initializes.
+    private SlugData codeFontData; // Immutable code font selection; shares bundled data unless explicitly overridden.
+    private ByteBuffer nanoDefaultFontBytes; // Root-owned encoded memory borrowed by NanoVG until its context is deleted.
+    private ByteBuffer nanoCodeFontBytes; // Code face backing memory, shared with ordinary bytes when both selections match.
     private boolean windowsTextEnabled; // DirectWrite is an explicit Windows comparison/override; Slug is the portable default.
     private boolean slugHintingEnabled = true; // Physical-size hinting for eligible axis-aligned UI; world outlines remain scalable.
     private SlugUIText slugText; // Lazily owned physical-size hinted outline views.
@@ -297,7 +302,13 @@ public class UIRoot extends UIContainer {
         this.inputPriority = inputPriority;
         this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
         if (nanoVGHandle != 0L) {
-            registerDefaultNanoFont();
+            try {
+                registerDefaultNanoFont();
+            } catch (RuntimeException | Error failure) {
+                nvgDelete(nanoVGHandle);
+                nanoVGHandle = 0;
+                throw failure;
+            }
         }
 
         this.yogaConfig = Yoga.YGConfigNew();
@@ -953,6 +964,10 @@ public class UIRoot extends UIContainer {
         }
         if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
         nanoVGHandle = 0L;
+        nanoDefaultFontBytes = null;
+        nanoCodeFontBytes = null;
+        defaultFontData = null;
+        codeFontData = null;
     }
 
     /**
@@ -967,16 +982,22 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * Returns a shared smooth default font once this root has a graphics context.
+     * Returns the pinned default font once this root has a graphics context.
+     * Ordinary/code roles share one SlugFont when both use the bundled source.
      *
      * @param code true for the monospace editing face
      * @return borrowed root-owned font, or null before graphics initialization
      */
     SlugFont getNanoTextFont(boolean code) {
         if (disposed || nanoVGHandle == 0) return null;
+        if (defaultFontData == null) {
+            defaultFontData = DefaultFonts.load(false);
+            codeFontData = DefaultFonts.load(true);
+        }
+        if (code && codeFontData == defaultFontData) return getNanoTextFont(false);
         SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
         if (current != null) return current;
-        current = new SlugFont(SlugData.load(SystemFonts.find(code).toString(), 32, 224), true);
+        current = new SlugFont(code ? codeFontData : defaultFontData, true);
         if (code) nanoSlugCodeFont = current;
         else nanoSlugFont = current;
         return current;
@@ -1714,7 +1735,9 @@ public class UIRoot extends UIContainer {
     /**
      * Replaces the stored NanoVG handle without deleting the old one or registering
      * fonts on the replacement. The root will delete the stored nonzero handle during
-     * disposal, so callers must arrange ownership of both contexts.
+     * disposal, so callers must arrange ownership of both contexts. Delete an old
+     * context before disposing this root: its registered fonts may still borrow
+     * the root-owned default font buffers.
      *
      * @param nanoVGHandle replacement handle, or zero to disable NanoVG rendering
      */
@@ -1723,22 +1746,34 @@ public class UIRoot extends UIContainer {
     }
 
     /**
-     * Registers installed proportional and monospace fonts in the root's context.
-     * Both renderers share the same filesystem selection and override settings.
+     * Registers pinned ordinary/code font bytes in NanoVG without extraction.
+     * Both renderers use the bundled JetBrains Mono source unless independent
+     * filesystem overrides were explicitly requested. NanoVG borrows root-owned
+     * direct buffers; their lifetime extends through context deletion.
      */
     private void registerDefaultNanoFont() {
-        Path proportional = SystemFonts.find(false);
-        Path monospace = SystemFonts.find(true);
-        if (nvgCreateFont(nanoVGHandle, "default", proportional.toString()) == -1)
-            throw new IllegalStateException("NanoVG could not load installed UI font: " + proportional);
-        if (nvgCreateFont(nanoVGHandle, "code", monospace.toString()) == -1)
-            throw new IllegalStateException("NanoVG could not load installed code font: " + monospace);
+        defaultFontData = DefaultFonts.load(false);
+        codeFontData = DefaultFonts.load(true);
+        byte[] ordinary = defaultFontData.bytes();
+        nanoDefaultFontBytes = BufferUtils.createByteBuffer(ordinary.length);
+        nanoDefaultFontBytes.put(ordinary).flip();
+        if (codeFontData == defaultFontData) {
+            nanoCodeFontBytes = nanoDefaultFontBytes;
+        } else {
+            byte[] code = codeFontData.bytes();
+            nanoCodeFontBytes = BufferUtils.createByteBuffer(code.length);
+            nanoCodeFontBytes.put(code).flip();
+        }
+        if (nvgCreateFontMem(nanoVGHandle, "default", nanoDefaultFontBytes, false) == -1)
+            throw new IllegalStateException("NanoVG could not load the selected default UI font");
+        if (nvgCreateFontMem(nanoVGHandle, "code", nanoCodeFontBytes, false) == -1)
+            throw new IllegalStateException("NanoVG could not load the selected default code font");
     }
 
     /**
-     * Returns a shared root-owned installed font for regular UI controls.
+     * Returns root-owned JetBrains Mono for ordinary UI unless explicitly overridden.
      *
-     * @return borrowed proportional font, or null before graphics initialization
+     * @return borrowed default UI font, or null before graphics initialization
      */
     public SlugFont getDefaultFont() {return getNanoTextFont(false);}
 

@@ -16,8 +16,15 @@ binaries. Distribute the licenses accompanying those dependencies with your game
 
 ## Assets included in the library
 
-- **Atkinson Hyperlegible Regular**: SIL Open Font License 1.1. The font and
-  `ui/OFL-AtkinsonHyperlegible.txt` ship together in the JAR.
+- **JetBrains Mono Regular 2.304**: Copyright 2020 The JetBrains Mono Project
+  Authors (https://github.com/JetBrains/JetBrainsMono). The unmodified font is
+  licensed separately under the SIL Open Font License 1.1, not Apache-2.0.
+  The font, [copyright notice](src/main/resources/valthorne/fonts/jetbrains-mono/COPYRIGHT.txt),
+  [complete OFL.txt](src/main/resources/valthorne/fonts/jetbrains-mono/OFL.txt),
+  authorship, and version/source provenance ship together at
+  `valthorne/fonts/jetbrains-mono/` in the runtime and source JARs distributed
+  through Maven and GitHub releases. Retain the copyright and complete OFL
+  when redistributing the font in a game or other bundle.
 - **Filament studio environment**: derived from Filament's `studio_small_02_2k.hdr`,
   originally HDRI Haven / Poly Haven, CC0. The dedication is in
   `META-INF/licenses/filament-environment-CC0.html`; generation is documented in

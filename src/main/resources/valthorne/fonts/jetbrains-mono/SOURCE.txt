@@ -1,0 +1,15 @@
+JetBrains Mono Regular 2.304
+
+Official release: https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304
+Distribution: https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip
+Archive font path: fonts/ttf/JetBrainsMono-Regular.ttf
+Font SHA-256: a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f
+Embedded version: Version 2.304; ttfautohint (v1.8.4.7-5d5b)
+
+JetBrainsMono-Regular.ttf, OFL.txt, and AUTHORS.txt are unmodified files from
+the official release archive. COPYRIGHT.txt repeats the matching copyright
+notice in both the font's name table and the release's OFL.txt.
+
+The font remains licensed separately under the SIL Open Font License 1.1.
+Valthorne's Apache-2.0 code license does not relicense this font. Distribute
+COPYRIGHT.txt and the complete OFL.txt with any artifact containing the font.

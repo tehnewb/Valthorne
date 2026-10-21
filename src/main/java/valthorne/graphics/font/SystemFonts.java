@@ -5,10 +5,12 @@ import java.nio.file.Path;
 import java.util.Locale;
 
 /**
- * Finds installed desktop fonts for UI defaults without classpath font resources.
+ * Finds installed desktop fonts for explicit application selection and file overrides.
  * Windows uses Segoe UI and Consolas, macOS uses Arial and Menlo, and Linux
  * checks common DejaVu, Liberation and Noto installations. Explicit filesystem
  * overrides use {@code valthorne.ui.defaultFont} and {@code valthorne.ui.codeFont}.
+ * UI defaults use bundled JetBrains Mono through {@link DefaultFonts}; this API
+ * retains installed-font discovery for callers that explicitly request it.
  * Discovery happens at font loading boundaries, never during glyph rendering.
  * Returned files remain owned by the operating system; callers own loaded fonts.
  */

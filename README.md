@@ -41,7 +41,11 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 - **Fonts and vector drawing:** Bitmap fonts, live Slug curve fonts, and NanoVG
   drawing. UI text defaults to Slug with HarfBuzz shaping and physical-size
   FreeType hinting; world text retains scalable outlines. DirectWrite remains an
-  explicit Windows option. Default fonts are loaded from installed system fonts.
+  explicit Windows option. UI defaults to bundled JetBrains Mono Regular 2.304 on
+  every platform. Explicit application/theme fonts and the
+  `valthorne.ui.defaultFont` / `valthorne.ui.codeFont` file overrides take priority.
+  The font's copyright notice and complete SIL OFL 1.1 ship beside it in the JAR;
+  see [third-party notices](THIRD_PARTY_NOTICES.md).
 - **UI layout and styling:** Retained UI trees, Yoga layout, themes, gradients,
   borders, scrolling, and a UI inspector.
 - **UI controls:** Buttons, checkboxes, radio groups, sliders, number spinners,
