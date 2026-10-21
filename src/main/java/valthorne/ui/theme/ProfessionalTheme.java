@@ -58,7 +58,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * @param light   true for the light palette, false for the dark palette
      * @param density finite size multiplier in the inclusive range 0.5 to 3
      * @throws IllegalArgumentException if density is outside the supported range
-     * @throws IllegalStateException    if the installed font is missing or cannot be read
+     * @throws IllegalStateException    if the default font or explicit override cannot be read
      */
     public ProfessionalTheme(boolean light, float density) {
         if (!Float.isFinite(density) || density < .5f || density > 3)

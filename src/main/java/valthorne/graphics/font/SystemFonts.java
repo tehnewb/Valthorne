@@ -1,36 +1,39 @@
 package valthorne.graphics.font;
 
+import valthorne.io.file.ValthorneFiles;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 
 /**
- * Finds installed desktop fonts for explicit application selection and file overrides.
- * Windows uses Segoe UI and Consolas, macOS uses Arial and Menlo, and Linux
- * checks common DejaVu, Liberation and Noto installations. Explicit filesystem
- * overrides use {@code valthorne.ui.defaultFont} and {@code valthorne.ui.codeFont}.
- * UI defaults use bundled JetBrains Mono through {@link DefaultFonts}; this API
- * retains installed-font discovery for callers that explicitly request it.
- * Discovery happens at font loading boundaries, never during glyph rendering.
- * Returned files remain owned by the operating system; callers own loaded fonts.
+ * Resolves the font paths used by existing UI and theme loaders. Both ordinary
+ * and code text default to bundled JetBrains Mono. Explicit filesystem overrides
+ * use {@code valthorne.ui.defaultFont} and {@code valthorne.ui.codeFont}.
+ * The bundled resource is extracted once through ValthorneFiles for APIs that
+ * require filesystem paths and is deleted on JVM exit. Callers own loaded fonts.
  */
 public final class SystemFonts {
     /**
-     * Prevents construction of the installed-font locator.
+     * Shared bundled font path for existing filesystem-based font loaders.
+     */
+    private static final Path DEFAULT_FONT = ValthorneFiles.extractToTempFile("valthorne/fonts/jetbrains-mono/JetBrainsMono-Regular.ttf");
+
+    /**
+     * Prevents construction of the font path resolver.
      */
     private SystemFonts() {}
 
     /**
-     * Finds a readable installed regular or monospace font.
+     * Resolves the bundled default or an explicitly configured font file.
      *
-     * @param code whether a monospace face is required
-     * @return absolute installed font path
-     * @throws IllegalStateException if no supported font file is installed
+     * @param code whether the independent code-font override should be consulted
+     * @return absolute font path
+     * @throws IllegalStateException if an explicit override cannot be read
      */
     public static Path find(boolean code) {
         /*
-         * Prefer native UI families and inspect only a small deterministic file list.
-         * Overrides are validated before loading rather than silently ignored.
+         * Existing loaders share the bundled path rather than selecting different
+         * installed fonts on each platform. Invalid explicit overrides still fail.
          */
         String property = code ? "valthorne.ui.codeFont" : "valthorne.ui.defaultFont";
         String override = System.getProperty(property);
@@ -40,21 +43,6 @@ public final class SystemFonts {
                 throw new IllegalStateException("Unreadable UI font override: " + path);
             return path;
         }
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        String[] candidates;
-        if (os.startsWith("windows")) {
-            String windows = System.getenv("WINDIR");
-            Path directory = Path.of(windows == null ? "C:/Windows" : windows, "Fonts");
-            candidates = code ? new String[]{directory.resolve("consola.ttf").toString(), directory.resolve("cour.ttf").toString()} : new String[]{directory.resolve("segoeui.ttf").toString(), directory.resolve("tahoma.ttf").toString(), directory.resolve("arial.ttf").toString()};
-        } else if (os.contains("mac")) {
-            candidates = code ? new String[]{"/System/Library/Fonts/Supplemental/Courier New.ttf", "/System/Library/Fonts/Menlo.ttc", "/Library/Fonts/Courier New.ttf"} : new String[]{"/System/Library/Fonts/Supplemental/Arial.ttf", "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc"};
-        } else {
-            candidates = code ? new String[]{"/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "/usr/share/fonts/dejavu/DejaVuSansMono.ttf", "/usr/share/fonts/truetype/liberation2/LiberationMono-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf"} : new String[]{"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"};
-        }
-        for (String candidate : candidates) {
-            Path path = Path.of(candidate);
-            if (Files.isRegularFile(path) && Files.isReadable(path)) return path.toAbsolutePath().normalize();
-        }
-        throw new IllegalStateException("No installed " + (code ? "monospace" : "UI") + " font found; set -D" + property + " to a readable font file");
+        return DEFAULT_FONT;
     }
 }
