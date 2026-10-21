@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Asset manager for Valthorne that supports "prepare then load" and direct async loads with caching.
@@ -81,8 +80,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <h2>Progress tracking</h2>
  * <p>
- * Progress is defined as {@code completedCount / preparedCount}. It only applies to the batch workflow
- * (prepared and load). Direct {@link #loadAsync(AssetParameters, Class)} calls do not increment the prepared count.
+ * Progress measures processed requests (including failures) in the current reset window. It applies to the batch workflow
+ * (prepared and load). Direct {@link #loadAsync(AssetParameters, Class)} calls do not affect progress.
+ * Reset starts a new observation without cancelling prior work; queued requests remain enrolled.
+ * {@link #getFailedCount()} reports exceptional or cancelled requests in the current observation.
  * </p>
  *
  * @author Albert Beaupre
@@ -102,18 +103,18 @@ public final class Assets {
      * Concurrent cache of load futures indexed by asset key.
      */
     private static final ConcurrentMap<String, CompletableFuture<?>> cache = new ConcurrentHashMap<>();
-    /**
-     * Atomic completed-load progress counter.
+    /*
+     * Serializes queue claims and progress bookkeeping across reset boundaries.
      */
-    private static final AtomicInteger completedCount = new AtomicInteger(0);
+    private static final Object PROGRESS_LOCK = new Object();
+    /*
+     * Current progress observation; callbacks retain the observation they were started in.
+     */
+    private static AssetLoadProgress progress = new AssetLoadProgress(0);
     /**
      * Concurrent set of assets queued for prepared loading.
      */
     private static final Set<AssetParameters> prepared = ConcurrentHashMap.newKeySet();
-    /**
-     * Atomic count used as the prepared-loading progress denominator.
-     */
-    private static final AtomicInteger preparedCount = new AtomicInteger(0);
     /**
      * Volatile owned virtual-thread executor, recreated after shutdown when needed.
      */
@@ -155,26 +156,68 @@ public final class Assets {
     }
 
     /**
-     * Resets the progress tracking for asset loading operations.
-     * This method sets both the number of prepared assets and the number of completed assets to zero.
-     * It is useful for initializing or restarting the loading progress tracking.
+     * Starts a new progress observation without cancelling loading work. Already queued
+     * requests remain enrolled; callbacks from previously claimed requests update only
+     * their old observation and cannot change current progress or completion status.
      */
     public static void resetProgress() {
-        preparedCount.set(0);
-        completedCount.set(0);
+        /*
+         * Replace the observation under the same lock used for queue claims so no
+         * callback or preparation can cross the reset boundary with partial counts.
+         */
+        synchronized (PROGRESS_LOCK) {
+            progress = new AssetLoadProgress(prepared.size());
+        }
     }
 
     /**
-     * Calculates and returns the progress of some operation as a floating-point value
-     * between 0 and 1, inclusive. The progress is determined based on the ratio of
-     * completed tasks to the total number of prepared tasks. If no tasks have been
-     * prepared, the method returns 1.0, indicating completion by default.
+     * Returns a consistent detached snapshot of the current prepared-loading counters.
+     * Fluent changes to the result do not affect global loading progress. Each call
+     * allocates one small snapshot; retain it when displaying several counter values.
      *
-     * @return the progress as a floating-point value between 0 and 1.
+     * @return caller-owned current progress snapshot
+     */
+    public static AssetLoadProgress getLoadProgress() {
+        /*
+         * Copy all counters under the bookkeeping lock so callers receive one
+         * consistent observation without gaining mutable access to live state.
+         */
+        synchronized (PROGRESS_LOCK) {
+            return new AssetLoadProgress(progress.getRequests())
+                    .setProcessed(progress.getProcessed())
+                    .setPending(progress.getPending())
+                    .setFailed(progress.getFailed());
+        }
+    }
+
+    /**
+     * Returns the processed fraction in the current observation, including failed and
+     * cancelled requests. An observation with no requests is complete and returns one.
+     *
+     * @return progress between zero and one
      */
     public static float getProgress() {
-        int total = preparedCount.get();
-        return total == 0 ? 1f : completedCount.get() / (float) total;
+        /*
+         * Read both counters together to provide a consistent progress snapshot.
+         */
+        synchronized (PROGRESS_LOCK) {
+            return progress.getRequests() == 0 ? 1f : progress.getProcessed() / (float) progress.getRequests();
+        }
+    }
+
+    /**
+     * Returns the number of exceptional or cancelled prepared requests processed in
+     * the current observation. Failures also propagate through the batch future.
+     *
+     * @return current failed request count
+     */
+    public static int getFailedCount() {
+        /*
+         * Failure counting shares the observation lock with completion callbacks.
+         */
+        synchronized (PROGRESS_LOCK) {
+            return progress.getFailed();
+        }
     }
 
     /**
@@ -279,8 +322,10 @@ public final class Assets {
         int removed = futures.size();
 
         cache.clear();
-        prepared.clear();
-        resetProgress();
+        synchronized (PROGRESS_LOCK) {
+            prepared.clear();
+            progress = new AssetLoadProgress(0);
+        }
 
         Throwable failure = null;
         for (CompletableFuture<?> future : futures) {
@@ -314,13 +359,19 @@ public final class Assets {
 
     /**
      * Determines whether all prepared assets have been processed and no assets remain
-     * in the preparation queue.
+     * in the preparation queue for the current observation, including failed requests.
      *
      * @return {@code true} if the prepared queue is empty and the number of completed
-     * assets matches the number of prepared assets; {@code false} otherwise.
+     * requests have reached a terminal result in the current observation; {@code false} otherwise.
      */
     public static boolean isFinished() {
-        return prepared.isEmpty() && completedCount.get() == preparedCount.get();
+        /*
+         * Terminal status uses outstanding work, not equality of success counters.
+         * Work detached by reset is deliberately excluded from this observation.
+         */
+        synchronized (PROGRESS_LOCK) {
+            return prepared.isEmpty() && progress.getPending() == 0;
+        }
     }
 
     /**
@@ -332,10 +383,13 @@ public final class Assets {
      * @throws NullPointerException If {@code params} is null.
      */
     public static void prepare(AssetParameters params) {
+        /*
+         * Queue insertion and denominator enrollment must share a reset boundary.
+         */
         Objects.requireNonNull(params);
-
-        if (prepared.add(params))
-            preparedCount.incrementAndGet();
+        synchronized (PROGRESS_LOCK) {
+            if (prepared.add(params)) progress.setRequests(progress.getRequests() + 1);
+        }
     }
 
     /**
@@ -345,12 +399,12 @@ public final class Assets {
      * using a {@link ConcurrentLinkedQueue} of {@link CompletableFuture} instances.
      * <p>
      * Each asset's loading result is stored in the {@code cache} using its unique key, and
-     * the {@code completedCount} is incremented as each asset finishes loading. Additionally,
+     * processed and failure counts are updated as each request reaches a terminal result. Additionally,
      * an aggregated {@link CompletableFuture} is created to represent the collective completion
      * of all the individual asset loading tasks.
      * <p>
-     * If no loader is registered for a particular asset type, an {@link IllegalStateException}
-     * is thrown.
+     * Missing loaders, loading failures, cancellation and scheduling rejection complete the
+     * returned future exceptionally while still counting each affected request as processed.
      * <p>
      * Optional completion actions can be performed after the entire batch of assets finishes loading.
      * Completion does not request process-wide garbage collection; heap collection policy belongs
@@ -359,38 +413,48 @@ public final class Assets {
      * This method is typically called after preparing assets using the {@link #prepare(AssetParameters)}
      * method. It ensures that all prepared assets are processed in an asynchronous and thread-safe manner.
      *
-     * @throws IllegalStateException If no {@link AssetLoader} is registered for the given asset parameters type.
+     * @return future completing after all claimed requests, exceptionally if any request fails
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static CompletableFuture<Void> load() {
+        /*
+         * Capture one progress observation per claimed request. Its completion callback
+         * remains tied to that observation even if reset detaches outstanding work.
+         */
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
         ExecutorService executor = ensureService();
 
         for (AssetParameters parameters : prepared) {
-            if (!prepared.remove(parameters))
-                continue;
+            AssetLoadProgress observation;
+            synchronized (PROGRESS_LOCK) {
+                if (!prepared.remove(parameters)) continue;
+                observation = progress;
+                observation.setPending(observation.getPending() + 1);
+            }
 
             final String key = parameters.key();
 
-            CompletableFuture<?> future = CompletableFuture
-                    .supplyAsync(() -> {
-                        AssetLoader loader = loaders.get(parameters.getClass());
-                        if (loader == null)
-                            throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
-
-                        return loader.load(parameters);
-                    }, executor)
-                    .whenComplete((_, ex) -> {
-                        if (ex != null) {
-                            ex.printStackTrace();
-                            return;
-                        }
-
-                        completedCount.incrementAndGet();
-                    });
+            CompletableFuture<?> future;
+            try {
+                future = CompletableFuture.supplyAsync(() -> {
+                    AssetLoader loader = loaders.get(parameters.getClass());
+                    if (loader == null)
+                        throw new IllegalStateException("No loader registered for " + parameters.getClass().getName());
+                    return loader.load(parameters);
+                }, executor);
+            } catch (RejectedExecutionException failure) {
+                future = CompletableFuture.failedFuture(failure);
+            }
+            CompletableFuture<?> tracked = future.whenComplete((_, ex) -> {
+                synchronized (PROGRESS_LOCK) {
+                    observation.setProcessed(observation.getProcessed() + 1);
+                    observation.setPending(observation.getPending() - 1);
+                    if (ex != null) observation.setFailed(observation.getFailed() + 1);
+                }
+            });
 
             cache.put(key, future);
-            futures.add(future);
+            futures.add(tracked);
         }
 
         return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
