@@ -2,7 +2,7 @@ package valthorne.ui;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.directwrite.DirectWriteSelection;
+import valthorne.graphics.font.TextSelection;
 import valthorne.ui.theme.StyleKey;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.nodes.nano.NanoCodeEditor;
@@ -13,7 +13,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * Shared text bridge for Nano controls. Eligible Windows UI uses Microsoft's real
  * DirectWrite layout and grayscale rasterization from the theme font's exact bytes.
  * Other platforms and transformed UI retain Slug curves; roots supply defaults
- * when no face is configured. Native caret/selection measurements use shaped text.
+ * when no face is configured. Caret/selection measurements share the selected shaped layout.
  * Detached drawing without a root context retains the NanoVG renderer.
  * The active root coordinates backend transitions and painter order. Font
  * ownership stays with the theme, and controls retain their normal text input.
@@ -151,32 +151,31 @@ public final class NanoText {
      */
     public static float measureTextWidth(UINode node, long vg, String name, float size, String text, int start, int end) {
         /*
-         * Range slicing occurs only for caret measurement, matching the existing
-         * editor's prefix measurement semantics.
+         * Registered Slug faces measure the complete shaped context at both carets;
+         * custom NanoVG names retain their own range measurement.
          */
         SlugFont selected = font(node, name);
         if (selected == null) return NanoUtility.measureTextWidth(vg, name, size, text, start, end);
-        if (UIText.usesWindows(node)) return Math.abs(UIText.caretX(node, selected, text, size, end) - UIText.caretX(node, selected, text, size, start));
-        return measureTextWidth(node, vg, name, size, text.substring(start, end));
+        return Math.abs(UIText.caretX(node, selected, text, size, end) - UIText.caretX(node, selected, text, size, start));
     }
 
     /**
-     * Uses native shaped hit testing for an eligible editor, retaining the existing
-     * grapheme-prefix fallback for custom NanoVG faces or scalable text.
+     * Uses the selected shaped backend for registered Slug faces. Custom NanoVG
+     * names retain the editor's existing fallback.
      *
      * @param node owning editor
      * @param name registered font name
      * @param text complete displayed line
      * @param size logical em size
      * @param x logical horizontal position relative to text origin
-     * @return native UTF-16 insertion position, or -1 for the existing fallback
+     * @return shaped UTF-16 insertion position, or -1 for a custom NanoVG face
      */
     public static int nativeHitTest(UINode node, String name, String text, float size, float x) {
         /*
          * Native cluster boundaries preserve ligatures and bidirectional shaping.
          */
         SlugFont selected = font(node, name);
-        return selected != null && UIText.usesWindows(node) ? UIText.hitTest(node, selected, text, size, x) : -1;
+        return selected != null ? UIText.hitTest(node, selected, text, size, x) : -1;
     }
 
     /**
@@ -195,12 +194,12 @@ public final class NanoText {
          * RTL caret coordinates are positions, not absolute prefix distances.
          */
         SlugFont selected = font(node, name);
-        return selected != null && UIText.usesWindows(node) ? UIText.caretX(node, selected, text, size, position)
+        return selected != null ? UIText.caretX(node, selected, text, size, position)
                 : measureTextWidth(node, vg, name, size, text, 0, position);
     }
 
     /**
-     * Gets native selection rectangles without approximating bidi ranges.
+     * Gets shaped selection rectangles without approximating bidi ranges.
      *
      * @param node owning editor
      * @param name registered font name
@@ -208,11 +207,11 @@ public final class NanoText {
      * @param size logical em size
      * @param start inclusive UTF-16 position
      * @param end exclusive UTF-16 position
-     * @return native visual rectangles, or null for the existing fallback
+     * @return shaped visual rectangles, or null for a custom NanoVG face
      */
-    public static DirectWriteSelection selection(UINode node, String name, String text, float size, int start, int end) {
+    public static TextSelection selection(UINode node, String name, String text, float size, int start, int end) {
         /*
-         * The same exact font and native layout drive selection, carets, and drawing.
+         * The same exact font and selected layout drive selection, carets, and drawing.
          */
         SlugFont selected = font(node, name);
         return selected == null ? null : UIText.selection(node, selected, text, size, start, end);

@@ -81,70 +81,24 @@ public final class SlugTextRun {
         minX = minY = Float.POSITIVE_INFINITY;
         maxX = maxY = Float.NEGATIVE_INFINITY;
 
-        float penX = 0f;
-        float penY = 0f;
-        float lineWidth = 0f;
-        float maxWidth = 0f;
-        int previous = 0;
-        int lines = 1;
-
-        for (int i = 0; i < this.text.length(); i++) {
-            char c = this.text.charAt(i);
-
-            if (c == '\n') {
-                maxWidth = Math.max(maxWidth, lineWidth);
-                lineWidth = 0f;
-                penX = 0f;
-                penY -= font.lineHeight() * size;
-                previous = 0;
-                lines++;
-                continue;
-            }
-
-            if (c == '\t') {
-                SlugGlyph space = font.glyph(' ');
-                float tab = (space != null ? space.advance : 0.25f) * 4f * size;
-                penX += tab;
-                lineWidth += tab;
-                previous = 0;
-                continue;
-            }
-
-            SlugGlyph glyph = font.glyph(c);
-            if (glyph == null) {
-                float fallback = 0.25f * size;
-                penX += fallback;
-                lineWidth += fallback;
-                previous = 0;
-                continue;
-            }
-
-            if (previous != 0) {
-                float kern = font.kerning(previous, c) * size;
-                penX += kern;
-                lineWidth += kern;
-            }
-
-            if (glyph.drawable) {
-                ensureCapacity(count + 1);
-                glyphs[count] = glyph;
-                xOffsets[count] = penX;
-                yOffsets[count] = penY;
-                minX = Math.min(minX, penX + glyph.x0 * size);
-                minY = Math.min(minY, penY + glyph.y0 * size);
-                maxX = Math.max(maxX, penX + glyph.x1 * size);
-                maxY = Math.max(maxY, penY + glyph.y1 * size);
-                count++;
-            }
-
-            float advance = glyph.advance * size;
-            penX += advance;
-            lineWidth += advance;
-            previous = c;
+        SlugShape shape = font.shape(this.text);
+        for (int index = 0; index < shape.glyphCount(); index++) {
+            SlugGlyph glyph = font.glyphByIndex(shape.glyphIndex(index));
+            if (!glyph.drawable) continue;
+            ensureCapacity(count + 1);
+            float offsetX = shape.x(index) * size;
+            float offsetY = shape.y(index) * size;
+            glyphs[count] = glyph;
+            xOffsets[count] = offsetX;
+            yOffsets[count] = offsetY;
+            minX = Math.min(minX, offsetX + glyph.x0 * size);
+            minY = Math.min(minY, offsetY + glyph.y0 * size);
+            maxX = Math.max(maxX, offsetX + glyph.x1 * size);
+            maxY = Math.max(maxY, offsetY + glyph.y1 * size);
+            count++;
         }
-
-        width = Math.max(maxWidth, lineWidth);
-        height = this.text.isEmpty() ? 0 : lines * font.lineHeight() * size;
+        width = shape.width() * size;
+        height = shape.height() * size;
         if (count < oldCount) Arrays.fill(glyphs, count, oldCount, null);
     }
 

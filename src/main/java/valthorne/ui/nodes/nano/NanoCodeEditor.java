@@ -1,7 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.ui.NanoText;
-import valthorne.graphics.font.directwrite.DirectWriteSelection;
+import valthorne.graphics.font.TextSelection;
 
 import valthorne.Keyboard;
 import valthorne.Mouse;
@@ -339,7 +339,7 @@ public class NanoCodeEditor extends NanoPanel {
                 float left = x + TEXT_X + caretX(line, begin - starts.get(line));
                 float right = x + TEXT_X + caretX(line, end - starts.get(line));
                 nvgBeginPath(vg);
-                DirectWriteSelection nativeSelection = NanoText.selection(this, fontName, visible(value), FONT_SIZE,
+                TextSelection nativeSelection = NanoText.selection(this, fontName, visible(value), FONT_SIZE,
                         visible(value.substring(0, begin - starts.get(line))).length(), visible(value.substring(0, end - starts.get(line))).length());
                 if (nativeSelection == null) nvgRect(vg, left, top - 1, Math.max(1, right - left), LINE_HEIGHT);
                 else for (int index = 0; index < nativeSelection.size(); index++)

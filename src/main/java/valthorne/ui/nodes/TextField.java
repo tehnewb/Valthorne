@@ -6,7 +6,7 @@ import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.directwrite.DirectWriteSelection;
+import valthorne.graphics.font.TextSelection;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
@@ -845,7 +845,7 @@ public class TextField extends Panel {
         float selectionY = getRenderY() + (getHeight() - selectionH) * 0.5f;
 
         Color drawSelectionColor = selectionColor != null ? selectionColor : defaultSelectionColor;
-        DirectWriteSelection nativeSelection = UIText.selection(this, font, getDisplayText(), fontSize, a, b);
+        TextSelection nativeSelection = UIText.selection(this, font, getDisplayText(), fontSize, a, b);
         if (nativeSelection != null) {
             for (int index = 0; index < nativeSelection.size(); index++)
                 batch.draw(getCaretPixel(), drawX + nativeSelection.left(index), selectionY, nativeSelection.width(index), selectionH, drawSelectionColor);

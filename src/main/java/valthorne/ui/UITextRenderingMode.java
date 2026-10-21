@@ -31,6 +31,10 @@ public enum UITextRenderingMode {
      */
     SLUG,
     /**
+     * Slug GPU curves use FreeType-hinted geometry and HarfBuzz positioning at the physical UI size.
+     */
+    SLUG_HINTED,
+    /**
      * Existing NanoVG renderer handled the named-font submission.
      */
     NANOVG

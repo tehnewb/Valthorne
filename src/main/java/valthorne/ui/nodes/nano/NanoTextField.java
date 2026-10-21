@@ -1,7 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.ui.NanoText;
-import valthorne.graphics.font.directwrite.DirectWriteSelection;
+import valthorne.graphics.font.TextSelection;
 
 import org.lwjgl.nanovg.NVGColor;
 import valthorne.Keyboard;
@@ -870,7 +870,7 @@ public class NanoTextField extends UINode implements NanoNode {
             float selectionY = y + (height - selectionH) * 0.5f;
 
             nvgBeginPath(vg);
-            DirectWriteSelection nativeSelection = NanoText.selection(this, fontName, visibleText, fontSize, a, b);
+            TextSelection nativeSelection = NanoText.selection(this, fontName, visibleText, fontSize, a, b);
             if (nativeSelection == null) nvgRect(vg, x1, selectionY, Math.max(0f, x2 - x1), selectionH);
             else for (int index = 0; index < nativeSelection.size(); index++)
                 nvgRect(vg, drawX + nativeSelection.left(index), selectionY, nativeSelection.width(index), selectionH);

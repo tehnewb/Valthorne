@@ -39,6 +39,7 @@ final class TextureBatchGlyphs {
     private final int instanceVBO; // Borrowed streaming VBO owned by the parent batch.
     private final int capacity; // Maximum glyph count fitting the shared staging and stream storage.
     private final int[] viewport = new int[4]; // Reused viewport query storage for coverage and rejection bounds.
+    private final int[] query = new int[1]; // Reused scalar GL query storage avoids per-segment NIO wrappers.
     private int instanceCount; // Glyph records queued in the shared storage during the active segment.
     private long totalDrawCalls; // Cumulative nonempty glyph uploads, including font and capacity boundaries.
     private boolean clipEnabled; // Whether the current submission uses a logical world clip.
@@ -84,6 +85,7 @@ final class TextureBatchGlyphs {
     private boolean oldCull; // Original face-cull enablement.
     private boolean oldDepthMask; // Original depth-write enablement.
     private boolean oldSrgb; // Framebuffer conversion policy restored after glyph drawing.
+    private boolean srgbTarget; // Active attachment encoding used by scalable world-text blending.
 
     /**
      * Borrows shared storage without creating GPU resources or reading GL state.
@@ -185,36 +187,7 @@ final class TextureBatchGlyphs {
      * @param size positive finite world units per em
      */
     void draw(SlugFont font, String text, float x, float y, float size) {
-        float originX = x;
-        float penX = originX;
-        float penY = y;
-        float lineAdvance = font.lineHeight() * size;
-        int previous = 0;
-        for (int i = 0; i < text.length(); i++) {
-            char codepoint = text.charAt(i);
-            if (codepoint == '\n') {
-                penX = originX;
-                penY -= lineAdvance;
-                previous = 0;
-                continue;
-            }
-            if (codepoint == '\t') {
-                SlugGlyph space = font.glyph(' ');
-                penX += (space == null ? .25f : space.advance()) * 4f * size;
-                previous = 0;
-                continue;
-            }
-            SlugGlyph glyph = font.glyph(codepoint);
-            if (glyph == null) {
-                penX += .25f * size;
-                previous = 0;
-                continue;
-            }
-            if (previous != 0) penX += font.kerning(previous, codepoint) * size;
-            if (glyph.isDrawable()) appendGlyph(font, glyph, penX, penY, size);
-            penX += glyph.advance() * size;
-            previous = codepoint;
-        }
+        draw(font.cachedRun(text, size), x, y);
     }
 
     /**
@@ -281,28 +254,29 @@ final class TextureBatchGlyphs {
             if (!projection.isFinite() || viewport[2] <= 0 || viewport[3] <= 0)
                 throw new IllegalStateException("Text requires a finite projection and a nonempty viewport.");
             updateGlyphBounds();
-            oldProgram = glGetInteger(GL_CURRENT_PROGRAM);
-            oldVao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
-            oldBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
-            oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+            oldProgram = readInteger(GL_CURRENT_PROGRAM);
+            oldVao = readInteger(GL_VERTEX_ARRAY_BINDING);
+            oldBuffer = readInteger(GL_ARRAY_BUFFER_BINDING);
+            oldActiveTexture = readInteger(GL_ACTIVE_TEXTURE);
             glActiveTexture(GL_TEXTURE0);
-            oldTexture0 = glGetInteger(GL_TEXTURE_BINDING_2D);
-            oldSampler0 = glGetInteger(GL_SAMPLER_BINDING);
+            oldTexture0 = readInteger(GL_TEXTURE_BINDING_2D);
+            oldSampler0 = readInteger(GL_SAMPLER_BINDING);
             glActiveTexture(GL_TEXTURE0 + 1);
-            oldTexture1 = glGetInteger(GL_TEXTURE_BINDING_2D);
-            oldSampler1 = glGetInteger(GL_SAMPLER_BINDING);
+            oldTexture1 = readInteger(GL_TEXTURE_BINDING_2D);
+            oldSampler1 = readInteger(GL_SAMPLER_BINDING);
             oldBlend = glIsEnabled(GL_BLEND);
             oldDepth = glIsEnabled(GL_DEPTH_TEST);
             oldCull = glIsEnabled(GL_CULL_FACE);
-            oldDepthMask = glGetInteger(GL_DEPTH_WRITEMASK) != 0;
+            oldDepthMask = readInteger(GL_DEPTH_WRITEMASK) != 0;
             oldSrgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
-            oldSrcRgb = glGetInteger(GL_BLEND_SRC);
-            oldDstRgb = glGetInteger(GL_BLEND_DST);
-            oldSrcAlpha = glGetInteger(GL_BLEND_SRC_ALPHA);
-            oldDstAlpha = glGetInteger(GL_BLEND_DST_ALPHA);
-            oldEquationRgb = glGetInteger(GL_BLEND_EQUATION_RGB);
-            oldEquationAlpha = glGetInteger(GL_BLEND_EQUATION_ALPHA);
+            oldSrcRgb = readInteger(GL_BLEND_SRC);
+            oldDstRgb = readInteger(GL_BLEND_DST);
+            oldSrcAlpha = readInteger(GL_BLEND_SRC_ALPHA);
+            oldDstAlpha = readInteger(GL_BLEND_DST_ALPHA);
+            oldEquationRgb = readInteger(GL_BLEND_EQUATION_RGB);
+            oldEquationAlpha = readInteger(GL_BLEND_EQUATION_ALPHA);
             boolean srgb = isSrgbFramebuffer();
+            srgbTarget = srgb;
             shader.bind();
             shader.setUniformMatrix4("u_mvp", projection.get(matrix));
             shader.setUniform4f("u_textTransform", cosine, sine, transformX, transformY);
@@ -401,22 +375,31 @@ final class TextureBatchGlyphs {
     }
 
     /**
+     * Reads one scalar GL state value into reusable primitive storage. LWJGL's
+     * convenience return overload creates a temporary buffer view per query.
+     *
+     * @param name scalar state selector
+     * @return selected state value
+     */
+    private int readInteger(int name) {
+        glGetIntegerv(name, query);
+        return query[0];
+    }
+
+    /**
      * Reads the current draw attachment's color encoding without changing targets.
      *
      * @return true when glyphs should be blended in linear light
      */
-    private static boolean isSrgbFramebuffer() {
-        /*
-         * Default framebuffer attachment names differ from FBO color attachments.
-         * Query the active draw buffer so both offscreen and window text agree.
-         */
-        int attachment = glGetInteger(GL_DRAW_BUFFER0);
+    private boolean isSrgbFramebuffer() {
+        int attachment = readInteger(GL_DRAW_BUFFER0);
         if (attachment == GL_NONE) return false;
-        if (glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0) {
+        if (readInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0) {
             if (attachment == GL_BACK) attachment = GL_BACK_LEFT;
             else if (attachment == GL_FRONT) attachment = GL_FRONT_LEFT;
         }
-        return glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, attachment, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING) == GL_SRGB;
+        glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, attachment, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, query);
+        return query[0] == GL_SRGB;
     }
 
     /**
@@ -466,6 +449,11 @@ final class TextureBatchGlyphs {
     private void flushGlyphs() {
         if (instanceCount == 0) return;
         activeFont.bindTextures();
+        boolean linear = srgbTarget && !activeFont.isHinted();
+        shader.setUniform1i("u_linearColor", linear ? 1 : 0);
+        shader.setUniform1i("u_hintedUi", activeFont.isHinted() ? 1 : 0);
+        if (linear) glEnable(GL_FRAMEBUFFER_SRGB);
+        else glDisable(GL_FRAMEBUFFER_SRGB);
         instances.flip();
         glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
         glBufferData(GL_ARRAY_BUFFER, (long) capacity * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);

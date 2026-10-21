@@ -2,18 +2,18 @@ package valthorne.ui;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.font.directwrite.DirectWriteBackend;
-import valthorne.graphics.font.directwrite.DirectWriteSelection;
+import valthorne.graphics.font.TextSelection;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.theme.StyleKey;
 
 /**
- * Shared typography operations for UI text controls. Eligible Windows UI uses the
- * operating system's exact-file DirectWrite layout and native grayscale rasterizer.
- * Non-Windows, rotated, and camera-zoomed controls keep scalable Slug rendering.
- * Measurement, caret positioning, and painting select the same backend. Direct
- * world-space SlugFont/SlugTextRun use remains unchanged.
+ * Shared typography for UI controls. Slug is the portable default: HarfBuzz supplies
+ * full-context glyph positions and FreeType hints axis-aligned UI geometry at its
+ * physical size. Rotated and camera-zoomed controls retain scalable world outlines.
+ * DirectWrite is an explicit Windows comparison/override. Measurement, caret
+ * positioning, selection, and painting share the selected shaping backend.
  */
 public final class UIText {
     /**
@@ -46,6 +46,42 @@ public final class UIText {
          * intentionally preserve live outline rendering instead of scaling bitmaps.
          */
         return fallbackReason(node) == UITextFallbackReason.NONE;
+    }
+
+    /**
+     * Checks portable hinted-outline policy without querying OpenGL or loading native fonts.
+     * Actual framebuffer size/projection is validated when drawing. Logical metrics
+     * come from the same shaped source regardless of hinted-view eligibility.
+     *
+     * @param node owning UI node
+     * @return whether transform policy allows the hinted Slug UI path
+     */
+    public static boolean usesHintedSlug(UINode node) {
+        /*
+         * World camera zoom and node rotations retain continuous scalable geometry.
+         */
+        UIRoot root = node.getRoot();
+        return root != null && !root.isWindowsTextEnabled() && slugFallbackReason(node) == UITextFallbackReason.NONE;
+    }
+
+    /**
+     * Resolves why physical-size UI hinting is unavailable for this node.
+     *
+     * @param node owning UI node
+     * @return NONE for hinted UI, otherwise an explicit scalable fallback reason
+     */
+    private static UITextFallbackReason slugFallbackReason(UINode node) {
+        /*
+         * Portable eligibility does not depend on the Windows-only comparison policy.
+         */
+        UIRoot root = node.getRoot();
+        if (root == null) return UITextFallbackReason.DETACHED;
+        if (!root.isSlugHintingEnabled()) return UITextFallbackReason.DISABLED;
+        var viewport = root.getViewport();
+        if (viewport != null && viewport.getCamera() != null && viewport.getCamera().getZoom() != 1) return UITextFallbackReason.CAMERA_ZOOM;
+        for (UINode current = node; current != null; current = current.getParent())
+            if (current.getRotation() != 0) return UITextFallbackReason.ROTATION;
+        return UITextFallbackReason.NONE;
     }
 
     /**
@@ -166,7 +202,7 @@ public final class UIText {
          * Native hit metrics retain ligatures and kerning context across the caret.
          */
         if (size == 0 || text.isEmpty()) return 0;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).caretX(position) : font.getWidth(text, 0, position, size);
+        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).caretX(position) : font.shape(text).caretX(position) * size;
     }
 
     /**
@@ -181,17 +217,15 @@ public final class UIText {
      */
     public static int hitTest(UINode node, SlugFont font, String text, float size, float x) {
         /*
-         * Retain the existing simple fallback while native text uses real shaping.
+         * Both backends hit-test complete shaped context rather than prefix widths.
          */
         if (size == 0 || text.isEmpty()) return 0;
         if (usesWindows(node)) return node.getRoot().windowsText().layout(font, text, size).hitTest(x, lineHeight(node, font, size) * .5f);
-        for (int i = 1; i <= text.length(); i++)
-            if (font.getWidth(text, 0, i, size) >= x) return i;
-        return text.length();
+        return font.shape(text).hitTest(x / size, font.lineHeight() * .5f);
     }
 
     /**
-     * Borrows native visual selection ranges when this control uses DirectWrite.
+     * Borrows visual selection ranges from the selected full-context shaping backend.
      *
      * @param node owning editor
      * @param font borrowed source font
@@ -199,13 +233,14 @@ public final class UIText {
      * @param size logical em size
      * @param start inclusive UTF-16 selection position
      * @param end exclusive UTF-16 selection position
-     * @return native selection geometry, or null for the existing scalable fallback
+     * @return shaped selection geometry, or null for an absent font or zero size
      */
-    public static DirectWriteSelection selection(UINode node, SlugFont font, String text, float size, int start, int end) {
+    public static TextSelection selection(UINode node, SlugFont font, String text, float size, int start, int end) {
         /*
          * Bidirectional selections cannot be represented by subtracting caret widths.
          */
-        return usesWindows(node) && size > 0 ? node.getRoot().windowsText().layout(font, text, size).selection(start, end) : null;
+        if (font == null || size <= 0) return null;
+        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).selection(start, end) : font.shape(text).selection(start, end, size);
     }
 
     /**
@@ -223,8 +258,8 @@ public final class UIText {
      */
     public static void draw(UINode node, TextureBatch batch, SlugTextRun run, SlugFont font, String text, float x, float baseline, float size, Color color) {
         /*
-         * Cached native pixels use normal batch ordering/clipping; curve runs remain
-         * available for transformed UI and non-Windows platforms.
+         * Hinted Slug is the default for ordinary UI. Explicit DirectWrite and
+         * transformed scalable runs preserve the same batch ordering/clipping.
          */
         if (text == null || text.isEmpty() || size == 0) return;
         int background = -1;
@@ -236,6 +271,13 @@ public final class UIText {
         if (reason == UITextFallbackReason.NONE) {
             reason = root.windowsText().draw(batch, font, text, x, baseline, size, color, background);
             if (reason == UITextFallbackReason.NONE) return;
+        }
+        if (root != null && !root.isWindowsTextEnabled()) {
+            reason = slugFallbackReason(node);
+            if (reason == UITextFallbackReason.NONE) {
+                reason = root.slugText().draw(batch, font, text, x, baseline, size, color);
+                if (reason == UITextFallbackReason.NONE) return;
+            }
         }
         if (run != null) run.draw(batch, x, baseline, color);
         else font.draw(batch, text, x, baseline, size, color);

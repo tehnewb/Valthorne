@@ -6,6 +6,7 @@ const int BAND_TEXTURE_WIDTH = 1 << BAND_TEXTURE_WIDTH_LOG2;
 uniform sampler2D u_curveTexture;
 uniform usampler2D u_bandTexture;
 uniform bool u_linearColor;
+uniform bool u_hintedUi;
 
 in vec4 v_color;
 in vec2 v_texCoord;
@@ -17,6 +18,18 @@ flat in vec4 v_clipRect;
 flat in float v_clipEnabled;
 
 out vec4 fragColor;
+
+// Grayscale alpha-response adaptation from Microsoft Terminal (MIT).
+// Source: src/renderer/atlas/dwrite_helpers.hlsl. License: META-INF/licenses/microsoft-terminal.txt.
+// Fixed published default gamma 1.8 / grayscale contrast 1 keeps portable UI output
+// independent of platform settings. The geometry and scalable world path are unchanged.
+float uiCoverage(float coverage, vec3 foreground) {
+    const vec4 gammaRatios = vec4(0.148054421, -0.894594550, 1.47590804, -0.324668258);
+    float contrast = clamp(3.0 - 4.0 * dot(foreground, vec3(0.30, 0.59, 0.11)), 0.0, 1.0);
+    float contrasted = coverage * (contrast + 1.0) / (coverage * contrast + 1.0);
+    float intensity = dot(foreground, vec3(0.25, 0.5, 0.25));
+    return clamp(contrasted + contrasted * (1.0 - contrasted) * ((gammaRatios.x * intensity + gammaRatios.y) * contrasted + gammaRatios.z * intensity + gammaRatios.w), 0.0, 1.0);
+}
 
 float saturate(float x) {
     return clamp(x, 0.0, 1.0);
@@ -153,6 +166,7 @@ float slugRender(vec2 renderCoord, vec4 bandTransform, ivec4 glyphData) {
 void main() {
     // Evaluate derivatives before clipping makes neighboring fragments diverge.
     float coverage = slugRender(v_texCoord, v_banding, v_glyph);
+    if (u_hintedUi) coverage = uiCoverage(coverage, v_color.rgb);
     if (v_clipEnabled > 0.5 && (v_world.x < v_clipRect.x || v_world.y < v_clipRect.y ||
         v_world.x > v_clipRect.x + v_clipRect.z || v_world.y > v_clipRect.y + v_clipRect.w)) {
         discard;

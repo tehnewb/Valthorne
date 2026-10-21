@@ -163,7 +163,9 @@ public class UIRoot extends UIContainer {
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
     private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
-    private boolean windowsTextEnabled = DirectWriteBackend.isSupported(); // Native Windows UI text; scalable text remains available by opting out.
+    private boolean windowsTextEnabled; // DirectWrite is an explicit Windows comparison/override; Slug is the portable default.
+    private boolean slugHintingEnabled = true; // Physical-size hinting for eligible axis-aligned UI; world outlines remain scalable.
+    private SlugUIText slugText; // Lazily owned physical-size hinted outline views.
     private WindowsUIText windowsText; // Lazily owned native shaping, raster, and GPU caches for this root.
     private UITextRenderingMode lastTextMode = UITextRenderingMode.NOT_DRAWN; // Renderer and native target mode of the latest text submission.
     private UITextFallbackReason lastTextFallback = UITextFallbackReason.NONE; // Why that submission bypassed native drawing or produced no pixels.
@@ -935,6 +937,10 @@ public class UIRoot extends UIContainer {
         if (windowsText != null) {
             windowsText.close();
             windowsText = null;
+        }
+        if (slugText != null) {
+            slugText.close();
+            slugText = null;
         }
         if (namedTextFonts != null) namedTextFonts.clear();
         if (nanoSlugFont != null) {
@@ -1737,9 +1743,10 @@ public class UIRoot extends UIContainer {
     public SlugFont getDefaultFont() {return getNanoTextFont(false);}
 
     /**
-     * Selects Microsoft's native shaping and grayscale rasterization for ordinary
-     * Windows UI text. Rotated/zoomed UI and explicit SlugLabel nodes retain curves;
-     * other operating systems always retain the existing renderer. Set this before
+     * Explicitly selects Microsoft's native shaping and rasterization for ordinary
+     * Windows UI text instead of the default hinted Slug path. Rotated/zoomed UI
+     * and explicit SlugLabel nodes retain scalable curves. Other operating systems
+     * retain portable Slug. Set this before
      * laying out controls so their dimensions and caret metrics use the same backend.
      *
      * @param enabled whether eligible Windows UI text should use DirectWrite
@@ -1755,6 +1762,44 @@ public class UIRoot extends UIContainer {
      * @return whether DirectWrite is enabled on this Windows root
      */
     public boolean isWindowsTextEnabled() { return windowsTextEnabled; }
+
+    /**
+     * Enables physical-size FreeType hinting for Slug's axis-aligned UI outlines.
+     * Enabled by default on every platform. Disabling retains HarfBuzz shaping but
+     * uses ordinary scalable outlines; direct world text is unaffected either way.
+     * DirectWrite, when explicitly enabled, takes priority over this policy.
+     * Hinted UI uses the published Microsoft Terminal default grayscale response
+     * (gamma 1.8, grayscale contrast 1) consistently across platforms, independently
+     * of local Windows calibration. It does not simulate LCD subpixel ClearType.
+     *
+     * @param enabled whether eligible Slug UI uses hinted outlines
+     */
+    public void setSlugHintingEnabled(boolean enabled) {
+        if (batch != null) batch.flush();
+        slugHintingEnabled = enabled;
+        if (!enabled && slugText != null) {
+            slugText.close();
+            slugText = null;
+        }
+        invalidateTextLayout(this);
+    }
+
+    /**
+     * Returns the root's Slug hinting policy before transform eligibility.
+     *
+     * @return whether axis-aligned Slug UI should use hinted outlines
+     */
+    public boolean isSlugHintingEnabled() { return slugHintingEnabled; }
+
+    /**
+     * Borrows the lazy owner of physical-size hinted Slug views.
+     *
+     * @return root-owned hinted outline cache
+     */
+    SlugUIText slugText() {
+        if (slugText == null) slugText = new SlugUIText(this);
+        return slugText;
+    }
 
     /**
      * Snapshots the most recent text submission through the shared UI typography

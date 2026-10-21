@@ -1,12 +1,14 @@
 package valthorne.graphics.font.directwrite;
 
+import valthorne.graphics.font.TextSelection;
+
 /**
  * Immutable native hit-test rectangles for a logical selection. Bidirectional text
  * can produce multiple disjoint visible rectangles for one UTF-16 range. Coordinates
  * are relative to the layout's top-left origin in DIPs; callers must not substitute
  * a rectangle between two caret X values for these shaped visual ranges.
  */
-public final class DirectWriteSelection {
+public final class DirectWriteSelection implements TextSelection {
     private final float[] boxes; // Packed left/top/width/height coordinates of each native selection rectangle.
 
     /**
