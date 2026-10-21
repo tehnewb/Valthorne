@@ -30,12 +30,6 @@ Pull requests are the fastest way to get improvements merged. A good PR usually:
 * References related issues when applicable
 * Includes tests or verification notes for behavior changes
 
-Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources,
-and Javadoc; `verifyRelease` additionally checks publication artifacts and metadata.
-The native Slug check verifies rendering in a hidden graphics context. Record
-manual runtime verification separately; packaging checks alone do not establish
-rendering or interaction correctness.
-
 ## Repository ownership
 
 Keep engine code and runtime resources under `src/main`. Release packaging checks live in `gradle/release.gradle`;
