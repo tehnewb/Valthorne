@@ -32,11 +32,7 @@ Pull requests are the fastest way to get improvements merged. A good PR usually:
 
 ## Repository ownership
 
-Keep engine code and runtime resources under `src/main`. Release packaging checks live in `gradle/release.gradle`;
-optional local benchmark configuration lives in `gradle/benchmarks.gradle`.
-
-Keep benchmark outputs produced during development under `build/`. Record the
-measured revision and environment alongside each result.
+Keep engine code and runtime resources under `src/main`
 
 ## Reviews
 
