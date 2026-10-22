@@ -2,11 +2,8 @@ package valthorne.graphics.map.tiled;
 
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Stores a TMX tile layer as either a finite row-major ID array or a collection
@@ -54,12 +51,16 @@ public class TiledTileMapLayer extends MapLayer {
     /**
      * Loads a TiledTileMapLayer from the provided TMX bytes and XML stream reader.
      *
-     * @param tmxBytes the byte array containing the TMX file data.
+     * @param tmxBytes original TMX bytes, retained for source compatibility; decoding uses the reader
      * @param r        the XMLStreamReader used to parse the TMX file.
      * @return an instance of TiledTileMapLayer, representing the layer described in the TMX data.
      * @throws Exception if an error occurs during the reading or parsing process.
      */
     public static TiledTileMapLayer load(byte[] tmxBytes, XMLStreamReader r) throws Exception {
+        /*
+         * Decode each layer at its current stream position. Reopening the map by
+         * layer name repeats work and cannot distinguish duplicate layer names.
+         */
         String name = TiledXML.readAttribute(r, "name", "");
         int width = TiledXML.readInteger(r, "width", 0);
         int height = TiledXML.readInteger(r, "height", 0);
@@ -82,30 +83,8 @@ public class TiledTileMapLayer extends MapLayer {
                 if ("properties".equals(tag)) {
                     props.putAll(TiledXML.readProperties(r));
                 } else if ("data".equals(tag)) {
-                    String encoding = TiledXML.readAttribute(r, "encoding", null);
-                    String compression = TiledXML.readAttribute(r, "compression", null);
-
-                    while (r.hasNext()) {
-                        int ev2 = r.next();
-                        if (ev2 == XMLStreamConstants.START_ELEMENT) {
-                            if ("chunk".equals(r.getLocalName())) {
-                                infinite = true;
-                                int cx = TiledXML.readInteger(r, "x", 0);
-                                int cy = TiledXML.readInteger(r, "y", 0);
-                                int cw = TiledXML.readInteger(r, "width", 0);
-                                int ch = TiledXML.readInteger(r, "height", 0);
-
-                                String chunkText = TiledXML.readElementText(r, "chunk");
-                                int[] cgids = TiledDecoding.decodeLayerData(chunkText, encoding, compression, cw * ch);
-                                MapChunk c = new MapChunk(cx, cy, cw, ch, cgids);
-                                chunks.put(packChunkKey(cx, cy), c);
-                            } else {
-                                TiledXML.skipElement(r);
-                            }
-                        } else if (ev2 == XMLStreamConstants.END_ELEMENT) {
-                            if ("data".equals(r.getLocalName())) break;
-                        }
-                    }
+                    gids = readData(r, width, height, chunks);
+                    infinite = gids == null;
                 } else {
                     TiledXML.skipElement(r);
                 }
@@ -115,64 +94,53 @@ public class TiledTileMapLayer extends MapLayer {
             }
         }
 
-        if (!infinite) {
-            gids = secondPassDecodeFiniteLayerData(tmxBytes, name, width, height);
-        }
+        if (!infinite && gids == null) gids = new int[Math.max(0, width * height)];
 
         return new TiledTileMapLayer(name, width, height, visible, opacity, offsetX, offsetY, props, gids, infinite, chunks);
     }
 
     /**
-     * Decodes the data for a specific finite layer from a byte array, based on its name.
-     * This method performs a second pass to parse and decode the XML representation
-     * of the layer data, including attributes like encoding and compression.
+     * Consumes the current data element, decoding finite text or retaining chunks.
+     * Chunk payloads are consumed separately so surrounding whitespace never
+     * becomes part of an infinite layer's tile data. The reader ends on data's
+     * closing tag; the enclosing layer loader continues from that position.
      *
-     * @param data      the byte array containing the XML data of the map.
-     * @param layerName the name of the layer to decode.
-     * @param w         the width of the layer in tiles.
-     * @param h         the height of the layer in tiles.
-     * @return an integer array representing the decoded tile data of the specified layer.
-     * If the layer is not found, a default array of size w * h is returned.
-     * @throws Exception if an error occurs during XML parsing or data decoding.
+     * @param reader stream positioned on the layer's data start element
+     * @param width finite layer width in tiles
+     * @param height finite layer height in tiles
+     * @param chunks destination for decoded infinite-map chunks
+     * @return finite global IDs, or null when chunks define an infinite layer
+     * @throws Exception if XML traversal or tile payload decoding fails
      */
-    private static int[] secondPassDecodeFiniteLayerData(byte[] data, String layerName, int w, int h) throws Exception {
-        try (InputStream in = new ByteArrayInputStream(data)) {
-            XMLStreamReader r = TiledXML.getXMLFactory().createXMLStreamReader(in);
-            TiledXML.moveToStart(r, "map");
-
-            while (r.hasNext()) {
-                int ev = r.next();
-                if (ev == XMLStreamConstants.START_ELEMENT && "layer".equals(r.getLocalName())) {
-                    String name = TiledXML.readAttribute(r, "name", "");
-                    int lw = TiledXML.readInteger(r, "width", 0);
-                    int lh = TiledXML.readInteger(r, "height", 0);
-
-                    if (!Objects.equals(name, layerName)) {
-                        TiledXML.skipElement(r);
-                        continue;
-                    }
-
-                    while (r.hasNext()) {
-                        int ev2 = r.next();
-                        if (ev2 == XMLStreamConstants.START_ELEMENT && "data".equals(r.getLocalName())) {
-                            String encoding = TiledXML.readAttribute(r, "encoding", null);
-                            String compression = TiledXML.readAttribute(r, "compression", null);
-
-                            String text = TiledXML.readElementText(r, "data");
-                            int expected = Math.max(0, lw * lh);
-                            if (expected == 0) expected = Math.max(0, w * h);
-                            return TiledDecoding.decodeLayerData(text, encoding, compression, expected);
-                        } else if (ev2 == XMLStreamConstants.END_ELEMENT && "layer".equals(r.getLocalName())) {
-                            break;
-                        } else if (ev2 == XMLStreamConstants.START_ELEMENT) {
-                            TiledXML.skipElement(r);
-                        }
-                    }
-                }
+    private static int[] readData(XMLStreamReader reader, int width, int height, Map<Long, MapChunk> chunks) throws Exception {
+        /*
+         * One forward pass handles both storage forms without a second parser
+         * or dependence on a layer's nonunique display name.
+         */
+        String encoding = TiledXML.readAttribute(reader, "encoding", null);
+        String compression = TiledXML.readAttribute(reader, "compression", null);
+        StringBuilder text = new StringBuilder();
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.END_ELEMENT && "data".equals(reader.getLocalName())) break;
+            if (event == XMLStreamConstants.CHARACTERS || event == XMLStreamConstants.CDATA || event == XMLStreamConstants.SPACE) {
+                text.append(reader.getText());
+                continue;
             }
+            if (event != XMLStreamConstants.START_ELEMENT) continue;
+            if (!"chunk".equals(reader.getLocalName())) {
+                TiledXML.skipElement(reader);
+                continue;
+            }
+            int x = TiledXML.readInteger(reader, "x", 0);
+            int y = TiledXML.readInteger(reader, "y", 0);
+            int chunkWidth = TiledXML.readInteger(reader, "width", 0);
+            int chunkHeight = TiledXML.readInteger(reader, "height", 0);
+            String payload = TiledXML.readElementText(reader, "chunk");
+            int[] ids = TiledDecoding.decodeLayerData(payload, encoding, compression, chunkWidth * chunkHeight);
+            chunks.put(packChunkKey(x, y), new MapChunk(x, y, chunkWidth, chunkHeight, ids));
         }
-
-        return new int[Math.max(0, w * h)];
+        return chunks.isEmpty() ? TiledDecoding.decodeLayerData(text.toString(), encoding, compression, Math.max(0, width * height)) : null;
     }
 
     /**
@@ -186,6 +154,9 @@ public class TiledTileMapLayer extends MapLayer {
      * @return packed coordinate key
      */
     private static long packChunkKey(int x, int y) {
+        /*
+         * Preserve both signed coordinate bit patterns in separate halves.
+         */
         return (((long) x) << 32) ^ (y & 0xFFFF_FFFFL);
     }
 

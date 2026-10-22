@@ -1211,7 +1211,8 @@ public class UIRoot extends UIContainer {
      * @param node nonnull modal subtree
      */
     public void showModal(UINode node) {
-        if (focusScopes.stream().anyMatch(scope -> scope.node() == node)) return;
+        for (int i = 0; i < focusScopes.size(); i++)
+            if (focusScopes.get(i).node() == node) return;
         UINode previous = focused;
         showOverlay(node);
         focusScopes.add(new UIFocusScope(node, previous));

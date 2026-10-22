@@ -39,6 +39,12 @@ public record NanoFileFilter(String description, List<String> extensions) {
         String name = path.getFileName()
                 .toString()
                 .toLowerCase(Locale.ROOT);
-        return extensions.isEmpty() || extensions.stream().anyMatch(extension -> name.endsWith("." + extension));
+        if (extensions.isEmpty()) return true;
+        for (int i = 0; i < extensions.size(); i++) {
+            String extension = extensions.get(i);
+            int dot = name.length() - extension.length() - 1;
+            if (dot >= 0 && name.charAt(dot) == '.' && name.endsWith(extension)) return true;
+        }
+        return false;
     }
 }

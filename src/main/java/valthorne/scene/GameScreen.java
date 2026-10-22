@@ -133,7 +133,7 @@ public class GameScreen implements Application {
             return;
         }
 
-        this.currentScene.disposeScene();
+        this.currentScene.closeScene();
     }
 
     /**
@@ -145,16 +145,16 @@ public class GameScreen implements Application {
      * </p>
      *
      * <p>
-     * Unlike {@link #init()}, this method directly calls {@link Scene#initializeFields()} followed by
-     * {@link Scene#init()} for the incoming scene so the scene is immediately ready for use after
-     * the switch.
+     * Calls {@link Scene#initializeFields()} for the incoming scene; that method invokes
+     * {@link Scene#init()} once after preparing shared resources, so the scene is ready
+     * for use immediately after the switch.
      * </p>
      *
      * @param scene the new scene to activate, or null to clear the current scene
      */
     public void setScene(Scene scene) {
         if (currentScene != null) {
-            currentScene.disposeScene();
+            currentScene.closeScene();
         }
 
         currentScene = scene;
@@ -178,17 +178,17 @@ public class GameScreen implements Application {
             replacement.initializeFields();
         } catch (RuntimeException | Error failure) {
             try {
-                replacement.disposeScene();
+                replacement.closeScene();
             } catch (RuntimeException | Error cleanup) {
                 failure.addSuppressed(cleanup);
             }
             throw failure;
         }
         try {
-            if (currentScene != null) currentScene.disposeScene();
+            if (currentScene != null) currentScene.closeScene();
         } catch (RuntimeException | Error failure) {
             try {
-                replacement.disposeScene();
+                replacement.closeScene();
             } catch (RuntimeException | Error cleanup) {
                 failure.addSuppressed(cleanup);
             }

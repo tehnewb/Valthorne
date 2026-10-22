@@ -51,18 +51,10 @@ public class GZIP implements CompressionStrategy {
      */
     @Override
     public byte[] decompress(byte[] data) {
-        try (ByteArrayOutputStream decompressed = new ByteArrayOutputStream()) {
-            try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(data))) {
-                byte[] buffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = gzipInputStream.read(buffer)) != -1) {
-                    decompressed.write(buffer, 0, bytesRead);
-                }
-            }
-
-            return decompressed.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to decompress using GZip algorithm", e);
+        try (GZIPInputStream stream = new GZIPInputStream(new ByteArrayInputStream(data))) {
+            return stream.readAllBytes();
+        } catch (IOException failure) {
+            throw new RuntimeException("Failed to decompress using GZip algorithm", failure);
         }
     }
 }
