@@ -16,7 +16,12 @@ import java.util.Objects;
 import valthorne.Mouse;
 import valthorne.ui.nodes.Button;
 import valthorne.ui.nodes.TextField;
+import valthorne.ui.nodes.NumberSpinner;
+import valthorne.ui.nodes.MenuBar;
 import valthorne.ui.nodes.nano.NanoButton;
+import valthorne.ui.nodes.nano.NanoComboBox;
+import valthorne.ui.nodes.nano.NanoNumberSpinner;
+import valthorne.ui.nodes.nano.NanoMenuBar;
 import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.ui.nodes.nano.NanoTextField;
 
@@ -236,6 +241,9 @@ public abstract class UINode implements Dimensional {
      * @param point mutable point in the coordinate system preceding these transforms
      */
     private static void transformContentPoint(UIContainer container, Vector2f point) {
+        /*
+         * Apply ancestor transforms in hierarchy order using the caller-owned scratch vector.
+         */
         if (container == null) return;
         transformContentPoint(container.getParent(), point);
         float x = container.inverseRotationX(point.x(), point.y());
@@ -281,7 +289,9 @@ public abstract class UINode implements Dimensional {
      * cursor choice. Overrides should return zero when the interaction is unavailable.
      * @return a Mouse.CURSOR_* shape, or zero to leave the application cursor unchanged
      */
-    public int getCursorShape() { return 0; }
+    public int getCursorShape() {
+        return 0;
+    }
 
     /**
      * Screen pixels (bottom-left) to this node's local top-left coordinates.
@@ -372,6 +382,16 @@ public abstract class UINode implements Dimensional {
      * @param event the mouse scroll event containing scroll offsets
      */
     public void onMouseScroll(MouseScrollEvent event) {}
+
+    /**
+     * Receives an external desktop path drop at this node or a descendant.
+     * The root bubbles drops through the visible hit target's ancestors; consume
+     * the event after accepting it to prevent another owner from importing it.
+     * Paths remain valid after the native callback returns.
+     *
+     * @param event immutable paths and window-relative drop coordinates
+     */
+    public void onFileDrop(FileDropEvent event) {}
 
     /**
      * Called when the window is resized.
@@ -812,7 +832,7 @@ public abstract class UINode implements Dimensional {
      *
      * @return the resolved style, or null when neither a theme, composite inputs, nor local overrides exist
      */
-    protected final ResolvedStyle getStyle() {
+    public final ResolvedStyle getStyle() {
         if (cachedStyle != null) return cachedStyle;
         ThemeData theme = getTheme();
         StyleMap overrides = styleOverrides;
@@ -1286,7 +1306,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setX(float x) {
-        this.getLayout().left(x);
+        this.getLayout()
+                .left(x);
     }
 
     /**
@@ -1307,7 +1328,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setY(float y) {
-        this.getLayout().top(y - getHeight());
+        this.getLayout()
+                .top(y - getHeight());
     }
 
     /**
@@ -1331,7 +1353,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setWidth(float width) {
-        this.getLayout().width(width);
+        this.getLayout()
+                .width(width);
     }
 
     /**
@@ -1355,7 +1378,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setHeight(float height) {
-        this.getLayout().height(height);
+        this.getLayout()
+                .height(height);
     }
 
     /**
@@ -1431,21 +1455,27 @@ public abstract class UINode implements Dimensional {
      *
      * @return angle in degrees
      */
-    public final float getRotation() {return rotation;}
+    public final float getRotation() {
+        return rotation;
+    }
 
     /**
      * Supplies the cached orientation to the root's rendering context.
      *
      * @return counterclockwise rotation cosine
      */
-    final float rotationCosine() {return rotationCosine;}
+    final float rotationCosine() {
+        return rotationCosine;
+    }
 
     /**
      * Supplies the cached orientation to the root's rendering context.
      *
      * @return counterclockwise rotation sine
      */
-    final float rotationSine() {return rotationSine;}
+    final float rotationSine() {
+        return rotationSine;
+    }
 
     /**
      * Resolves the rotated visual envelope in top-down layout coordinates, including
@@ -1571,7 +1601,8 @@ public abstract class UINode implements Dimensional {
      */
     protected float getRenderSpaceHeight() {
         if (root != null) {
-            if (root.getViewport() != null) return root.getViewport().getWorldHeight();
+            if (root.getViewport() != null) return root.getViewport()
+                    .getWorldHeight();
 
             if (root.getHeight() > 0f) return root.getHeight();
         }
@@ -1698,7 +1729,9 @@ public abstract class UINode implements Dimensional {
         ResolvedStyle style = getStyle();
         if (style != null && layout.getMinHeight().isAuto() && layout.getHeight().isAuto()
                 && (this instanceof Button || this instanceof TextField
-                || this instanceof NanoButton || this instanceof NanoTextField)) {
+                || this instanceof NanoButton || this instanceof NanoTextField
+                || this instanceof NanoComboBox || this instanceof NumberSpinner || this instanceof NanoNumberSpinner
+                || this instanceof MenuBar || this instanceof NanoMenuBar)) {
             Float height = style.get(UITokens.CONTROL_HEIGHT);
             if (height != null) Yoga.YGNodeStyleSetMinHeight(yogaMemoryAddress, height);
         }

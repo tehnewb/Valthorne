@@ -11,16 +11,11 @@ import valthorne.event.Event;
 import valthorne.event.EventHandler;
 import valthorne.event.EventTypes;
 import valthorne.event.events.*;
-import valthorne.event.listeners.KeyListener;
-import valthorne.event.listeners.MouseListener;
-import valthorne.event.listeners.MouseScrollListener;
-import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.font.SystemFonts;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugData;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.behavior.TextEditing;
-import valthorne.ui.nodes.Label;
 import valthorne.ui.nodes.Panel;
 import valthorne.ui.nodes.Tooltip;
 import valthorne.ui.nodes.nano.NanoContainer;
@@ -29,6 +24,7 @@ import valthorne.ui.nodes.nano.NanoLabel;
 import valthorne.ui.nodes.nano.NanoPanel;
 import valthorne.ui.theme.ThemeData;
 import valthorne.ui.theme.ThemeDataChangeEvent;
+import valthorne.ui.theme.ProfessionalTheme;
 import valthorne.viewport.Viewport;
 
 import java.nio.file.Path;
@@ -157,39 +153,65 @@ public class UIRoot extends UIContainer {
 
     private final EventHandler<ThemeDataChangeEvent> themeListener = event -> refreshTheme(this, event.getData()); // Persistent listener invalidating nodes that use changed theme data.
     private final UIInspector inspector = new UIInspector(); // Root-owned optional draw inspection controller.
-    private final List<FocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
+    private final List<UIFocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
     private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
+    private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
     private Set<UINode> externallyPresentedNodes; // Top-level nodes painted and picked by an external editor; allocated only when needed.
-    private final RootKeyListener keyListener = new RootKeyListener(); // Root-level keyboard listener instance
-    private final RootMouseListener mouseListener = new RootMouseListener(); // Root-level mouse listener instance
-    private final RootScrollListener scrollListener = new RootScrollListener(); // Root-level scroll listener instance
-    private final RootWindowListener windowListener = new RootWindowListener(); // Root-level window resize listener instance
+    private final UIRootKeyListener keyListener = new UIRootKeyListener(this); // Root-level keyboard listener instance
+    private final UIRootMouseListener mouseListener = new UIRootMouseListener(this); // Root-level mouse listener instance
+    private final UIRootScrollListener scrollListener = new UIRootScrollListener(this); // Root-level scroll listener instance
+    private final UIRootWindowListener windowListener = new UIRootWindowListener(this); // Root-level window resize listener instance
     private long nanoVGHandle; // Stored NanoVG context deleted by this root on disposal, or zero when unavailable.
     private UIRotationShader rotationShader; // Lazily created texture shader owned by this root for rotated UI scopes.
     private UIRenderContext renderContext; // Borrowed active mixed-backend drawing context, null outside drawing.
     private boolean disposed; // Whether root resource disposal has been requested.
-    private boolean blockLowerInput, pointerOwned;
+    boolean blockLowerInput; // Whether handled root input consumes events before lower-priority listeners.
+    boolean pointerOwned; // Whether the current pointer gesture began on this root.
     private int inputPriority; // Priority of this root's keyboard, pointer, scroll, and text subscriptions.
     private UIFrameStats frameStats = new UIFrameStats(0, 0, 0, 0, 0, 0, 0); // Latest immutable drawing and layout statistics.
-    private long pendingLayoutPasses, pendingLayoutNanos; // Layout work accumulated until the next recorded draw.
+    private long pendingLayoutPasses; // Layout work accumulated until the next recorded draw.
+    private long pendingLayoutNanos; // Layout work accumulated until the next recorded draw.
     private UINode focused; // Node that currently owns keyboard focus
     private final EventHandler<TextInputEvent> textListener = event -> {
         boolean active = blockLowerInput && getFocused() != null;
         route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false);
         if (active) event.consume();
     }; // Persistent committed-text listener targeting the current focus.
+    private final EventHandler<FileDropEvent> fileDropListener = this::handleFileDrop; // Routes native path drops through the visible modal-aware hit target.
     private UINode pressed; // Node currently being pressed by the mouse
-    private int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
-    private final ArrayList<NanoLabel> selectionLabels = new ArrayList<>();
-    private boolean textDragPending, textDragActive;
-    private float textPressX, textPressY;
-    private int textAnchorLabel, textAnchorOffset;
+    int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
+    private final ArrayList<NanoLabel> selectionLabels = new ArrayList<>(); // Reusable document-order list of eligible selectable labels.
+    private boolean textDragPending; // Whether a label press may begin document-wide selection.
+    private boolean textDragActive; // Whether the current pointer gesture selects across labels.
+    private float textPressX; // Initial document-selection pointer X in screen coordinates.
+    private float textPressY; // Initial document-selection pointer Y in screen coordinates.
+    private int textAnchorLabel; // Document-order index of the selection anchor label.
+    private int textAnchorOffset; // UTF-16 anchor offset within the initial label.
+    private UINode hovered; // Node currently being hovered by the mouse
+    private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
+    private boolean presentationEnabled = true; // Whether this root paints or accepts input in the active scene view.
+    private boolean clipToViewport; // Whether this root clips every child to its viewport's local UI bounds.
+    private boolean customViewportClip; // Whether a parent viewport further restricts this root's clip.
+    private float viewportClipX; // Left edge of the active viewport-local UI clip.
+    private float viewportClipY; // Bottom edge of the active viewport-local UI clip.
+    private float viewportClipWidth; // Width of the active viewport-local UI clip.
+    private float viewportClipHeight; // Height of the active viewport-local UI clip.
+    private float hoverTime; // Time accumulated while hovering the current node
+    private Tooltip activeTooltip; // Tooltip currently being displayed in the overlay layer
+    private final EventHandler<WindowFocusEvent> focusListener = event -> {
+        if (!event.isFocused()) cancelInput();
+    }; // Persistent window-focus listener cancelling UI input on focus loss.
 
+    /**
+     * Collects interactive selectable labels in document order for cross-label text selection.
+     *
+     * @param node tree or UI node whose state is queried or changed
+     */
     private void collectSelectableText(UINode node) {
         if (!isNodeInteractiveNow(node)) return;
         if (node instanceof NanoLabel label && label.isSelectable()) selectionLabels.add(label);
@@ -197,12 +219,22 @@ public class UIRoot extends UIContainer {
             for (UINode child : container.getChildren()) collectSelectableText(child);
     }
 
+    /**
+     * Clears all label ranges and releases pending document-selection drag state.
+     */
     private void clearDocumentSelection() {
         for (var label : selectionLabels) label.documentSelection(0, 0);
         selectionLabels.clear();
         textDragPending = textDragActive = false;
     }
 
+    /**
+     * Finds the nearest eligible label in layout coordinates for document-selection dragging.
+     *
+     * @param x horizontal logical or screen coordinate as used by the caller
+     * @param y vertical logical or screen coordinate as used by the caller
+     * @return finds the nearest eligible label in layout coordinates for document-selection dragging
+     */
     private int nearestText(float x, float y) {
         int best = -1;
         float distance = Float.POSITIVE_INFINITY;
@@ -221,6 +253,12 @@ public class UIRoot extends UIContainer {
         return best;
     }
 
+    /**
+     * Extends the anchored document range across labels using the current pointer location.
+     *
+     * @param event borrowed routed pointer event; retained only for this call
+     * @return extends the anchored document range across labels using the current pointer location
+     */
     private boolean extendDocumentSelection(MouseDragEvent event) {
         if (!textDragPending || event.getButton() != Mouse.LEFT) return false;
         if (!textDragActive) {
@@ -234,7 +272,8 @@ public class UIRoot extends UIContainer {
         }
         int endLabel = nearestText(event.getToX(), event.getToY());
         if (endLabel < 0) return false;
-        int endOffset = selectionLabels.get(endLabel).selectionIndexAt(event.getToX(), event.getToY());
+        int endOffset = selectionLabels.get(endLabel)
+                .selectionIndexAt(event.getToX(), event.getToY());
         int low = Math.min(textAnchorLabel, endLabel), high = Math.max(textAnchorLabel, endLabel);
         boolean forward = textAnchorLabel <= endLabel;
         for (int i = 0; i < selectionLabels.size(); i++) {
@@ -251,21 +290,6 @@ public class UIRoot extends UIContainer {
         return true;
     }
 
-    private UINode hovered; // Node currently being hovered by the mouse
-    private Viewport viewport; // Optional viewport used for screen-to-world conversion and rendering
-    private boolean presentationEnabled = true; // Whether this root paints or accepts input in the active scene view.
-    private boolean clipToViewport; // Whether this root clips every child to its viewport's local UI bounds.
-    private boolean customViewportClip; // Whether a parent viewport further restricts this root's clip.
-    private float viewportClipX; // Left edge of the active viewport-local UI clip.
-    private float viewportClipY; // Bottom edge of the active viewport-local UI clip.
-    private float viewportClipWidth; // Width of the active viewport-local UI clip.
-    private float viewportClipHeight; // Height of the active viewport-local UI clip.
-    private float hoverTime; // Time accumulated while hovering the current node
-    private Tooltip activeTooltip; // Tooltip currently being displayed in the overlay layer
-    private final EventHandler<WindowFocusEvent> focusListener = event -> {
-        if (!event.isFocused()) cancelInput();
-    }; // Persistent window-focus listener cancelling UI input on focus loss.
-
     /**
      * <p>
      * Creates a new {@code UIRoot}, initializes Yoga configuration, attaches the
@@ -278,7 +302,9 @@ public class UIRoot extends UIContainer {
      * does not participate in interaction and exists purely for top-level floating UI.
      * </p>
      */
-    public UIRoot() {this(0);}
+    public UIRoot() {
+        this(0);
+    }
 
     /**
      * Creates a UI root whose input is delivered before lower-priority application listeners.
@@ -295,18 +321,23 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigSetUseWebDefaults(yogaConfig, true);
         attachToRoot(yogaConfig);
         setRoot(this);
-        if (nanoVGHandle != 0L) {
-            ThemeData defaults = new ThemeData();
-            defaults.setToken(Label.FONT_KEY, getDefaultFont());
-            setTheme(defaults);
-        }
+        defaultTheme = new ProfessionalTheme();
+        setTheme(defaultTheme.create());
 
         setSize(Window.getWidth(), Window.getHeight());
 
-        overlayLayer.getLayout().absolute().left(0).top(0).width(Window.getWidth()).height(Window.getHeight()).noGrow().noShrink();
+        overlayLayer.getLayout()
+                .absolute()
+                .left(0)
+                .top(0)
+                .width(Window.getWidth())
+                .height(Window.getHeight())
+                .noGrow()
+                .noShrink();
         overlayLayer.setClickable(false);
         overlayLayer.setFocusable(false);
         overlayLayer.setScrollable(false);
+        overlayLayer.setStyleName("widget-layout");
         super.add(overlayLayer);
 
         JGL.subscribe(EventTypes.KEY_PRESS, inputPriority, keyListener);
@@ -319,6 +350,7 @@ public class UIRoot extends UIContainer {
         Window.addWindowResizeListener(windowListener);
         JGL.subscribe(EventTypes.WINDOW_FOCUS, focusListener);
         JGL.subscribe(EventTypes.TEXT_INPUT, inputPriority, textListener);
+        JGL.subscribe(EventTypes.FILE_DROP, inputPriority, fileDropListener);
         JGL.subscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
     }
 
@@ -349,6 +381,7 @@ public class UIRoot extends UIContainer {
         JGL.unsubscribe(EventTypes.MOUSE_RELEASE, mouseListener);
         JGL.unsubscribe(EventTypes.MOUSE_SCROLL, scrollListener);
         JGL.unsubscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.unsubscribe(EventTypes.FILE_DROP, fileDropListener);
         JGL.subscribe(EventTypes.KEY_PRESS, priority, keyListener);
         JGL.subscribe(EventTypes.KEY_RELEASE, priority, keyListener);
         JGL.subscribe(EventTypes.MOUSE_MOVE, priority, mouseListener);
@@ -357,10 +390,18 @@ public class UIRoot extends UIContainer {
         JGL.subscribe(EventTypes.MOUSE_RELEASE, priority, mouseListener);
         JGL.subscribe(EventTypes.MOUSE_SCROLL, priority, scrollListener);
         JGL.subscribe(EventTypes.TEXT_INPUT, priority, textListener);
+        JGL.subscribe(EventTypes.FILE_DROP, priority, fileDropListener);
         inputPriority = priority;
     }
 
-    private boolean hasUiAt(float x, float y) {
+    /**
+     * Checks whether an interactive UI target occupies the supplied screen coordinates.
+     *
+     * @param x horizontal logical or screen coordinate as used by the caller
+     * @param y vertical logical or screen coordinate as used by the caller
+     * @return checks whether an interactive ui target occupies the supplied screen coordinates
+     */
+    boolean hasUiAt(float x, float y) {
         UINode hit = findNodeAt(x, y, UINode.CLICKABLE_BIT);
         return hit != null && hit != this && hit.blocksLowerInput();
     }
@@ -374,6 +415,9 @@ public class UIRoot extends UIContainer {
      * @return true if ancestor occurs in the parent chain
      */
     private static boolean within(UINode node, UINode ancestor) {
+        /*
+         * Walk parent identities directly, avoiding allocation of an ancestor collection.
+         */
         for (UINode current = node; current != null; current = current.getParent())
             if (current == ancestor) return true;
         return false;
@@ -402,7 +446,9 @@ public class UIRoot extends UIContainer {
      *
      * @return mutable inspection controller
      */
-    public UIInspector getInspector() {return inspector;}
+    public UIInspector getInspector() {
+        return inspector;
+    }
 
     /**
      * Returns the last recorded frame's immutable statistics, initially all zero.
@@ -410,7 +456,9 @@ public class UIRoot extends UIContainer {
      *
      * @return latest frame statistics
      */
-    public UIFrameStats getFrameStats() {return frameStats;}
+    public UIFrameStats getFrameStats() {
+        return frameStats;
+    }
 
     /**
      * <p>
@@ -476,7 +524,8 @@ public class UIRoot extends UIContainer {
         if (viewport != null) {
             viewport.update(Window.getWidth(), Window.getHeight());
             if (viewport.getCamera() != null)
-                viewport.getCamera().setCenter(viewport.getWorldWidth() * .5f, viewport.getWorldHeight() * .5f);
+                viewport.getCamera()
+                    .setCenter(viewport.getWorldWidth() * .5f, viewport.getWorldHeight() * .5f);
             setSize(viewport.getWorldWidth(), viewport.getWorldHeight());
             layout();
         } else {
@@ -545,10 +594,14 @@ public class UIRoot extends UIContainer {
      * @param height the new root height
      */
     public void setSize(float width, float height) {
-        getLayout().width(width).height(height);
+        getLayout()
+                .width(width)
+                .height(height);
         Yoga.YGNodeStyleSetWidth(getYogaMemoryAddress(), width);
         Yoga.YGNodeStyleSetHeight(getYogaMemoryAddress(), height);
-        overlayLayer.getLayout().width(width).height(height);
+        overlayLayer.getLayout()
+                .width(width)
+                .height(height);
         markLayoutDirty();
     }
 
@@ -607,7 +660,8 @@ public class UIRoot extends UIContainer {
         if (node == null) return;
 
         if (node.getParent() != overlayLayer) {
-            if (node.getParent() != null) node.getParent().remove(node);
+            if (node.getParent() != null) node.getParent()
+                    .remove(node);
 
             overlayLayer.add(node);
         }
@@ -676,7 +730,7 @@ public class UIRoot extends UIContainer {
         if (isLayoutDirty()) layout(false);
         updateCursor();
 
-        if (hovered == null) {
+        if (!isNodeInteractiveNow(hovered) || !within(hovered, activeFocusScope())) {
             hideActiveTooltip();
             hoverTime = 0f;
             return;
@@ -698,7 +752,12 @@ public class UIRoot extends UIContainer {
         if (activeTooltip != tooltip) {
             hideActiveTooltip();
             activeTooltip = tooltip;
-            activeTooltip.getLayout().absolute().widthAuto().heightAuto().noGrow().noShrink();
+            activeTooltip.getLayout()
+                    .absolute()
+                    .widthAuto()
+                    .heightAuto()
+                    .noGrow()
+                    .noShrink();
             showTooltip(activeTooltip);
             layout();
         }
@@ -796,7 +855,9 @@ public class UIRoot extends UIContainer {
      *
      * @return active context, or null outside draw
      */
-    public UIRenderContext getRenderContext() {return renderContext;}
+    public UIRenderContext getRenderContext() {
+        return renderContext;
+    }
 
     /**
      * Lazily creates the root-owned shader for textured content inside a rotated
@@ -915,6 +976,7 @@ public class UIRoot extends UIContainer {
         Window.removeWindowResizeListener(windowListener);
         JGL.unsubscribe(EventTypes.WINDOW_FOCUS, focusListener);
         JGL.unsubscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.unsubscribe(EventTypes.FILE_DROP, fileDropListener);
         JGL.unsubscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
         cancelInput();
         focusScopes.clear();
@@ -931,6 +993,10 @@ public class UIRoot extends UIContainer {
         if (nanoSlugCodeFont != null) {
             nanoSlugCodeFont.dispose();
             nanoSlugCodeFont = null;
+        }
+        if (defaultTheme != null) {
+            defaultTheme.close();
+            defaultTheme = null;
         }
         if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
         nanoVGHandle = 0L;
@@ -954,7 +1020,9 @@ public class UIRoot extends UIContainer {
      * @return borrowed root-owned font, or null before graphics initialization
      */
     SlugFont getNanoTextFont(boolean code) {
-        if (disposed || nanoVGHandle == 0) return null;
+        if (disposed) return null;
+        if (!code && defaultTheme != null) return defaultTheme.getFont();
+        if (nanoVGHandle == 0) return null;
         SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
         if (current != null) return current;
         current = new SlugFont(SlugData.load(SystemFonts.find(code).toString(), 32, 224), true);
@@ -1086,7 +1154,9 @@ public class UIRoot extends UIContainer {
     /**
      * Move backwards through the active focus scope, wrapping at its start.
      */
-    public void focusPrevious() {moveFocus(-1);}
+    public void focusPrevious() {
+        moveFocus(-1);
+    }
 
     /**
      * Collects eligible nodes inside the current modal scope and moves focus with
@@ -1144,7 +1214,7 @@ public class UIRoot extends UIContainer {
         if (focusScopes.stream().anyMatch(scope -> scope.node() == node)) return;
         UINode previous = focused;
         showOverlay(node);
-        focusScopes.add(new FocusScope(node, previous));
+        focusScopes.add(new UIFocusScope(node, previous));
         cancelPointer();
         setFocusTo(null);
         focusNext();
@@ -1156,7 +1226,9 @@ public class UIRoot extends UIContainer {
      *
      * @param node modal node to hide; null has no effect
      */
-    public void hideModal(UINode node) {hideOverlay(node);}
+    public void hideModal(UINode node) {
+        hideOverlay(node);
+    }
 
     /**
      * Clear captured gestures and focus without synthesizing a release/click.
@@ -1220,14 +1292,18 @@ public class UIRoot extends UIContainer {
      *
      * @return captured node, or null
      */
-    public UINode getCaptured() {return pressed;}
+    public UINode getCaptured() {
+        return pressed;
+    }
 
     /**
      * Returns the last node selected by pointer hover handling.
      *
      * @return hovered node, or null
      */
-    public UINode getHovered() {return hovered;}
+    public UINode getHovered() {
+        return hovered;
+    }
 
     /**
      * Clears the captured node and button before notifying the former target through
@@ -1319,7 +1395,8 @@ public class UIRoot extends UIContainer {
      */
     private void showTooltip(Tooltip tooltip) {
         if (tooltip.getParent() != overlayLayer) {
-            if (tooltip.getParent() != null) tooltip.getParent().remove(tooltip);
+            if (tooltip.getParent() != null) tooltip.getParent()
+                    .remove(tooltip);
 
             overlayLayer.add(tooltip);
         }
@@ -1354,7 +1431,10 @@ public class UIRoot extends UIContainer {
             mouseY = world.y();
         }
 
-        tooltip.getLayout().absolute().left(mouseX).top(getRenderSpaceHeight() - mouseY - tooltip.getHeight());
+        tooltip.getLayout()
+                .absolute()
+                .left(mouseX)
+                .top(getRenderSpaceHeight() - mouseY - tooltip.getHeight());
 
         tooltip.markLayoutDirty();
         layout();
@@ -1393,7 +1473,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the key press event
      */
-    private void handleKeyPressed(KeyPressEvent event) {
+    void handleKeyPressed(KeyPressEvent event) {
         hideActiveTooltip();
         if (!isNodeFocusableNow(focused)) setFocusTo(null);
         if (focused instanceof NanoLabel && (event.isCtrlDown() || event.isSuperDown()) && event.getKey() == Keyboard.A) {
@@ -1443,7 +1523,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the key release event
      */
-    private void handleKeyReleased(KeyReleaseEvent event) {
+    void handleKeyReleased(KeyReleaseEvent event) {
         if (!isNodeFocusableNow(focused)) setFocusTo(null);
         route(focused, event, Float.NaN, Float.NaN, node -> node.onKeyRelease(event), true);
     }
@@ -1462,7 +1542,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the mouse press event
      */
-    private void handleMousePressed(MousePressEvent event) {
+    void handleMousePressed(MousePressEvent event) {
         hideActiveTooltip();
         if (pressed != null) return;
 
@@ -1513,7 +1593,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the mouse release event
      */
-    private void handleMouseReleased(MouseReleaseEvent event) {
+    void handleMouseReleased(MouseReleaseEvent event) {
         if (event.getButton() == Mouse.LEFT) {
             textDragPending = false;
             if (textDragActive) {
@@ -1557,7 +1637,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the mouse drag event
      */
-    private void handleMouseDragged(MouseDragEvent event) {
+    void handleMouseDragged(MouseDragEvent event) {
         hideActiveTooltip();
         hoverTime = 0f;
         if (extendDocumentSelection(event)) return;
@@ -1580,7 +1660,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the mouse move event
      */
-    private void handleMouseMoved(MouseMoveEvent event) {
+    void handleMouseMoved(MouseMoveEvent event) {
         UINode target = findNodeAt(event.getToX(), event.getToY(), UINode.CLICKABLE_BIT);
 
         if (target != hovered) {
@@ -1617,7 +1697,7 @@ public class UIRoot extends UIContainer {
      *
      * @param event the mouse scroll event
      */
-    private void handleMouseScrolled(MouseScrollEvent event) {
+    void handleMouseScrolled(MouseScrollEvent event) {
         hideActiveTooltip();
         hoverTime = 0f;
 
@@ -1625,6 +1705,21 @@ public class UIRoot extends UIContainer {
         route(target, event, Mouse.getX(), Mouse.getY(), node -> {
             if (node.isScrollable()) node.onMouseScroll(event);
         }, true);
+    }
+
+    /**
+     * Picks the visible desktop-drop destination using ordinary viewport and modal
+     * boundaries, then bubbles the immutable paths until a receiver consumes them.
+     * Drops require no preceding in-application mouse capture or keyboard focus.
+     *
+     * @param event native window path-drop notification
+     */
+    private void handleFileDrop(FileDropEvent event) {
+        if (disposed || !presentationEnabled || event.isConsumed()) return;
+        UINode target = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
+        boolean active = blockLowerInput && hasUiAt(event.getX(), event.getY());
+        route(target, event, event.getX(), event.getY(), node -> node.onFileDrop(event), true);
+        if (active) event.consume();
     }
 
     /**
@@ -1641,13 +1736,14 @@ public class UIRoot extends UIContainer {
      *
      * @param event the window resize event
      */
-    private void handleWindowResized(WindowResizeEvent event) {
+    void handleWindowResized(WindowResizeEvent event) {
         hideActiveTooltip();
 
         if (viewport != null) {
             viewport.update(event.getNewWidth(), event.getNewHeight());
             if (viewport.getCamera() != null)
-                viewport.getCamera().setCenter(viewport.getWorldWidth() * .5f, viewport.getWorldHeight() * .5f);
+                viewport.getCamera()
+                    .setCenter(viewport.getWorldWidth() * .5f, viewport.getWorldHeight() * .5f);
             setSize(viewport.getWorldWidth(), viewport.getWorldHeight());
         } else {
             setSize(event.getNewWidth(), event.getNewHeight());
@@ -1721,182 +1817,8 @@ public class UIRoot extends UIContainer {
      *
      * @return borrowed proportional font, or null before graphics initialization
      */
-    public SlugFont getDefaultFont() {return getNanoTextFont(false);}
-
-    /**
-     * One modal input boundary and the focus target that preceded it. Both nodes
-     * are borrowed references; eligibility is rechecked when restoring focus.
-     *
-     * <p>The stack of these entries constrains routing to the active modal subtree. Removing
-     * a scope may restore its previous focus only if that node is still attached and eligible.</p>
-     *
-     * @param node     modal subtree root
-     * @param previous focus target to restore, possibly null
-     * @author Albert Beaupre
-     */
-    private record FocusScope(UINode node, UINode previous) {
+    public SlugFont getDefaultFont() {
+        return getNanoTextFont(false);
     }
 
-    /**
-     * Persistent global keyboard adapter owned by this root. Forwards press and
-     * release events into scoped root routing and is unregistered during disposal.
-     * <p>The adapter retains its enclosing root and forwards the original event objects, allowing
-     * consumption to remain visible to subsequent routing. Keyboard policy stays in the
-     * root handlers rather than in the adapter.</p>
-     *
-     * @author Albert Beaupre
-     */
-    private final class RootKeyListener implements KeyListener {
-
-        /**
-         * <p>
-         * Forwards a key press event to {@link UIRoot#handleKeyPressed(KeyPressEvent)}.
-         * </p>
-         *
-         * @param event the key press event
-         */
-        @Override
-        public void keyPressed(KeyPressEvent event) {
-            boolean active = blockLowerInput && getFocused() != null;
-            handleKeyPressed(event);
-            if (active || blockLowerInput && getFocused() != null) event.consume();
-        }
-
-        /**
-         * <p>
-         * Forwards a key release event to {@link UIRoot#handleKeyReleased(KeyReleaseEvent)}.
-         * </p>
-         *
-         * @param event the key release event
-         */
-        @Override
-        public void keyReleased(KeyReleaseEvent event) {
-            boolean active = blockLowerInput && getFocused() != null;
-            handleKeyReleased(event);
-            if (active) event.consume();
-        }
-    }
-
-    /**
-     * Persistent pointer adapter forwarding presses, releases, drags, and movement
-     * to the owning root's capture and hover logic.
-     * <p>The original event object is passed through so capture, hit testing, and consumption
-     * share one routing decision. Registration and removal follow the enclosing root's
-     * lifecycle; the adapter owns no native cursor resources.</p>
-     *
-     * @author Albert Beaupre
-     */
-    private final class RootMouseListener implements MouseListener {
-
-        /**
-         * <p>
-         * Forwards a mouse press event to {@link UIRoot#handleMousePressed(MousePressEvent)}.
-         * </p>
-         *
-         * @param event the mouse press event
-         */
-        @Override
-        public void mousePressed(MousePressEvent event) {
-            boolean onUi = blockLowerInput && hasUiAt(event.getX(), event.getY());
-            handleMousePressed(event);
-            if (onUi) {
-                pointerOwned = true;
-                event.consume();
-            }
-        }
-
-        /**
-         * <p>
-         * Forwards a mouse release event to {@link UIRoot#handleMouseReleased(MouseReleaseEvent)}.
-         * </p>
-         *
-         * @param event the mouse release event
-         */
-        @Override
-        public void mouseReleased(MouseReleaseEvent event) {
-            boolean owned = pointerOwned && event.getButton() == pressedButton;
-            if (pointerOwned && pressedButton < 0) owned = true;
-            handleMouseReleased(event);
-            if (owned) {
-                pointerOwned = false;
-                event.consume();
-            }
-        }
-
-        /**
-         * <p>
-         * Forwards a mouse drag event to {@link UIRoot#handleMouseDragged(MouseDragEvent)}.
-         * </p>
-         *
-         * @param event the mouse drag event
-         */
-        @Override
-        public void mouseDragged(MouseDragEvent event) {
-            handleMouseDragged(event);
-            if (pointerOwned) event.consume();
-        }
-
-        /**
-         * <p>
-         * Forwards a mouse move event to {@link UIRoot#handleMouseMoved(MouseMoveEvent)}.
-         * </p>
-         *
-         * @param event the mouse move event
-         */
-        @Override
-        public void mouseMoved(MouseMoveEvent event) {
-            handleMouseMoved(event);
-            if (blockLowerInput && hasUiAt(event.getToX(), event.getToY())) event.consume();
-        }
-    }
-
-    /**
-     * Persistent global scroll adapter forwarding events into the owning root's
-     * hit testing and bubbling path.
-     * <p>It forwards the same event object so a consuming scroll target can stop further
-     * propagation. Scroll offsets belong to controls, while this adapter only connects
-     * global delivery to root routing.</p>
-     *
-     * @author Albert Beaupre
-     */
-    private final class RootScrollListener implements MouseScrollListener {
-
-        /**
-         * <p>
-         * Forwards a mouse scroll event to {@link UIRoot#handleMouseScrolled(MouseScrollEvent)}.
-         * </p>
-         *
-         * @param event the mouse scroll event
-         */
-        @Override
-        public void mouseScrolled(MouseScrollEvent event) {
-            boolean onUi = blockLowerInput && hasUiAt(Mouse.getX(), Mouse.getY());
-            handleMouseScrolled(event);
-            if (onUi) event.consume();
-        }
-    }
-
-    /**
-     * Persistent resize adapter updating the root and optional viewport when the
-     * window dimensions change. Unregistered with the root lifecycle.
-     * <p>The resize event is forwarded to the root's sizing policy instead of directly mutating
-     * individual children. Layout and viewport decisions remain centralized in the owning
-     * root, and this listener allocates no window resources.</p>
-     *
-     * @author Albert Beaupre
-     */
-    private final class RootWindowListener implements WindowResizeListener {
-
-        /**
-         * <p>
-         * Forwards a window resize event to {@link UIRoot#handleWindowResized(WindowResizeEvent)}.
-         * </p>
-         *
-         * @param event the resize event
-         */
-        @Override
-        public void windowResized(WindowResizeEvent event) {
-            handleWindowResized(event);
-        }
-    }
 }

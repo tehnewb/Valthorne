@@ -4,8 +4,6 @@ import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.Sprite;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.shader.Shader;
 
 import java.nio.ByteBuffer;
@@ -157,7 +155,8 @@ public final class TextureBatch {
     private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
     private long totalDrawCalls; // Cumulative nonempty sprite draw count, combined with glyph counts by the getter.
     private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
-    private long totalSubmittedSprites, totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalSubmittedSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
 
     /**
      * <p>
@@ -227,13 +226,31 @@ public final class TextureBatch {
 
         FloatBuffer quad = BufferUtils.createFloatBuffer(TextureBatchContract.QUAD_VERTS * TextureBatchContract.QUAD_FLOATS_PER_VERT);
 
-        quad.put(0f).put(0f).put(0f).put(0f);
-        quad.put(1f).put(0f).put(1f).put(0f);
-        quad.put(1f).put(1f).put(1f).put(1f);
+        quad.put(0f)
+                .put(0f)
+                .put(0f)
+                .put(0f);
+        quad.put(1f)
+                .put(0f)
+                .put(1f)
+                .put(0f);
+        quad.put(1f)
+                .put(1f)
+                .put(1f)
+                .put(1f);
 
-        quad.put(1f).put(1f).put(1f).put(1f);
-        quad.put(0f).put(1f).put(0f).put(1f);
-        quad.put(0f).put(0f).put(0f).put(0f);
+        quad.put(1f)
+                .put(1f)
+                .put(1f)
+                .put(1f);
+        quad.put(0f)
+                .put(1f)
+                .put(0f)
+                .put(1f);
+        quad.put(0f)
+                .put(0f)
+                .put(0f)
+                .put(0f);
 
         quad.flip();
 
@@ -260,6 +277,9 @@ public final class TextureBatch {
      * @return the adjusted float value based on the size parameter
      */
     private static float insetMin(float value, float size) {
+        /*
+         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
+         */
         return size > 1f ? value + 0.5f : value;
     }
 
@@ -274,6 +294,9 @@ public final class TextureBatch {
      * modification for sizes greater than 1
      */
     private static float insetMax(float value, float size) {
+        /*
+         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
+         */
         return size > 1f ? value + size - 0.5f : value + size;
     }
 
@@ -292,6 +315,9 @@ public final class TextureBatch {
      * @return the detected and clamped texture unit count
      */
     private static int detectTextureUnitsClamped(int clampTo) {
+        /*
+         * Clamp native texture capacity to the supported batch contract before allocating indexed storage.
+         */
         int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
         if (units <= 0) {
             units = 8;
@@ -585,35 +611,45 @@ public final class TextureBatch {
      *
      * @return whether logical clipping is active
      */
-    public boolean isClipEnabled() {return clipEnabled;}
+    public boolean isClipEnabled() {
+        return clipEnabled;
+    }
 
     /**
      * Returns the active logical clip's X coordinate in batch drawing space.
      *
      * @return clip X; meaningful when clipping is enabled
      */
-    public float getClipX() {return clipX;}
+    public float getClipX() {
+        return clipX;
+    }
 
     /**
      * Returns the active logical clip's Y coordinate in batch drawing space.
      *
      * @return clip Y; meaningful when clipping is enabled
      */
-    public float getClipY() {return clipY;}
+    public float getClipY() {
+        return clipY;
+    }
 
     /**
      * Returns the active logical clip width before conversion to framebuffer scissor pixels.
      *
      * @return clip width
      */
-    public float getClipWidth() {return clipW;}
+    public float getClipWidth() {
+        return clipW;
+    }
 
     /**
      * Returns the active logical clip height before conversion to framebuffer scissor pixels.
      *
      * @return clip height
      */
-    public float getClipHeight() {return clipH;}
+    public float getClipHeight() {
+        return clipH;
+    }
 
     /**
      * Restores GPU bindings after another renderer has drawn. Call flush() before
@@ -1109,8 +1145,10 @@ public final class TextureBatch {
         float[] srcXs = {srcX0, left, srcX2, texW};
         float[] srcYs = {srcY0, bottom, srcY2, texH};
 
-        float originX = texture.getRotationOrigin().x();
-        float originY = texture.getRotationOrigin().y();
+        float originX = texture.getRotationOrigin()
+                .x();
+        float originY = texture.getRotationOrigin()
+                .y();
 
         float rad = (float) Math.toRadians(-texture.getRotation());
         float sin = (float) Math.sin(rad);
@@ -1687,18 +1725,35 @@ public final class TextureBatch {
 
         a *= opacityMultiplier;
 
-        instanceBuffer.put(x).put(y).put(w).put(h);
-        instanceBuffer.put(r).put(g).put(b).put(a);
+        instanceBuffer.put(x)
+                .put(y)
+                .put(w)
+                .put(h);
+        instanceBuffer.put(r)
+                .put(g)
+                .put(b)
+                .put(a);
         instanceBuffer.put((float) texUnit);
-        instanceBuffer.put(u0).put(v0).put(u1).put(v1);
-        instanceBuffer.put(originX).put(originY);
-        instanceBuffer.put(sinRot).put(cosRot);
+        instanceBuffer.put(u0)
+                .put(v0)
+                .put(u1)
+                .put(v1);
+        instanceBuffer.put(originX)
+                .put(originY);
+        instanceBuffer.put(sinRot)
+                .put(cosRot);
 
         if (clipEnabled) {
-            instanceBuffer.put(clipX).put(clipY).put(clipW).put(clipH);
+            instanceBuffer.put(clipX)
+                    .put(clipY)
+                    .put(clipW)
+                    .put(clipH);
             instanceBuffer.put(1f);
         } else {
-            instanceBuffer.put(0f).put(0f).put(0f).put(0f);
+            instanceBuffer.put(0f)
+                    .put(0f)
+                    .put(0f)
+                    .put(0f);
             instanceBuffer.put(0f);
         }
 
@@ -1706,114 +1761,36 @@ public final class TextureBatch {
     }
 
     /**
-     * Queues live Slug outlines at a baseline origin in the normal batch scope.
-     * Consecutive text calls share a glyph queue; switching to sprites preserves
-     * submission order. Null tint selects the batch color. Translation, logical
-     * clipping and opacity apply exactly once when glyphs are submitted.
-     *
-     * @param font borrowed live font, kept alive through flush
-     * @param text UTF-16 text; null or empty submits nothing
-     * @param x baseline X in world units before batch translation
-     * @param y baseline Y in world units before batch translation
-     * @param size finite nonnegative world units per em
-     * @param tint copied tint, or null for the batch color
-     * @throws IllegalStateException if the batch is not drawing or the font is disposed
-     * @throws IllegalArgumentException if size is negative or nonfinite
-     */
-    public void draw(SlugFont font, String text, float x, float y, float size, Color tint) {
-        if (!drawing) throw new IllegalStateException("Call begin() before draw().");
-        Objects.requireNonNull(font, "font");
-        if (!Float.isFinite(size) || size < 0f)
-            throw new IllegalArgumentException("Size must be finite and nonnegative.");
-        if (text == null || text.isEmpty() || size == 0f || opacityMultiplier == 0f) return;
-        Color selected = tint == null ? color : tint;
-        if (selected.a() <= 0f) return;
-        if (font.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
-        prepareGlyphs(selected).draw(font, text, x + translationX, y + translationY, size);
-    }
-
-    /**
-     * Queues a retained layout using live curves without repeating text layout.
-     * The run and its font are borrowed; the font must outlive queued draws.
-     *
-     * @param run precomputed glyph positions and size
-     * @param x baseline X before batch translation
-     * @param y baseline Y before batch translation
-     * @param tint copied tint, or null for the batch color
-     * @throws IllegalStateException if the batch is not drawing or the font is disposed
-     */
-    public void draw(SlugTextRun run, float x, float y, Color tint) {
-        if (!drawing) throw new IllegalStateException("Call begin() before draw().");
-        Objects.requireNonNull(run, "run");
-        if (run.glyphCount() == 0 || run.size() == 0f || opacityMultiplier == 0f) return;
-        Color selected = tint == null ? color : tint;
-        if (selected.a() <= 0f) return;
-        SlugFont font = run.font();
-        if (font.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
-        prepareGlyphs(selected).draw(run, x + translationX, y + translationY);
-    }
-
-    /**
-     * Coordinates exclusive use of shared staging and prepares text submission.
-     * GPU state and glyph layout remain owned by the internal glyph component.
-     *
-     * @param tint validated nonnull text tint
-     * @return prepared glyph component with the sprite queue flushed
-     */
-    private TextureBatchGlyphs prepareGlyphs(Color tint) {
-        TextureBatchGlyphs glyphs = getGlyphs();
-        if (!glyphs.isDrawing()) flush();
-        glyphs.prepare(tint, opacityMultiplier, clipEnabled, clipX, clipY, clipW, clipH);
-        return glyphs;
-    }
-
-    /**
      * Lazily creates glyph implementation state while borrowing existing storage.
      * Sprite-only batches allocate no glyph component or associated matrices.
      *
+     * The component is borrowed and remains owned by this batch. Its public
+     * text API requires an active begin/end scope on this graphics thread.
+     *
      * @return this batch's reusable glyph component
      */
-    private TextureBatchGlyphs getGlyphs() {
-        if (glyphs == null) glyphs = new TextureBatchGlyphs(instanceBytes, quadVBO, instanceVBO, maxSprites);
+    public TextureBatchGlyphs getGlyphs() {
+        if (glyphs == null) glyphs = new TextureBatchGlyphs(this, instanceBytes, quadVBO, instanceVBO, maxSprites);
         return glyphs;
     }
 
     /**
-     * Applies a rigid world transform to text, matching a caller's custom sprite
-     * transform. UI scopes use this for composed node rotations. Previously queued
-     * work is flushed before the transform changes; begin resets it to identity.
+     * Reports the parent's drawing scope to its owned rendering components.
      *
-     * @param cosine finite rotation cosine
-     * @param sine finite rotation sine
-     * @param x finite horizontal transform offset
-     * @param y finite vertical transform offset
+     * @return whether begin has established an active batch scope
      */
-    public void setTextTransform(float cosine, float sine, float x, float y) {
-        if (!drawing) throw new IllegalStateException("Call begin() before setTextTransform().");
-        if (!Float.isFinite(cosine) || !Float.isFinite(sine) || !Float.isFinite(x) || !Float.isFinite(y))
-            throw new IllegalArgumentException("Text transform must be finite.");
-        if (glyphs == null && cosine == 1f && sine == 0f && x == 0f && y == 0f) return;
-        TextureBatchGlyphs glyphs = getGlyphs();
-        if (glyphs.matchesTransform(cosine, sine, x, y)) return;
-        flush();
-        glyphs.setTransform(cosine, sine, x, y);
+    boolean isDrawing() {
+        return drawing;
     }
 
     /**
-     * Aligns a text baseline to the nearest physical pixel boundary when the
-     * combined camera/text projection is axis-aligned and uniformly scaled.
-     * Begins a glyph segment so subsequent text reuses its projection/viewport
-     * snapshot. Rotated or nonuniform projections retain the supplied baseline.
+     * Borrows the current default tint for owned rendering components.
+     * The borrower must not mutate the returned color.
      *
-     * @param baseline finite Y coordinate before batch translation
-     * @return aligned baseline in the same local world coordinates
+     * @return live batch tint
      */
-    public float alignTextBaseline(float baseline) {
-        if (!drawing) throw new IllegalStateException("Call begin() before alignTextBaseline().");
-        if (!Float.isFinite(baseline)) throw new IllegalArgumentException("Baseline must be finite.");
-        TextureBatchGlyphs glyphs = getGlyphs();
-        if (!glyphs.isDrawing()) flush();
-        return glyphs.alignBaseline(baseline, translationY);
+    Color getDefaultTint() {
+        return color;
     }
 
     /**
@@ -1893,7 +1870,9 @@ public final class TextureBatch {
      *
      * @return configured culling flag
      */
-    public boolean isCullingEnabled() {return cullingEnabled;}
+    public boolean isCullingEnabled() {
+        return cullingEnabled;
+    }
 
     /**
      * Standard-quad viewport culling. Custom shaders are conservatively exempt.
@@ -1908,14 +1887,18 @@ public final class TextureBatch {
      *
      * @return lifetime submitted-sprite count
      */
-    public long getTotalSubmittedSprites() {return totalSubmittedSprites;}
+    public long getTotalSubmittedSprites() {
+        return totalSubmittedSprites;
+    }
 
     /**
      * Returns the cumulative number of sprites rejected by viewport culling.
      *
      * @return lifetime culled-sprite count
      */
-    public long getTotalCulledSprites() {return totalCulledSprites;}
+    public long getTotalCulledSprites() {
+        return totalCulledSprites;
+    }
 
     /**
      * Returns the cumulative count of nonempty sprite and glyph draws, including
@@ -1923,7 +1906,9 @@ public final class TextureBatch {
      *
      * @return lifetime draw-call count
      */
-    public long getTotalDrawCalls() {return totalDrawCalls + (glyphs == null ? 0L : glyphs.getTotalDrawCalls());}
+    public long getTotalDrawCalls() {
+        return totalDrawCalls + (glyphs == null ? 0L : glyphs.getTotalDrawCalls());
+    }
 
     /**
      * Finishes any live glyph segment and restores the sprite pipeline, then

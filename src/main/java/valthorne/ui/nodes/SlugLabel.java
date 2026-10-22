@@ -27,6 +27,8 @@ import java.util.Objects;
  * Container clipping is applied in world coordinates, including rotated labels.
  * The label owns only CPU layout; its root's texture
  * batch owns GPU drawing resources.
+ * Axis-aligned line origins and baselines align to physical pixels while glyph
+ * advances retain fractional precision; rotated placement is preserved.
  * @author Albert Beaupre
  */
 public final class SlugLabel extends UINode {
@@ -85,7 +87,9 @@ public final class SlugLabel extends UINode {
      * Reads the normalized source string retained by the glyph layout.
      * @return current text, never null
      */
-    public String text() { return run.text(); }
+    public String text() {
+        return run.text();
+    }
 
     /**
      * Changes the em scale, rebuilds glyph positions when necessary, and updates dimensions.
@@ -104,7 +108,9 @@ public final class SlugLabel extends UINode {
      * Reads the retained font scale, which is independent of the node's layout height.
      * @return world units per em
      */
-    public float size() { return run.size(); }
+    public float size() {
+        return run.size();
+    }
 
     /**
      * Borrows a tint object without copying it; later mutations affect subsequent draws.
@@ -157,6 +163,7 @@ public final class SlugLabel extends UINode {
 
     @Override
     public void draw(TextureBatch batch) {
-        run.draw(batch, getRenderX(), getRenderY() + getHeight() - font.ascent() * run.size(), color);
+        float baseline = getRenderY() + getHeight() - font.ascent() * run.size();
+        run.draw(batch, batch.getGlyphs().alignTextOrigin(getRenderX()), batch.getGlyphs().alignTextBaseline(baseline), color);
     }
 }

@@ -160,7 +160,8 @@ public final class SlugFont implements Dimensional {
         int characterCount = data.characterCount();
 
         ByteBuffer fontBuffer = BufferUtils.createByteBuffer(fontBytes.length);
-        fontBuffer.put(fontBytes).flip();
+        fontBuffer.put(fontBytes)
+                .flip();
 
         STBTTFontinfo info = STBTTFontinfo.create();
         if (!stbtt_InitFont(info, fontBuffer)) {
@@ -222,7 +223,8 @@ public final class SlugFont implements Dimensional {
      */
     public void draw(TextureBatch batch, String text, float x, float y, float size, Color tint) {
         if (batch == null) throw new NullPointerException("batch");
-        batch.draw(this, text, x, y, size, tint);
+        batch.getGlyphs()
+                .draw(this, text, x, y, size, tint);
     }
 
     /**
@@ -804,7 +806,9 @@ public final class SlugFont implements Dimensional {
      *
      * @return true after disposal; measurement remains available
      */
-    public boolean isDisposed() { return disposed; }
+    public boolean isDisposed() {
+        return disposed;
+    }
 
     /**
      * Uploads staged outline data once with the owning context current. Both texture

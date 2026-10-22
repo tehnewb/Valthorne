@@ -1,5 +1,9 @@
 package valthorne.ui.nodes.nano;
 
+import java.util.ArrayList;
+import valthorne.Keyboard;
+import valthorne.event.events.KeyPressEvent;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -19,28 +23,47 @@ import java.util.function.Function;
  * @author Albert Beaupre
  */
 public class NanoComboBox<T> extends NanoContainer {
-    /** Borrows the Nano caption for custom layout. @return owned trigger caption */
-    public NanoLabel getLabel() { return trigger.getLabel(); }
+    /**
+     * Borrows the Nano caption for custom layout. @return owned trigger caption
+     */
+    public NanoLabel getLabel() {
+        return trigger.getLabel();
+    }
 
-    /** Returns the formatted selection or placeholder. @return displayed caption */
-    public String getText() { return trigger.getText(); }
+    /**
+     * Returns the formatted selection or placeholder. @return displayed caption
+     */
+    public String getText() {
+        return trigger.getText();
+    }
 
-    /** Borrows the button used to paint and activate this control. @return owned trigger */
-    public NanoButton getTrigger() { return trigger; }
+    /**
+     * Borrows the button used to paint and activate this control. @return owned trigger
+     */
+    public NanoButton getTrigger() {
+        return trigger;
+    }
 
-    /** Keeps named widget chrome on the actual NanoVG button. */
-    @Override protected void applyLayout() {
-        trigger.setStyleName(getStyleName());
+    /**
+     * Keeps named widget chrome on the actual NanoVG button.
+     */
+    @Override
+    protected void applyLayout() {
+        String name = getStyleName();
+        trigger.setStyleName(name == null || name.isEmpty() ? "combo-trigger" : name);
         super.applyLayout();
     }
 
-    /** Mirrors focus for painting while the root retains this control as its focus target. */
-    @Override public void setFocused(boolean focused) {
+    /**
+     * Mirrors focus for painting while the root retains this control as its focus target.
+     */
+    @Override
+    public void setFocused(boolean focused) {
         super.setFocused(focused);
         trigger.setFocused(focused);
     }
 
-    private final NanoButton trigger = new NanoButton("Select...");
+    private final NanoButton trigger = new NanoButton("Select..."); // Owned button opening the current option snapshot.
     private List<T> items = List.of(); // Immutable option sequence; elements remain borrowed.
     private Function<? super T, String> formatter = String::valueOf; // Option-to-label conversion callback.
     private Consumer<? super T> change = value -> {}; // User-selection listener, invoked after dismissal.
@@ -51,10 +74,24 @@ public class NanoComboBox<T> extends NanoContainer {
      * Creates an empty dropdown whose standard button action toggles the popup.
      */
     public NanoComboBox() {
-        setClickable(true); setFocusable(true);
-        trigger.setFocusable(false); trigger.getLayout().widthPercent(100).heightPercent(100); add(trigger);
-        trigger.action(button -> { if (popup.isOpen()) popup.close(); else open(); });
-        getLayout().minWidth(160).height(36);
+        setClickable(true);
+        setFocusable(true);
+        trigger.leftAligned(true);
+        NanoDisclosureIndicator arrow = new NanoDisclosureIndicator(() -> true);
+        arrow.getLayout()
+                .leftAuto()
+                .right(8);
+        trigger.add(arrow);
+        trigger.setFocusable(false);
+        trigger.getLayout()
+                .widthPercent(100)
+                .heightPercent(100);
+        add(trigger);
+        trigger.action(button -> {
+            if (popup.isOpen()) popup.close(); else open();
+        });
+        getLayout()
+                .minWidth(160);
     }
 
     /**
@@ -64,26 +101,36 @@ public class NanoComboBox<T> extends NanoContainer {
      */
     public NanoComboBox<T> items(List<T> items) {
         List<T> copy = List.copyOf(items);
-        popup.close(); this.items = copy; selected = -1; trigger.text("Select..."); return this;
+        popup.close();
+        this.items = copy;
+        selected = -1;
+        trigger.text("Select...");
+        return this;
     }
 
     /**
      * Returns the immutable option list; individual values are not deep copied.
      * @return options in menu order
      */
-    public List<T> getItems() { return items; }
+    public List<T> getItems() {
+        return items;
+    }
 
     /**
      * Reads the selected index without notifying listeners.
      * @return index or -1 when empty
      */
-    public int getSelectedIndex() { return selected; }
+    public int getSelectedIndex() {
+        return selected;
+    }
 
     /**
      * Borrows the selected value; no selection returns null.
      * @return selected option or null
      */
-    public T getSelected() { return selected < 0 ? null : items.get(selected); }
+    public T getSelected() {
+        return selected < 0 ? null : items.get(selected);
+    }
 
     /**
      * Sets selection silently, dismissing options only when the index or formatted
@@ -124,7 +171,10 @@ public class NanoComboBox<T> extends NanoContainer {
     public NanoComboBox<T> formatter(Function<? super T, String> formatter) {
         Objects.requireNonNull(formatter);
         String label = selected < 0 ? "Select..." : Objects.requireNonNull(formatter.apply(getSelected()));
-        popup.close(); this.formatter = formatter; trigger.text(label); return this;
+        popup.close();
+        this.formatter = formatter;
+        trigger.text(label);
+        return this;
     }
 
     /**
@@ -132,7 +182,10 @@ public class NanoComboBox<T> extends NanoContainer {
      * @param listener nonnull callback
      * @return this dropdown
      */
-    public NanoComboBox<T> onChange(Consumer<? super T> listener) { change = Objects.requireNonNull(listener); return this; }
+    public NanoComboBox<T> onChange(Consumer<? super T> listener) {
+        change = Objects.requireNonNull(listener);
+        return this;
+    }
 
     /**
      * Builds labels for a new opening and presents options below this control.
@@ -140,12 +193,13 @@ public class NanoComboBox<T> extends NanoContainer {
      */
     public void open() {
         if (isDisabled() || getRoot() == null || items.isEmpty()) return;
-        var commands = new java.util.ArrayList<NanoPopupMenu.Item>();
+        var commands = new ArrayList<NanoPopupMenuItem>();
         for (int i = 0; i < items.size(); i++) {
             int index = i;
-            commands.add(new NanoPopupMenu.Item(Objects.requireNonNull(formatter.apply(items.get(i))), () -> select(index), true));
+            commands.add(new NanoPopupMenuItem(Objects.requireNonNull(formatter.apply(items.get(i))), () -> select(index), true));
         }
-        popup.items(commands).showBelow(this);
+        popup.items(commands)
+                .showBelow(this);
         if (selected >= 0) popup.highlight(selected);
     }
 
@@ -154,12 +208,16 @@ public class NanoComboBox<T> extends NanoContainer {
      * Enter and Space use the normal button toggle action; disabled controls ignore keys.
      * @param event routed control key press
      */
-    @Override public void onKeyPress(valthorne.event.events.KeyPressEvent event) {
+    @Override
+    public void onKeyPress(KeyPressEvent event) {
         if (isDisabled()) return;
-        if (event.getKey() == valthorne.Keyboard.DOWN || event.getKey() == valthorne.Keyboard.UP) {
-            open(); event.consume();
-        } else if (event.getKey() == valthorne.Keyboard.ENTER || event.getKey() == valthorne.Keyboard.SPACE) {
-            if (isOpen()) close(); else open(); event.consume();
+        if (event.getKey() == Keyboard.DOWN || event.getKey() == Keyboard.UP) {
+            open();
+            event.consume();
+        } else if (event.getKey() == Keyboard.ENTER || event.getKey() == Keyboard.SPACE) {
+            if (isOpen()) close();
+            else open();
+            event.consume();
         }
     }
 
@@ -167,15 +225,22 @@ public class NanoComboBox<T> extends NanoContainer {
      * Reports whether the dropdown currently owns an attached option overlay.
      * @return true while open
      */
-    public boolean isOpen() { return popup.isOpen(); }
+    public boolean isOpen() {
+        return popup.isOpen();
+    }
 
     /**
      * Dismisses options without modifying selection or notifying listeners.
      */
-    public void close() { popup.close(); }
+    public void close() {
+        popup.close();
+    }
 
     /**
      * Removes the option overlay when its anchor leaves the UI tree.
      */
-    @Override public void onDestroy() { close(); }
+    @Override
+    public void onDestroy() {
+        close();
+    }
 }

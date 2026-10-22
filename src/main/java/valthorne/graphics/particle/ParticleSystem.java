@@ -8,6 +8,9 @@ import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.Texture;
 import valthorne.io.pool.Pool;
 import valthorne.math.MathUtils;
+import valthorne.math.physics.PhysicsWorld2D;
+import valthorne.math.physics.RigidBody2D;
+import java.util.Objects;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -35,6 +38,7 @@ import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
  *     <li><b>Frame-rate independent continuous emission</b>: uses an accumulator (rate * delta).</li>
  *     <li><b>Frame-rate independent burst emission</b>: burst is released over time using an accumulator (burstRate * delta).</li>
  *     <li><b>Optional render throttling</b>: draw every N seconds and/or cap particles drawn per draw call.</li>
+ *     <li><b>Optional individual physics</b>: bounded reusable rigid bodies collide in a caller-owned {@link PhysicsWorld2D}.</li>
  * </ul>
  *
  * <h2>Required render state</h2>
@@ -75,16 +79,34 @@ import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
  * ps.dispose();
  * }</pre>
  *
+ * <h2>Individual rigid-body particles</h2>
+ * <pre>{@code
+ * ps.enablePhysics(world, new ParticlePhysicsSettings()
+ *         .maxBodies(256)
+ *         .restitution(0.7f)
+ *         .friction(0.3f));
+ * // Reserve space for these bodies in the shared world configuration.
+ * ps.update(delta);              // Emit, age, and attach particles.
+ * world.update(delta);           // Step the shared world exactly once.
+ * ps.synchronizePhysics();       // Copy poses before shadows/custom drawing.
+ * ps.draw();
+ *
+ * // Any live particle can opt out independently.
+ * ps.getActiveParticle(0).setPhysicsEnabled(false);
+ * // Cleanup releases particle bodies; the caller still owns world.
+ * ps.dispose();
+ * }</pre>
+ *
  * @author Albert Beaupre
  * @since February 15th, 2026
  */
 public final class ParticleSystem {
+
+    private ParticlePhysics physics; // Optional reusable per-particle bodies borrowing a shared world.
     private final IntBuffer renderViewport = BufferUtils.createIntBuffer(4); // Reused GL viewport dimensions for quad projection.
     private float sizeScaleX = 1; // Pixels per particle width unit; standalone drawing defaults to pixels.
     private float sizeScaleY = 1; // Pixels per particle height unit.
     private float discSoftness = -1; // Negative uses the supplied image; nonnegative enables analytic discs.
-
-
     /**
      * Power-of-two angular lookup-table length covering one full revolution.
      */
@@ -97,7 +119,6 @@ public final class ParticleSystem {
      * Multiplier converting degrees to angular lookup-table indices.
      */
     private static final float DEG_TO_LUT = TRIG_LUT_SIZE / 360.0f;
-
     /**
      * Sine samples spanning a full revolution, initialized once at class loading.
      */
@@ -146,6 +167,28 @@ public final class ParticleSystem {
      * Bundled particle fragment-stage GLSL loaded once at class initialization.
      */
     private static final String FRAG = ValthorneFiles.readString("valthorne/shaders/particle/particle.frag");
+    private final int maxParticles;                                                           // Maximum number of simultaneously active particles.
+    private final FloatBuffer batch;                                                          // CPU staging buffer for interleaved particle vertex data.
+    private final int vbo;                                                                    // OpenGL buffer object storing particle vertex data.
+    private final int vao;                                                                    // Vertex array object storing the particle attribute layout.
+    private final Shader shader = new Shader(VERT, FRAG);                                     // Shader used to render instanced particle quads.
+    private final Random random = new Random();                                               // Random source used only for spawn distributor offsets.
+    private final float[] spawnTmp = new float[2];                                            // Scratch spawn offset array (dx, dy).
+    private final Texture texture;                                                            // Shared texture used for all particles.
+    private final ParticleEmitter emitter;                                                    // Emitter configuration for spawning and interpolation endpoints.
+    private final Pool<Particle> pool;                                                        // Reuse-only particle pool.
+    private final Particle[] active;                                                          // Active particle list (swap-remove compacted).
+    private int activeCount;                                                                  // Current number of active particles.
+    private boolean externalMotion; // Whether a scene physics owner integrates positions and velocities.
+    private float x;                                                                          // Emitter world-space x position.
+    private float y;                                                                          // Emitter world-space y position.
+    private int burstRemaining;                                                               // Remaining burst particles queued to spawn.
+    private float burstRatePerSecond;                                                         // Burst release rate in particles per second.
+    private float burstAccumulator;                                                           // Fractional accumulator for burst spawning.
+    private float renderInterval = 0f;                                                        // Seconds between draws; 0 means draw every frame.
+    private float renderTimer = 0f;                                                           // Accumulator used to enforce renderInterval.
+    private int maxDrawPerFrame = Integer.MAX_VALUE;                                          // Cap particles drawn per draw() call.
+    private int drawCursor = 0;                                                               // Round-robin cursor for partial drawing.
 
     static {
         for (int i = 0; i < TRIG_LUT_SIZE; i++) {
@@ -154,35 +197,6 @@ public final class ParticleSystem {
             COS_LUT[i] = (float) Math.cos(radians);
         }
     }
-
-    private final int maxParticles;                                                           // Maximum number of simultaneously active particles.
-    private final FloatBuffer batch;                                                          // CPU staging buffer for interleaved particle vertex data.
-    private final int vbo;                                                                    // OpenGL buffer object storing particle vertex data.
-    private final int vao;                                                                    // Vertex array object storing the particle attribute layout.
-
-    private final Shader shader = new Shader(VERT, FRAG);                                     // Shader used to render instanced particle quads.
-    private final Random random = new Random();                                               // Random source used only for spawn distributor offsets.
-    private final float[] spawnTmp = new float[2];                                            // Scratch spawn offset array (dx, dy).
-
-    private final Texture texture;                                                            // Shared texture used for all particles.
-    private final ParticleEmitter emitter;                                                    // Emitter configuration for spawning and interpolation endpoints.
-    private final Pool<Particle> pool;                                                        // Reuse-only particle pool.
-    private final Particle[] active;                                                          // Active particle list (swap-remove compacted).
-
-    private int activeCount;                                                                  // Current number of active particles.
-    private boolean externalMotion; // Whether a scene physics owner integrates positions and velocities.
-    private float x;                                                                          // Emitter world-space x position.
-    private float y;                                                                          // Emitter world-space y position.
-
-    private int burstRemaining;                                                               // Remaining burst particles queued to spawn.
-    private float burstRatePerSecond;                                                         // Burst release rate in particles per second.
-    private float burstAccumulator;                                                           // Fractional accumulator for burst spawning.
-
-    private float renderInterval = 0f;                                                        // Seconds between draws; 0 means draw every frame.
-    private float renderTimer = 0f;                                                           // Accumulator used to enforce renderInterval.
-
-    private int maxDrawPerFrame = Integer.MAX_VALUE;                                          // Cap particles drawn per draw() call.
-    private int drawCursor = 0;                                                               // Round-robin cursor for partial drawing.
 
     /**
      * Creates a new quad particle system.
@@ -239,7 +253,9 @@ public final class ParticleSystem {
      *
      * @return live count
      */
-    public int getActiveCount() {return activeCount;}
+    public int getActiveCount() {
+        return activeCount;
+    }
 
     /**
      * Transfers motion integration to an external owner while retaining emission,
@@ -247,11 +263,77 @@ public final class ParticleSystem {
      *
      * @param externalMotion whether CPU motion integration is disabled
      */
-    public void setExternalMotion(boolean externalMotion) {this.externalMotion = externalMotion;}
+    public void setExternalMotion(boolean externalMotion) {
+        if (externalMotion && physics != null) throw new IllegalStateException("Detach particle physics before transferring motion ownership");
+        this.externalMotion = externalMotion;
+    }
+
+    /**
+     * Gives each participating particle its own reusable rigid body. Call update
+     * before stepping the shared world, then synchronizePhysics before shadow or
+     * custom rendering. draw also synchronizes automatically. The caller owns the
+     * world and must reserve settings.maxBodies worth of native capacity.
+     * Physical particles use native world gravity and collision response; emitter
+     * gravity/wind affect only particles without a body. Native collider dimensions
+     * are captured when a slot begins a particle lifetime.
+     * @param world open shared physics world, never owned by this system
+     * @param settings configuration copied at attachment time
+     * @return this particle system
+     */
+    public ParticleSystem enablePhysics(PhysicsWorld2D world, ParticlePhysicsSettings settings) {
+        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(settings, "settings");
+        if (externalMotion) throw new IllegalStateException("External motion and particle physics cannot both own motion");
+        ParticlePhysics next = new ParticlePhysics(world, settings, maxParticles);
+        disablePhysics();
+        physics = next;
+        return this;
+    }
+
+    /**
+     * Releases every owned particle body while retaining the caller's world.
+     * Existing particles continue ordinary integration from their current state.
+     * @return this particle system
+     */
+    public ParticleSystem disablePhysics() {
+        if (physics != null) {
+            physics.close();
+            physics = null;
+        }
+        return this;
+    }
+
+    /**
+     * Copies current native body positions and velocities into live particles.
+     * Call after the shared world update and before external shadow rendering.
+     */
+    public void synchronizePhysics() {
+        if (physics != null) physics.synchronize();
+    }
+
+    /**
+     * Returns a particle's borrowed body for applying impulses or customizing
+     * native friction/restitution. A pooled lifetime must not retain this handle.
+     * @param particle live particle belonging to this system
+     * @return assigned body, or null without a native slot
+     */
+    public RigidBody2D getPhysicsBody(Particle particle) {
+        Objects.requireNonNull(particle, "particle");
+        return physics == null ? null : physics.body(particle);
+    }
+
+    /**
+     * Reports actual native particle participation, excluding inactive reuse slots.
+     * @return live physics particle count
+     */
+    public int getPhysicsParticleCount() {
+        return physics == null ? 0 : physics.activeCount();
+    }
 
     /**
      * Borrows one live particle for editor visualization on the rendering thread.
-     * The handle may be reused after the next update; do not retain or mutate it.
+     * The handle may be reused after the next update. Per-particle physics can be
+     * toggled while it is live, but the handle must not be retained after recycling.
      *
      * @param index live particle index
      * @return borrowed particle
@@ -396,6 +478,7 @@ public final class ParticleSystem {
      */
     public void update(float delta) {
         if (delta <= 0f) return;
+        synchronizePhysics();
 
         int continuousToSpawn = computeContinuousSpawn(delta);
         int burstToSpawn = computeBurstSpawn(delta);
@@ -420,6 +503,7 @@ public final class ParticleSystem {
      */
     public void draw() {
         if (activeCount <= 0) return;
+        synchronizePhysics();
 
         if (renderInterval > 0f) {
             if (renderTimer < renderInterval) return;
@@ -460,6 +544,7 @@ public final class ParticleSystem {
             if (p == null) continue;
 
             p.setActive(false);
+            if (physics != null) physics.release(p);
             pool.free(p);
             active[i] = null;
         }
@@ -477,11 +562,14 @@ public final class ParticleSystem {
     }
 
     /**
-     * Disposes GPU resources created by this particle system.
+     * Kills live particles and disposes GPU resources and owned particle bodies.
      *
-     * <p>This disposes the internal shader and deletes the internal VBO. It does not dispose the shared {@link Texture}.</p>
+     * <p>This disposes the internal shader, vertex buffers and optional particle
+     * bodies. It does not dispose the shared {@link Texture} or physics world.</p>
      */
     public void dispose() {
+        clear();
+        disablePhysics();
         shader.dispose();
         glDeleteVertexArrays(vao);
         glDeleteBuffers(vbo);
@@ -554,7 +642,7 @@ public final class ParticleSystem {
             Particle p = active[i];
 
             p.setAge(p.getAge() + delta);
-            if (p.getAge() >= p.getLife()) {
+            if (!p.isActive() || p.getAge() >= p.getLife()) {
                 activeCount--;
                 active[i] = active[activeCount];
                 active[activeCount] = null;
@@ -562,13 +650,15 @@ public final class ParticleSystem {
                 if (drawCursor > activeCount) drawCursor = 0;
 
                 p.setActive(false);
+                if (physics != null) physics.release(p);
                 pool.free(p);
                 continue;
             }
 
             float t = p.getAge() / p.getLife();
 
-            if (!externalMotion) {
+            boolean physical = physics != null && physics.attach(p);
+            if (!externalMotion && !physical) {
                 p.setVelX(p.getVelX() + emitter.getWindX() * delta);
                 p.setVelY(p.getVelY() + emitter.getGravityY() * delta);
 
@@ -619,11 +709,16 @@ public final class ParticleSystem {
 
             Color c = p.getColor();
 
-            batch.put(p.getX()).put(p.getY());
+            batch.put(p.getX())
+                    .put(p.getY());
             batch.put(size);
-            batch.put(ax).put(ay);
+            batch.put(ax)
+                    .put(ay);
             batch.put(p.getRotation());
-            batch.put(c.r()).put(c.g()).put(c.b()).put(c.a());
+            batch.put(c.r())
+                    .put(c.g())
+                    .put(c.b())
+                    .put(c.a());
         }
 
         drawCursor = idx;
@@ -728,7 +823,8 @@ public final class ParticleSystem {
         float sx = x;
         float sy = y;
 
-        emitter.getShape().computeOffset(random, spawnTmp);
+        emitter.getShape()
+                .computeOffset(random, spawnTmp);
         sx += spawnTmp[0];
         sy += spawnTmp[1];
 
@@ -754,9 +850,12 @@ public final class ParticleSystem {
         p.setBaseWidth(emitter.getBaseWidth());
         p.setBaseHeight(emitter.getBaseHeight());
 
-        p.getStartColor().set(emitter.getStartColor());
-        p.getEndColor().set(emitter.getEndColor());
-        p.getColor().set(p.getStartColor());
+        p.getStartColor()
+                .set(emitter.getStartColor());
+        p.getEndColor()
+                .set(emitter.getEndColor());
+        p.getColor()
+                .set(p.getStartColor());
     }
     /**
      * Configures projected dimensions independently of particle simulation.
