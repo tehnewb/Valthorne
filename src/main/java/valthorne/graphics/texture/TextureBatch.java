@@ -36,7 +36,9 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * <p>
  * Slug fonts and retained text runs use live outline coverage within this same
  * begin/end scope. The batch lazily creates a curve shader, groups consecutive text
- * submissions, and flushes at sprite/text boundaries to preserve painter order.
+ * submissions, and preserves painter order across sprite/text boundaries.
+ * Compatible default sprites share cached text submissions; custom shader, blend,
+ * transform and sRGB policies retain independent pipeline boundaries.
  * Glyphs share sprite staging storage, quad geometry and the instance VBO.
  * An internal component owns glyph implementation state and is allocated only
  * when text is used; callers keep one batch and the same drawing lifecycle.
@@ -44,7 +46,8 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * uses the current window projection and physical GL viewport; custom sprite shaders
  * do not affect glyphs. Flush before changing projection, viewport or external GL
  * state. Fonts are borrowed and must remain alive until queued text is flushed.
- * No raster atlas or per-draw scratch allocation is used by the text path.
+ * A bounded atlas caches Slug's own exact GPU coverage for axis-aligned sampling;
+ * cold tiles share a bounded staging buffer, without per-glyph scratch allocation.
  * </p>
  * <p>
  * Native pre-rendered display pixels can use {@link #drawEncoded(Texture, float, float, float, float)}.
@@ -1705,6 +1708,8 @@ public final class TextureBatch {
             return;
         }
 
+        if (glyphs != null && activeShader == defaultShader && !encodedSubmission && sinRot == 0f && cosRot == 1f && w > 0f && h > 0f
+                && glyphs.appendSprite(tex.getTextureID(), x + translationX, y + translationY, w, h, u0, v0, u1, v1, tint != null ? tint : color, opacityMultiplier, clipEnabled, clipX, clipY, clipW, clipH)) return;
         finishGlyphs();
         if (encodedInstances != encodedSubmission) {
             if (instanceCount != 0) flush();

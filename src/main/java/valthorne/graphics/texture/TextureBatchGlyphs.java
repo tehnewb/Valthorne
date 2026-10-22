@@ -15,6 +15,8 @@ import java.nio.IntBuffer;
 import java.lang.ref.WeakReference;
 
 import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * Owns live-outline submission and GPU state for one {@link TextureBatch}.
@@ -23,27 +25,35 @@ import static org.lwjgl.opengl.GL33.*;
  * records, font bindings and restoration of the sprite pipeline.
  *
  * <p>Created lazily on the first text operation. It borrows the parent's native
- * staging buffer, quad VBO and instance VBO, with exclusive access while a glyph
- * segment is active. No second staging buffer or stream VBO is allocated. Shader
- * resources are initialized on the first segment and released by the parent.
+ * staging buffer, quad VBO and instance VBO while a glyph segment is active.
+ * A second bounded native staging buffer is allocated only for cold captures;
+ * both streams reuse the parent's VBO. The parent releases all owned resources.
  * Fonts and text runs are borrowed and must outlive queued submission.</p>
  *
- * <p>Repeated axis-aligned glyph samples use a bounded, lazily allocated sixteen
- * MiB R32F coverage atlas. Exact physical size and subpixel baseline phase are
- * retained; tint, opacity and blending stay live. Three distinct drawing
- * scopes establish reuse before a cold capture is admitted. Moving samples,
- * oversized glyphs and general transforms retain analytic coverage. The batch
- * owns and disposes the atlas independently of borrowed font resources.</p>
+ * <p>Positive uniform axis-aligned samples use a lazy sixteen MiB R32F atlas.
+ * Cold tiles are queued and evaluated together before their first use, including
+ * changing text and fractional movement. Physical baseline fractions retain
+ * shader precision without phase quantization or coverage filtering. Run origins
+ * and the original projection arithmetic are preserved without changing the
+ * analytic sampling positions. Oversized glyphs and general transforms retain
+ * direct analytic coverage. Tint and opacity remain live.</p>
  *
- * <p>Stable runs additionally reuse packed CPU geometry, capped at four MiB over
- * 1024 submission slots. Atlas resets, layout changes and drawing-state changes
- * invalidate these records. A hot run copies its instances in bulk instead of
- * repeating per-glyph bounds, phase calculations and cache lookups.</p>
+ * <p>Packed CPU geometry is capped at four MiB over 1024 slots. Stable runs copy
+ * their instances in bulk. Recent rebuilds can reuse an identical shaped glyph
+ * prefix and update only its suffix. Atlas resets and drawing-state changes
+ * invalidate sample addresses. Full-context shaping establishes prefix identity;
+ * no substring is independently shaped or assumed context-free.</p>
  *
- * <p>All calls are confined to the parent's graphics thread. The parent flushes
- * sprites before entering a segment and finishes the segment before drawing
- * sprites, changing transforms or ending a scope. Clip and tint values are
- * copied once per submission; glyph loops allocate no temporary objects.
+ * <p>Compatible unrotated default sprites join cached text in painter order.
+ * OpenGL 3.3 dual-source factors preserve straight sprite blending and
+ * premultiplied text, including their distinct destination-alpha behavior.
+ * Matching sprite triangulation preserves texture sampling at texel boundaries.
+ * Custom shaders, custom blending, depth/cull state, sRGB attachments and text
+ * transforms retain independent pipeline boundaries.</p>
+ *
+ * <p>All calls are confined to the parent's graphics thread. Clip and tint values
+ * are copied per submission; glyph loops allocate no temporary objects. Cold
+ * capture suspends caller masking state and restores it before composition.
  * Package visibility keeps this implementation out of the public drawing API.</p>
  */
 final class TextureBatchGlyphs {
@@ -69,8 +79,9 @@ final class TextureBatchGlyphs {
     private final SlugCoverageCache coverageCache = new SlugCoverageCache(); // Bounded raw Slug coverage reused at identical physical sampling positions.
     private final int[] cacheScissor = new int[4]; // Caller scissor box retained during cold coverage draws.
     private final int[] cachePolygonMode = new int[2]; // Caller polygon rasterization mode retained during cold coverage draws.
-    private final float[] clearCoverage = new float[4]; // Zero clear value for previously occupied atlas regions.
     private final ByteBuffer cacheColorMask = BufferUtils.createByteBuffer(4); // Caller write mask restored after cold coverage draws.
+    private ByteBuffer captures; // Lazily allocated bounded staging for cold atlas tiles.
+    private int captureCount; // Cold tiles evaluated together before queued coverage is sampled.
     private boolean cachedCoverage; // Whether queued instances reference coverage samples rather than outlines.
     private int oldTexture2; // Caller texture binding on the coverage sampler unit.
     private int oldSampler2; // Caller sampler binding on the coverage sampler unit.
@@ -88,9 +99,14 @@ final class TextureBatchGlyphs {
     private float clipW; // Logical clip width in final world coordinates.
     private float clipH; // Logical clip height in final world coordinates.
     private Shader shader; // Lazily initialized curve-coverage shader owned by this component.
+    private Shader mixedShader; // Dual-source composition preserves distinct sprite and glyph alpha rules.
+    private boolean mixedSprites; // Current segment includes compatible ordinary sprites.
+    private int spriteTexture; // Borrowed sprite texture sampled by the mixed segment.
+    private int oldTexture3; // Texture binding restored after mixed composition.
+    private int oldSampler3; // Sampler binding restored after mixed composition.
     private Shader cachedShader; // Coverage-only shader omits analytic curve evaluation and its GPU register pressure.
     private int vao; // Glyph interpretation of the shared quad and instance VBOs.
-    private int indexBuffer; // Four indices preserving the curve shader's original triangle-strip interpolation.
+    private int indexBuffer; // Analytic strip indices followed by the sprite pipeline's original triangles.
     private Matrix4f projection; // Reused combined camera/text transform for coverage and culling.
     private float[] matrix; // Reusable upload storage for the composed glyph projection.
     private Matrix4f transform; // Reused rigid text transform composed with the current projection.
@@ -162,7 +178,6 @@ final class TextureBatchGlyphs {
      * Requires the preceding segment to have finished.
      */
     void resetTransform() {
-        coverageCache.begin();
         geometryScope++;
         cosine = 1f;
         sine = 0f;
@@ -196,6 +211,59 @@ final class TextureBatchGlyphs {
         this.sine = sine;
         transformX = x;
         transformY = y;
+    }
+
+    /**
+     * Appends an unrotated default sprite to a compatible coverage segment.
+     * Dual-source blending retains the sprite pipeline's squared source alpha
+     * while glyphs retain ordinary source-over alpha. Custom blending, sRGB
+     * targets and text transforms keep the independent renderer boundary.
+     *
+     * @param texture borrowed sprite texture name
+     * @param x translated minimum X
+     * @param y translated minimum Y
+     * @param width sprite width
+     * @param height sprite height
+     * @param u0 minimum texture U
+     * @param v0 minimum texture V
+     * @param u1 maximum texture U
+     * @param v1 maximum texture V
+     * @param tint full precision sprite color
+     * @param opacity parent opacity
+     * @param clipped whether a world clip is enabled
+     * @param cx clip minimum X
+     * @param cy clip minimum Y
+     * @param cw clip width
+     * @param ch clip height
+     * @return true when the sprite joined the glyph queue
+     */
+    boolean appendSprite(int texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color tint, float opacity, boolean clipped, float cx, float cy, float cw, float ch) {
+        if (texture == 0 || !drawing || !cachedCoverage || activeFont == null || srgbTarget || oldDepth || oldCull || cosine != 1f || sine != 0f || transformX != 0f || transformY != 0f) return false;
+        if (oldSrcRgb != GL_SRC_ALPHA || oldDstRgb != GL_ONE_MINUS_SRC_ALPHA || oldSrcAlpha != GL_SRC_ALPHA || oldDstAlpha != GL_ONE_MINUS_SRC_ALPHA || oldEquationRgb != GL_FUNC_ADD || oldEquationAlpha != GL_FUNC_ADD) return false;
+        if (mixedShader == null) {
+            String vertex = ValthorneFiles.readString("valthorne/shaders/font/slug.vert");
+            String fragment = ValthorneFiles.readString("valthorne/shaders/font/slug.frag");
+            mixedShader = new Shader(vertex, fragment.replace("#version 330 core", "#version 330 core\n#define SLUG_CACHED_COVERAGE\n#define SLUG_MIXED_SPRITES"));
+            mixedShader.bind();
+            mixedShader.setUniform1i("u_coverageTexture", 2);
+            mixedShader.setUniform1i("u_spriteTexture", 3);
+        }
+        if (!mixedSprites) {
+            glActiveTexture(GL_TEXTURE3);
+            oldTexture3 = readInteger(GL_TEXTURE_BINDING_2D);
+            oldSampler3 = readInteger(GL_SAMPLER_BINDING);
+            mixedSprites = true;
+        }
+        if (instanceCount == capacity || spriteTexture != texture && spriteTexture != 0) flushGlyphs();
+        spriteTexture = texture;
+        instances.putFloat(x).putFloat(y).putFloat(x + width).putFloat(y + height);
+        instances.putFloat(u0).putFloat(v0).putFloat(u1).putFloat(v1);
+        instances.putInt(0).putInt(0);
+        instances.putFloat(tint.r()).putFloat(tint.g()).putFloat(tint.b()).putFloat(tint.a() * opacity);
+        instances.putFloat(-2f).putInt(0);
+        instances.putFloat(cx).putFloat(cy).putFloat(cw).putFloat(ch).putFloat(clipped ? 1f : 0f);
+        instanceCount++;
+        return true;
     }
 
     /**
@@ -244,6 +312,9 @@ final class TextureBatchGlyphs {
         SlugFont font = run.font();
         if (!run.intersects(x, y, viewMinX - padding, viewMinY - padding, viewMaxX + padding, viewMaxY + padding)) return;
         SlugRunGeometry retained = null;
+        byte[] reusable = null;
+        WeakReference<SlugTextRun> retainedIdentity = null;
+        int prefix = 0;
         boolean repeated = false;
         if (run.glyphCount() <= capacity && run.glyphCount() <= MAX_RUN_GEOMETRY_BYTES / TextureBatchContract.GLYPH_STRIDE_BYTES) {
             int hash = System.identityHashCode(run);
@@ -254,34 +325,50 @@ final class TextureBatchGlyphs {
             if (matchesGeometry(retained, run, x, y)) {
                 repeated = retained.scope != geometryScope;
                 if (retained.bytes != null) {
-                    if (!cachedCoverage || activeFont != font || instanceCount + retained.count > capacity) flushGlyphs();
-                    cachedCoverage = true;
-                    activeFont = font;
-                    instances.put(retained.bytes);
-                    instanceCount += retained.count;
-                    retained.scope = geometryScope;
-                    return;
+                    if (retained.revision == run.revision()) {
+                        if (!cachedCoverage || activeFont != font || instanceCount + retained.count > capacity) flushGlyphs();
+                        cachedCoverage = true;
+                        activeFont = font;
+                        instances.put(retained.bytes);
+                        instanceCount += retained.count;
+                        retained.scope = geometryScope;
+                        return;
+                    }
+                    if (retained.complete) prefix = Math.min(retained.count, run.unchangedGlyphPrefix(retained.revision));
+                    reusable = retained.bytes;
+                    retainedIdentity = retained.run;
                 }
-            } else if (retained.bytes != null) {
+            }
+            if (retained.bytes != null) {
                 geometryBytes -= retained.bytes.length;
                 retained.bytes = null;
             }
             retainGeometryKey(retained, run, x, y);
         }
+        if (prefix > 0) {
+            if (!cachedCoverage || activeFont != font || instanceCount + run.glyphCount() > capacity) flushGlyphs();
+            cachedCoverage = true;
+            activeFont = font;
+        }
         int start = instances.position();
         int count = instanceCount;
         long draws = totalDrawCalls;
         long generation = coverageCache.generation();
-        for (int i = 0; i < run.glyphCount(); i++)
+        if (prefix > 0) {
+            instances.put(reusable, 0, prefix * TextureBatchContract.GLYPH_STRIDE_BYTES);
+            instanceCount += prefix;
+        }
+        for (int i = prefix; i < run.glyphCount(); i++)
             appendGlyph(font, run.glyph(i), x + run.xOffset(i), y + run.yOffset(i), run.size());
         int bytes = instances.position() - start;
         if (retained != null && repeated && cachedCoverage && totalDrawCalls == draws && coverageCache.generation() == generation && bytes > 0 && geometryBytes + bytes <= MAX_GEOMETRY_BYTES) {
-            byte[] packed = new byte[bytes];
-            WeakReference<SlugTextRun> identity = new WeakReference<>(run);
+            byte[] packed = reusable != null && reusable.length == bytes ? reusable : new byte[bytes];
+            WeakReference<SlugTextRun> identity = retainedIdentity != null ? retainedIdentity : new WeakReference<>(run);
             instances.get(start, packed);
             retained.run = identity;
             retained.bytes = packed;
             retained.count = instanceCount - count;
+            retained.complete = retained.count == run.glyphCount();
             geometryBytes += bytes;
         }
     }
@@ -320,7 +407,8 @@ final class TextureBatchGlyphs {
     }
 
     /**
-     * Compares every input that can affect packed glyph coordinates or color.
+     * Compares submission state independently of layout revision. The caller
+     * validates the revision or an explicitly preserved shaped prefix before reuse.
      *
      * @param entry retained submission slot
      * @param run current layout
@@ -329,7 +417,7 @@ final class TextureBatchGlyphs {
      * @return true when retained instances remain valid
      */
     private boolean matchesGeometry(SlugRunGeometry entry, SlugTextRun run, float x, float y) {
-        return (entry.bytes == null ? entry.identity == System.identityHashCode(run) : entry.run.get() == run) && entry.revision == run.revision() && entry.size == run.size() && entry.x == x && entry.y == y && entry.color == packedColor && entry.clipped == clipEnabled
+        return (entry.bytes == null ? entry.identity == System.identityHashCode(run) : entry.run.get() == run) && entry.size == run.size() && entry.x == x && entry.y == y && entry.color == packedColor && entry.clipped == clipEnabled
                 && entry.clipX == clipX && entry.clipY == clipY && entry.clipW == clipW && entry.clipH == clipH
                 && entry.cosine == cosine && entry.sine == sine && entry.transformX == transformX && entry.transformY == transformY
                 && entry.viewportX == viewport[0] && entry.viewportY == viewport[1] && entry.viewportW == viewport[2] && entry.viewportH == viewport[3]
@@ -497,8 +585,9 @@ final class TextureBatchGlyphs {
             glVertexAttribPointer(0, 2, GL_FLOAT, false, TextureBatchContract.QUAD_FLOATS_PER_VERT * Float.BYTES, 0L);
             indexBuffer = glGenBuffers();
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-            IntBuffer indices = BufferUtils.createIntBuffer(4);
-            indices.put(0).put(1).put(4).put(2).flip();
+            IntBuffer indices = BufferUtils.createIntBuffer(10);
+            indices.put(0).put(1).put(4).put(2);
+            indices.put(0).put(1).put(2).put(2).put(4).put(0).flip();
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
             int stride = TextureBatchContract.GLYPH_STRIDE_BYTES;
@@ -601,6 +690,12 @@ final class TextureBatchGlyphs {
      * @param size positive finite world units per em
      */
     private void appendGlyph(SlugFont font, SlugGlyph glyph, float x, float y, float size) {
+        float px = 0;
+        float py = 0;
+        if (projectionScale > 0f && projection.m00() > 0f && projection.m11() > 0f) {
+            px = ((projection.m00() * x + projection.m30()) / projection.m33() + 1f) * .5f * viewport[2];
+            py = ((projection.m11() * y + projection.m31()) / projection.m33() + 1f) * .5f * viewport[3];
+        }
         float x0 = x + glyph.minX() * size - padding;
         float y0 = y + glyph.minY() * size - padding;
         float x1 = x + glyph.maxX() * size + padding;
@@ -617,7 +712,7 @@ final class TextureBatchGlyphs {
             y1 = Math.min(y1, clipY + clipH);
         }
         if (x0 >= x1 || y0 >= y1) return;
-        if (projectionScale > 0f && projection.m00() > 0f && projection.m11() > 0f && appendCachedGlyph(font, glyph, x, y, size, x0, y0, x1, y1, cpuClip)) return;
+        if (projectionScale > 0f && projection.m00() > 0f && projection.m11() > 0f && appendCachedGlyph(font, glyph, x, y, size, x0, y0, x1, y1, cpuClip, px, py)) return;
         if (cachedCoverage) {
             flushGlyphs();
             cachedCoverage = false;
@@ -628,11 +723,9 @@ final class TextureBatchGlyphs {
         } else if (instanceCount == capacity) flushGlyphs();
         float inverseSize = 1f / size;
         if (projectionScale > 0f && projection.m00() > 0f && projection.m11() > 0f) {
-            float px = ((projection.m00() * x + projection.m30()) / projection.m33() + 1f) * .5f * viewport[2];
-            float py = ((projection.m11() * y + projection.m31()) / projection.m33() + 1f) * .5f * viewport[3];
-            float ix = (float) Math.floor(px);
-            float iy = (float) Math.floor(py);
-            glyph.writeInstance(instances, x0, y0, x1, y1, ix + viewport[0], iy + viewport[1], px - ix, py - iy, size * projectionScale, packedColor);
+            double ix = Math.floor(px);
+            double iy = Math.floor(py);
+            glyph.writeInstance(instances, x0, y0, x1, y1, (float) ix + viewport[0], (float) iy + viewport[1], (float) (px - ix), (float) (py - iy), size * projectionScale, packedColor);
         } else {
             glyph.writeInstance(instances, x0, y0, x1, y1, (x0 - x) * inverseSize, (y0 - y) * inverseSize, (x1 - x) * inverseSize, (y1 - y) * inverseSize, -1f, packedColor);
         }
@@ -655,32 +748,38 @@ final class TextureBatchGlyphs {
      * @param x1 clipped world maximum X
      * @param y1 clipped world maximum Y
      * @param cpuClip whether clipping has already been applied
+     * @param px original projected physical baseline X
+     * @param py original projected physical baseline Y
      * @return true when coverage instances were queued
      */
-    private boolean appendCachedGlyph(SlugFont font, SlugGlyph glyph, float x, float y, float size, float x0, float y0, float x1, float y1, boolean cpuClip) {
+    private boolean appendCachedGlyph(SlugFont font, SlugGlyph glyph, float x, float y, float size, float x0, float y0, float x1, float y1, boolean cpuClip, float px, float py) {
         float ppem = size * projectionScale;
-        float px = ((projection.m00() * x + projection.m30()) / projection.m33() + 1f) * .5f * viewport[2];
-        float py = ((projection.m11() * y + projection.m31()) / projection.m33() + 1f) * .5f * viewport[3];
         float phaseX = px - (float) Math.floor(px);
         float phaseY = py - (float) Math.floor(py);
-        int left = (int) Math.floor(phaseX + glyph.minX() * ppem - .5f);
-        int bottom = (int) Math.floor(phaseY + glyph.minY() * ppem - .5f);
-        int width = (int) Math.ceil(phaseX + glyph.maxX() * ppem + .5f) - left;
-        int height = (int) Math.ceil(phaseY + glyph.maxY() * ppem + .5f) - bottom;
-        if (width <= 0 || height <= 0 || width > SlugCoverageCache.MAX_GLYPH_EXTENT || height > SlugCoverageCache.MAX_GLYPH_EXTENT) return false;
-        if (coverageCache.full()) {
-            flushGlyphs();
-            coverageCache.reset();
-        }
         int slot = coverageCache.find(glyph, ppem, phaseX, phaseY);
-        if (!coverageCache.contains(slot)) {
-            if (!coverageCache.admit(glyph, ppem, phaseX, phaseY)) return false;
-            flushGlyphs();
+        int left;
+        int bottom;
+        int width;
+        int height;
+        if (coverageCache.contains(slot)) {
+            left = coverageCache.left(slot);
+            bottom = coverageCache.bottom(slot);
+            width = coverageCache.width(slot);
+            height = coverageCache.height(slot);
+        } else {
+            left = (int) Math.floor(phaseX + glyph.minX() * ppem - .5f);
+            bottom = (int) Math.floor(phaseY + glyph.minY() * ppem - .5f);
+            width = (int) Math.ceil(phaseX + glyph.maxX() * ppem + .5f) - left;
+            height = (int) Math.ceil(phaseY + glyph.maxY() * ppem + .5f) - bottom;
+            if (width <= 0 || height <= 0 || width > SlugCoverageCache.MAX_GLYPH_EXTENT || height > SlugCoverageCache.MAX_GLYPH_EXTENT) return false;
+            if (activeFont != font || captureCount == capacity) flushGlyphs();
+            activeFont = font;
             if (coverageCache.needsReset(width, height)) {
+                flushGlyphs();
                 coverageCache.reset();
                 slot = coverageCache.find(glyph, ppem, phaseX, phaseY);
             }
-            captureCoverage(font, glyph, slot, ppem, phaseX, phaseY, left, bottom, width, height);
+            queueCoverage(glyph, slot, ppem, phaseX, phaseY, left, bottom, width, height);
         }
         if (!cachedCoverage || activeFont != font || instanceCount == capacity) flushGlyphs();
         cachedCoverage = true;
@@ -691,30 +790,65 @@ final class TextureBatchGlyphs {
         y0 = Math.max(y0, originY);
         x1 = Math.min(x1, originX + width / projectionScale);
         y1 = Math.min(y1, originY + height / projectionScale);
-        glyph.writeInstance(instances, x0, y0, x1, y1, coverageCache.x(slot) + (x0 - originX) * projectionScale, coverageCache.y(slot) + (y0 - originY) * projectionScale, coverageCache.x(slot) + (x1 - originX) * projectionScale, coverageCache.y(slot) + (y1 - originY) * projectionScale, ppem, packedColor);
-        instances.putFloat(clipX).putFloat(clipY).putFloat(clipW).putFloat(clipH).putFloat(clipEnabled && !cpuClip ? 1f : 0f);
+        instances.putFloat(x0).putFloat(y0).putFloat(x1).putFloat(y1);
+        instances.putFloat(coverageCache.x(slot) + (x0 - originX) * projectionScale).putFloat(coverageCache.y(slot) + (y0 - originY) * projectionScale);
+        instances.putFloat(coverageCache.x(slot) + (x1 - originX) * projectionScale).putFloat(coverageCache.y(slot) + (y1 - originY) * projectionScale);
+        // Cached shaders never read outline addresses or band transforms.
+        instances.position(instances.position() + 24);
+        instances.putFloat(ppem);
+        instances.put((byte) (packedColor >>> 24)).put((byte) (packedColor >>> 16)).put((byte) (packedColor >>> 8)).put((byte) packedColor);
+        if (clipEnabled && !cpuClip) instances.putFloat(clipX).putFloat(clipY).putFloat(clipW).putFloat(clipH).putFloat(1);
+        else {
+            instances.position(instances.position() + 16);
+            instances.putFloat(0);
+        }
         instanceCount++;
         return true;
     }
 
     /**
-     * Evaluates one cold glyph with the original analytic shader into R32F.
-     * An independent tile projection avoids baking camera/frustum clipping into
-     * reusable glyph samples. The complete rectangle includes zero coverage. Caller draw
-     * bindings and sampling uniforms are restored before queued text resumes.
+     * Reserves and queues an exact cold sample without interrupting painter order.
      *
-     * @param font source outline owner
-     * @param glyph source glyph metadata
-     * @param slot vacant coverage entry
-     * @param ppem physical pixels per em
-     * @param phaseX horizontal baseline fraction
-     * @param phaseY vertical baseline fraction
-     * @param left first sample column relative to integer baseline
-     * @param bottom first sample row relative to integer baseline
-     * @param width physical sample width
-     * @param height physical sample height
+     * @param glyph immutable outline metadata
+     * @param slot vacant atlas key
+     * @param ppem physical em size
+     * @param phaseX exact horizontal baseline fraction
+     * @param phaseY exact vertical baseline fraction
+     * @param left sample minimum relative to integer baseline
+     * @param bottom sample minimum relative to integer baseline
+     * @param width sample width in pixels
+     * @param height sample height in pixels
      */
-    private void captureCoverage(SlugFont font, SlugGlyph glyph, int slot, float ppem, float phaseX, float phaseY, int left, int bottom, int width, int height) {
+    private void queueCoverage(SlugGlyph glyph, int slot, float ppem, float phaseX, float phaseY, int left, int bottom, int width, int height) {
+        if (captures == null) captures = memAlloc(capacity * TextureBatchContract.GLYPH_STRIDE_BYTES);
+        int target = coverageCache.texture() == 0 ? readInteger(GL_DRAW_FRAMEBUFFER_BINDING) : -1;
+        if (target != -1) {
+            glActiveTexture(GL_TEXTURE2);
+            try {
+                coverageCache.insert(slot, glyph, ppem, phaseX, phaseY, left, bottom, width, height);
+            } catch (RuntimeException | Error failure) {
+                coverageCache.dispose();
+                throw failure;
+            } finally {
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target);
+            }
+        } else coverageCache.insert(slot, glyph, ppem, phaseX, phaseY, left, bottom, width, height);
+        int x = coverageCache.x(slot);
+        int y = coverageCache.y(slot);
+        glyph.writeInstance(captures, x, y, x + width, y + height, x - left, y - bottom, phaseX, phaseY, ppem, -1);
+        captures.putFloat(0).putFloat(0).putFloat(0).putFloat(0).putFloat(0);
+        captureCount++;
+    }
+
+    /**
+     * Evaluates queued cold tiles in one analytic draw before their first use.
+     * Each tile writes its complete rectangle, including zero coverage, so no
+     * per-glyph clears or framebuffer switches are needed. Caller masking state
+     * is suspended during capture and restored before destination composition.
+     */
+    private void captureCoverage() {
+        if (captureCount == 0) return;
         int target = readInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         boolean scissor = glIsEnabled(GL_SCISSOR_TEST);
         boolean srgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
@@ -727,15 +861,10 @@ final class TextureBatchGlyphs {
         glGetBooleanv(GL_COLOR_WRITEMASK, cacheColorMask);
         glGetIntegerv(GL_POLYGON_MODE, cachePolygonMode);
         try {
-            glActiveTexture(GL_TEXTURE2);
-            coverageCache.insert(slot, glyph, ppem, phaseX, phaseY, width, height);
-            glBindTexture(GL_TEXTURE_2D, 0);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, coverageCache.framebuffer());
-            glViewport(coverageCache.x(slot), coverageCache.y(slot), width, height);
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(coverageCache.x(slot), coverageCache.y(slot), width, height);
+            glViewport(0, 0, SlugCoverageCache.EXTENT, coverageCache.height());
+            glDisable(GL_SCISSOR_TEST);
             glColorMask(true, true, true, true);
-            glClearBufferfv(GL_COLOR, 0, clearCoverage);
             glDisable(GL_BLEND);
             glDisable(GL_FRAMEBUFFER_SRGB);
             glDisable(GL_STENCIL_TEST);
@@ -745,22 +874,22 @@ final class TextureBatchGlyphs {
             glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             shader.bind();
-            shader.setUniformMatrix4("u_mvp", transform.identity().ortho2D(0, width, 0, height).get(matrix));
+            shader.setUniformMatrix4("u_mvp", transform.identity().ortho2D(0, SlugCoverageCache.EXTENT, 0, coverageCache.height()).get(matrix));
             shader.setUniform4f("u_textTransform", 1, 0, 0, 0);
             shader.setUniform1i("u_writeCoverage", 1);
-            font.bindTextures();
-            glyph.writeInstance(instances, 0, 0, width, height, coverageCache.x(slot) - left, coverageCache.y(slot) - bottom, phaseX, phaseY, ppem, -1);
-            instances.putFloat(0).putFloat(0).putFloat(0).putFloat(0).putFloat(0).flip();
+            activeFont.bindTextures();
+            captures.flip();
             glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
             glBufferData(GL_ARRAY_BUFFER, (long) capacity * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
-            glBufferSubData(GL_ARRAY_BUFFER, 0L, instances);
-            glDrawElementsInstanced(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_INT, 0L, 1);
+            glBufferSubData(GL_ARRAY_BUFFER, 0L, captures);
+            glDrawElementsInstanced(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_INT, 0L, captureCount);
             totalDrawCalls++;
         } catch (RuntimeException | Error failure) {
             coverageCache.dispose();
             throw failure;
         } finally {
-            instances.clear();
+            captures.clear();
+            captureCount = 0;
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target);
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
             glScissor(cacheScissor[0], cacheScissor[1], cacheScissor[2], cacheScissor[3]);
@@ -783,16 +912,17 @@ final class TextureBatchGlyphs {
 
     /**
      * Uploads the shared byte storage as packed glyphs and draws the existing
-     * quad through four strip indices. Keeps shader/coverage state active for
+     * quad through analytic strip or compatible sprite triangle indices. Keeps state active for
      * subsequent text and preserves the original antialiasing interpolation.
      */
     private void flushGlyphs() {
+        captureCoverage();
         if (instanceCount == 0) return;
         if (cachedCoverage) {
             if (activeFont.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
         } else activeFont.bindTextures();
         boolean linear = srgbTarget && !activeFont.isHinted();
-        Shader current = cachedCoverage ? cachedShader : shader;
+        Shader current = cachedCoverage ? mixedSprites ? mixedShader : cachedShader : shader;
         current.bind();
         current.setUniformMatrix4("u_mvp", projection.get(matrix));
         current.setUniform4f("u_textTransform", cosine, sine, transformX, transformY);
@@ -803,13 +933,20 @@ final class TextureBatchGlyphs {
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, coverageCache.texture());
         }
+        if (cachedCoverage && mixedSprites) {
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, spriteTexture);
+            glBindSampler(3, 0);
+            glBlendFuncSeparate(GL_SRC1_COLOR, GL_ONE_MINUS_SRC_ALPHA, GL_SRC1_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        } else glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         if (linear) glEnable(GL_FRAMEBUFFER_SRGB);
         else glDisable(GL_FRAMEBUFFER_SRGB);
         instances.flip();
         glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
         glBufferData(GL_ARRAY_BUFFER, (long) capacity * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
         glBufferSubData(GL_ARRAY_BUFFER, 0L, instances);
-        glDrawElementsInstanced(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_INT, 0L, instanceCount);
+        if (cachedCoverage && mixedSprites) glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 4L * Integer.BYTES, instanceCount);
+        else glDrawElementsInstanced(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_INT, 0L, instanceCount);
         totalDrawCalls++;
         instances.clear();
         instanceCount = 0;
@@ -848,7 +985,16 @@ final class TextureBatchGlyphs {
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, oldTexture2);
         glBindSampler(2, oldSampler2);
+        if (mixedSprites) {
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, oldTexture3);
+            glBindSampler(3, oldSampler3);
+            mixedSprites = false;
+            spriteTexture = 0;
+        }
         glActiveTexture(oldActiveTexture);
+        captureCount = 0;
+        if (captures != null) captures.clear();
         if (oldDepth) glEnable(GL_DEPTH_TEST);
         else glDisable(GL_DEPTH_TEST);
         if (oldCull) glEnable(GL_CULL_FACE);
@@ -871,7 +1017,10 @@ final class TextureBatchGlyphs {
     void dispose() {
         if (drawing) restoreState();
         coverageCache.dispose();
+        if (captures != null) memFree(captures);
+        captures = null;
         if (cachedShader != null) cachedShader.dispose();
+        if (mixedShader != null) mixedShader.dispose();
         for (int i = 0; i < geometryCache.length; i++) geometryCache[i] = null;
         geometryBytes = 0;
         if (shader == null) return;

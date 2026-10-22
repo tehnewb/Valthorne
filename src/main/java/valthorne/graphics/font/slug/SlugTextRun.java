@@ -27,6 +27,11 @@ import java.util.Arrays;
  */
 public final class SlugTextRun {
 
+    /**
+     * Bounded consecutive rebuild history used to preserve shaped prefixes.
+     */
+    private static final int PREFIX_HISTORY = 8;
+    private final int[] prefixHistory = new int[PREFIX_HISTORY]; // Unchanged leading drawable count per recent rebuild.
     private final SlugFont font; // Font that owns the glyph data.
     private SlugGlyph[] glyphs; // Drawable glyphs in draw order.
     private float[] xOffsets; // Baseline x offsets in world units.
@@ -34,6 +39,9 @@ public final class SlugTextRun {
     private int count; // Number of drawable glyphs.
     private String text; // Source text.
     private float size; // World units per em.
+    private int previousCount; // Drawable count before the current full-context rebuild.
+    private boolean matchingSize; // Whether previous offsets use the current em size.
+    private int unchangedPrefix; // Drawable prefix preserved by the immediately preceding rebuild.
     private long revision; // Increments whenever layout geometry is rebuilt.
     private float width; // Measured width.
     private float height; // Measured height.
@@ -70,12 +78,15 @@ public final class SlugTextRun {
             throw new IllegalArgumentException("Size must be finite and nonnegative");
         String normalized = text == null ? "" : text;
         if (glyphs != null && this.size == size && normalized.equals(this.text)) return;
+        matchingSize = this.size == size;
+        unchangedPrefix = 0;
         revision++;
         this.text = text == null ? "" : text;
         this.size = size;
 
         int capacity = Math.max(8, this.text.length());
         int oldCount = count;
+        previousCount = count;
         if (glyphs == null) {
             glyphs = new SlugGlyph[capacity];
             xOffsets = new float[capacity];
@@ -85,25 +96,44 @@ public final class SlugTextRun {
         minX = minY = Float.POSITIVE_INFINITY;
         maxX = maxY = Float.NEGATIVE_INFINITY;
 
-        SlugShape shape = font.shape(this.text);
-        for (int index = 0; index < shape.glyphCount(); index++) {
-            SlugGlyph glyph = font.glyphByIndex(shape.glyphIndex(index));
-            if (!glyph.drawable) continue;
-            ensureCapacity(count + 1);
-            float offsetX = shape.x(index) * size;
-            float offsetY = shape.y(index) * size;
-            glyphs[count] = glyph;
-            xOffsets[count] = offsetX;
-            yOffsets[count] = offsetY;
-            minX = Math.min(minX, offsetX + glyph.x0 * size);
-            minY = Math.min(minY, offsetY + glyph.y0 * size);
-            maxX = Math.max(maxX, offsetX + glyph.x1 * size);
-            maxY = Math.max(maxY, offsetY + glyph.y1 * size);
-            count++;
+        SlugShape cached = this.text.isEmpty() ? null : font.cachedShape(this.text);
+        if (cached != null) {
+            for (int index = 0; index < cached.glyphCount(); index++)
+                appendShapedGlyph(cached.glyphIndex(index), cached.x(index), cached.y(index));
+            width = cached.width() * size;
+            height = cached.height() * size;
+        } else {
+            SlugShapeBuilder shape = this.text.isEmpty() ? null : font.layoutRun(this.text, this);
+            width = shape == null ? 0 : shape.width * size;
+            height = shape == null ? 0 : shape.lines * shape.lineHeight * size;
         }
-        width = shape.width() * size;
-        height = shape.height() * size;
+        prefixHistory[(int) (revision & (PREFIX_HISTORY - 1))] = unchangedPrefix;
         if (count < oldCount) Arrays.fill(glyphs, count, oldCount, null);
+    }
+
+    /**
+     * Consumes one glyph from the full-context shaping stream without intermediate
+     * index/position arrays. Whitespace contributes advances but no draw record.
+     *
+     * @param index exact font glyph index selected by HarfBuzz
+     * @param x normalized horizontal baseline position
+     * @param y normalized vertical baseline position
+     */
+    void appendShapedGlyph(int index, float x, float y) {
+        SlugGlyph glyph = font.glyphByIndex(index);
+        if (!glyph.drawable) return;
+        ensureCapacity(count + 1);
+        float offsetX = x * size;
+        float offsetY = y * size;
+        if (matchingSize && count < previousCount && unchangedPrefix == count && glyphs[count] == glyph && xOffsets[count] == offsetX && yOffsets[count] == offsetY) unchangedPrefix++;
+        glyphs[count] = glyph;
+        xOffsets[count] = offsetX;
+        yOffsets[count] = offsetY;
+        minX = Math.min(minX, offsetX + glyph.x0 * size);
+        minY = Math.min(minY, offsetY + glyph.y0 * size);
+        maxX = Math.max(maxX, offsetX + glyph.x1 * size);
+        maxY = Math.max(maxY, offsetY + glyph.y1 * size);
+        count++;
     }
 
     /**
@@ -155,6 +185,24 @@ public final class SlugTextRun {
      */
     public long revision() {
         return revision;
+    }
+
+    /**
+     * Returns the drawable prefix preserved across up to eight recent rebuilds.
+     * Glyph identity and fully shaped offsets must match at the same em size;
+     * contextual substitutions and kerning therefore invalidate affected glyphs.
+     * Older revisions conservatively require rebuilding all drawing geometry.
+     *
+     * @param previousRevision generation represented by the caller's geometry
+     * @return identical leading drawable glyph count, or zero for older revisions
+     */
+    public int unchangedGlyphPrefix(long previousRevision) {
+        long distance = revision - previousRevision;
+        if (distance <= 0 || distance > PREFIX_HISTORY) return 0;
+        int prefix = count;
+        for (int step = 1; step <= distance; step++)
+            prefix = Math.min(prefix, prefixHistory[(int) ((previousRevision + step) & (PREFIX_HISTORY - 1))]);
+        return prefix;
     }
 
     /**

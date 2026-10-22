@@ -30,13 +30,6 @@ final class SlugCoverageCache {
      * Power-of-two identity table with at most half its slots occupied.
      */
     private static final int SLOTS = 16384;
-    /**
-     * Maximum cold captures admitted in one drawing scope.
-     */
-    private static final int MAX_CAPTURES = 256;
-    private final SlugCoverageAdmission admission = new SlugCoverageAdmission(); // Candidate history cannot evict useful GPU samples.
-    private int frame = 1; // Drawing scope generation used to reject one-off moving samples.
-    private int captures; // Cold captures admitted in the current scope.
     private long generation; // Invalidates retained run geometry whenever sample addresses are reused.
     private final SlugGlyph[] glyphs = new SlugGlyph[SLOTS]; // Bounded identity keys.
     private final float[] sizes = new float[SLOTS]; // Physical em size for each key.
@@ -44,43 +37,16 @@ final class SlugCoverageCache {
     private final float[] phasesY = new float[SLOTS]; // Exact fractional physical baseline Y.
     private final int[] xs = new int[SLOTS]; // Atlas column per entry.
     private final int[] ys = new int[SLOTS]; // Atlas row per entry.
+    private final int[] lefts = new int[SLOTS]; // First sample column relative to the integer baseline.
+    private final int[] bottoms = new int[SLOTS]; // First sample row relative to the integer baseline.
+    private final int[] widths = new int[SLOTS]; // Initialized tile widths.
+    private final int[] heights = new int[SLOTS]; // Initialized tile heights.
     private int count; // Number of retained glyph keys.
     private int nextX; // Shelf insertion column.
     private int nextY; // Shelf insertion row.
     private int rowHeight; // Height of the current shelf.
     private int texture; // Owned R32F sample texture, created on first insertion.
     private int framebuffer; // Owned framebuffer targeting the sample texture.
-
-    /**
-     * Starts one batch drawing scope and resets the cold-work budget.
-     */
-    void begin() {
-        frame++;
-        captures = 0;
-    }
-
-    /**
-     * Admits samples repeated across three distinct scopes, limiting cold GPU work.
-     * One-off positions continue through the analytic path without an atlas draw.
-     *
-     * @param glyph outline identity
-     * @param size physical em size
-     * @param phaseX horizontal baseline fraction
-     * @param phaseY vertical baseline fraction
-     * @return true when reuse justifies a cold capture
-     */
-    boolean admit(SlugGlyph glyph, float size, float phaseX, float phaseY) {
-        if (!admission.observe(glyph, size, phaseX, phaseY, frame) || captures >= MAX_CAPTURES) return false;
-        captures++;
-        return true;
-    }
-
-    /**
-     * Reports whether key admission requires clearing queued references first.
-     *
-     * @return true when the index reaches its bounded occupancy
-     */
-    boolean full() { return count >= SLOTS / 2; }
 
     /**
      * Finds a matching key or its vacant insertion slot without allocation.
@@ -102,7 +68,7 @@ final class SlugCoverageCache {
     }
 
     /**
-     * Mixes exact coverage-key bits for cache and admission lookup.
+     * Mixes exact coverage-key bits for bounded sample lookup.
      *
      * @param glyph outline identity
      * @param size physical em size
@@ -172,10 +138,12 @@ final class SlugCoverageCache {
      * @param size physical pixels per em
      * @param phaseX horizontal baseline fraction
      * @param phaseY vertical baseline fraction
+     * @param left first sample column relative to integer baseline
+     * @param bottom first sample row relative to integer baseline
      * @param width sample width
      * @param height sample height
      */
-    void insert(int slot, SlugGlyph glyph, float size, float phaseX, float phaseY, int width, int height) {
+    void insert(int slot, SlugGlyph glyph, float size, float phaseX, float phaseY, int left, int bottom, int width, int height) {
         if (texture == 0) {
             texture = glGenTextures();
             glBindTexture(GL_TEXTURE_2D, texture);
@@ -198,11 +166,54 @@ final class SlugCoverageCache {
         sizes[slot] = size;
         phasesX[slot] = phaseX;
         phasesY[slot] = phaseY;
+        lefts[slot] = left;
+        bottoms[slot] = bottom;
+        widths[slot] = width;
+        heights[slot] = height;
         xs[slot] = nextX;
         ys[slot] = nextY;
         nextX += width;
         rowHeight = Math.max(rowHeight, height);
     }
+
+    /**
+     * Returns a cached tile's first sample relative to the integer baseline.
+     *
+     * @param slot populated key
+     * @return relative sample column
+     */
+    int left(int slot) { return lefts[slot]; }
+
+    /**
+     * Returns a cached tile's first row relative to the integer baseline.
+     *
+     * @param slot populated key
+     * @return relative sample row
+     */
+    int bottom(int slot) { return bottoms[slot]; }
+
+    /**
+     * Returns the initialized sample rectangle width.
+     *
+     * @param slot populated key
+     * @return physical sample columns
+     */
+    int width(int slot) { return widths[slot]; }
+
+    /**
+     * Returns the initialized sample rectangle height.
+     *
+     * @param slot populated key
+     * @return physical sample rows
+     */
+    int height(int slot) { return heights[slot]; }
+
+    /**
+     * Returns the fixed physical row count used by batched atlas captures.
+     *
+     * @return atlas rows, bounded to sixteen MiB of R32F storage
+     */
+    int height() { return EXTENT; }
 
     /**
      * Returns an entry's atlas column.
@@ -241,7 +252,6 @@ final class SlugCoverageCache {
         if (framebuffer != 0) glDeleteFramebuffers(framebuffer);
         if (texture != 0) glDeleteTextures(texture);
         framebuffer = texture = 0;
-        admission.reset();
         reset();
     }
 }

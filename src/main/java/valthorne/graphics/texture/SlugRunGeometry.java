@@ -39,5 +39,6 @@ final class SlugRunGeometry {
     long generation; // Atlas generation referenced by retained sample coordinates.
     long scope; // Most recent drawing scope observing this key.
     byte[] bytes; // Bounded packed glyph instances, or null until repeated reuse.
+    boolean complete; // Whether packed storage represents every drawable glyph of its source revision.
     int count; // Instance count represented by the packed bytes.
 }

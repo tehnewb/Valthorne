@@ -19,7 +19,13 @@ in vec2 v_world;
 flat in vec4 v_clipRect;
 flat in float v_clipEnabled;
 
+#ifdef SLUG_MIXED_SPRITES
+layout(location = 0, index = 0) out vec4 fragColor;
+layout(location = 0, index = 1) out vec4 blendSource;
+uniform sampler2D u_spriteTexture;
+#else
 out vec4 fragColor;
+#endif
 
 // Grayscale alpha-response adaptation from Microsoft Terminal (MIT).
 // Source: src/renderer/atlas/dwrite_helpers.hlsl. License: META-INF/licenses/microsoft-terminal.txt.
@@ -175,6 +181,14 @@ void main() {
         v_world.x > v_clipRect.x + v_clipRect.z || v_world.y > v_clipRect.y + v_clipRect.w)) {
         discard;
     }
+#ifdef SLUG_MIXED_SPRITES
+    if (v_pixelsPerEm == -2.0) {
+        vec4 c = texture(u_spriteTexture, v_texCoord) * v_color;
+        fragColor = c;
+        blendSource = vec4(c.a);
+        return;
+    }
+#endif
 #ifdef SLUG_CACHED_COVERAGE
     float coverage = texelFetch(u_coverageTexture, ivec2(floor(v_texCoord)), 0).r;
 #else
@@ -189,5 +203,11 @@ void main() {
         discard;
     }
     float alpha = v_color.a * coverage;
+#ifdef SLUG_MIXED_SPRITES
     fragColor = vec4(v_color.rgb * alpha, alpha);
+    // Glyphs are already premultiplied; sprites use their own alpha as source factor.
+    blendSource = vec4(1.0);
+#else
+    fragColor = vec4(v_color.rgb * alpha, alpha);
+#endif
 }

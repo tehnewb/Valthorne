@@ -18,14 +18,15 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
 
 /**
  * Unicode paragraph/script analysis and HarfBuzz layout assembly. This builder
- * is single-use: completed arrays transfer to immutable SlugShape storage;
- * native UTF-16 scratch is borrowed from the face, with oversized input released
+ * transfers completed editing arrays to immutable SlugShape storage; draw-only
+ * instances stream directly into their borrowed destination without staging
+ * glyph or editing arrays. Native UTF-16 scratch is borrowed from the face, with oversized input released
  * before build returns. Printable ASCII still uses full HarfBuzz shaping while
  * avoiding unnecessary bidi, script and grapheme itemization. Directional runs are
  * reordered visually while their cluster indices retain absolute UTF-16 positions.
  */
 final class SlugShapeBuilder {
-    final String text; // Original source whose logical indices are preserved.
+    String text; // Original source whose logical indices are preserved.
     final float lineHeight; // Baseline spacing in em units.
     final float[] carets; // Leading caret positions for every UTF-16 offset.
     final int[] caretLines; // Logical line number for each insertion position.
@@ -45,6 +46,8 @@ final class SlugShapeBuilder {
     float width; // Largest line advance in em units.
     private final SlugNativeFace face; // Borrowed native face and reusable HarfBuzz scratch.
     private ByteBuffer utf16; // Borrowed or temporary absolute-indexed UTF-16 native input.
+    private SlugTextRun drawTarget; // Borrowed draw-only destination, cleared before a rebuild returns.
+    private boolean editing = true; // Whether caret and selection metadata is required by this build.
     private float penX; // Current visual pen X in em units.
     private int line; // Current logical line number.
 
@@ -56,10 +59,23 @@ final class SlugShapeBuilder {
      * @param lineHeight baseline spacing in em units
      */
     SlugShapeBuilder(SlugNativeFace face, String text, float lineHeight) {
+        this(face, text, lineHeight, true);
+    }
+
+    /**
+     * Creates editing staging or a draw-only stream with no editing arrays.
+     *
+     * @param face borrowed exact-file shaping face
+     * @param text initial UTF-16 input
+     * @param lineHeight baseline spacing in em units
+     * @param editing whether immutable caret/selection layouts will be published
+     */
+    SlugShapeBuilder(SlugNativeFace face, String text, float lineHeight, boolean editing) {
         this.face = face;
         this.text = text;
         this.lineHeight = lineHeight;
-        int capacity = Math.max(8, text.length());
+        this.editing = editing;
+        int capacity = editing ? Math.max(8, text.length()) : 0;
         glyphs = new int[capacity];
         xs = new float[capacity];
         ys = new float[capacity];
@@ -69,9 +85,31 @@ final class SlugShapeBuilder {
         clusterWidths = new float[capacity];
         clusterLines = new int[capacity];
         clusterRtl = new boolean[capacity];
-        carets = new float[text.length() + 1];
-        caretLines = new int[text.length() + 1];
-        boundaries = new boolean[text.length() + 1];
+        carets = new float[editing ? text.length() + 1 : 0];
+        caretLines = new int[editing ? text.length() + 1 : 0];
+        boundaries = new boolean[editing ? text.length() + 1 : 0];
+    }
+
+    /**
+     * Reuses draw-only staging after the previous borrower consumed its positions.
+     * Full HarfBuzz substitution, positioning and Unicode itemization remain active;
+     * editing-only arrays are untouched because no immutable shape escapes.
+     *
+     * @param text replacement UTF-16 input
+     * @param target borrowed destination receiving fully shaped glyph positions
+     */
+    void rebuildRun(String text, SlugTextRun target) {
+        this.text = text;
+        glyphCount = clusterCount = line = 0;
+        lines = 1;
+        width = penX = 0;
+        editing = false;
+        drawTarget = target;
+        try {
+            buildLayout();
+        } finally {
+            drawTarget = null;
+        }
     }
 
     /**
@@ -80,6 +118,16 @@ final class SlugShapeBuilder {
      * @return immutable normalized layout
      */
     SlugShape build() {
+        buildLayout();
+        return new SlugShape(this);
+    }
+
+    /**
+     * Executes the shared shaping algorithm into this builder's primitive arrays.
+     * Only immutable public layouts require editing metadata; drawing consumes
+     * glyph indices and offsets directly before this storage can be reused.
+     */
+    private void buildLayout() {
         int bytes = Math.max(2, Math.multiplyExact(text.length(), 2));
         ByteBuffer borrowed = face == null ? null : face.textScratch(text.length());
         utf16 = borrowed == null ? memAlloc(bytes) : borrowed;
@@ -92,14 +140,16 @@ final class SlugShapeBuilder {
             }
             utf16.limit(text.length() * 2);
             if (printableAscii) {
-                Arrays.fill(boundaries, true);
+                if (editing) Arrays.fill(boundaries, true);
                 shapeSegment(0, text.length(), false);
                 width = penX;
-                return new SlugShape(this);
+                return;
             }
-            BreakIterator graphemes = BreakIterator.getCharacterInstance(Locale.ROOT);
-            graphemes.setText(text);
-            for (int index = graphemes.first(); index != BreakIterator.DONE; index = graphemes.next()) boundaries[index] = true;
+            if (editing) {
+                BreakIterator graphemes = BreakIterator.getCharacterInstance(Locale.ROOT);
+                graphemes.setText(text);
+                for (int index = graphemes.first(); index != BreakIterator.DONE; index = graphemes.next()) boundaries[index] = true;
+            }
             int start = 0;
             while (start <= text.length()) {
                 int end = start;
@@ -107,10 +157,10 @@ final class SlugShapeBuilder {
                 shapeLine(start, end);
                 width = Math.max(width, penX);
                 if (end == text.length()) break;
-                caretLines[end] = line;
+                if (editing) caretLines[end] = line;
                 int next = end + 1;
                 if (text.charAt(end) == '\r' && next < text.length() && text.charAt(next) == '\n') next++;
-                for (int index = end + 1; index < next; index++) {
+                for (int index = end + 1; editing && index < next; index++) {
                     carets[index] = carets[end];
                     caretLines[index] = line;
                 }
@@ -119,7 +169,6 @@ final class SlugShapeBuilder {
                 lines++;
                 penX = 0;
             }
-            return new SlugShape(this);
         } finally {
             if (borrowed == null) memFree(utf16);
             utf16 = null;
@@ -133,8 +182,10 @@ final class SlugShapeBuilder {
      * @param end exclusive absolute line end
      */
     private void shapeLine(int start, int end) {
-        carets[start] = 0;
-        caretLines[start] = line;
+        if (editing) {
+            carets[start] = 0;
+            caretLines[start] = line;
+        }
         if (start == end) return;
         Bidi bidi = new Bidi(text.substring(start, end), Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT);
         List<SlugScriptRun> logical = new ArrayList<>();
@@ -234,31 +285,62 @@ final class SlugShapeBuilder {
         hb_buffer_guess_segment_properties(buffer);
         hb_shape(face.font(), buffer, null);
         if (!hb_buffer_allocation_successful(buffer)) throw new OutOfMemoryError("HarfBuzz layout allocation failed");
-        hb_glyph_info_t.Buffer info = hb_buffer_get_glyph_infos(buffer);
-        hb_glyph_position_t.Buffer positions = hb_buffer_get_glyph_positions(buffer);
-        if (info == null || positions == null) return;
+        int length = hb_buffer_get_length(buffer);
+        long info = nhb_buffer_get_glyph_infos(buffer, 0L);
+        long positions = nhb_buffer_get_glyph_positions(buffer, 0L);
+        if (info == 0L || positions == 0L) return;
         float inverseEm = 1f / face.unitsPerEm();
+        if (drawTarget != null) {
+            streamGlyphs(info, positions, length, inverseEm);
+            return;
+        }
         int firstGlyph = 0;
         int previousClusterEnd = end;
-        while (firstGlyph < info.remaining()) {
-            int cluster = info.get(firstGlyph).cluster();
+        while (firstGlyph < length) {
+            int cluster = hb_glyph_info_t.ncluster(info + (long) firstGlyph * hb_glyph_info_t.SIZEOF);
             float left = penX;
             int limit = firstGlyph;
-            while (limit < info.remaining() && info.get(limit).cluster() == cluster) {
+            while (limit < length && hb_glyph_info_t.ncluster(info + (long) limit * hb_glyph_info_t.SIZEOF) == cluster) {
+                int glyph = hb_glyph_info_t.ncodepoint(info + (long) limit * hb_glyph_info_t.SIZEOF);
+                float x = penX + hb_glyph_position_t.nx_offset(positions + (long) limit * hb_glyph_position_t.SIZEOF) * inverseEm;
+                float y = -line * lineHeight + hb_glyph_position_t.ny_offset(positions + (long) limit * hb_glyph_position_t.SIZEOF) * inverseEm;
                 growGlyphs();
-                glyphs[glyphCount] = info.get(limit).codepoint();
-                xs[glyphCount] = penX + positions.get(limit).x_offset() * inverseEm;
-                ys[glyphCount] = -line * lineHeight + positions.get(limit).y_offset() * inverseEm;
-                penX += positions.get(limit).x_advance() * inverseEm;
+                glyphs[glyphCount] = glyph;
+                xs[glyphCount] = x;
+                ys[glyphCount] = y;
+                penX += hb_glyph_position_t.nx_advance(positions + (long) limit * hb_glyph_position_t.SIZEOF) * inverseEm;
                 glyphCount++;
                 limit++;
             }
             // MONOTONE_GRAPHEMES guarantees ascending LTR or descending RTL clusters.
-            int logicalEnd = rtl ? previousClusterEnd : limit < info.remaining() ? info.get(limit).cluster() : end;
+            int logicalEnd = rtl ? previousClusterEnd : limit < length ? hb_glyph_info_t.ncluster(info + (long) limit * hb_glyph_info_t.SIZEOF) : end;
             addCluster(cluster, logicalEnd, left, penX - left, rtl);
             previousClusterEnd = cluster;
             firstGlyph = limit;
         }
+    }
+
+    /**
+     * Streams native visual-order positions without rebuilding editing clusters.
+     * HarfBuzz has already resolved substitutions, clusters and bidi-local glyph
+     * order; drawing consumes only indices, offsets and cumulative advances.
+     *
+     * @param info live HarfBuzz glyph-info storage
+     * @param positions matching live native glyph positions
+     * @param length native visual glyph count
+     * @param inverseEm font-unit to em-space conversion
+     */
+    private void streamGlyphs(long info, long positions, int length, float inverseEm) {
+        float baseline = -line * lineHeight;
+        for (int i = 0; i < length; i++) {
+            long glyph = info + (long) i * hb_glyph_info_t.SIZEOF;
+            long position = positions + (long) i * hb_glyph_position_t.SIZEOF;
+            float x = penX + hb_glyph_position_t.nx_offset(position) * inverseEm;
+            float y = baseline + hb_glyph_position_t.ny_offset(position) * inverseEm;
+            drawTarget.appendShapedGlyph(hb_glyph_info_t.ncodepoint(glyph), x, y);
+            penX += hb_glyph_position_t.nx_advance(position) * inverseEm;
+        }
+        glyphCount += length;
     }
 
     /**
@@ -272,6 +354,7 @@ final class SlugShapeBuilder {
      * @param rtl whether logical caret order runs right-to-left
      */
     private void addCluster(int start, int end, float left, float advance, boolean rtl) {
+        if (!editing) return;
         if (clusterCount == clusterStarts.length) {
             int next = clusterCount * 2;
             clusterStarts = Arrays.copyOf(clusterStarts, next);

@@ -40,11 +40,12 @@ void main() {
     );
     v_banding = a_band;
     v_pixelsPerEm = a_pixelsPerEm;
-    vec3 color = a_color.rgb;
+    vec4 instanceColor = a_pixelsPerEm == -2.0 ? a_band : a_color;
+    vec3 color = instanceColor.rgb;
     if (u_linearColor) {
         color = mix(color / 12.92, pow((color + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), color));
     }
-    v_color = vec4(color, a_color.a);
+    v_color = vec4(color, instanceColor.a);
     v_world = world;
     v_clipRect = a_clipRect;
     v_clipEnabled = a_clipEnabled;

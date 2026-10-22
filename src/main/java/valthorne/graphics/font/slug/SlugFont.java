@@ -107,6 +107,10 @@ public final class SlugFont implements Dimensional {
      * Em-space expansion on each band edge to retain near-boundary curves.
      */
     private static final float BAND_EPSILON = 0.00005f;
+    /**
+     * Largest input retained by reusable draw-only HarfBuzz staging.
+     */
+    private static final int MAX_RUN_LAYOUT_CHARACTERS = 4096;
     private SlugTextRun retainedRun; // Reusable convenience-draw layout; separate runs are required for independent retained text.
 
     private final STBTTFontinfo info; // STB font info kept alive for fallback queries.
@@ -126,6 +130,7 @@ public final class SlugFont implements Dimensional {
     private final SlugGlyph[][] indexedGlyphs; // Lazily allocated 256-glyph pages support substitutions without large sparse arrays.
     private final LinkedHashMap<String, SlugShape> shapes = new LinkedHashMap<>(16, .75f, true); // Bounded retained normalized text layouts.
     private final LinkedHashMap<String, SlugTextRun> cachedRuns = new LinkedHashMap<>(16, .75f, true); // Bounded prepared geometry/layouts for immediate drawing.
+    private SlugShapeBuilder runLayout; // Bounded source-owned draw-only HarfBuzz staging, never exposed as an immutable shape.
     private SlugNativeFace nativeFace; // Lazily owned shaping/hinting face, shared by borrowed hinted views.
     private int shapedCharacters; // UTF-16 character count retained in the shape cache.
     private int runCharacters; // UTF-16 character count retained by prepared immediate runs.
@@ -341,6 +346,40 @@ public final class SlugFont implements Dimensional {
                 shapedCharacters -= shapes.pollFirstEntry().getKey().length();
         }
         return result;
+    }
+
+    /**
+     * Borrows an immutable layout already retained by measurement or editing.
+     * Drawing may consume these positions directly without shaping the same
+     * changing label a second time. A miss does not allocate a public shape.
+     *
+     * @param text complete nonnull UTF-16 source
+     * @return previously computed source layout, or null when none is retained
+     */
+    SlugShape cachedShape(String text) {
+        return sourceFont != null ? sourceFont.cachedShape(text) : shapes.get(text);
+    }
+
+    /**
+     * Borrows a full-context draw layout until the next run rebuild on this source.
+     * Hinted views share the same source-owned staging. Inputs above 4096 UTF-16
+     * units use temporary staging so a large one-off label cannot grow the retained
+     * draw scratch indefinitely. Public immutable shapes retain separate storage.
+     *
+     * @param text nonempty UTF-16 source
+     * @param target borrowed run receiving full-context glyph positions
+     * @return completed borrowed line metrics; glyph positions are sent directly to target
+     */
+    SlugShapeBuilder layoutRun(String text, SlugTextRun target) {
+        if (sourceFont != null) return sourceFont.layoutRun(text, target);
+        if (text.length() > MAX_RUN_LAYOUT_CHARACTERS) {
+            SlugShapeBuilder temporary = new SlugShapeBuilder(nativeFace(), text, lineHeight, false);
+            temporary.rebuildRun(text, target);
+            return temporary;
+        }
+        if (runLayout == null) runLayout = new SlugShapeBuilder(nativeFace(), text, lineHeight, false);
+        runLayout.rebuildRun(text, target);
+        return runLayout;
     }
 
     /**
@@ -1203,6 +1242,7 @@ public final class SlugFont implements Dimensional {
         disposed = true;
         cachedRuns.clear();
         retainedRun = null;
+        runLayout = null;
         runCharacters = 0;
         if (nativeFace != null) {
             nativeFace.close();
