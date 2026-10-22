@@ -6,6 +6,7 @@ import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.UINode;
+import valthorne.ui.LayoutValue;
 import valthorne.ui.UIRoot;
 import valthorne.ui.enums.Alignment;
 import valthorne.ui.theme.ResolvedStyle;
@@ -79,8 +80,8 @@ public class NanoLabel extends UINode implements NanoNode {
     private Color color = Color.WHITE; // Borrowed mutable text color, initially the shared white constant.
     private float tabSize = 4f; // Requested tab-stop interval rounded to integer character columns.
     private float lineSpacing; // Extra UI-unit distance between successive lines.
-    private float intrinsicWidth = Float.NaN; // Last width supplied by text measurement; NaN before measurement.
-    private float intrinsicHeight = Float.NaN; // Last height supplied by text measurement; NaN before measurement.
+    private LayoutValue intrinsicWidth; // Last width supplied by text measurement, or null before measurement.
+    private LayoutValue intrinsicHeight; // Last height supplied by text measurement, or null before measurement.
     private Alignment horizontalAlignment = Alignment.START; // Horizontal placement of each line within the resolved label width.
     private Alignment verticalAlignment = Alignment.START; // Vertical placement of the complete text block; START is top.
     private boolean fontLoaded; // Reserved font state; current implementation does not read or update it.
@@ -517,13 +518,13 @@ public class NanoLabel extends UINode implements NanoNode {
             measuredHeight = lines.length == 0 ? estimatedLineHeight : (lines.length * estimatedLineHeight) + Math.max(0, lines.length - 1) * lineSpacing;
         }
 
-        if (getLayout().getWidth().isAuto() || getLayout().getWidth().isPoints() && getLayout().getWidth().getValue() == intrinsicWidth) {
+        if (getLayout().getWidth().isAuto() || getLayout().getWidth() == intrinsicWidth) {
             getLayout().width(measuredWidth);
-            intrinsicWidth = measuredWidth;
+            intrinsicWidth = getLayout().getWidth();
         }
-        if (getLayout().getHeight().isAuto() || getLayout().getHeight().isPoints() && getLayout().getHeight().getValue() == intrinsicHeight) {
+        if (getLayout().getHeight().isAuto() || getLayout().getHeight() == intrinsicHeight) {
             getLayout().height(measuredHeight);
-            intrinsicHeight = measuredHeight;
+            intrinsicHeight = getLayout().getHeight();
         }
 
         super.applyLayout();
