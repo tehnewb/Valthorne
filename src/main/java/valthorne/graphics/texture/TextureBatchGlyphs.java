@@ -119,14 +119,18 @@ public final class TextureBatchGlyphs {
      *
      * @return true while a glyph segment is active
      */
-    boolean isDrawing() { return drawing; }
+    boolean isDrawing() {
+        return drawing;
+    }
 
     /**
      * Returns nonempty glyph draws without querying the GPU.
      *
      * @return lifetime glyph draw-call count
      */
-    long getTotalDrawCalls() { return totalDrawCalls; }
+    long getTotalDrawCalls() {
+        return totalDrawCalls;
+    }
 
     /**
      * Resets transform state at the start of the parent's drawing scope.
@@ -432,7 +436,11 @@ public final class TextureBatchGlyphs {
             indexBuffer = glGenBuffers();
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
             IntBuffer indices = BufferUtils.createIntBuffer(4);
-            indices.put(0).put(1).put(4).put(2).flip();
+            indices.put(0)
+                    .put(1)
+                    .put(4)
+                    .put(2)
+                    .flip();
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
             int stride = TextureBatchContract.GLYPH_STRIDE_BYTES;
@@ -538,7 +546,11 @@ public final class TextureBatchGlyphs {
         } else if (instanceCount == capacity) flushGlyphs();
         float inverseSize = 1f / size;
         glyph.writeInstance(instances, x0, y0, x1, y1, (x0 - x) * inverseSize, (y0 - y) * inverseSize, (x1 - x) * inverseSize, (y1 - y) * inverseSize, projectionScale > 0f ? size * projectionScale : -1f, packedColor);
-        instances.putFloat(clipX).putFloat(clipY).putFloat(clipW).putFloat(clipH).putFloat(clipEnabled && !cpuClip ? 1f : 0f);
+        instances.putFloat(clipX)
+                .putFloat(clipY)
+                .putFloat(clipW)
+                .putFloat(clipH)
+                .putFloat(clipEnabled && !cpuClip ? 1f : 0f);
         instanceCount++;
     }
 

@@ -41,7 +41,9 @@ public final class WindowContext implements AutoCloseable {
      * @param width positive logical width
      * @param height positive logical height
      */
-    public WindowContext(int width, int height) { resize(width, height); }
+    public WindowContext(int width, int height) {
+        resize(width, height);
+    }
 
     /**
      * Returns this thread's active presentation, or null for ordinary window work.
@@ -83,56 +85,78 @@ public final class WindowContext implements AutoCloseable {
      */
     public void resize(int width, int height) {
         if (width < 1 || height < 1 || width > Short.MAX_VALUE || height > Short.MAX_VALUE) throw new IllegalArgumentException("Invalid presentation size");
-        this.width = width; this.height = height;
-        matrix.setOrtho(0, width, 0, height, -1, 1).get(projection);
+        this.width = width;
+        this.height = height;
+        matrix.setOrtho(0, width, 0, height, -1, 1)
+                .get(projection);
     }
 
     /**
      * Returns logical width.
      * @return width
      */
-    public int width() { return width; }
+    public int width() {
+        return width;
+    }
     /**
      * Returns logical height.
      * @return height
      */
-    public int height() { return height; }
+    public int height() {
+        return height;
+    }
     /**
      * Returns the associated native presentation handle.
      * @return handle, or zero for offscreen rendering
      */
-    public long nativeWindow() { return nativeWindow; }
+    public long nativeWindow() {
+        return nativeWindow;
+    }
     /**
      * Associates a shared-context secondary window without transferring ownership.
      * @param handle handle, or zero when embedded
      */
-    public void nativeWindow(long handle) { nativeWindow = handle; }
+    public void nativeWindow(long handle) {
+        nativeWindow = handle;
+    }
     /**
      * Returns borrowed shader projection values.
      * @return read-only column-major values
      */
-    public float[] projection() { return projection; }
+    public float[] projection() {
+        return projection;
+    }
     /**
      * Copies a projection into this presentation's cached shader state.
      * @param values at least sixteen column-major values
      */
-    public void projection(float[] values) { matrix.set(values).get(projection); }
+    public void projection(float[] values) {
+        matrix.set(values)
+                .get(projection);
+    }
     /**
      * Returns logical cursor X.
      * @return bottom-left X
      */
-    public int mouseX() { return mouseX; }
+    public int mouseX() {
+        return mouseX;
+    }
     /**
      * Returns logical cursor Y.
      * @return bottom-left Y
      */
-    public int mouseY() { return mouseY; }
+    public int mouseY() {
+        return mouseY;
+    }
     /**
      * Updates mapped cursor coordinates.
      * @param x logical X
      * @param y logical Y
      */
-    public void pointer(int x, int y) { mouseX = x; mouseY = y; }
+    public void pointer(int x, int y) {
+        mouseX = x;
+        mouseY = y;
+    }
     /**
      * Updates held button and modifiers before event publication.
      * @param button valid GLFW mouse button
@@ -149,12 +173,16 @@ public final class WindowContext implements AutoCloseable {
      * @param button GLFW button
      * @return held state
      */
-    public boolean buttonDown(int button) { return button >= 0 && button <= GLFW_MOUSE_BUTTON_LAST && (buttons & 1 << button) != 0; }
+    public boolean buttonDown(int button) {
+        return button >= 0 && button <= GLFW_MOUSE_BUTTON_LAST && (buttons & 1 << button) != 0;
+    }
     /**
      * Returns the current mouse-button mask.
      * @return held button bits
      */
-    public int buttons() { return buttons; }
+    public int buttons() {
+        return buttons;
+    }
     /**
      * Updates held key and modifier state before event publication.
      * @param key GLFW key code
@@ -164,82 +192,125 @@ public final class WindowContext implements AutoCloseable {
     public void key(int key, boolean down, int modifiers) {
         if (key < 0 || key > GLFW_KEY_LAST) return;
         if (key == GLFW_KEY_CAPS_LOCK && down && !keys.get(key)) capsLock = !capsLock;
-        keys.set(key, down); this.modifiers = modifiers;
+        keys.set(key, down);
+        this.modifiers = modifiers;
     }
     /**
      * Checks one held key.
      * @param key GLFW key code
      * @return held state
      */
-    public boolean keyDown(int key) { return key >= 0 && key <= GLFW_KEY_LAST && keys.get(key); }
+    public boolean keyDown(int key) {
+        return key >= 0 && key <= GLFW_KEY_LAST && keys.get(key);
+    }
     /**
      * Returns current GLFW modifiers.
      * @return modifier mask
      */
-    public int modifiers() { return modifiers; }
+    public int modifiers() {
+        return modifiers;
+    }
     /**
      * Returns Caps Lock state for key-to-character helpers.
      * @return Caps Lock state
      */
-    public boolean capsLock() { return capsLock; }
+    public boolean capsLock() {
+        return capsLock;
+    }
     /**
      * Initializes Caps Lock from the host's actual input state.
      * @param enabled host state
      */
-    public void capsLock(boolean enabled) { capsLock = enabled; }
+    public void capsLock(boolean enabled) {
+        capsLock = enabled;
+    }
     /**
      * Accumulates precise scroll movement.
      * @param x horizontal movement
      * @param y vertical movement
      */
-    public void scroll(double x, double y) { scrollX += x; scrollY += y; }
+    public void scroll(double x, double y) {
+        scrollX += x;
+        scrollY += y;
+    }
     /**
      * Returns accumulated horizontal scrolling.
      * @return wheel movement
      */
-    public double scrollX() { return scrollX; }
+    public double scrollX() {
+        return scrollX;
+    }
     /**
      * Returns accumulated vertical scrolling.
      * @return wheel movement
      */
-    public double scrollY() { return scrollY; }
+    public double scrollY() {
+        return scrollY;
+    }
     /**
      * Clears consumed frame scrolling.
      */
-    public void resetScroll() { scrollX = 0; scrollY = 0; }
+    public void resetScroll() {
+        scrollX = 0;
+        scrollY = 0;
+    }
     /**
      * Returns input focus ownership.
      * @return focus state
      */
-    public boolean focused() { return focused; }
+    public boolean focused() {
+        return focused;
+    }
     /**
      * Changes focus and clears stale held input on loss.
      * @param focused input ownership
      */
-    public void focus(boolean focused) { this.focused = focused; if (!focused) clearInput(); }
+    public void focus(boolean focused) {
+        this.focused = focused;
+        if (!focused) clearInput();
+    }
     /**
      * Clears held input without changing operating-system input state.
      */
-    public void clearInput() { keys.clear(); buttons = 0; modifiers = 0; resetScroll(); }
+    public void clearInput() {
+        keys.clear();
+        buttons = 0;
+        modifiers = 0;
+        resetScroll();
+    }
     /**
      * Clears presentation pointer capture state.
      */
-    public void cancelButtons() { buttons = 0; resetScroll(); }
+    public void cancelButtons() {
+        buttons = 0;
+        resetScroll();
+    }
     /**
      * Requests game closure without closing the primary editor window.
      */
-    public void requestClose() { closeRequested = true; }
+    public void requestClose() {
+        closeRequested = true;
+    }
     /**
      * Reports a logical game-close request.
      * @return whether the presentation should end
      */
-    public boolean closeRequested() { return closeRequested; }
+    public boolean closeRequested() {
+        return closeRequested;
+    }
     /**
      * Reports disposal for late queued task guards.
      * @return whether this scope is closed
      */
-    public boolean isClosed() { return closed; }
+    public boolean isClosed() {
+        return closed;
+    }
 
     @Override
-    public void close() { clearInput(); focused = false; nativeWindow = 0; closed = true; }
+    public void close() {
+        clearInput();
+        focused = false;
+        nativeWindow = 0;
+        closed = true;
+    }
 }

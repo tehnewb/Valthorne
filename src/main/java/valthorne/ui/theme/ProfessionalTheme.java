@@ -104,7 +104,9 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * Has the same graphics-thread and resource-lifetime requirements as the
      * configurable constructor.
      */
-    public ProfessionalTheme() {this(false, 1);}
+    public ProfessionalTheme() {
+        this(false, 1);
+    }
 
     /**
      * Selects square skins for texture-backed controls created by subsequent calls.
@@ -141,7 +143,9 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      *
      * @return the shared font reference
      */
-    public SlugFont getFont() {return font;}
+    public SlugFont getFont() {
+        return font;
+    }
 
     /**
      * Builds a new style collection with semantic tokens and state-specific rules
@@ -480,7 +484,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 .set(UITokens.ACCENT, accent);
         for (String name : List.of("chooser-pane", "chooser-chrome"))
             data.rule(NanoPanel.class, name)
-                    .set(NanoPanel.CORNER_RADIUS_KEY, 0f);
+                .set(NanoPanel.CORNER_RADIUS_KEY, 0f);
 
         nanoButton(data.rule(NanoButton.class, "window-title"), windowHeader, windowHeader);
         data.rule(NanoButton.class, "window-title")
@@ -707,10 +711,10 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 boolean outline = distance > -1.5f || x == 0 || y == 0 || x == size - 1 || y == size - 1;
                 Color c = outline ? edge : fill;
                 pixels.put((byte) (c.r() * 255))
-                        .put((byte) (c.g() * 255))
-                        .put((byte) (c.b() * 255))
-                        .put((byte) (c.a() * alpha * 255));
-            }
+                    .put((byte) (c.g() * 255))
+                    .put((byte) (c.b() * 255))
+                    .put((byte) (c.a() * alpha * 255));
+        }
         pixels.flip();
         var skin = new NinePatchTexture(new TextureData(pixels, size, size), radius, radius, radius, radius);
         skins.add(skin);
@@ -732,10 +736,10 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
             for (int x = 0; x < size; x++) {
                 Color color = x == 0 || y == 0 || x == size - 1 || y == size - 1 ? edge : fill;
                 pixels.put((byte) (color.r() * 255))
-                        .put((byte) (color.g() * 255))
-                        .put((byte) (color.b() * 255))
-                        .put((byte) (color.a() * 255));
-            }
+                    .put((byte) (color.g() * 255))
+                    .put((byte) (color.b() * 255))
+                    .put((byte) (color.a() * 255));
+        }
         pixels.flip();
         var texture = new NinePatchTexture(new TextureData(pixels, size, size), 1, 1, 1, 1);
         skins.add(texture);

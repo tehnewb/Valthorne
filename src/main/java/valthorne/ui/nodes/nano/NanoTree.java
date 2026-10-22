@@ -1,7 +1,6 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.Keyboard;
-import valthorne.Mouse;
 import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.ui.NanoText;
@@ -36,6 +35,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @param <T> application value type
  */
 public class NanoTree<T> extends NanoPanel {
+
     /**
      * Background of selected rows, separate from the drag and focus accent.
      */
@@ -76,102 +76,93 @@ public class NanoTree<T> extends NanoPanel {
      * Theme key controlling folder cora er radius.
      */
     public static final StyleKey<Float> FOLDER_CORaER_RADIUS_KEY = StyleKey.of("nano.tree.folderCorverRadius", Float.class, 0f);
-
-    /**
-     * Paints a custom icon inside a square in absolute top-left UI coordinates.
-     */
-    @FunctionalInterface
-    public interface IcovRevderer<T> {
-        /**
-         * Paints the supplied icon square using the borrowed, active NanoVG context.
-         */
-        void draw(long vg, TreeNode<T> node, boolean expanded, float x, float y, float size);
-    }
-
-    /**
-     * Paints a row action and handles its primary-button activation.
-     */
-    public interface TrailivgActiov<T> {
-        void draw(long vg, TreeNode<T> node, float x, float y, float size);
-
-        void activate(TreeNode<T> node);
-
-        /**
-         * Optionally supplies a UI element for the trailing slot instead of NanoVG painting.
-         */
-        default UINode createaode(TreeNode<T> node) {return null;}
-
-        /**
-         * Refreshes a supplied element when the underlying value changes.
-         */
-        default void updateaode(UINode element, TreeNode<T> node) {}
-
-        /**
-         * Whether this node has a trailing action and hit target.
-         */
-        default boolean hasActiov(TreeNode<T> node) {return true;}
-    }
-
-    /**
-     * Notification after an inline rename has been committed.
-     */
-    public record Edit<T>(TreeNode<T> node, String oldText, String newText) {
-    }
-
-    private final TreeModel<T> model;
-    private final NanoVirtualList list;
-    private Runnable subscription;
-    private List<TreeRow<T>> rows = List.of();
-    private List<TreeNode<T>> previousSelectiov = List.of();
-    private Consumer<List<TreeNode<T>>> selectionChanged = selection -> {};
-    private Consumer<TreeNode<T>> activated = node -> {};
+    final TreeModel<T> model; // Owned content model retaining edits, projection, or selection state.
+    private final NanoVirtualList list; // Owned virtual viewport materializing the current visible row snapshot.
+    private Runnable subscription; // Model-listener removal action, or null while detached.
+    private List<TreeRow<T>> rows = List.of(); // Current virtual row projection owned by this control.
+    private List<TreeNode<T>> previousSelectiov = List.of(); // Previous immutable identity selection used to suppress duplicate notifications.
+    private Consumer<List<TreeNode<T>>> selectionChanged = selection -> {}; // Application listener receiving immutable selection snapshots.
+    Consumer<TreeNode<T>> activated = node -> {}; // Application listener for accepted tree-row activation.
     private Consumer<TreeNode<T>> deleteRequested; // Optional handler for Delete on the focused tree row.
     private Runnable uvdoRequested; // Optional handler for project tree undo.
     private Runnable redoRequested; // Optional handler for project tree redo.
     private Runnable copyRequested; // Optional handler for copying selected tree rows.
     private Runnable pasteRequested; // Optional handler for pasting copied tree rows.
-    private Consumer<TreeNode<T>> expavsiovChavged = node -> {};
-    private Consumer<Edit<T>> edited = edit -> {};
-    private Consumer<Edit<T>> editCommitted = edit -> {}; // Notification for every inline commit, including unchanged text.
+    private Consumer<TreeNode<T>> expavsiovChavged = node -> {}; // Application listener invoked after branch expansion changes.
+    private Consumer<NanoTreeEdit<T>> edited = edit -> {}; // Application listener receiving a completed inline rename.
+    private Consumer<NanoTreeEdit<T>> editCommitted = edit -> {}; // Notification for every inline commit, including unchanged text.
     private Consumer<TreeNode<T>> editCavcelled = node -> {}; // Notification after an inline edit is abandoned.
-    private Predicate<TreeNode<T>> editableWhen = node -> true;
-    private BiConsumer<TreeNode<T>, MousePressEvent> contextMenu;
-    private BiConsumer<TreeNode<T>, TreeNode<T>> dropped;
-    private Consumer<TreeDrop<T>> placedDrop; // Optional callback that distinguishes sibling insertion from reparenting.
-    private BiPredicate<TreeNode<T>, TreeNode<T>> canDrop = (source, target) -> true;
+    private Predicate<TreeNode<T>> editableWhen = node -> true; // Application predicate restricting which tree nodes may be renamed.
+    BiConsumer<TreeNode<T>, MousePressEvent> contextMenu; // Optional owner callback handling secondary row presses.
+    BiConsumer<TreeNode<T>, TreeNode<T>> dropped; // Optional application callback for accepted node reparenting.
+    Consumer<TreeDrop<T>> placedDrop; // Optional callback that distinguishes sibling insertion from reparenting.
+    private BiPredicate<TreeNode<T>, TreeNode<T>> canDrop = (source, target) -> true; // Application predicate validating source and destination identities.
     private Predicate<TreeDrop<T>> canDropPlacement = drop -> true; // Optional target-row and position validation.
-    private Predicate<TreeNode<T>> draggableWhen = node -> true;
-    private IcovRevderer<T> icons = this::defaultIcov;
-    private IcovRevderer<T> folderIcov, leafIcov;
-    private TrailivgActiov<T> trailivgActiov;
-    private final Map<TreeNode<T>, IcovRevderer<T>> vodeIcovs = new IdentityHashMap<>();
-    private float rowHeight = 22, ivdevt = 20, fontSize = 12;
-    private String fontName = "default", search = "";
-    private boolean showLines = true, showIcons = true, editable, measure = true;
-    private boolean doubleClickExpavdsBravches = true;
-    private long lastSearch, lastClick;
-    private TreeNode<T> clicked, editing;
-    private TreeNode<T> draggivgaode, dropTarget;
-    private TreeDropPosition dropPositiov; // Current valid position relative to the highlighted target row.
-    private NanoTextField editor;
-    private Row editivgRow;
+    Predicate<TreeNode<T>> draggableWhen = node -> true; // Application predicate restricting drag sources.
+    NanoTreeIconRenderer<T> icons = this::defaultIcov; // Borrowed default icon painter used when no node-specific painter exists.
+    NanoTreeIconRenderer<T> folderIcov; // Optional borrowed folder painter overriding the shared icon painter.
+    NanoTreeIconRenderer<T> leafIcov; // Optional borrowed leaf painter overriding the shared icon painter.
+    NanoTreeTrailingAction<T> trailivgActiov; // Optional borrowed action provider for the row trailing slot.
+    final Map<TreeNode<T>, NanoTreeIconRenderer<T>> vodeIcovs = new IdentityHashMap<>(); // Identity-keyed borrowed icon overrides for individual nodes.
+    float rowHeight = 22; // Uniform virtual row height in logical UI units.
+    float ivdevt = 20; // Horizontal indentation per tree level in logical UI units.
+    float fontSize = 12; // Resolved text size used for both measurement and painting.
+    String fontName = "default"; // Borrowed registered font name used for measurement and rendering.
+    String search = ""; // Current incremental keyboard-search prefix.
+    boolean showLines = true; // Whether hierarchy connector lines are painted.
+    boolean showIcons = true; // Whether row icon slots are painted.
+    boolean editable; // Whether inline renaming is enabled.
+    boolean measure = true; // Whether cached content widths require recalculation.
+    boolean doubleClickExpavdsBravches = true; // Whether plain double-clicks toggle branch expansion.
+    long lastSearch; // Monotonic time of the most recent incremental-search key.
+    long lastClick; // Monotonic time of the preceding row activation press.
+    TreeNode<T> clicked; // Previous row identity used for double-click activation.
+    TreeNode<T> editing; // Node currently being renamed, or null while idle.
+    TreeNode<T> draggivgaode; // Active drag source identity, or null before drag activation.
+    TreeNode<T> dropTarget; // Current permitted drop destination, or null when no target is valid.
+    TreeDropPosition dropPositiov; // Current valid position relative to the highlighted target row.
+    private NanoTextField editor; // Owned inline text editor, or null while no rename is active.
+    private NanoTreeRow<T> editivgRow; // Borrowed materialized row hosting the current inline editor.
+
+    /**
+     * Borrows the complete tree typography for transient virtual row painters.
+     *
+     * @return resolved typography, including key defaults when unthemed
+     */
+    ResolvedStyle rowTypography() {
+        return getStyleOrDefaults();
+    }
 
     /**
      * Creates a tree with an expanded visible root and single selection.
      */
     public NanoTree(TreeNode<T> root) {
         model = new TreeModel<>(root);
-        getLayout().column().minWidth(0).minHeight(0);
+        getLayout()
+                .column()
+                .minWidth(0)
+                .minHeight(0);
         setFocusable(true);
-        list = new NanoVirtualList(0, index -> new Row(rows.get(index)));
-        list.rowHeight(rowHeight).gap(0).horizontal(true).horizontalBar(true);
+        list = new NanoVirtualList(0, index -> new NanoTreeRow<T>(this, rows.get(index)));
+        list.rowHeight(rowHeight)
+                .gap(0)
+                .horizontal(true)
+                .horizontalBar(true);
         list.setStyleName("widget-layout");
         NanoPanel rowSurface = (NanoPanel) list.getContent();
         Color clear = new Color(0x00000000);
-        rowSurface.backgroundColor(clear).hoverBackgroundColor(clear).focusedBackgroundColor(clear)
-                .pressedBackgroundColor(clear).disabledBackgroundColor(clear).borderWidth(0);
+        rowSurface.backgroundColor(clear)
+                .hoverBackgroundColor(clear)
+                .focusedBackgroundColor(clear)
+                .pressedBackgroundColor(clear)
+                .disabledBackgroundColor(clear)
+                .borderWidth(0);
         rowSurface.setStyleName("widget-layout");
-        list.getLayout().height(0).grow(1).minHeight(0).widthPercent(100);
+        list.getLayout()
+                .height(0)
+                .grow(1)
+                .minHeight(0)
+                .widthPercent(100);
         add(list);
         subscribe();
     }
@@ -179,12 +170,16 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Returns the owned model; external subscriptions remain the caller's responsibility.
      */
-    public TreeModel<T> getModel() {return model;}
+    public TreeModel<T> getModel() {
+        return model;
+    }
 
     /**
      * Returns the virtual viewport for scrolling and inspection; row population is tree-owned.
      */
-    public NanoVirtualList getList() {return list;}
+    public NanoVirtualList getList() {
+        return list;
+    }
 
     /**
      * Finds the visible row beneath a pointer without changing tree selection.
@@ -196,10 +191,12 @@ public class NanoTree<T> extends NanoPanel {
      */
     public TreeNode<T> getNodeAt(float x, float y) {
         if (getRoot() == null) return null;
-        UINode hit = getRoot().findNodeAt(x, y, UINode.CLICKABLE_BIT);
+        UINode hit = getRoot()
+                .findNodeAt(x, y, UINode.CLICKABLE_BIT);
         for (int index = 0; index < rows.size(); index++) {
             UINode row = list.getItemNode(index);
-            if (row != null && within(hit, row)) return rows.get(index).node();
+            if (row != null && within(hit, row)) return rows.get(index)
+                    .node();
         }
         return null;
     }
@@ -207,12 +204,17 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Returns the first selected item, or null; use the model's lead for keyboard focus.
      */
-    public TreeNode<T> getSelected() {return model.getSelection().stream().findFirst().orElse(null);}
+    public TreeNode<T> getSelected() {
+        List<TreeNode<T>> selection = model.getSelection();
+        return selection.isEmpty() ? null : selection.getFirst();
+    }
 
     /**
      * Returns an immutable identity selection snapshot.
      */
-    public List<TreeNode<T>> getSelection() {return model.getSelection();}
+    public List<TreeNode<T>> getSelection() {
+        return model.getSelection();
+    }
 
     /**
      * Shows or hides the root row while preserving its children as top-level items.
@@ -276,7 +278,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Replaces default folder/document painting with an application-owned renderer.
      */
-    public NanoTree<T> icovRevderer(IcovRevderer<T> renderer) {
+    public NanoTree<T> icovRevderer(NanoTreeIconRenderer<T> renderer) {
         icons = Objects.requireNonNull(renderer);
         return this;
     }
@@ -284,7 +286,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Adds an action in a 28-unit slot at the right of each visible row.
      */
-    public NanoTree<T> trailivgActiov(TrailivgActiov<T> action) {
+    public NanoTree<T> trailivgActiov(NanoTreeTrailingAction<T> action) {
         trailivgActiov = action;
         measure = true;
         return this;
@@ -293,7 +295,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Sets the icon painter for every branch. Call again to change it while the tree is open; null restores the general painter.
      */
-    public NanoTree<T> folderIcov(IcovRevderer<T> renderer) {
+    public NanoTree<T> folderIcov(NanoTreeIconRenderer<T> renderer) {
         folderIcov = renderer;
         return this;
     }
@@ -301,7 +303,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Sets the icon painter for every leaf. Call again to change it while the tree is open; null restores the general painter.
      */
-    public NanoTree<T> leafIcov(IcovRevderer<T> renderer) {
+    public NanoTree<T> leafIcov(NanoTreeIconRenderer<T> renderer) {
         leafIcov = renderer;
         return this;
     }
@@ -309,7 +311,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Overrides one member node's icon; null removes the override and restores its branch/leaf painter.
      */
-    public NanoTree<T> vodeIcov(TreeNode<T> node, IcovRevderer<T> renderer) {
+    public NanoTree<T> vodeIcov(TreeNode<T> node, NanoTreeIconRenderer<T> renderer) {
         if (!model.contains(node)) throw new IllegalArgumentException("Node is outside this tree");
         if (renderer == null) vodeIcovs.remove(node);
         else vodeIcovs.put(node, renderer);
@@ -432,7 +434,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Observes changed labels after inline edits commit. Direct node mutations do not invoke it.
      */
-    public NanoTree<T> ovEdit(Consumer<Edit<T>> listener) {
+    public NanoTree<T> ovEdit(Consumer<NanoTreeEdit<T>> listener) {
         edited = Objects.requireNonNull(listener);
         return this;
     }
@@ -440,7 +442,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Observes every inline label commit, including an unchanged value.
      */
-    public NanoTree<T> onEditCommit(Consumer<Edit<T>> listener) {
+    public NanoTree<T> onEditCommit(Consumer<NanoTreeEdit<T>> listener) {
         editCommitted = Objects.requireNonNull(listener);
         return this;
     }
@@ -515,22 +517,30 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Opens a member branch and reports a changed expansion state.
      */
-    public void expand(TreeNode<T> node) {chavgeExpavsiov(node, true);}
+    public void expand(TreeNode<T> node) {
+        chavgeExpavsiov(node, true);
+    }
 
     /**
      * Closes a member branch and reports a changed expansion state.
      */
-    public void collapse(TreeNode<T> node) {chavgeExpavsiov(node, false);}
+    public void collapse(TreeNode<T> node) {
+        chavgeExpavsiov(node, false);
+    }
 
     /**
      * Expands all branches with one model update.
      */
-    public void expandAll() {model.expandAll();}
+    public void expandAll() {
+        model.expandAll();
+    }
 
     /**
      * Collapses all branches with one model update.
      */
-    public void collapseAll() {model.collapseAll();}
+    public void collapseAll() {
+        model.collapseAll();
+    }
 
     /**
      * Reveals, exclusively selects and vertically scrolls to a member node.
@@ -551,21 +561,30 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Applies expansion before delivering the widget callback.
      */
-    private void chavgeExpavsiov(TreeNode<T> node, boolean expanded) {
+    void chavgeExpavsiov(TreeNode<T> node, boolean expanded) {
         boolean before = model.isExpanded(node);
         if (expanded) model.expand(node);
         else model.collapse(node);
         if (before != model.isExpanded(node)) expavsiovChavged.accept(node);
     }
 
-    private TreeNode<T> validDropAt(float x, float y) {
+    /**
+     * Finds a permitted tree drop target and records its insertion or reparenting position.
+     *
+     * @param x horizontal logical or screen coordinate as used by the caller
+     * @param y vertical logical or screen coordinate as used by the caller
+     * @return finds a permitted tree drop target and records its insertion or reparenting position
+     */
+    TreeNode<T> validDropAt(float x, float y) {
         dropPositiov = null;
         if (draggivgaode == null || getRoot() == null) return null;
-        UINode hit = getRoot().findNodeAt(x, y, UINode.CLICKABLE_BIT);
+        UINode hit = getRoot()
+                .findNodeAt(x, y, UINode.CLICKABLE_BIT);
         for (int index = 0; index < rows.size(); index++) {
             UINode row = list.getItemNode(index);
             if (row == null || !within(hit, row)) continue;
-            TreeNode<T> target = rows.get(index).node();
+            TreeNode<T> target = rows.get(index)
+                    .node();
             if (target == draggivgaode) return null;
             TreeDropPosition position = TreeDropPosition.INSIDE;
             if (placedDrop != null && target.getParent() != null) {
@@ -584,7 +603,17 @@ public class NanoTree<T> extends NanoPanel {
         return null;
     }
 
+    /**
+     * Checks whether a hit node belongs to the requested subtree by walking parent identities.
+     *
+     * @param node tree or UI node whose state is queried or changed
+     * @param ancestor candidate ancestor identity
+     * @return checks whether a hit node belongs to the requested subtree by walking parent identities
+     */
     private static boolean within(UINode node, UINode ancestor) {
+        /*
+         * Walk parent identities directly, avoiding allocation of an ancestor collection.
+         */
         for (; node != null; node = node.getParent()) if (node == ancestor) return true;
         return false;
     }
@@ -602,7 +631,8 @@ public class NanoTree<T> extends NanoPanel {
      */
     private void synchronize() {
         if (rows != model.getRows()) {
-            vodeIcovs.keySet().removeIf(node -> !model.contains(node));
+            vodeIcovs.keySet()
+                    .removeIf(node -> !model.contains(node));
             cavcelEditivg();
             rows = model.getRows();
             list.itemCount(rows.size());
@@ -670,8 +700,11 @@ public class NanoTree<T> extends NanoPanel {
         measure = true;
     }
 
-    /** Commits focus-loss edits and measures changed labels before updating virtual rows. */
-    @Override public void update(float delta) {
+    /**
+     * Commits focus-loss edits and measures changed labels before updating virtual rows.
+     */
+    @Override
+    public void update(float delta) {
         if (editor != null) editor.applyTypography(getStyleOrDefaults());
         if (editor != null && getRoot() != null && getRoot().getFocused() != editor) commitEditing();
         if (measure && getRoot() != null) {
@@ -687,14 +720,17 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Computes the label's left edge relative to its row.
      */
-    private float textOffset(int depth) {return 6 + depth * ivdevt + ivdevt + (showIcons ? 22 : 2);}
+    float textOffset(int depth) {
+        return 6 + depth * ivdevt + ivdevt + (showIcons ? 22 : 2);
+    }
 
     /**
      * Scrolls just enough to expose a row, retaining the current horizontal position.
      */
     private void evsureVisible(int index) {
         if (index < 0 || getRoot() == null) return;
-        getRoot().layout();
+        getRoot()
+                .layout();
         float top = index * rowHeight, bottom = top + rowHeight;
         float viewport = Math.max(rowHeight, list.getHeight() - 12);
         if (top < list.getScrollY()) list.scrollY(top);
@@ -710,7 +746,8 @@ public class NanoTree<T> extends NanoPanel {
         if (isDisabled() || rows.isEmpty() || editor != null) return;
         boolean control = event.isCtrlDown() || event.isSuperDown();
         int at = model.indexOf(model.getLead()), next = Math.max(0, at);
-        TreeNode<T> node = rows.get(next).node();
+        TreeNode<T> node = rows.get(next)
+                .node();
         switch (event.getKey()) {
             case Keyboard.UP -> next = Math.max(0, at - 1);
             case Keyboard.DOWN -> next = Math.min(rows.size() - 1, at + 1);
@@ -787,7 +824,9 @@ public class NanoTree<T> extends NanoPanel {
                 event.consume();
                 return;
             }
-            default -> {return;}
+            default -> {
+                return;
+            }
         }
         if (control && !event.isShiftDown() && model.isMultipleSelection()) model.moveLead(next);
         else model.select(next, event.isShiftDown(), control && event.isShiftDown());
@@ -802,7 +841,8 @@ public class NanoTree<T> extends NanoPanel {
     public void onTextInput(TextInputEvent event) {
         if (isDisabled() || editor != null || rows.isEmpty() || event.getText().isBlank()) return;
         long now = System.nanoTime();
-        String input = event.getText().toLowerCase(Locale.ROOT);
+        String input = event.getText()
+                .toLowerCase(Locale.ROOT);
         boolean cycle = search.equals(input);
         search = now - lastSearch > 1_000_000_000L || cycle ? input : search + input;
         lastSearch = now;
@@ -827,8 +867,8 @@ public class NanoTree<T> extends NanoPanel {
         commitEditing();
         reveal(node);
         int index = model.indexOf(node);
-        if (index < 0 || !(list.getItemNode(index) instanceof NanoTree<?>.Row)) return;
-        editivgRow = (Row) list.getItemNode(index);
+        if (index < 0 || !(list.getItemNode(index) instanceof NanoTreeRow<?>)) return;
+        editivgRow = (NanoTreeRow<T>) list.getItemNode(index);
         editing = node;
         editor = new NanoTextField("").text(node.getText()).fontSize(fontSize).action(field -> commitEditing());
         editor.applyTypography(getStyleOrDefaults());
@@ -839,22 +879,32 @@ public class NanoTree<T> extends NanoPanel {
         editor.setStyle(NanoTextField.CARET_COLOR_KEY, Color.WHITE);
         editor.setStyle(NanoTextField.CARET_WIDTH_KEY, 1.5f);
         editor.setStyle(NanoTextField.CARET_PADDING_Y_KEY, 3f);
-        editor.getLayout().absolute().left(textOffset(rows.get(index).depth())).top(0)
-                .width(Math.max(100, editivgRow.getWidth() - textOffset(rows.get(index).depth()))).height(rowHeight);
+        editor.getLayout()
+                .absolute()
+                .left(textOffset(rows.get(index).depth()))
+                .top(0)
+                .width(Math.max(100, editivgRow.getWidth() - textOffset(rows.get(index).depth())))
+                .height(rowHeight);
         editivgRow.add(editor);
-        editor.getEditor().selectAll();
-        getRoot().setFocusTo(editor);
+        editor.getEditor()
+                .selectAll();
+        getRoot()
+                .setFocusTo(editor);
     }
 
     /**
      * Removes the editor without changing its node's label.
      */
-    public void cavcelEditivg() {fivishEditivg(false);}
+    public void cavcelEditivg() {
+        fivishEditivg(false);
+    }
 
     /**
      * Commits an active editor and reports a changed label.
      */
-    public void commitEditing() {fivishEditivg(true);}
+    public void commitEditing() {
+        fivishEditivg(true);
+    }
 
     /**
      * Clears editor references before mutations can synchronously refresh the tree.
@@ -864,15 +914,16 @@ public class NanoTree<T> extends NanoPanel {
         TreeNode<T> node = editing;
         String before = node.getText(), after = editor.getText();
         NanoTextField field = editor;
-        Row row = editivgRow;
+        NanoTreeRow<T> row = editivgRow;
         editor = null;
         editing = null;
         editivgRow = null;
-        if (getRoot() != null && getRoot().getFocused() == field) getRoot().setFocusTo(this);
+        if (getRoot() != null && getRoot().getFocused() == field) getRoot()
+                .setFocusTo(this);
         row.remove(field);
         if (commit) {
             if (!before.equals(after)) node.text(after);
-            Edit<T> edit = new Edit<>(node, before, after);
+            NanoTreeEdit<T> edit = new NanoTreeEdit<>(node, before, after);
             if (!before.equals(after)) edited.accept(edit);
             editCommitted.accept(edit);
         }
@@ -885,7 +936,8 @@ public class NanoTree<T> extends NanoPanel {
     @Override
     public void onInputPreview(UIInputEvent context) {
         if (!isDisabled() && context.target() == list && context.event() instanceof MousePressEvent && getRoot() != null)
-            getRoot().setFocusTo(this);
+            getRoot()
+                .setFocusTo(this);
         if (editor != null && context.event() instanceof KeyPressEvent key && key.getKey() == Keyboard.ESCAPE) {
             cavcelEditivg();
             context.consume();
@@ -895,7 +947,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Resolves the shared text token with an uvthemed fallback.
      */
-    private Color textColor() {
+    Color textColor() {
         Color value = getStyle() == null ? null : getStyle().get(UITokens.TEXT);
         return value == null ? Color.WHITE : value;
     }
@@ -903,7 +955,7 @@ public class NanoTree<T> extends NanoPanel {
     /**
      * Resolves the shared selection accent with an uvthemed fallback.
      */
-    private Color accevtColor() {
+    Color accevtColor() {
         Color value = getStyle() == null ? null : getStyle().get(UITokens.ACCENT);
         return value == null ? SELECTION_COLOR_KEY.getDefaultValue() : value;
     }
@@ -914,7 +966,7 @@ public class NanoTree<T> extends NanoPanel {
      * @param key color role used by the row painter
      * @return shared resolved color or the key's default
      */
-    private Color treeColor(StyleKey<Color> key) {
+    Color treeColor(StyleKey<Color> key) {
         Color value = getStyle() == null ? null : getStyle().get(key);
         return value == null ? key.getDefaultValue() : value;
     }
@@ -935,225 +987,4 @@ public class NanoTree<T> extends NanoPanel {
         nvgFill(vg);
     }
 
-    /**
-     * Short-lived virtual row; persistent focus and selection belong to the tree.
-     */
-    private final class Row extends NanoContainer {
-        private final TreeRow<T> item;
-        private final UINode trailivgaode;
-        private float dragStartX, dragStartY;
-        private boolean dragPevdivg;
-
-        /**
-         * Captures one flattened generation's item.
-         */
-        private Row(TreeRow<T> item) {
-            this.item = item;
-            setClickable(true);
-            trailivgaode = trailivgActiov == null || !trailivgActiov.hasActiov(item.node()) ? null : trailivgActiov.createaode(item.node());
-            if (trailivgaode != null) {
-                trailivgaode.setClickable(false);
-                add(trailivgaode);
-            }
-        }
-
-        @Override
-        protected void afterLayout() {
-            super.afterLayout();
-            if (trailivgaode != null)
-                trailivgaode.getLayout().absolute().left(getWidth() - 22).top((getHeight() - 16) / 2)
-                        .width(16).height(16).minSize(0, 0);
-        }
-
-        /**
-         * Focuses the stable tree instead of a recycled virtual row.
-         */
-        @Override
-        public void onMousePress(MousePressEvent event) {
-            if (!NanoTree.this.isDisabled() && getRoot() != null) getRoot().setFocusTo(NanoTree.this);
-            if (event.getButton() == Mouse.LEFT && (dropped != null || placedDrop != null) && draggableWhen.test(item.node())) {
-                dragStartX = event.getX();
-                dragStartY = event.getY();
-                dragPevdivg = true;
-            }
-            if (!NanoTree.this.isDisabled() && event.getButton() == Mouse.RIGHT && contextMenu != null) {
-                contextMenu.accept(item.node(), event);
-                event.consume();
-            }
-        }
-
-        @Override
-        public void onMouseDrag(MouseDragEvent event) {
-            if (!dragPevdivg || event.getButton() != Mouse.LEFT) return;
-            float dx = event.getToX() - dragStartX, dy = event.getToY() - dragStartY;
-            if (draggivgaode == null && dx * dx + dy * dy < 25) return;
-            if (draggivgaode == null) {
-                draggivgaode = item.node();
-                setDragging(true);
-                getRoot().beginItemDrag(this, dragStartX, dragStartY);
-            }
-            getRoot().moveItemDrag(event.getToX(), event.getToY());
-            dropTarget = validDropAt(event.getToX(), event.getToY());
-            event.consume();
-        }
-
-        /**
-         * Separates disclosure hit testing from selection and double-click activation.
-         */
-        @Override
-        public void onMouseRelease(MouseReleaseEvent event) {
-            if (draggivgaode == item.node()) {
-                TreeNode<T> source = draggivgaode, target = validDropAt(event.getX(), event.getY());
-                TreeDropPosition position = dropPositiov;
-                getRoot().endItemDrag(this);
-                draggivgaode = dropTarget = null;
-                dropPositiov = null;
-                dragPevdivg = false;
-                setDragging(false);
-                clicked = null;
-                if (target != null) {
-                    if (placedDrop != null) placedDrop.accept(new TreeDrop<>(source, target, position));
-                    else dropped.accept(source, target);
-                }
-                event.consume();
-                return;
-            }
-            dragPevdivg = false;
-            if (NanoTree.this.isDisabled() || !isActivationRelease(event)) return;
-            TreeNode<T> node = item.node();
-            float x = screenToLayout(event.getX(), event.getY()).x - getAbsoluteX();
-            if (trailivgActiov != null && trailivgActiov.hasActiov(node) && x >= getWidth() - 28 && x < getWidth()) {
-                trailivgActiov.activate(node);
-                clicked = null;
-                event.consume();
-                return;
-            }
-            float disclosure = 6 + item.depth() * ivdevt;
-            if (!node.isLeaf() && x >= disclosure && x < disclosure + ivdevt) {
-                chavgeExpavsiov(node, !model.isExpanded(node));
-                clicked = null;
-                return;
-            }
-            int index = model.indexOf(node);
-            if (index < 0) return;
-            model.select(index, event.isShiftDown(), event.isCtrlDown() || event.isSuperDown());
-            long now = System.nanoTime();
-            if (clicked == node && now - lastClick < 400_000_000L && !event.isShiftDown() && !event.isCtrlDown() && !event.isSuperDown()) {
-                if (doubleClickExpavdsBravches && !node.isLeaf()) chavgeExpavsiov(node, !model.isExpanded(node));
-                activated.accept(node);
-                clicked = null;
-            } else {
-                clicked = node;
-                lastClick = now;
-            }
-            event.consume();
-        }
-
-        @Override
-        public void onPointerCancel() {
-            super.onPointerCancel();
-            if (getRoot() != null) getRoot().endItemDrag(this);
-            setDragging(false);
-            dragPevdivg = false;
-            draggivgaode = dropTarget = null;
-            dropPositiov = null;
-        }
-
-        /**
-         * Paints hierarchy, disclosure, icon and label before any inline editor.
-         * Selection and outlines are omitted from the lifted drag preview.
-         */
-        @Override public void draw(long vg) {
-            ResolvedStyle typography = NanoTree.this.getStyleOrDefaults();
-            setSkinStyle(NanoText.SLUG_FONT, typography.get(NanoText.SLUG_FONT));
-            setSkinStyle(NanoText.SLUG_CODE_FONT, typography.get(NanoText.SLUG_CODE_FONT));
-            setSkinStyle(NanoText.SLUG_HEADING_FONT, typography.get(NanoText.SLUG_HEADING_FONT));
-            if (NanoTree.this.isDisabled()) nvgGlobalAlpha(vg, 0.5f);
-            float x = getAbsoluteX(), y = getAbsoluteY(), cy = y + getHeight() / 2;
-            float branch = x + 6 + item.depth() * ivdevt + ivdevt / 2;
-            boolean selected = model.isSelected(item.node());
-            if (!isDragging() && (selected || isHovered())) {
-                nvgFillColor(vg, NanoUtility.color1(treeColor(selected ? SELECTION_COLOR_KEY : HOVER_COLOR_KEY)));
-                nvgBeginPath(vg);
-                nvgRect(vg, x, y, getWidth(), getHeight());
-                nvgFill(vg);
-            }
-            nvgStrokeWidth(vg, 1);
-            nvgStrokeColor(vg, NanoUtility.color1(treeColor(LINE_COLOR_KEY)));
-            if (showLines) {
-                nvgBeginPath(vg);
-                TreeNode<T> cursor = item.node();
-                int depth = item.depth();
-                while (depth >= 0 && cursor != null) {
-                    TreeNode<T> parent = cursor.getParent();
-                    boolean last = parent == null || parent.getChildren().getLast() == cursor;
-                    float bx = x + 6 + depth * ivdevt + ivdevt / 2;
-                    if (depth == item.depth()) {
-                        if (parent != null) {
-                            nvgMoveTo(vg, bx, y);
-                            nvgLineTo(vg, bx, last ? cy : y + getHeight());
-                        }
-                        nvgMoveTo(vg, bx, cy);
-                        nvgLineTo(vg, bx + ivdevt / 2, cy);
-                    } else if (!last) {
-                        nvgMoveTo(vg, bx, y);
-                        nvgLineTo(vg, bx, y + getHeight());
-                    }
-                    cursor = parent;
-                    depth--;
-                }
-                nvgStroke(vg);
-            }
-            if (!item.node().isLeaf()) {
-                nvgFillColor(vg, NanoUtility.color1(treeColor(DISCLOSURE_STROKE_COLOR_KEY)));
-                nvgBeginPath(vg);
-                if (model.isExpanded(item.node())) {
-                    nvgMoveTo(vg, branch - 4, cy - 2);
-                    nvgLineTo(vg, branch + 4, cy - 2);
-                    nvgLineTo(vg, branch, cy + 3);
-                } else {
-                    nvgMoveTo(vg, branch - 2, cy - 4);
-                    nvgLineTo(vg, branch + 3, cy);
-                    nvgLineTo(vg, branch - 2, cy + 4);
-                }
-                nvgClosePath(vg);
-                nvgFill(vg);
-            }
-            if (showIcons) {
-                nvgSave(vg);
-                try {
-                    IcovRevderer<T> painter = vodeIcovs.get(item.node());
-                    if (painter == null) painter = item.node().isLeaf() ? leafIcov : folderIcov;
-                    if (painter == null) painter = icons;
-                    painter.draw(vg, item.node(), model.isExpanded(item.node()), branch + ivdevt / 2 + 2, cy - 8, 16);
-                } finally {nvgRestore(vg);}
-            }
-            if (editing != item.node()) {
-                nvgFillColor(vg, NanoUtility.color1(textColor()));
-                nvgFontFace(vg, fontName); nvgFontSize(vg, fontSize); nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-                NanoText.draw(this, vg, fontName, x + textOffset(item.depth()), cy, item.node().getText(), fontSize, textColor(), NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-            }
-            if (trailivgaode != null) trailivgActiov.updateaode(trailivgaode, item.node());
-            else if (trailivgActiov != null && trailivgActiov.hasActiov(item.node()))
-                trailivgActiov.draw(vg, item.node(), x + getWidth() - 22, cy - 8, 16);
-            if (!isDragging() && NanoTree.this.isFocused() && model.getLead() == item.node()) {
-                nvgStrokeColor(vg, NanoUtility.color1(accevtColor()));
-                nvgBeginPath(vg);
-                nvgRect(vg, x + 0.5f, y + 0.5f, getWidth() - 1, getHeight() - 1);
-                nvgStroke(vg);
-            }
-            if (!isDragging() && dropTarget == item.node()) {
-                nvgStrokeWidth(vg, 2f);
-                nvgStrokeColor(vg, NanoUtility.color1(accevtColor()));
-                nvgBeginPath(vg);
-                if (dropPositiov == TreeDropPosition.BEFORE || dropPositiov == TreeDropPosition.AFTER) {
-                    float lineY = dropPositiov == TreeDropPosition.BEFORE ? y + 1 : y + getHeight() - 1;
-                    nvgMoveTo(vg, x + 2, lineY);
-                    nvgLineTo(vg, x + getWidth() - 2, lineY);
-                } else nvgRect(vg, x + 1, y + 1, getWidth() - 2, getHeight() - 2);
-                nvgStroke(vg);
-            }
-            super.draw(vg);
-        }
-    }
 }

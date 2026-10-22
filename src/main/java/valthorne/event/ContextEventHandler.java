@@ -16,7 +16,10 @@ final class ContextEventHandler implements EventHandler<Event> {
      * @param handler original handler
      * @param context presentation identity, or null
      */
-    ContextEventHandler(EventHandler<Event> handler, WindowContext context) { this.handler = handler; this.context = context; }
+    ContextEventHandler(EventHandler<Event> handler, WindowContext context) {
+        this.handler = handler;
+        this.context = context;
+    }
 
     @Override
     public void handle(Event event) {

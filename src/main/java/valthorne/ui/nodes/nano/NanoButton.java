@@ -54,7 +54,9 @@ public class NanoButton extends NanoContainer {
             label = new NanoLabel(text);
             label.setClickable(false);
             label.applyCaptionStyle(fontName, fontSize, textColor, getStyleOrDefaults());
-            getLayout().itemsCenter().justifyCenter();
+            getLayout()
+                    .itemsCenter()
+                    .justifyCenter();
             add(label);
         }
         return label;
@@ -763,12 +765,14 @@ public class NanoButton extends NanoContainer {
         float measuredHeight = measureTextHeight() + paddingY * 2f;
 
         if (getLayout().getWidth().isAuto())
-            getLayout().width(measuredWidth);
+            getLayout()
+                .width(measuredWidth);
 
         if (getLayout().getHeight().isAuto()) {
             Float controlHeight = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
             if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
-            getLayout().height(measuredHeight);
+            getLayout()
+                    .height(measuredHeight);
         }
 
         super.applyLayout();

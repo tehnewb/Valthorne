@@ -24,6 +24,10 @@ final class EventRegistration {
      * @param sequence tie-break sequence
      */
     EventRegistration(EventHandler<Event> handler, EventHandler<Event> invoker, WindowContext context, int priority, long sequence) {
-        this.handler = handler; this.invoker = invoker; this.context = context; this.priority = priority; this.sequence = sequence;
+        this.handler = handler;
+        this.invoker = invoker;
+        this.context = context;
+        this.priority = priority;
+        this.sequence = sequence;
     }
 }

@@ -142,7 +142,6 @@ public class NanoProgressBar extends UINode implements NanoNode {
         return this;
     }
 
-
     /**
      * Replaces the synchronous displayed-value callback. It runs during animated
      * updates or immediate target snaps, and can read both target and displayed

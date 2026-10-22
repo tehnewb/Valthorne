@@ -87,7 +87,9 @@ public final class SlugLabel extends UINode {
      * Reads the normalized source string retained by the glyph layout.
      * @return current text, never null
      */
-    public String text() { return run.text(); }
+    public String text() {
+        return run.text();
+    }
 
     /**
      * Changes the em scale, rebuilds glyph positions when necessary, and updates dimensions.
@@ -106,7 +108,9 @@ public final class SlugLabel extends UINode {
      * Reads the retained font scale, which is independent of the node's layout height.
      * @return world units per em
      */
-    public float size() { return run.size(); }
+    public float size() {
+        return run.size();
+    }
 
     /**
      * Borrows a tint object without copying it; later mutations affect subsequent draws.

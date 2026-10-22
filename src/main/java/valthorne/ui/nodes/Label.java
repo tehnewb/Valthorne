@@ -237,7 +237,9 @@ public class Label extends UINode {
      *
      * @return world units per em
      */
-    public float getFontSize() { return fontSize; }
+    public float getFontSize() {
+        return fontSize;
+    }
 
     /**
      * Borrows a color reference as an explicit style override for subsequent draws.

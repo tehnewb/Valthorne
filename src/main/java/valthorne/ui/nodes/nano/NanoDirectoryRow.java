@@ -153,7 +153,8 @@ final class NanoDirectoryRow extends NanoContainer {
 
     @Override
     protected void applyLayout() {
-        disclosure.getLayout().left(4 + branch.depth() * tree.getIndent());
+        disclosure.getLayout()
+                .left(4 + branch.depth() * tree.getIndent());
         super.applyLayout();
     }
 

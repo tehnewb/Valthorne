@@ -78,7 +78,10 @@ final class ParticlePhysics implements AutoCloseable {
      * @return whether native physics owns this particle's motion
      */
     boolean attach(Particle particle) {
-        if (!particle.isPhysicsEnabled()) { release(particle); return false; }
+        if (!particle.isPhysicsEnabled()) {
+            release(particle);
+            return false;
+        }
         if (particle.physicsSlot >= 0) return true;
         if (freeCount == 0) return false;
         int slot = free[freeCount - 1];
@@ -132,8 +135,12 @@ final class ParticlePhysics implements AutoCloseable {
             Particle particle = particles[i];
             if (particle == null) continue;
             RigidBody2D body = bodies[i];
-            if (body.isDestroyed()) { release(particle); continue; }
-            body.getPosition(vector).asPixels();
+            if (body.isDestroyed()) {
+                release(particle);
+                continue;
+            }
+            body.getPosition(vector)
+                    .asPixels();
             particle.setX(vector.x);
             particle.setY(vector.y);
             particle.setRotation((float) Math.toDegrees(body.getRotation()) * ySign);
@@ -173,7 +180,9 @@ final class ParticlePhysics implements AutoCloseable {
     /**
      * Returns the number of participating bodies without allocating a collection.
      */
-    int activeCount() { return activeCount; }
+    int activeCount() {
+        return activeCount;
+    }
 
     @Override
     public void close() {

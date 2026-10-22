@@ -91,9 +91,12 @@ public final class FileOperationHistory {
         ArrayList<FileHistoryEntry> entries = new ArrayList<>(selected.size());
         try {
             for (Path source : selected) {
-                Path original = source.getParent().toRealPath().resolve(source.getFileName());
+                Path original = source.getParent()
+                        .toRealPath()
+                        .resolve(source.getFileName());
                 FileHistoryIdentity identity = move ? identity(original) : null;
-                Path target = operations.paste(List.of(source), destination, move).getFirst();
+                Path target = operations.paste(List.of(source), destination, move)
+                        .getFirst();
                 if (move && original.equals(target)) continue;
                 entries.add(new FileHistoryEntry(operations, move ? original : null, target, null, identity));
                 if (move) relocateDescendants(original, target);
@@ -124,7 +127,9 @@ public final class FileOperationHistory {
      * @throws IOException if the rename fails
      */
     public void rename(Path source, String name) throws IOException {
-        Path original = source.getParent().toRealPath().resolve(source.getFileName());
+        Path original = source.getParent()
+                .toRealPath()
+                .resolve(source.getFileName());
         FileHistoryIdentity identity = identity(original);
         Path target = operations.rename(source, name);
         if (original.getFileName().toString().equals(target.getFileName().toString())) return;
@@ -147,9 +152,12 @@ public final class FileOperationHistory {
         ArrayList<FileHistoryEntry> entries = new ArrayList<>(selected.size());
         try {
             for (Path source : selected) {
-                Path original = source.getParent().toRealPath().resolve(source.getFileName());
+                Path original = source.getParent()
+                        .toRealPath()
+                        .resolve(source.getFileName());
                 FileHistoryIdentity identity = identity(original);
-                Path backup = Files.createTempDirectory(storage(), "deleted-").resolve(source.getFileName());
+                Path backup = Files.createTempDirectory(storage(), "deleted-")
+                        .resolve(source.getFileName());
                 operations.copy(source, backup);
                 operations.moveToTrash(List.of(source));
                 entries.add(new FileHistoryEntry(operations, null, original, backup, identity));
@@ -199,7 +207,8 @@ public final class FileOperationHistory {
      */
     private void record(String name, List<FileHistoryEntry> entries) {
         if (entries.isEmpty()) return;
-        if (cursor < history.size()) history.subList(cursor, history.size()).clear();
+        if (cursor < history.size()) history.subList(cursor, history.size())
+                .clear();
         history.add(new FileHistoryOperation(name, List.copyOf(entries)));
         cursor++;
     }
@@ -292,7 +301,8 @@ public final class FileOperationHistory {
      * @throws IOException if transfer or descendant identity refresh fails
      */
     private void replayEntry(FileHistoryEntry entry, boolean undo, Path recovery) throws IOException {
-        Path original = entry.identity().path();
+        Path original = entry.identity()
+                .path();
         entry.replay(undo, recovery);
         relocateDescendants(original, entry.identity().path());
     }

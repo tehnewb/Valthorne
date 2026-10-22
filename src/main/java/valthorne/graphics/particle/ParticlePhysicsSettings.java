@@ -47,13 +47,19 @@ public final class ParticlePhysicsSettings {
      * Selects circles using half the smaller initial particle dimension.
      * @return these settings
      */
-    public ParticlePhysicsSettings circle() { circle = true; return this; }
+    public ParticlePhysicsSettings circle() {
+        circle = true;
+        return this;
+    }
 
     /**
      * Selects boxes matching initial particle width and height.
      * @return these settings
      */
-    public ParticlePhysicsSettings box() { circle = false; return this; }
+    public ParticlePhysicsSettings box() {
+        circle = false;
+        return this;
+    }
 
     /**
      * Adjusts collider size without changing rendered particle dimensions.
@@ -129,19 +135,28 @@ public final class ParticlePhysicsSettings {
      * @param fixed whether rotation is locked
      * @return these settings
      */
-    public ParticlePhysicsSettings fixedRotation(boolean fixed) { fixedRotation = fixed; return this; }
+    public ParticlePhysicsSettings fixedRotation(boolean fixed) {
+        fixedRotation = fixed;
+        return this;
+    }
 
     /**
      * Enables continuous collision detection for fast small debris.
      * @param enabled whether to use native linear casts
      * @return these settings
      */
-    public ParticlePhysicsSettings continuous(boolean enabled) { continuous = enabled; return this; }
+    public ParticlePhysicsSettings continuous(boolean enabled) {
+        continuous = enabled;
+        return this;
+    }
 
     /**
      * Selects overlap detection without physically blocking other bodies.
      * @param enabled whether particle bodies are sensors
      * @return these settings
      */
-    public ParticlePhysicsSettings sensor(boolean enabled) { sensor = enabled; return this; }
+    public ParticlePhysicsSettings sensor(boolean enabled) {
+        sensor = enabled;
+        return this;
+    }
 }

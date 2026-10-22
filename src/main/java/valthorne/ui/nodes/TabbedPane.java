@@ -1,7 +1,6 @@
 package valthorne.ui.nodes;
 
 import valthorne.Keyboard;
-import valthorne.event.events.KeyPressEvent;
 import valthorne.ui.UINode;
 import valthorne.ui.behavior.ChangeSignal;
 import valthorne.ui.theme.ResolvedStyle;
@@ -37,7 +36,7 @@ public class TabbedPane extends Panel {
     public static final StyleKey<Float> HEADER_HEIGHT_KEY = StyleKey.of("tabbedPane.headerHeight", Float.class, 26f);
     private final Panel headers = new Panel(); // Owned horizontal strip of tab buttons.
     private final Panel deck = new Panel(); // Owned container retaining every instantiated page.
-    private final ArrayList<Tab> tabs = new ArrayList<>(); // Ordered tab metadata matching header order.
+    final ArrayList<PaneTab> tabs = new ArrayList<>(); // Ordered tab metadata matching header order.
     private final ChangeSignal changes = new ChangeSignal(); // Synchronous selection and removal notifications.
     private int selected = -1; // Active tab index, or -1 when no tab is selected.
 
@@ -46,19 +45,30 @@ public class TabbedPane extends Panel {
      * and a growing page deck. No tab or page is initially selected.
      */
     public TabbedPane() {
-        getLayout().column().gap(0);
+        getLayout()
+                .column()
+                .gap(0);
         headers.setStyleName("tab-header-strip");
-        headers.getLayout().row().gap(1).height(26).noShrink();
+        headers.getLayout()
+                .row()
+                .gap(1)
+                .height(26)
+                .noShrink();
         deck.setStyleName("tab-body");
-        deck.getLayout().height(0).minHeight(0).grow();
-        super.add(headers); super.add(deck);
+        deck.getLayout()
+                .height(0)
+                .minHeight(0)
+                .grow();
+        super.add(headers);
+        super.add(deck);
     }
 
     @Override
     protected void applyLayout() {
         ResolvedStyle style = getStyle();
         Float height = style == null ? null : style.get(HEADER_HEIGHT_KEY);
-        if (height != null && Float.isFinite(height) && height > 0) headers.getLayout().height(height);
+        if (height != null && Float.isFinite(height) && height > 0) headers.getLayout()
+                .height(height);
         super.applyLayout();
     }
     /**
@@ -67,14 +77,18 @@ public class TabbedPane extends Panel {
      *
      * @return current tab count
      */
-    public int getTabCount() { return tabs.size(); }
+    public int getTabCount() {
+        return tabs.size();
+    }
     /**
      * Returns the selected tab's current index. Removing an earlier tab can change
      * this index while leaving the same page selected.
      *
      * @return selected index, or -1 when no tab is selected
      */
-    public int getSelectedIndex() { return selected; }
+    public int getSelectedIndex() {
+        return selected;
+    }
     /**
      * Returns an existing page without invoking its factory. The returned node belongs
      * to the deck; callers should not reparent it independently.
@@ -83,7 +97,9 @@ public class TabbedPane extends Panel {
      * @return live page, or null if never successfully selected
      * @throws IndexOutOfBoundsException if index is outside the tab list
      */
-    public UINode getPage(int index) { return tabs.get(index).page; }
+    public UINode getPage(int index) {
+        return tabs.get(index).page;
+    }
     /**
      * Returns the live header for label, style, or disabled-state customization.
      * Ownership stays with the header strip.
@@ -92,7 +108,9 @@ public class TabbedPane extends Panel {
      * @return tab header button
      * @throws IndexOutOfBoundsException if index is outside the tab list
      */
-    public Button getHeader(int index) { return tabs.get(index).button; }
+    public Button getHeader(int index) {
+        return tabs.get(index).button;
+    }
     /**
      * Subscribes to synchronous selection and removal notifications. Registration does
      * not immediately report the current selection; close the subscription to detach.
@@ -100,7 +118,9 @@ public class TabbedPane extends Panel {
      * @param listener callback invoked after state changes
      * @return subscription handle
      */
-    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) {
+        return changes.subscribe(listener);
+    }
     /**
      * Adds a header and retains its page factory. If no tab is selected, selects index
      * zero immediately. Other page factories are deferred until selection; failures
@@ -112,8 +132,9 @@ public class TabbedPane extends Panel {
      * @throws NullPointerException if title or factory is null
      */
     public TabbedPane addTab(String title, Supplier<? extends UINode> factory) {
-        Tab tab = new Tab(Objects.requireNonNull(title), Objects.requireNonNull(factory));
-        tabs.add(tab); headers.add(tab.button);
+        PaneTab tab = new PaneTab(this, Objects.requireNonNull(title), Objects.requireNonNull(factory));
+        tabs.add(tab);
+        headers.add(tab.button);
         if (selected < 0) select(0);
         return this;
     }
@@ -130,25 +151,36 @@ public class TabbedPane extends Panel {
      * @throws IllegalArgumentException if the page is attached or is this pane
      */
     public void select(int index) {
-        Tab next = tabs.get(index);
+        PaneTab next = tabs.get(index);
         if (next.button.isDisabled() || index == selected) return;
         if (next.page == null) {
             UINode page = Objects.requireNonNull(next.factory.get(), "Page factory returned null");
             if (page.getParent() != null || page == this) throw new IllegalArgumentException("Page must be fresh and unattached");
-            page.getLayout().absolute().left(0).top(0).widthPercent(100).heightPercent(100);
-            deck.add(page); next.page = page;
+            page.getLayout()
+                    .absolute()
+                    .left(0)
+                    .top(0)
+                    .widthPercent(100)
+                    .heightPercent(100);
+            deck.add(page);
+            next.page = page;
         }
-        Tab previous = selected < 0 ? null : tabs.get(selected);
+        PaneTab previous = selected < 0 ? null : tabs.get(selected);
         boolean moveFocus = previous != null && getRoot() != null && contains(previous.page, getRoot().getFocused());
         if (previous != null) {
             if (getRoot() != null && contains(previous.page, getRoot().getCaptured())) {
-                getRoot().cancelInput(); moveFocus = true;
+                getRoot()
+                        .cancelInput();
+                moveFocus = true;
             }
-            previous.page.setVisible(false); previous.button.setSelected(false);
+            previous.page.setVisible(false);
+            previous.button.setSelected(false);
         }
         selected = index;
-        next.page.setVisible(true); next.button.setSelected(true);
-        if (moveFocus) getRoot().setFocusTo(next.button);
+        next.page.setVisible(true);
+        next.button.setSelected(true);
+        if (moveFocus) getRoot()
+                .setFocusTo(next.button);
         changes.fire();
     }
     /**
@@ -161,7 +193,7 @@ public class TabbedPane extends Panel {
      * @throws IndexOutOfBoundsException if index is invalid
      */
     public void removeTab(int index) {
-        Tab removed = tabs.get(index);
+        PaneTab removed = tabs.get(index);
         boolean active = selected == index;
         boolean hadFocus = getRoot() != null && (getRoot().getFocused() == removed.button || contains(removed.page, getRoot().getFocused()));
         tabs.remove(index);
@@ -172,14 +204,18 @@ public class TabbedPane extends Panel {
             int candidate = Math.min(index, tabs.size() - 1);
             for (int i = 0; i < tabs.size(); i++) {
                 int next = (candidate + i) % tabs.size();
-                if (!tabs.get(next).button.isDisabled()) { select(next); break; }
+                if (!tabs.get(next).button.isDisabled()) {
+                    select(next);
+                    break;
+                }
             }
             if (selected < 0) changes.fire();
         } else {
             if (selected > index) selected--;
             changes.fire();
         }
-        if (hadFocus && getRoot() != null && selected >= 0) getRoot().setFocusTo(tabs.get(selected).button);
+        if (hadFocus && getRoot() != null && selected >= 0) getRoot()
+                .setFocusTo(tabs.get(selected).button);
     }
     /**
      * Updates the header strip and only the selected page. Inactive pages retain state
@@ -187,9 +223,11 @@ public class TabbedPane extends Panel {
      *
      * @param delta elapsed time in seconds
      */
-    @Override public void update(float delta) {
+    @Override
+    public void update(float delta) {
         headers.update(delta);
-        if (selected >= 0) tabs.get(selected).page.update(delta);
+        if (selected >= 0) tabs.get(selected)
+                .page.update(delta);
     }
     /**
      * Finds the next enabled header for Left, Right, Home, or End, wrapping when needed.
@@ -199,14 +237,15 @@ public class TabbedPane extends Panel {
      * @param from header's owning tab
      * @param key supported navigation key
      */
-    private void navigate(Tab from, int key) {
+    void navigate(PaneTab from, int key) {
         int direction = key == Keyboard.LEFT || key == Keyboard.END ? -1 : 1;
         int index = key == Keyboard.HOME ? -1 : key == Keyboard.END ? tabs.size() : tabs.indexOf(from);
         for (int i = 0; i < tabs.size(); i++) {
             index = Math.floorMod(index + direction, tabs.size());
             if (tabs.get(index).button.isDisabled()) continue;
             select(index);
-            if (getRoot() != null) getRoot().setFocusTo(tabs.get(index).button);
+            if (getRoot() != null) getRoot()
+                    .setFocusTo(tabs.get(index).button);
             return;
         }
     }
@@ -219,47 +258,12 @@ public class TabbedPane extends Panel {
      * @return whether node belongs to parent's subtree
      */
     private static boolean contains(UINode parent, UINode node) {
+        /*
+         * Walk parent identities directly, avoiding allocation of an ancestor collection.
+         */
         if (parent == null) return false;
         for (; node != null; node = node.getParent()) if (node == parent) return true;
         return false;
     }
-    /**
-     * Retains one header, its deferred factory, and its instantiated page reference.
-     * The enclosing pane controls attachment, selection, and disposal through its
-     * header and deck containers.
-     *
-     * @author Albert Beaupre
-     */
-    private final class Tab {
-        final Supplier<? extends UINode> factory; // Retained factory used when this tab is first selected.
-        final Button button; // Owned header button used to select this tab.
-        UINode page; // Lazily attached page, or null before successful creation.
-        /**
-         * Creates a header whose activation selects this tab and whose navigation keys
-         * are handled by the enclosing pane. Page construction remains deferred.
-         *
-         * @param title header label
-         * @param factory retained page supplier
-         */
-        Tab(String title, Supplier<? extends UINode> factory) {
-            this.factory = factory;
-            button = new Button(title) {
-                /**
-                 * Handles enabled header navigation using Left, Right, Home, and End, consuming
-                 * those events. Other keys use normal button activation; disabled headers do nothing.
-                 *
-                 * @param event routed header key press
-                 */
-                @Override public void onKeyPress(KeyPressEvent event) {
-                    if (isDisabled()) return;
-                    int key = event.getKey();
-                    if (key == Keyboard.LEFT || key == Keyboard.RIGHT || key == Keyboard.HOME || key == Keyboard.END) {
-                        navigate(Tab.this, key); event.consume();
-                    } else super.onKeyPress(event);
-                }
-            }.action(b -> select(tabs.indexOf(this)));
-            button.setStyleName("tab-header");
-            button.getLayout().paddingHorizontal(8).minWidth(64).heightPercent(100);
-        }
-    }
+
 }

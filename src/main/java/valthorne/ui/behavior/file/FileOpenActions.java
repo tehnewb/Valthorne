@@ -80,7 +80,8 @@ public final class FileOpenActions {
     public void open(Path path) throws IOException {
         Path entry = requireEntry(path);
         try {
-            desktop(Action.OPEN).open(entry.toFile());
+            desktop(Action.OPEN)
+                    .open(entry.toFile());
         } catch (UnsupportedOperationException | IllegalArgumentException | SecurityException failure) {
             throw new IOException("The entry could not be opened with its default application: " + entry, failure);
         }
@@ -96,11 +97,13 @@ public final class FileOpenActions {
         Path entry = requireEntry(path);
         try {
             if (supports(Action.BROWSE_FILE_DIR)) {
-                desktop(Action.BROWSE_FILE_DIR).browseFileDirectory(entry.toFile());
+                desktop(Action.BROWSE_FILE_DIR)
+                        .browseFileDirectory(entry.toFile());
                 return;
             }
             Path parent = entry.getParent();
-            desktop(Action.OPEN).open((parent == null ? entry : parent).toFile());
+            desktop(Action.OPEN)
+                    .open((parent == null ? entry : parent).toFile());
         } catch (UnsupportedOperationException | IllegalArgumentException | SecurityException failure) {
             throw new IOException("The entry could not be revealed in the system explorer: " + entry, failure);
         }
@@ -115,7 +118,8 @@ public final class FileOpenActions {
     public void edit(Path path) throws IOException {
         Path entry = requireEntry(path);
         try {
-            desktop(Action.EDIT).edit(entry.toFile());
+            desktop(Action.EDIT)
+                    .edit(entry.toFile());
         } catch (UnsupportedOperationException | IllegalArgumentException | SecurityException failure) {
             throw new IOException("The entry could not be opened with its default editor: " + entry, failure);
         }
@@ -238,6 +242,7 @@ public final class FileOpenActions {
      * @return whether the operating system identifies itself as Windows
      */
     private boolean isWindows() {
-        return System.getProperty("os.name", "").regionMatches(true, 0, "Windows", 0, 7);
+        return System.getProperty("os.name", "")
+                .regionMatches(true, 0, "Windows", 0, 7);
     }
 }

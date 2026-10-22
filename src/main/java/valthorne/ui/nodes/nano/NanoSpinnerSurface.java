@@ -70,14 +70,14 @@ public final class NanoSpinnerSurface extends NanoContainer {
             if (node.isDisabled()) {
                 enabled = false;
                 break;
-            }
+        }
         if (enabled && getRoot() != null) {
             for (UINode node = getRoot().getFocused(); node != null; node = node.getParent())
                 if (node == owner) {
                     Color accent = style == null ? null : style.get(UITokens.ACCENT);
                     edge = accent == null ? ACCENT : accent;
                     break;
-                }
+            }
         }
         Float resolvedRadius = style == null ? null : style.get(CORNER_RADIUS_KEY);
         Float resolvedWidth = style == null ? null : style.get(BORDER_WIDTH_KEY);

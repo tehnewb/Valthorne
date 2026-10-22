@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.function.Predicate;
-import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.nodes.nano.NanoLabel;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
@@ -66,16 +65,28 @@ public class DataTable<T> extends Panel {
         if (columns.isEmpty()) throw new IllegalArgumentException("At least one column is required");
         totalWeight = columns.stream().mapToDouble(TableColumn::weight).sum();
         buttons = new Button[columns.size()];
-        getLayout().column().gap(0).minHeight(0);
+        getLayout()
+                .column()
+                .gap(0)
+                .minHeight(0);
         headers.setStyleName("table-header-strip");
-        headers.getLayout().row().height(24).noShrink().paddingRight(12);
+        headers.getLayout()
+                .row()
+                .height(24)
+                .noShrink()
+                .paddingRight(12);
         for (int i = 0; i < columns.size(); i++) {
             int index = i;
             TableColumn<T> column = columns.get(i);
             reverse.add(column.comparator() == null ? null : column.comparator().reversed());
-            Button button = new Button(column.title()).action(b -> toggleSort(index));
+            Button button = new Button(column.title())
+                    .action(b -> toggleSort(index));
             button.setStyleName("table-header");
-            button.getLayout().width(0).grow(column.weight()).minWidth(0).heightPercent(100);
+            button.getLayout()
+                    .width(0)
+                    .grow(column.weight())
+                    .minWidth(0)
+                    .heightPercent(100);
             if (column.comparator() == null) {
                 button.setFocusable(false);
                 button.setClickable(false);
@@ -84,11 +95,18 @@ public class DataTable<T> extends Panel {
             buttons[i] = button;
         }
         rows = new VirtualList(0, this::createRow).rowHeight(24).gap(0).selectable(true);
-        rows.getLayout().widthPercent(100).height(0).grow().minHeight(0);
+        rows.getLayout()
+                .widthPercent(100)
+                .height(0)
+                .grow()
+                .minHeight(0);
         super.add(headers);
         super.add(rows);
         empty.setClickable(false);
-        empty.getLayout().absolute().left(8).top(32);
+        empty.getLayout()
+                .absolute()
+                .left(8)
+                .top(32);
         super.add(empty);
         model.onChange(() -> {
             rows.getSelection().clear();
@@ -194,8 +212,10 @@ public class DataTable<T> extends Panel {
             Float headerHeight = style.get(HEADER_HEIGHT_KEY);
             Float rowHeight = style.get(ROW_HEIGHT_KEY);
             if (headerHeight != null && Float.isFinite(headerHeight) && headerHeight > 0) {
-                headers.getLayout().height(headerHeight);
-                empty.getLayout().top(headerHeight + 8);
+                headers.getLayout()
+                        .height(headerHeight);
+                empty.getLayout()
+                        .top(headerHeight + 8);
             }
             if (rowHeight != null && Float.isFinite(rowHeight) && rowHeight > 0) rows.rowHeight(rowHeight);
         }
@@ -272,12 +292,19 @@ public class DataTable<T> extends Panel {
         Panel row = new Panel();
         row.setStyleName("table-row");
         row.setFocusable(true);
-        row.getLayout().row().itemsCenter();
+        row.getLayout()
+                .row()
+                .itemsCenter();
         for (TableColumn<T> column : columns) {
-            Panel cell = new Cell();
+            Panel cell = new TableCell();
             cell.setStyleName("widget-layout");
             cell.setClickable(false);
-            cell.getLayout().widthPercent((float) (column.weight() / totalWeight * 100)).heightPercent(100).minWidth(0).padding(6).justifyCenter();
+            cell.getLayout()
+                    .widthPercent((float) (column.weight() / totalWeight * 100))
+                    .heightPercent(100)
+                    .minWidth(0)
+                    .padding(6)
+                    .justifyCenter();
             UINode node = Objects.requireNonNull(column.cell().apply(item), "Cell factory returned null");
             if (node.getParent() != null)
                 throw new IllegalArgumentException("Cell factory must return fresh unattached nodes");
@@ -287,41 +314,4 @@ public class DataTable<T> extends Panel {
         return row;
     }
 
-    /**
-     * Internal cell container limiting both hit testing and drawing to its bounds.
-     * Texture-batch clipping includes the active translation and is unwound even
-     * when child drawing fails, preserving the enclosing table's clipping stack.
-     *
-     * @author Albert Beaupre
-     */
-    private static final class Cell extends Panel {
-        /**
-         * Rejects hits outside this cell before searching its descendants.
-         *
-         * @param x   query X in the coordinate space expected by contains
-         * @param y   query Y in the coordinate space expected by contains
-         * @param bit hit-test capability mask forwarded to descendants
-         * @return matching descendant or this cell, or null outside/no match
-         */
-        @Override
-        public UINode findNodeAt(float x, float y, int bit) {
-            return contains(x, y) ? super.findNodeAt(x, y, bit) : null;
-        }
-
-        /**
-         * Pushes a scissor at translated render bounds, draws the panel subtree, and
-         * restores the enclosing scissor in a finally block.
-         *
-         * @param batch active texture batch carrying current translation and clipping
-         */
-        @Override
-        public void draw(TextureBatch batch) {
-            batch.beginScissor(getRenderX() + batch.getTranslationX(), getRenderY() + batch.getTranslationY(), getWidth(), getHeight());
-            try {
-                super.draw(batch);
-            } finally {
-                batch.endScissor();
-            }
-        }
-    }
 }

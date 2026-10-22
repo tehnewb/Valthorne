@@ -92,6 +92,9 @@ public final class NanoText {
      * @return end pen X for syntax-highlighted runs
      */
     public static float draw(UINode node, long vg, float x, float y, String text, float size, Color color, int align) {
+        /*
+         * Delegate to named-font drawing so the default and explicit typography paths share layout and batching behavior.
+         */
         return draw(node, vg, node instanceof NanoCodeEditor ? "code" : "default", x, y, text, size, color, align);
     }
 

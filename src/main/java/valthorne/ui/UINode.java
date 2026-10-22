@@ -241,6 +241,9 @@ public abstract class UINode implements Dimensional {
      * @param point mutable point in the coordinate system preceding these transforms
      */
     private static void transformContentPoint(UIContainer container, Vector2f point) {
+        /*
+         * Apply ancestor transforms in hierarchy order using the caller-owned scratch vector.
+         */
         if (container == null) return;
         transformContentPoint(container.getParent(), point);
         float x = container.inverseRotationX(point.x(), point.y());
@@ -286,7 +289,9 @@ public abstract class UINode implements Dimensional {
      * cursor choice. Overrides should return zero when the interaction is unavailable.
      * @return a Mouse.CURSOR_* shape, or zero to leave the application cursor unchanged
      */
-    public int getCursorShape() { return 0; }
+    public int getCursorShape() {
+        return 0;
+    }
 
     /**
      * Screen pixels (bottom-left) to this node's local top-left coordinates.
@@ -1301,7 +1306,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setX(float x) {
-        this.getLayout().left(x);
+        this.getLayout()
+                .left(x);
     }
 
     /**
@@ -1322,7 +1328,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setY(float y) {
-        this.getLayout().top(y - getHeight());
+        this.getLayout()
+                .top(y - getHeight());
     }
 
     /**
@@ -1346,7 +1353,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setWidth(float width) {
-        this.getLayout().width(width);
+        this.getLayout()
+                .width(width);
     }
 
     /**
@@ -1370,7 +1378,8 @@ public abstract class UINode implements Dimensional {
      */
     @Override
     public void setHeight(float height) {
-        this.getLayout().height(height);
+        this.getLayout()
+                .height(height);
     }
 
     /**
@@ -1446,21 +1455,27 @@ public abstract class UINode implements Dimensional {
      *
      * @return angle in degrees
      */
-    public final float getRotation() {return rotation;}
+    public final float getRotation() {
+        return rotation;
+    }
 
     /**
      * Supplies the cached orientation to the root's rendering context.
      *
      * @return counterclockwise rotation cosine
      */
-    final float rotationCosine() {return rotationCosine;}
+    final float rotationCosine() {
+        return rotationCosine;
+    }
 
     /**
      * Supplies the cached orientation to the root's rendering context.
      *
      * @return counterclockwise rotation sine
      */
-    final float rotationSine() {return rotationSine;}
+    final float rotationSine() {
+        return rotationSine;
+    }
 
     /**
      * Resolves the rotated visual envelope in top-down layout coordinates, including
@@ -1586,7 +1601,8 @@ public abstract class UINode implements Dimensional {
      */
     protected float getRenderSpaceHeight() {
         if (root != null) {
-            if (root.getViewport() != null) return root.getViewport().getWorldHeight();
+            if (root.getViewport() != null) return root.getViewport()
+                    .getWorldHeight();
 
             if (root.getHeight() > 0f) return root.getHeight();
         }

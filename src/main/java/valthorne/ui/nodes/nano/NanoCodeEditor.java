@@ -27,6 +27,15 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * Editable multiline NanoVG text surface with line numbers and pluggable
  * syntax colors. A secondary click opens standard undo, clipboard, deletion,
  * and selection commands at the pointer while preserving an existing selection.
+ * Mutations and callbacks run on the UI thread. The editor owns its edit model
+ * and transient command menu; fonts belong to the theme or root. Line starts
+ * are rebuilt after text changes, while painting visits only visible lines.
+ *
+ * <pre>{@code
+ * NanoCodeEditor editor = new NanoCodeEditor().text(source);
+ * editor.onSave(() -> saveDocument(editor.getText()));
+ * root.add(editor);
+ * }</pre>
  */
 public class NanoCodeEditor extends NanoPanel {
 
@@ -60,17 +69,21 @@ public class NanoCodeEditor extends NanoPanel {
     private static final float TEXT_X = 64;
     private float lineHeight = 18f; // Distance between successive editor lines in UI units.
     private float fontSize = 12f; // Current resolved source and gutter text size.
-    private final TextEditModel model = new TextEditModel().multiline(true);
+    private final TextEditModel model = new TextEditModel()
+            .multiline(true); // Owned content model retaining edits, projection, or selection state.
     private final NanoPopupMenu contextMenu = new NanoPopupMenu(); // Standard text commands for a secondary click.
-    private final ArrayList<Integer> starts = new ArrayList<>();
-    private String lastText = "";
-    private Function<String, List<NanoColoredRun>> highlighter;
-    private Consumer<String> changed = text -> {};
-    private Runnable save = () -> {};
-    private float blink;
-    private int preferredColumn = -1;
-    private String fontName = "default";
+    private final ArrayList<Integer> starts = new ArrayList<>(); // Cached UTF-16 start offset of each source line.
+    private String lastText = ""; // Last source string used to build cached line offsets.
+    private Function<String, List<NanoColoredRun>> highlighter; // Optional application callback returning colored source runs.
+    private Consumer<String> changed = text -> {}; // Synchronous application callback after text changes.
+    private Runnable save = () -> {}; // Application action invoked by the save shortcut.
+    private float blink; // Elapsed time used to alternate caret visibility.
+    private int preferredColumn = -1; // Retained horizontal caret column, or minus one before vertical navigation.
+    private String fontName = "default"; // Borrowed registered font name used for measurement and rendering.
 
+    /**
+     * Builds the control and its owned children from the supplied configuration.
+     */
     public NanoCodeEditor() {
         setClickable(true);
         setFocusable(true);
@@ -95,50 +108,108 @@ public class NanoCodeEditor extends NanoPanel {
         super.applyLayout();
     }
 
-    public String getText() {return model.text();}
+    /**
+     * Returns current source text without copying the editing model.
+     *
+     * @return current source text without copying the editing model
+     */
+    public String getText() {
+        return model.text();
+    }
 
-    public int getCaretOffset() {return model.caret();}
+    /**
+     * Returns the current UTF-16 insertion offset in the source text.
+     *
+     * @return the current utf-16 insertion offset in the source text
+     */
+    public int getCaretOffset() {
+        return model.caret();
+    }
 
+    /**
+     * Replaces source text through the editing model and synchronizes line geometry.
+     *
+     * @param value replacement value applied to this control
+     * @return this control for further configuration
+     */
     public NanoCodeEditor text(String value) {
         model.text(value);
         return this;
     }
 
+    /**
+     * Selects a borrowed registered font name for drawing and caret measurement.
+     *
+     * @param name borrowed registered font or displayed command name
+     * @return this control for further configuration
+     */
     public NanoCodeEditor font(String name) {
         fontName = Objects.requireNonNull(name);
         return this;
     }
 
+    /**
+     * Installs the callback producing ordered colored runs for each visible source line.
+     *
+     * @param value replacement value applied to this control
+     * @return this control for further configuration
+     */
     public NanoCodeEditor highlighter(Function<String, List<NanoColoredRun>> value) {
         highlighter = Objects.requireNonNull(value);
         return this;
     }
 
+    /**
+     * Replaces the synchronous user-change callback without emitting an initial notification.
+     *
+     * @param listener nonnull synchronous application callback
+     * @return this control for further configuration
+     */
     public NanoCodeEditor onChange(Consumer<String> listener) {
         changed = Objects.requireNonNull(listener);
         return this;
     }
 
+    /**
+     * Installs the action requested by the editor save shortcut.
+     *
+     * @param listener nonnull synchronous application callback
+     * @return this control for further configuration
+     */
     public NanoCodeEditor onSave(Runnable listener) {
         save = Objects.requireNonNull(listener);
         return this;
     }
 
-    /** Restores the most recent source edit and makes it available for redo. */
-    public void undo() {model.undo();}
+    /**
+     * Restores the most recent source edit and makes it available for redo.
+     */
+    public void undo() {
+        model.undo();
+    }
 
-    /** Reapplies the most recently undone source edit. */
-    public void redo() {model.redo();}
+    /**
+     * Reapplies the most recently undone source edit.
+     */
+    public void redo() {
+        model.redo();
+    }
 
-    /** Opens the standard editing actions at a secondary pointer press. */
+    /**
+     * Opens the standard editing actions at a secondary pointer press.
+     */
     private void showContextMenu(MousePressEvent event) {
         int offset = positionAt(event.getX(), event.getY());
         if (offset < model.start() || offset > model.end()) model.move(offset, false);
-        contextMenu.items(List.of(new NanoPopupMenu.Item("Undo", model::undo, model.canUndo()), new NanoPopupMenu.Item("Redo", model::redo, model.canRedo()), new NanoPopupMenu.Item("Cut", () -> {
+        contextMenu.items(List.of(new NanoPopupMenuItem("Undo", model::undo, model.canUndo()), new NanoPopupMenuItem("Redo", model::redo, model.canRedo()), new NanoPopupMenuItem("Cut", () -> {
             if (TextEditing.copy(model, false)) model.deleteSelection();
-        }, model.hasSelection()), new NanoPopupMenu.Item("Copy", () -> TextEditing.copy(model, false), model.hasSelection()), new NanoPopupMenu.Item("Paste", () -> TextEditing.paste(model), true), new NanoPopupMenu.Item("Delete", model::deleteSelection, model.hasSelection()), new NanoPopupMenu.Item("Select All", model::selectAll, !model.text().isEmpty()))).showAt(this, event.getX(), event.getY(), 176);
+        }, model.hasSelection()), new NanoPopupMenuItem("Copy", () -> TextEditing.copy(model, false), model.hasSelection()), new NanoPopupMenuItem("Paste", () -> TextEditing.paste(model), true), new NanoPopupMenuItem("Delete", model::deleteSelection, model.hasSelection()), new NanoPopupMenuItem("Select All", model::selectAll, !model.text().isEmpty())))
+                .showAt(this, event.getX(), event.getY(), 176);
     }
 
+    /**
+     * Rebuilds cached line starts after model changes and notifies the application.
+     */
     private void modelChanged() {
         blink = 0;
         if (!lastText.equals(model.text())) {
@@ -149,6 +220,9 @@ public class NanoCodeEditor extends NanoPanel {
         revealCaret();
     }
 
+    /**
+     * Recomputes UTF-16 line starts and content bounds after text or typography changes.
+     */
     private void rebuildLines() {
         starts.clear();
         starts.add(0);
@@ -159,18 +233,35 @@ public class NanoCodeEditor extends NanoPanel {
                 longest = Math.max(longest, visualLength(text.substring(start, i)));
                 starts.add(i + 1);
                 start = i + 1;
-            }
+        }
         longest = Math.max(longest, visualLength(text.substring(start)));
-        getLayout().width(Math.max(500, TEXT_X + 20 + longest * fontSize * 0.65f)).height(Math.max(1, starts.size()) * lineHeight);
+        getLayout()
+                .width(Math.max(500, TEXT_X + 20 + longest * fontSize * 0.65f))
+                .height(Math.max(1, starts.size()) * lineHeight);
         markLayoutDirty();
     }
 
+    /**
+     * Counts display columns with tab expansion for fixed-width source layout.
+     *
+     * @param line zero-based source line index
+     * @return counts display columns with tab expansion for fixed-width source layout
+     */
     private static int visualLength(String line) {
+        /*
+         * Expand tabs into fixed display columns while scanning the existing line once.
+         */
         int length = 0;
         for (int i = 0; i < line.length(); i++) length += line.charAt(i) == '\t' ? 4 : 1;
         return length;
     }
 
+    /**
+     * Finds the source line containing a UTF-16 offset using cached line starts.
+     *
+     * @param offset UTF-16 insertion offset within the current source text
+     * @return finds the source line containing a utf-16 offset using cached line starts
+     */
     private int lineAt(int offset) {
         int low = 0, high = starts.size() - 1;
         while (low < high) {
@@ -181,24 +272,64 @@ public class NanoCodeEditor extends NanoPanel {
         return low;
     }
 
+    /**
+     * Returns the exclusive content end of a source line, excluding its newline.
+     *
+     * @param line zero-based source line index
+     * @return the exclusive content end of a source line, excluding its newline
+     */
     private int lineEnd(int line) {
         return line + 1 < starts.size() ? starts.get(line + 1) - 1 : model.text().length();
     }
 
-    private String lineText(int line) {return model.text().substring(starts.get(line), lineEnd(line));}
+    /**
+     * Copies one source line without its terminating newline for display.
+     *
+     * @param line zero-based source line index
+     * @return copies one source line without its terminating newline for display
+     */
+    private String lineText(int line) {
+        return model.text()
+                .substring(starts.get(line), lineEnd(line));
+    }
 
-    private static String visible(String text) {return text.replace("\t", "    ");}
+    /**
+     * Expands tab characters into spaces for aligned source display.
+     *
+     * @param text nonnull text to display or process
+     * @return expands tab characters into spaces for aligned source display
+     */
+    private static String visible(String text) {
+        /*
+         * Expand tabs only for display; source offsets remain unchanged in the editing model.
+         */
+        return text.replace("\t", "    ");
+    }
 
+    /**
+     * Finds the enclosing scroll viewport, or returns null for an unscrolled editor.
+     *
+     * @return finds the enclosing scroll viewport, or returns null for an unscrolled editor
+     */
     private NanoScrollPanel scroll() {
         for (var node = getParent(); node != null; node = node.getParent())
             if (node instanceof NanoScrollPanel panel) return panel;
         return null;
     }
 
+    /**
+     * Measures source text using the same font and size as rendering.
+     *
+     * @param text nonnull text to display or process
+     * @return measures source text using the same font and size as rendering
+     */
     private float width(String text) {
         return NanoText.measureTextWidth(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, fontSize, visible(text));
     }
 
+    /**
+     * Adjusts scrolling only as needed to keep the insertion caret visible.
+     */
     private void revealCaret() {
         NanoScrollPanel panel = scroll();
         if (panel == null) return;
@@ -211,6 +342,13 @@ public class NanoCodeEditor extends NanoPanel {
         else if (x > panel.getScrollX() + panel.getWidth() - 12) panel.scrollX(x - panel.getWidth() + 12);
     }
 
+    /**
+     * Converts a pointer position into a clamped UTF-16 insertion offset.
+     *
+     * @param screenX pointer X in window screen coordinates
+     * @param screenY pointer Y in bottom-origin window coordinates
+     * @return converts a pointer position into a clamped utf-16 insertion offset
+     */
     private int positionAt(float screenX, float screenY) {
         var point = screenToLayout(screenX, screenY);
         int line = Math.clamp((int) ((point.y() - getAbsoluteY()) / lineHeight), 0, starts.size() - 1);
@@ -230,13 +368,15 @@ public class NanoCodeEditor extends NanoPanel {
     @Override
     public void onMousePress(MousePressEvent event) {
         if (event.getButton() == Mouse.RIGHT && !isDisabled()) {
-            if (getRoot() != null) getRoot().setFocusTo(this);
+            if (getRoot() != null) getRoot()
+                    .setFocusTo(this);
             showContextMenu(event);
             event.consume();
             return;
         }
         if (event.getButton() != Mouse.LEFT || isDisabled()) return;
-        if (getRoot() != null) getRoot().setFocusTo(this);
+        if (getRoot() != null) getRoot()
+                .setFocusTo(this);
         model.move(positionAt(event.getX(), event.getY()), event.isShiftDown());
         preferredColumn = -1;
         event.consume();

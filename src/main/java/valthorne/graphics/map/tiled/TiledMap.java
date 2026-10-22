@@ -216,7 +216,9 @@ public final class TiledMap {
      *
      * @return degrees about the map center
      */
-    public float getRotation() {return rotation;}
+    public float getRotation() {
+        return rotation;
+    }
 
     /**
      * Rotates rendered layers without rewriting their canonical tile coordinates.
@@ -441,8 +443,14 @@ public final class TiledMap {
         layerOffsetX = layer.getOffsetX() * scaleX;
         layerOffsetY = -layer.getOffsetY() * scaleY;
         batch.setOpacityMultiplier(previousOpacity * Math.clamp(layer.getOpacity(), 0, 1));
-        try { renderTileLayerData(batch, layer, minTileX, minTileY, maxTileX, maxTileY); }
-        finally { layerOffsetX = previousX; layerOffsetY = previousY; batch.setOpacityMultiplier(previousOpacity); }
+        try {
+            renderTileLayerData(batch, layer, minTileX, minTileY, maxTileX, maxTileY);
+        }
+        finally {
+            layerOffsetX = previousX;
+            layerOffsetY = previousY;
+            batch.setOpacityMultiplier(previousOpacity);
+        }
     }
 
     /**
@@ -683,11 +691,24 @@ public final class TiledMap {
         boolean horizontal = (raw & 0x80000000) != 0;
         boolean vertical = (raw & 0x40000000) != 0;
         boolean diagonal = (raw & 0x20000000) != 0;
-        if (!horizontal && !vertical && !diagonal && rotation == 0) { batch.draw(region, x, y, width, height); return; }
-        float u0 = region.getU(); float u1 = region.getU2();
-        float v0 = region.getV(); float v1 = region.getV2();
-        if (diagonal ? !vertical : horizontal) { float swap = u0; u0 = u1; u1 = swap; }
-        if (diagonal ? horizontal : vertical) { float swap = v0; v0 = v1; v1 = swap; }
+        if (!horizontal && !vertical && !diagonal && rotation == 0) {
+            batch.draw(region, x, y, width, height);
+            return;
+        }
+        float u0 = region.getU();
+        float u1 = region.getU2();
+        float v0 = region.getV();
+        float v1 = region.getV2();
+        if (diagonal ? !vertical : horizontal) {
+            float swap = u0;
+            u0 = u1;
+            u1 = swap;
+        }
+        if (diagonal ? horizontal : vertical) {
+            float swap = v0;
+            v0 = v1;
+            v1 = swap;
+        }
         if (!diagonal) {
             batch.drawUV(region.getTexture(), x, y, width, height, u0, v0, u1, v1, pivotX - x, pivotY - y, rotationSine, rotationCosine, null);
             return;
@@ -1042,7 +1063,9 @@ public final class TiledMap {
      *
      * @return current visibility
      */
-    public boolean isVisible() {return visible;}
+    public boolean isVisible() {
+        return visible;
+    }
 
     /**
      * Changes visibility without releasing resources or changing the object's
@@ -1050,5 +1073,7 @@ public final class TiledMap {
      *
      * @param visible whether rendering and animation updates are enabled
      */
-    public void setVisible(boolean visible) {this.visible = visible;}
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
 }

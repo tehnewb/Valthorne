@@ -11,7 +11,7 @@ import java.util.Objects;
  * headings and empty menus. Only one menu owned by this bar opens at a time.
  * <pre>{@code
  * MenuBar bar = new MenuBar();
- * bar.addMenu("File", List.of(new PopupMenu.Item("Save", this::save, true)));
+ * bar.addMenu("File", List.of(new PopupMenuItem("Save", this::save, true)));
  * root.add(bar);
  * }</pre>
  * Heading and command callbacks execute on the UI thread. Removing the bar closes
@@ -25,7 +25,11 @@ public class MenuBar extends Panel {
     /**
      * Creates an empty horizontal bar whose minimum height follows the control theme.
      */
-    public MenuBar() { getLayout().row().noShrink(); }
+    public MenuBar() {
+        getLayout()
+                .row()
+                .noShrink();
+    }
 
     /**
      * Appends a heading with an immutable command snapshot. An empty command list
@@ -34,18 +38,26 @@ public class MenuBar extends Panel {
      * @param items menu commands
      * @return this bar
      */
-    public MenuBar addMenu(String text, List<PopupMenu.Item> items) {
+    public MenuBar addMenu(String text, List<PopupMenuItem> items) {
         Objects.requireNonNull(text);
-        PopupMenu menu = new PopupMenu().items(items);
+        PopupMenu menu = new PopupMenu()
+                .items(items);
         int index = menus.size();
         menu.horizontalNavigation(direction -> switchMenu(index, direction));
-        Button heading = new Button(text).action(button -> {
+        Button heading = new Button(text)
+                .action(button -> {
             boolean wasOpen = menu.isOpen(); closeMenus();
             if (!wasOpen) menu.showBelow(button);
         });
         heading.setStyleName("menu-heading");
-        heading.getLayout().heightPercent(100).paddingHorizontal(8).noShrink();
-        menus.add(menu); headings.add(heading); add(heading); return this;
+        heading.getLayout()
+                .heightPercent(100)
+                .paddingHorizontal(8)
+                .noShrink();
+        menus.add(menu);
+        headings.add(heading);
+        add(heading);
+        return this;
     }
 
     /**
@@ -53,19 +65,25 @@ public class MenuBar extends Panel {
      * @param index zero-based heading index
      * @return owned heading; do not reparent it
      */
-    public Button getHeading(int index) { return headings.get(index); }
+    public Button getHeading(int index) {
+        return headings.get(index);
+    }
 
     /**
      * Borrows the corresponding popup so commands can be replaced between openings.
      * @param index zero-based heading index
      * @return owned popup
      */
-    public PopupMenu getMenu(int index) { return menus.get(index); }
+    public PopupMenu getMenu(int index) {
+        return menus.get(index);
+    }
 
     /**
      * Closes all menus owned by this bar without changing their command lists.
      */
-    public void closeMenus() { menus.forEach(PopupMenu::close); }
+    public void closeMenus() {
+        menus.forEach(PopupMenu::close);
+    }
 
     /**
      * Opens the next available heading in circular order, closing prior overlays first.
@@ -76,7 +94,10 @@ public class MenuBar extends Panel {
         for (int offset = 1; offset <= menus.size(); offset++) {
             int index = Math.floorMod(from + direction * offset, menus.size());
             if (headings.get(index).isEnabled() && !menus.get(index).getItems().isEmpty()) {
-                closeMenus(); menus.get(index).showBelow(headings.get(index)); return;
+                closeMenus();
+                menus.get(index)
+                        .showBelow(headings.get(index));
+                return;
             }
         }
     }
@@ -84,5 +105,8 @@ public class MenuBar extends Panel {
     /**
      * Dismisses root overlays when this bar is detached; children follow normal teardown.
      */
-    @Override public void onDestroy() { closeMenus(); }
+    @Override
+    public void onDestroy() {
+        closeMenus();
+    }
 }

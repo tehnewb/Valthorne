@@ -60,13 +60,14 @@ public final class NanoSpinnerIndicator extends NanoContainer {
         float x = getAbsoluteX() + getWidth() * .5f;
         float y = getAbsoluteY() + getHeight() * .5f;
         float side = Math.min(getWidth() * .38f, getHeight() * .62f);
-        ResolvedStyle style = getParent().getStyle();
+        ResolvedStyle style = getParent()
+                .getStyle();
         boolean disabled = false;
         for (UINode node = getParent(); node != null; node = node.getParent())
             if (node.isDisabled()) {
                 disabled = true;
                 break;
-            }
+        }
         boolean active = getParent().isHovered() || getParent().isPressed();
         Color ink = disabled ? DISABLED : style == null ? null : style.get(active ? UITokens.TEXT : UITokens.MUTED);
         if (ink == null) ink = active || getParent().isFocused() ? ACTIVE : NORMAL;

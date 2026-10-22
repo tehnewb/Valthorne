@@ -822,12 +822,14 @@ public class NanoTextField extends UINode implements NanoNode {
         float measuredHeight = NanoText.measureTextHeight(this, (getRoot() == null ? 0L : getRoot().getNanoVGHandle()), fontName, fontSize) + padding * 2f;
 
         if (getLayout().getWidth().isAuto())
-            getLayout().width(measuredWidth);
+            getLayout()
+                .width(measuredWidth);
 
         if (getLayout().getHeight().isAuto()) {
             Float controlHeight = style.get(UITokens.CONTROL_HEIGHT);
             if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
-            getLayout().height(measuredHeight);
+            getLayout()
+                    .height(measuredHeight);
         }
 
         super.applyLayout();
@@ -852,7 +854,6 @@ public class NanoTextField extends UINode implements NanoNode {
     public void draw(long vg) {
         if (!isVisible() || vg == 0L)
             return;
-
 
         String visibleText = getDisplayText();
         boolean empty = visibleText.isEmpty();
@@ -981,7 +982,8 @@ public class NanoTextField extends UINode implements NanoNode {
      * @return content-space X used for caret hit testing
      */
     private float getEventX(MousePressEvent event) {
-        return getEventPosition(event.getX(), event.getY()).x();
+        return getEventPosition(event.getX(), event.getY())
+                .x();
     }
 
     /**
@@ -1004,7 +1006,8 @@ public class NanoTextField extends UINode implements NanoNode {
      * @return content-space X used for selection hit testing
      */
     private float getEventX(MouseDragEvent event) {
-        return getEventPosition(event.getToX(), event.getToY()).x();
+        return getEventPosition(event.getToX(), event.getToY())
+                .x();
     }
 
     /**
@@ -1035,7 +1038,9 @@ public class NanoTextField extends UINode implements NanoNode {
      *
      * @return owned mutable editor
      */
-    public TextEditModel getEditor() {return editor;}
+    public TextEditModel getEditor() {
+        return editor;
+    }
 
     /**
      * Copies current text, caret, and anchor into renderer state after any editor

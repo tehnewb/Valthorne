@@ -1,7 +1,8 @@
 package valthorne.ui.nodes.nano;
 
+import valthorne.ui.UINode;
+
 import valthorne.graphics.Color;
-import valthorne.ui.Canvas2D;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.UITokens;
 import java.util.Objects;
@@ -24,66 +25,94 @@ import java.util.function.Consumer;
  * @author Albert Beaupre
  */
 public class NanoColorPicker extends NanoContainer {
-    /**
-     * Selects the visible editing surfaces without changing the current color.
-     * Both surfaces edit the same packed value and share hexadecimal and alpha input.
-     * @author Albert Beaupre
-     */
-    public enum Mode {
-        /**
-         * Four red, green, blue and alpha channel sliders.
-         */
-        SLIDERS,
-        /**
-         * Hue/saturation wheel with brightness and alpha sliders.
-         */
-        WHEEL,
-        /**
-         * Wheel, brightness and all four RGBA sliders together.
-         */
-        BOTH
-    }
 
-    private Color value = Color.WHITE.copy(); // Owned current packed RGBA color.
+    Color value = Color.WHITE.copy(); // Owned current packed RGBA color.
     private final NanoSlider[] channels = new NanoSlider[4]; // Owned red, green, blue, and alpha editors.
     private final NanoTextField hex = new NanoTextField("#AARRGGBB"); // Owned hexadecimal commit field.
     private Consumer<Color> change = color -> {}; // User-change listener receiving defensive copies.
     private final NanoPanel[] channelRows = new NanoPanel[4]; // Owned RGBA rows whose layout follows the selected mode.
-    private final Wheel wheel = new Wheel(); // Owned hue/saturation input and NanoVG painting surface.
+    private final NanoColorPickerWheel wheel = new NanoColorPickerWheel(this); // Owned hue/saturation input and NanoVG painting surface.
     private final NanoPanel brightnessRow = NanoWidgetSupport.panel(); // Owned wheel brightness editor row.
     private final NanoSlider brightness = new NanoSlider(0, 1, 1); // HSV value component, independent of alpha.
-    private Mode mode = Mode.SLIDERS; // Current visible editing surfaces.
-    private float hue, saturation, luminance = 1; // HSV hue in turns, saturation, and value; retained through black edits.
+    private NanoColorPickerMode mode = NanoColorPickerMode.SLIDERS; // Current visible editing surfaces.
+    float hue; // HSV hue in turns, saturation, and value; retained through black edits.
+    float saturation; // HSV hue in turns, saturation, and value; retained through black edits.
+    float luminance = 1; // HSV hue in turns, saturation, and value; retained through black edits.
 
     /**
      * Creates a white picker with integer 0..255 sliders and a 40-unit preview.
      */
     public NanoColorPicker() {
-        getLayout().column().minWidth(240);
-        Swatch swatch = new Swatch(); swatch.getLayout().height(40).widthPercent(100).noShrink(); add(swatch);
-        wheel.getLayout().widthPercent(100).noShrink(); add(wheel);
-        brightnessRow.getLayout().row().itemsCenter().widthPercent(100).noShrink();
-        NanoLabel brightnessLabel = new NanoLabel("Value"); brightnessLabel.getLayout().minWidth(56).noShrink();
-        brightness.getLayout().grow(1).minWidth(0).heightPercent(100);
+        getLayout()
+                .column()
+                .minWidth(240);
+        NanoColorPickerSwatch swatch = new NanoColorPickerSwatch(this);
+        swatch.getLayout()
+                .height(40)
+                .widthPercent(100)
+                .noShrink();
+        add(swatch);
+        wheel.getLayout()
+                .widthPercent(100)
+                .noShrink();
+        add(wheel);
+        brightnessRow.getLayout()
+                .row()
+                .itemsCenter()
+                .widthPercent(100)
+                .noShrink();
+        NanoLabel brightnessLabel = new NanoLabel("Value");
+        brightnessLabel.getLayout()
+                .minWidth(56)
+                .noShrink();
+        brightness.getLayout()
+                .grow(1)
+                .minWidth(0)
+                .heightPercent(100);
         brightness.action(slider -> selectHSV(hue, saturation, slider.getValue()));
-        brightnessRow.add(brightnessLabel, brightness); add(brightnessRow);
+        brightnessRow.add(brightnessLabel, brightness);
+        add(brightnessRow);
         String[] names = {"Red", "Green", "Blue", "Alpha"};
         for (int i = 0; i < 4; i++) {
-            NanoPanel row = NanoWidgetSupport.panel(); row.getLayout().row().itemsCenter().height(26).widthPercent(100).noShrink();
-            NanoLabel label = new NanoLabel(names[i]); label.getLayout().minWidth(56).noShrink();
-            NanoSlider slider = new NanoSlider(0, 255, 255).stepSize(1).action(s -> editChannels());
-            slider.getLayout().grow(1).minWidth(0).heightPercent(100);
-            channels[i] = slider; channelRows[i] = row; row.add(label, slider); add(row);
+            NanoPanel row = NanoWidgetSupport.panel();
+            row.getLayout()
+                    .row()
+                    .itemsCenter()
+                    .height(26)
+                    .widthPercent(100)
+                    .noShrink();
+            NanoLabel label = new NanoLabel(names[i]);
+            label.getLayout()
+                    .minWidth(56)
+                    .noShrink();
+            NanoSlider slider = new NanoSlider(0, 255, 255)
+                    .stepSize(1)
+                    .action(s -> editChannels());
+            slider.getLayout()
+                    .grow(1)
+                    .minWidth(0)
+                    .heightPercent(100);
+            channels[i] = slider;
+            channelRows[i] = row;
+            row.add(label, slider);
+            add(row);
         }
-        hex.getLayout().widthPercent(100).noShrink();
-        hex.action(field -> commitHex()); add(hex); color(value); mode(Mode.SLIDERS);
+        hex.getLayout()
+                .widthPercent(100)
+                .noShrink();
+        hex.action(field -> commitHex());
+        add(hex);
+        color(value);
+        mode(NanoColorPickerMode.SLIDERS);
     }
 
     /**
      * Returns a defensive copy, including the stored alpha byte.
      * @return independently mutable current color
      */
-    public Color getColor() { return value.copy(); }
+    public Color getColor() {
+        return value.copy();
+    }
 
     /**
      * Silently copies a color and updates all editors, replacing uncommitted text.
@@ -103,7 +132,8 @@ public class NanoColorPicker extends NanoContainer {
         brightness.value(luminance);
         float[] components = {value.r(), value.g(), value.b(), value.a()};
         for (int i = 0; i < 4; i++) channels[i].value(Math.round(components[i] * 255));
-        hex.text(value.toHex()); return this;
+        hex.text(value.toHex());
+        return this;
     }
 
     /**
@@ -112,24 +142,33 @@ public class NanoColorPicker extends NanoContainer {
      * @param mode nonnull editor mode
      * @return this picker
      */
-    public NanoColorPicker mode(Mode mode) {
+    public NanoColorPicker mode(NanoColorPickerMode mode) {
         this.mode = Objects.requireNonNull(mode);
         float height = controlHeight();
-        boolean showWheel = mode != Mode.SLIDERS;
-        wheel.setVisible(showWheel); wheel.getLayout().height(showWheel ? 220 : 0);
-        brightnessRow.setVisible(showWheel); brightnessRow.getLayout().height(showWheel ? height : 0);
+        boolean showWheel = mode != NanoColorPickerMode.SLIDERS;
+        wheel.setVisible(showWheel);
+        wheel.getLayout()
+                .height(showWheel ? 220 : 0);
+        brightnessRow.setVisible(showWheel);
+        brightnessRow.getLayout()
+                .height(showWheel ? height : 0);
         for (int i = 0; i < 4; i++) {
-            boolean show = i == 3 || mode != Mode.WHEEL;
-            channelRows[i].setVisible(show); channelRows[i].getLayout().height(show ? height : 0);
+            boolean show = i == 3 || mode != NanoColorPickerMode.WHEEL;
+            channelRows[i].setVisible(show);
+            channelRows[i].getLayout()
+                    .height(show ? height : 0);
         }
-        markLayoutDirty(); return this;
+        markLayoutDirty();
+        return this;
     }
 
     @Override
     protected void applyLayout() {
         float height = controlHeight();
-        brightnessRow.getLayout().height(brightnessRow.isVisible() ? height : 0);
-        for (NanoPanel row : channelRows) row.getLayout().height(row.isVisible() ? height : 0);
+        brightnessRow.getLayout()
+                .height(brightnessRow.isVisible() ? height : 0);
+        for (NanoPanel row : channelRows) row.getLayout()
+                .height(row.isVisible() ? height : 0);
         super.applyLayout();
     }
 
@@ -148,19 +187,25 @@ public class NanoColorPicker extends NanoContainer {
      * Reads the active editor mode without changing selection or layout.
      * @return current mode
      */
-    public Mode getMode() { return mode; }
+    public NanoColorPickerMode getMode() {
+        return mode;
+    }
 
     /**
      * Exposes the wheel as a focus/layout target without transferring child ownership.
      * @return owned wheel node
      */
-    public valthorne.ui.UINode getWheel() { return wheel; }
+    public UINode getWheel() {
+        return wheel;
+    }
 
     /**
      * Borrows the HSV value slider for focus and styling; direct value setters are silent.
      * @return owned brightness slider
      */
-    public NanoSlider getBrightness() { return brightness; }
+    public NanoSlider getBrightness() {
+        return brightness;
+    }
 
     /**
      * Applies a user HSV edit while retaining alpha. Hue wraps in turns; saturation
@@ -178,7 +223,10 @@ public class NanoColorPicker extends NanoContainer {
         float h = hue - (float) Math.floor(hue), s = Math.clamp(saturation, 0, 1), v = Math.clamp(brightness, 0, 1);
         String before = value.toHex();
         color(hsv(h, s, v, value.a()));
-        this.hue = h; this.saturation = s; this.luminance = v; this.brightness.value(v);
+        this.hue = h;
+        this.saturation = s;
+        this.luminance = v;
+        this.brightness.value(v);
         if (!before.equals(value.toHex())) change.accept(value.copy());
     }
 
@@ -191,6 +239,9 @@ public class NanoColorPicker extends NanoContainer {
      * @return independent color
      */
     private static Color hsv(float h, float s, float v, float alpha) {
+        /*
+         * Convert hue sectors directly into the destination color representation without intermediate color objects.
+         */
         float sector = h * 6, fraction = sector - (float) Math.floor(sector);
         float p = v * (1 - s), q = v * (1 - s * fraction), t = v * (1 - s * (1 - fraction));
         return switch ((int) sector % 6) {
@@ -204,131 +255,32 @@ public class NanoColorPicker extends NanoContainer {
     }
 
     /**
-     * Focusable hue/saturation disc. Pointer capture belongs to the root; only a
-     * primary press inside the disc starts editing, and subsequent drags clamp to
-     * its rim. Arrow keys adjust hue/saturation without requiring a pointing device.
-     * @author Albert Beaupre
-     */
-    private final class Wheel extends NanoPanel implements NanoNode {
-        private boolean dragging; // Whether an accepted primary press owns this gesture.
-        private final valthorne.ui.nodes.ColorWheelImage wheelImage = new valthorne.ui.nodes.ColorWheelImage();
-
-        /**
-         * Enables routed primary input and keyboard focus on the wheel surface.
-         */
-        private Wheel() { setClickable(true); setFocusable(true); }
-
-        /**
-         * Computes the disc radius leaving room for the selection marker and border.
-         * @return nonnegative radius in layout units
-         */
-        private float radius() { return Math.max(0, Math.min(getWidth(), getHeight()) * .5f - 8); }
-
-        /**
-         * Maps a screen point into hue and radial saturation using shared UI transforms.
-         * @param x screen x
-         * @param y screen y
-         * @param initial whether points outside the disc must be ignored
-         * @return whether the point produced an edit
-         */
-        private boolean point(float x, float y, boolean initial) {
-            var local = screenToLocal(x, y);
-            float dx = local.x() - getWidth() * .5f, dy = local.y() - getHeight() * .5f;
-            float distance = (float) Math.hypot(dx, dy), radius = radius();
-            if (radius <= 0 || (initial && distance > radius)) return false;
-            float angle = distance < .001f ? hue : (float) (Math.atan2(dy, dx) / (Math.PI * 2));
-            selectHSV(angle, distance / radius, luminance); return true;
-        }
-
-        /**
-         * Begins editing only for an enabled primary press inside the circular surface.
-         * @param event routed screen-space press
-         */
-        @Override public void onMousePress(valthorne.event.events.MousePressEvent event) {
-            if (isDisabled() || NanoColorPicker.this.isDisabled() || event.getButton() != valthorne.Mouse.LEFT) return;
-            dragging = point(event.getX(), event.getY(), true);
-            if (dragging) event.consume();
-        }
-
-        /**
-         * Continues a captured gesture, clamping saturation when dragged beyond the rim.
-         * @param event routed drag with current screen-space endpoint
-         */
-        @Override public void onMouseDrag(valthorne.event.events.MouseDragEvent event) {
-            if (dragging && !isDisabled() && !NanoColorPicker.this.isDisabled()) {
-                point(event.getToX(), event.getToY(), false); event.consume();
-            }
-        }
-
-        /**
-         * Ends the current pointer gesture without generating an extra color change.
-         * @param event routed button release
-         */
-        @Override public void onMouseRelease(valthorne.event.events.MouseReleaseEvent event) {
-            if (dragging) { dragging = false; event.consume(); }
-        }
-
-        /**
-         * Clears gesture state when focus loss or root removal cancels pointer capture.
-         */
-        @Override public void onPointerCancel() { dragging = false; }
-
-        @Override public void onDestroy() { wheelImage.dispose(); }
-
-        /**
-         * Adjusts hue with Left/Right and saturation with Up/Down. Home selects the
-         * neutral center and End the fully saturated rim; alpha and brightness persist.
-         * @param event routed key press
-         */
-        @Override public void onKeyPress(valthorne.event.events.KeyPressEvent event) {
-            if (isDisabled() || NanoColorPicker.this.isDisabled()) return;
-            switch (event.getKey()) {
-                case valthorne.Keyboard.LEFT -> selectHSV(hue - 1f / 180, saturation, luminance);
-                case valthorne.Keyboard.RIGHT -> selectHSV(hue + 1f / 180, saturation, luminance);
-                case valthorne.Keyboard.UP -> selectHSV(hue, saturation + .01f, luminance);
-                case valthorne.Keyboard.DOWN -> selectHSV(hue, saturation - .01f, luminance);
-                case valthorne.Keyboard.HOME -> selectHSV(hue, 0, luminance);
-                case valthorne.Keyboard.END -> selectHSV(hue, 1, luminance);
-                default -> { return; }
-            }
-            event.consume();
-        }
-
-        /** Paints the continuous hue/saturation image and selection marker. */
-        @Override public void draw(long vg) {
-            float cx = getAbsoluteX() + getWidth() * .5f, cy = getAbsoluteY() + getHeight() * .5f, r = radius();
-            if (r <= 0) return;
-            wheelImage.draw(vg, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight(), r, luminance);
-            try (var stack = org.lwjgl.system.MemoryStack.stackPush()) {
-                float angle = hue * (float) (Math.PI * 2);
-                float x = cx + (float) Math.cos(angle) * r * saturation, y = cy + (float) Math.sin(angle) * r * saturation;
-                org.lwjgl.nanovg.NanoVG.nvgBeginPath(vg); org.lwjgl.nanovg.NanoVG.nvgCircle(vg, x, y, 5);
-                Canvas2D.color(vg, 0, 1); org.lwjgl.nanovg.NanoVG.nvgStrokeWidth(vg, 3); org.lwjgl.nanovg.NanoVG.nvgStroke(vg);
-                Canvas2D.color(vg, 0xffffff, 1); org.lwjgl.nanovg.NanoVG.nvgStrokeWidth(vg, 1); org.lwjgl.nanovg.NanoVG.nvgStroke(vg);
-            }
-        }
-    }
-
-    /**
      * Borrows a channel slider for style or focus configuration. Direct slider.value
      * calls are silent; use color to update the complete picker programmatically.
      * @param index zero for red, one green, two blue, three alpha
      * @return owned slider
      */
-    public NanoSlider getChannel(int index) { return channels[index]; }
+    public NanoSlider getChannel(int index) {
+        return channels[index];
+    }
 
     /**
      * Borrows the hexadecimal text field; call commitHex to apply pending text.
      * @return owned entry field
      */
-    public NanoTextField getHexField() { return hex; }
+    public NanoTextField getHexField() {
+        return hex;
+    }
 
     /**
      * Replaces the user-edit listener without an initial notification.
      * @param listener nonnull callback receiving a new color copy
      * @return this picker
      */
-    public NanoColorPicker onChange(Consumer<Color> listener) { change = Objects.requireNonNull(listener); return this; }
+    public NanoColorPicker onChange(Consumer<Color> listener) {
+        change = Objects.requireNonNull(listener);
+        return this;
+    }
 
     /**
      * Parses six RGB or eight ARGB hexadecimal digits, optionally prefixed by #.
@@ -338,12 +290,17 @@ public class NanoColorPicker extends NanoContainer {
      */
     public boolean commitHex() {
         if (isDisabled()) return false;
-        String input = hex.getText().trim();
+        String input = hex.getText()
+                .trim();
         if (input.startsWith("#")) input = input.substring(1);
-        if (!input.matches("(?i)([0-9a-f]{6}|[0-9a-f]{8})")) { hex.text(value.toHex()); return false; }
+        if (!input.matches("(?i)([0-9a-f]{6}|[0-9a-f]{8})")) {
+            hex.text(value.toHex());
+            return false;
+        }
         int packed = (int) Long.parseLong(input, 16);
         if (input.length() == 6) packed |= 0xff000000;
-        apply(new Color(packed)); return true;
+        apply(new Color(packed));
+        return true;
     }
 
     /**
@@ -362,31 +319,9 @@ public class NanoColorPicker extends NanoContainer {
      * @param next independently created proposed value
      */
     private void apply(Color next) {
-        String before = value.toHex(); color(next);
+        String before = value.toHex();
+        color(next);
         if (!before.equals(value.toHex())) change.accept(value.copy());
     }
 
-    /**
-     * Live preview combining a neutral checkerboard with the current alpha-composited
-     * color. Its NanoVG context and frame are borrowed from shared root dispatch.
-     * Shared dispatch supplies ancestor scrolling and clipping in top-left UI coordinates.
-     * @author Albert Beaupre
-     */
-    private final class Swatch extends NanoPanel implements NanoNode {
-        /**
-         * Draws clipped eight-unit checks, then overlays the current color. No GPU
-         * resources are allocated and no child traversal is needed for this leaf.
-         * @param vg root-owned active NanoVG context
-         */
-        @Override public void draw(long vg) {
-            for (int y = 0; y < getHeight(); y += 8) for (int x = 0; x < getWidth(); x += 8) {
-                Canvas2D.color(vg, ((x / 8 + y / 8) & 1) == 0 ? 0xcccccc : 0x777777, 1);
-                Canvas2D.beginPath(vg); Canvas2D.rect(vg, getAbsoluteX() + x, getAbsoluteY() + y,
-                        Math.min(8, getWidth() - x), Math.min(8, getHeight() - y)); Canvas2D.fill(vg);
-            }
-            int rgb = Math.round(value.r() * 255) << 16 | Math.round(value.g() * 255) << 8 | Math.round(value.b() * 255);
-            Canvas2D.color(vg, rgb, value.a()); Canvas2D.beginPath(vg);
-            Canvas2D.rect(vg, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight()); Canvas2D.fill(vg);
-        }
-    }
 }

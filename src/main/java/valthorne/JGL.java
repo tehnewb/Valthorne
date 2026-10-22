@@ -17,7 +17,6 @@ import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
 import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
 
-
 /**
  * The {@code JGL} class forms the core of the Valthorne 2D game engine framework.
  * It operates as a high-level orchestrator responsible for managing the application's lifecycle,
@@ -44,32 +43,32 @@ import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
  * @since October 17th, 2025
  */
 public class JGL {
-    
+
     /**
      * Shared engine event registry cleared during lifecycle reset.
      */
     private static final EventPublisher events = new EventPublisher();
-    
+
     /**
      * Thread-safe pending tasks drained by the application loop.
      */
     private static final BlockingDeque<Runnable> tasks = new LinkedBlockingDeque<>();
-    
+
     /**
      * Application callbacks used by the running loop; replaced only on its thread.
      */
     private static Application frameApplication;
-    
+
     /**
      * Most recently recorded frame duration in seconds.
      */
     private static float deltaTime;
-    
+
     /**
      * Cached frame-rate estimate stored as a short.
      */
     private static short framesPerSecond;
-    
+
     /**
      * Application-loop continuation flag.
      */
@@ -88,6 +87,9 @@ public class JGL {
      * @throws NullPointerException if {@code application} is {@code null}.
      */
     public static void init(Application application, String title, int width, int height) {
+        /*
+         * Keep lifecycle initialization on the calling engine thread so native handles and callbacks share one owner.
+         */
         init(application, JGLConfiguration.defaults().title(title).size(width, height));
     }
 
@@ -210,6 +212,9 @@ public class JGL {
      * @throws NullPointerException if {@code task} is null
      */
     public static void runTask(Runnable task) {
+        /*
+         * Capture presentation identity before queueing; only scoped tasks need a context wrapper.
+         */
         if (task == null)
             throw new NullPointerException("A null task cannot be executed.");
         WindowContext context = WindowContext.current();
@@ -225,6 +230,9 @@ public class JGL {
      * @throws NullPointerException if {@code eventType} or {@code listener} is null
      */
     public static <T extends Event> void subscribe(EventType<T> eventType, EventHandler<? super T> listener) {
+        /*
+         * Register the original callback identity so removal uses the same instance without reflective discovery.
+         */
         if (eventType == null)
             throw new NullPointerException("A null event type cannot be registered for event listeners.");
         if (listener == null)
@@ -243,6 +251,9 @@ public class JGL {
      * @throws NullPointerException if {@code eventType} or {@code listener} is null
      */
     public static <T extends Event> void subscribe(EventType<T> eventType, int priority, EventHandler<? super T> listener) {
+        /*
+         * Register the original callback identity so removal uses the same instance without reflective discovery.
+         */
         if (eventType == null)
             throw new NullPointerException("A null event type cannot be registered for event listeners.");
         if (listener == null)
@@ -260,6 +271,9 @@ public class JGL {
      * @throws NullPointerException if {@code eventType} or {@code listener} is null
      */
     public static <T extends Event> void unsubscribe(EventType<T> eventType, EventHandler<? super T> listener) {
+        /*
+         * Remove the original callback identity in the current presentation, preserving subscriptions belonging to other contexts.
+         */
         if (eventType == null)
             throw new NullPointerException("A null event type cannot be unregistered for event listeners.");
         if (listener == null)
@@ -276,6 +290,9 @@ public class JGL {
      * @throws NullPointerException if the provided event is null
      */
     public static void publish(Event event) {
+        /*
+         * Dispatch synchronously through the immutable route snapshot so listeners observe the current presentation without queued copies.
+         */
         if (event == null) throw new NullPointerException("A null event cannot be published to the event bus.");
         events.publish(event);
     }
@@ -286,6 +303,9 @@ public class JGL {
      * @return The current time in seconds as a float.
      */
     public static float getTime() {
+        /*
+         * Use the GLFW clock shared by frame timing rather than allocating a duration or reading an unrelated wall clock.
+         */
         return (float) glfwGetTime();
     }
 
@@ -296,6 +316,9 @@ public class JGL {
      * @return The current frames per second as a double.
      */
     public static short getFramesPerSecond() {
+        /*
+         * Return the cached completed sampling interval without recalculating timing during a query.
+         */
         return framesPerSecond;
     }
 
@@ -307,6 +330,9 @@ public class JGL {
      * @return The time difference (delta time) in seconds as a double.
      */
     public static float getDeltaTime() {
+        /*
+         * Return the cached frame interval so all callers in one frame observe the same elapsed duration.
+         */
         return deltaTime;
     }
 
@@ -318,6 +344,9 @@ public class JGL {
      * @return failure, or null on success
      */
     private static Throwable disposeApplication(Application application) {
+        /*
+         * Isolate application cleanup failure so native lifecycle cleanup can still run.
+         */
         try {
             application.dispose();
             return null;
@@ -333,6 +362,9 @@ public class JGL {
      * @return first cleanup failure with later failures suppressed, or null
      */
     private static Throwable dispose() {
+        /*
+         * Release retained native state in lifecycle order; cleanup failures must not hide later release attempts.
+         */
         Throwable failure = null;
 
         failure = appendSuppressed(failure, runSafe(Keyboard::dispose));
@@ -350,6 +382,9 @@ public class JGL {
      * flags. Does not perform native resource cleanup.
      */
     static void resetState() {
+        /*
+         * Restore reusable singleton state without retaining callbacks or stale native handles from a prior lifecycle.
+         */
         tasks.clear();
         events.clear();
         deltaTime = 0f;
@@ -363,6 +398,9 @@ public class JGL {
      * and leaves remaining queued work for the surrounding lifecycle to handle.
      */
     private static void drainTasks() {
+        /*
+         * Poll the shared queue in order; tasks submitted during draining remain eligible for the same pass.
+         */
         Runnable task;
         while ((task = tasks.poll()) != null) {
             task.run();
@@ -377,6 +415,9 @@ public class JGL {
      * @return thrown failure, or null on success
      */
     private static Throwable runSafe(Runnable action) {
+        /*
+         * Retain the original cleanup failure instead of interrupting the remaining release sequence.
+         */
         try {
             action.run();
             return null;
@@ -394,6 +435,9 @@ public class JGL {
      * @return first available failure
      */
     private static Throwable appendSuppressed(Throwable primary, Throwable next) {
+        /*
+         * Preserve the first failure as the primary cause and attach later cleanup failures in encounter order.
+         */
         if (next == null) {
             return primary;
         }
@@ -411,6 +455,9 @@ public class JGL {
      * @param throwable nonnull failure to propagate
      */
     private static void rethrowUnchecked(Throwable throwable) {
+        /*
+         * Preserve runtime and error identities; wrap only checked cleanup failures that cannot escape this API directly.
+         */
         if (throwable instanceof RuntimeException runtimeException) {
             throw runtimeException;
         }
@@ -459,7 +506,5 @@ public class JGL {
          */
         return events.unregisterContext(context);
     }
-
-
 
 }

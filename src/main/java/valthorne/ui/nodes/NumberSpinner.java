@@ -305,10 +305,12 @@ public class NumberSpinner extends Panel {
         if (controlHeight != height) {
             if (getLayout().getHeight() == automaticHeight || getLayout().getHeight().isAuto()) {
                 automaticHeight = LayoutValue.points(height);
-                getLayout().height(automaticHeight);
+                getLayout()
+                        .height(automaticHeight);
             }
             float width = DEFAULT_STEP_WIDTH * height / DEFAULT_CONTROL_HEIGHT;
-            arrows.getLayout().width(width);
+            arrows.getLayout()
+                    .width(width);
             controlHeight = height;
         }
         super.applyLayout();
@@ -322,7 +324,8 @@ public class NumberSpinner extends Panel {
             repeatTarget = context.target();
             repeatDirection = repeatTarget == increase ? 1 : -1;
             repeatRemaining = REPEAT_DELAY;
-            if (getRoot() != null) getRoot().setFocusTo(editor);
+            if (getRoot() != null) getRoot()
+                    .setFocusTo(editor);
             step(repeatDirection);
             editor.caretIndex(editor.getText().length());
             return;
@@ -364,7 +367,9 @@ public class NumberSpinner extends Panel {
                 terminateScrub();
                 repeatTarget = null;
             }
-            default -> { return; }
+            default -> {
+                return;
+            }
         }
         context.consume();
     }

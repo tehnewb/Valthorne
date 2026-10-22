@@ -14,13 +14,20 @@ final class ContextTask implements Runnable {
      * @param context presentation identity
      * @param task scheduled action
      */
-    ContextTask(WindowContext context, Runnable task) { this.context = context; this.task = task; }
+    ContextTask(WindowContext context, Runnable task) {
+        this.context = context;
+        this.task = task;
+    }
 
     @Override
     public void run() {
         if (context.isClosed()) return;
         WindowContext previous = WindowContext.use(context);
-        try { task.run(); }
-        finally { WindowContext.use(previous); }
+        try {
+            task.run();
+        }
+        finally {
+            WindowContext.use(previous);
+        }
     }
 }

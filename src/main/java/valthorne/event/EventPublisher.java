@@ -83,7 +83,9 @@ public final class EventPublisher {
     /**
      * Cold-path sort order: highest priority first, then earliest registration first.
      */
-    private static final Comparator<EventRegistration> REGISTRATION_ORDER = Comparator.comparingInt((EventRegistration registration) -> registration.priority).reversed().thenComparingLong(registration -> registration.sequence);
+    private static final Comparator<EventRegistration> REGISTRATION_ORDER = Comparator.comparingInt((EventRegistration registration) -> registration.priority)
+            .reversed()
+            .thenComparingLong(registration -> registration.sequence);
 
     private final Object mutationLock = new Object(); // Serializes registration changes; event publication does not acquire this lock.
 
@@ -383,7 +385,6 @@ public final class EventPublisher {
         }
     }
 
-
     /**
      * Removes every subscription owned by a disposed logical presentation.
      * Existing in-flight snapshots retain their documented completion semantics.
@@ -402,13 +403,14 @@ public final class EventPublisher {
                 for (int i = list.size() - 1; i >= 0; i--) if (list.get(i).context == context) list.remove(i);
                 if (before == list.size()) continue;
                 removed += before - list.size();
-                if (list.isEmpty()) { registrations[route] = null; publishRoute(route, EMPTY_HANDLERS); }
+                if (list.isEmpty()) {
+                    registrations[route] = null;
+                    publishRoute(route, EMPTY_HANDLERS);
+                }
                 else rebuildRoute(route, list);
             }
         }
         return removed;
     }
-
-
 
 }

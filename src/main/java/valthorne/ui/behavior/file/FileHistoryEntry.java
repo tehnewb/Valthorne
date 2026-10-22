@@ -85,7 +85,8 @@ final class FileHistoryEntry {
         validate(undo);
         Path current = identity.path();
         if (trash && !undo) {
-            Path backup = Files.createTempDirectory(storage, "deleted-").resolve(target.getFileName());
+            Path backup = Files.createTempDirectory(storage, "deleted-")
+                    .resolve(target.getFileName());
             operations.copy(current, backup);
             operations.moveToTrash(List.of(current));
             recovery = backup;

@@ -162,7 +162,9 @@ public class NanoDirectoryTree extends NanoPanel {
         Objects.requireNonNull(roots);
         ArrayList<Path> places = new ArrayList<>(roots.size());
         for (Path root : roots) {
-            Path normalized = Objects.requireNonNull(root).toAbsolutePath().normalize();
+            Path normalized = Objects.requireNonNull(root)
+                    .toAbsolutePath()
+                    .normalize();
             if (!places.contains(normalized)) places.add(normalized);
         }
         this.roots = List.copyOf(places);
@@ -176,7 +178,8 @@ public class NanoDirectoryTree extends NanoPanel {
                 .rowHeight(rowHeight)
                 .gap(0);
         list.setStyleName("widget-layout");
-        list.getContent().setStyleName("widget-layout");
+        list.getContent()
+                .setStyleName("widget-layout");
         list.getLayout()
                 .height(0)
                 .grow(1)
@@ -236,7 +239,7 @@ public class NanoDirectoryTree extends NanoPanel {
             if (node instanceof NanoDirectoryRow row) {
                 destination = row.getPath();
                 break;
-            }
+        }
         if (destination == null) return;
         event.consume();
         if (imported != null) imported.accept(event.getPaths(), destination);
@@ -264,7 +267,9 @@ public class NanoDirectoryTree extends NanoPanel {
      */
     public boolean expand(Path path) {
         if (isDisabled()) return false;
-        Path normalized = Objects.requireNonNull(path).toAbsolutePath().normalize();
+        Path normalized = Objects.requireNonNull(path)
+                .toAbsolutePath()
+                .normalize();
         if (expanded.contains(normalized)) return true;
         try {
             Map<Path, List<Path>> pending = new HashMap<>();
@@ -571,7 +576,8 @@ public class NanoDirectoryTree extends NanoPanel {
     void focusRow(Path path) {
         focusedPath = path;
         contextPath = path;
-        if (getRoot() != null) getRoot().setFocusTo(this);
+        if (getRoot() != null) getRoot()
+                .setFocusTo(this);
     }
 
     /**
@@ -777,7 +783,8 @@ public class NanoDirectoryTree extends NanoPanel {
         if (path != null) focusRow(path);
         else {
             contextPath = null;
-            if (getRoot() != null) getRoot().setFocusTo(this);
+            if (getRoot() != null) getRoot()
+                    .setFocusTo(this);
         }
         contextMenu.accept(path, press);
     }
@@ -791,7 +798,8 @@ public class NanoDirectoryTree extends NanoPanel {
      */
     private MousePressEvent keyboardContext(int index) {
         list.revealIndex(index);
-        if (getRoot() != null) getRoot().layout();
+        if (getRoot() != null) getRoot()
+                .layout();
         UINode row = list.getItemNode(index);
         if (row == null) row = this;
         Vector2f content = row.screenToContent(0, 0);
@@ -848,7 +856,8 @@ public class NanoDirectoryTree extends NanoPanel {
         if (at < 0) at = indexOf(selected);
         if (at < 0 && !visible.isEmpty()) at = 0;
         if (at < 0) return;
-        Path path = visible.get(at).path();
+        Path path = visible.get(at)
+                .path();
         if (key.getKey() == Keyboard.MENU || key.getKey() == Keyboard.F10 && key.isShiftDown()) {
             key.consume();
             if (!key.isRepeat()) requestContext(path, keyboardContext(at));
@@ -864,7 +873,8 @@ public class NanoDirectoryTree extends NanoPanel {
                 key.consume();
                 if (expanded.contains(path)) collapse(path);
                 else if (visible.get(at).depth() > 0) {
-                    int depth = visible.get(at).depth();
+                    int depth = visible.get(at)
+                            .depth();
                     while (at > 0 && visible.get(at).depth() >= depth) at--;
                     path = visible.get(at).path();
                 }

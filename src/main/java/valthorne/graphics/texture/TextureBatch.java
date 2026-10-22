@@ -155,7 +155,8 @@ public final class TextureBatch {
     private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
     private long totalDrawCalls; // Cumulative nonempty sprite draw count, combined with glyph counts by the getter.
     private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
-    private long totalSubmittedSprites, totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalSubmittedSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
 
     /**
      * <p>
@@ -225,13 +226,31 @@ public final class TextureBatch {
 
         FloatBuffer quad = BufferUtils.createFloatBuffer(TextureBatchContract.QUAD_VERTS * TextureBatchContract.QUAD_FLOATS_PER_VERT);
 
-        quad.put(0f).put(0f).put(0f).put(0f);
-        quad.put(1f).put(0f).put(1f).put(0f);
-        quad.put(1f).put(1f).put(1f).put(1f);
+        quad.put(0f)
+                .put(0f)
+                .put(0f)
+                .put(0f);
+        quad.put(1f)
+                .put(0f)
+                .put(1f)
+                .put(0f);
+        quad.put(1f)
+                .put(1f)
+                .put(1f)
+                .put(1f);
 
-        quad.put(1f).put(1f).put(1f).put(1f);
-        quad.put(0f).put(1f).put(0f).put(1f);
-        quad.put(0f).put(0f).put(0f).put(0f);
+        quad.put(1f)
+                .put(1f)
+                .put(1f)
+                .put(1f);
+        quad.put(0f)
+                .put(1f)
+                .put(0f)
+                .put(1f);
+        quad.put(0f)
+                .put(0f)
+                .put(0f)
+                .put(0f);
 
         quad.flip();
 
@@ -258,6 +277,9 @@ public final class TextureBatch {
      * @return the adjusted float value based on the size parameter
      */
     private static float insetMin(float value, float size) {
+        /*
+         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
+         */
         return size > 1f ? value + 0.5f : value;
     }
 
@@ -272,6 +294,9 @@ public final class TextureBatch {
      * modification for sizes greater than 1
      */
     private static float insetMax(float value, float size) {
+        /*
+         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
+         */
         return size > 1f ? value + size - 0.5f : value + size;
     }
 
@@ -290,6 +315,9 @@ public final class TextureBatch {
      * @return the detected and clamped texture unit count
      */
     private static int detectTextureUnitsClamped(int clampTo) {
+        /*
+         * Clamp native texture capacity to the supported batch contract before allocating indexed storage.
+         */
         int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
         if (units <= 0) {
             units = 8;
@@ -583,35 +611,45 @@ public final class TextureBatch {
      *
      * @return whether logical clipping is active
      */
-    public boolean isClipEnabled() {return clipEnabled;}
+    public boolean isClipEnabled() {
+        return clipEnabled;
+    }
 
     /**
      * Returns the active logical clip's X coordinate in batch drawing space.
      *
      * @return clip X; meaningful when clipping is enabled
      */
-    public float getClipX() {return clipX;}
+    public float getClipX() {
+        return clipX;
+    }
 
     /**
      * Returns the active logical clip's Y coordinate in batch drawing space.
      *
      * @return clip Y; meaningful when clipping is enabled
      */
-    public float getClipY() {return clipY;}
+    public float getClipY() {
+        return clipY;
+    }
 
     /**
      * Returns the active logical clip width before conversion to framebuffer scissor pixels.
      *
      * @return clip width
      */
-    public float getClipWidth() {return clipW;}
+    public float getClipWidth() {
+        return clipW;
+    }
 
     /**
      * Returns the active logical clip height before conversion to framebuffer scissor pixels.
      *
      * @return clip height
      */
-    public float getClipHeight() {return clipH;}
+    public float getClipHeight() {
+        return clipH;
+    }
 
     /**
      * Restores GPU bindings after another renderer has drawn. Call flush() before
@@ -1107,8 +1145,10 @@ public final class TextureBatch {
         float[] srcXs = {srcX0, left, srcX2, texW};
         float[] srcYs = {srcY0, bottom, srcY2, texH};
 
-        float originX = texture.getRotationOrigin().x();
-        float originY = texture.getRotationOrigin().y();
+        float originX = texture.getRotationOrigin()
+                .x();
+        float originY = texture.getRotationOrigin()
+                .y();
 
         float rad = (float) Math.toRadians(-texture.getRotation());
         float sin = (float) Math.sin(rad);
@@ -1685,18 +1725,35 @@ public final class TextureBatch {
 
         a *= opacityMultiplier;
 
-        instanceBuffer.put(x).put(y).put(w).put(h);
-        instanceBuffer.put(r).put(g).put(b).put(a);
+        instanceBuffer.put(x)
+                .put(y)
+                .put(w)
+                .put(h);
+        instanceBuffer.put(r)
+                .put(g)
+                .put(b)
+                .put(a);
         instanceBuffer.put((float) texUnit);
-        instanceBuffer.put(u0).put(v0).put(u1).put(v1);
-        instanceBuffer.put(originX).put(originY);
-        instanceBuffer.put(sinRot).put(cosRot);
+        instanceBuffer.put(u0)
+                .put(v0)
+                .put(u1)
+                .put(v1);
+        instanceBuffer.put(originX)
+                .put(originY);
+        instanceBuffer.put(sinRot)
+                .put(cosRot);
 
         if (clipEnabled) {
-            instanceBuffer.put(clipX).put(clipY).put(clipW).put(clipH);
+            instanceBuffer.put(clipX)
+                    .put(clipY)
+                    .put(clipW)
+                    .put(clipH);
             instanceBuffer.put(1f);
         } else {
-            instanceBuffer.put(0f).put(0f).put(0f).put(0f);
+            instanceBuffer.put(0f)
+                    .put(0f)
+                    .put(0f)
+                    .put(0f);
             instanceBuffer.put(0f);
         }
 
@@ -1813,7 +1870,9 @@ public final class TextureBatch {
      *
      * @return configured culling flag
      */
-    public boolean isCullingEnabled() {return cullingEnabled;}
+    public boolean isCullingEnabled() {
+        return cullingEnabled;
+    }
 
     /**
      * Standard-quad viewport culling. Custom shaders are conservatively exempt.
@@ -1828,14 +1887,18 @@ public final class TextureBatch {
      *
      * @return lifetime submitted-sprite count
      */
-    public long getTotalSubmittedSprites() {return totalSubmittedSprites;}
+    public long getTotalSubmittedSprites() {
+        return totalSubmittedSprites;
+    }
 
     /**
      * Returns the cumulative number of sprites rejected by viewport culling.
      *
      * @return lifetime culled-sprite count
      */
-    public long getTotalCulledSprites() {return totalCulledSprites;}
+    public long getTotalCulledSprites() {
+        return totalCulledSprites;
+    }
 
     /**
      * Returns the cumulative count of nonempty sprite and glyph draws, including
@@ -1843,7 +1906,9 @@ public final class TextureBatch {
      *
      * @return lifetime draw-call count
      */
-    public long getTotalDrawCalls() {return totalDrawCalls + (glyphs == null ? 0L : glyphs.getTotalDrawCalls());}
+    public long getTotalDrawCalls() {
+        return totalDrawCalls + (glyphs == null ? 0L : glyphs.getTotalDrawCalls());
+    }
 
     /**
      * Finishes any live glyph segment and restores the sprite pipeline, then

@@ -16,7 +16,6 @@ import valthorne.ui.behavior.file.FileCommand;
 import valthorne.ui.behavior.file.FileOpenActions;
 import valthorne.ui.behavior.file.FileOperations;
 import valthorne.ui.behavior.file.FileOperationHistory;
-import valthorne.ui.nodes.nano.NanoPopupMenu.Item;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -330,23 +329,23 @@ public final class NanoFileContextMenu {
         } catch (IOException failure) {
             status.accept(failure.getMessage());
         }
-        ArrayList<Item> items = new ArrayList<>(12);
-        items.add(new Item(canUndo() ? "Undo " + history.undoName() : "Undo", this::undo, canUndo()));
-        items.add(new Item(canRedo() ? "Redo " + history.redoName() : "Redo", this::redo, canRedo()));
-        items.add(new Item("Open", () -> open(snapshot), selected && !busy));
+        ArrayList<NanoPopupMenuItem> items = new ArrayList<>(12);
+        items.add(new NanoPopupMenuItem(canUndo() ? "Undo " + history.undoName() : "Undo", this::undo, canUndo()));
+        items.add(new NanoPopupMenuItem(canRedo() ? "Redo " + history.redoName() : "Redo", this::redo, canRedo()));
+        items.add(new NanoPopupMenuItem("Open", () -> open(snapshot), selected && !busy));
         if (snapshot.size() == 1 && !Files.isDirectory(snapshot.getFirst()))
-            items.add(Item.submenu("Open In", () -> applications(snapshot.getFirst())));
-        items.add(new Item("Show in File Explorer", () -> run("Opening location", () -> applications.reveal(snapshot.getFirst()), false, null), selected && applications.isRevealSupported() && !busy));
-        items.add(new Item("Copy", () -> copy(snapshot, false), selected && !busy));
-        items.add(new Item("Cut", () -> copy(snapshot, true), mutation));
-        items.add(new Item("Paste", () -> paste(folder), canPaste && !busy));
-        items.add(new Item("Copy Path", () -> copyPath(snapshot), selected && !busy));
-        items.add(new Item("Rename...", () -> rename(snapshot.getFirst()), mutation && snapshot.size() == 1));
-        items.add(new Item("Delete...", () -> delete(snapshot, false), mutation));
-        items.add(Item.submenu("New", List.of(
-                new Item("File...", () -> create(folder, false), writable && !busy),
-                new Item("Folder...", () -> create(folder, true), writable && !busy))));
-        items.add(new Item("Refresh", changed, !busy));
+            items.add(NanoPopupMenuItem.submenu("Open In", () -> applications(snapshot.getFirst())));
+        items.add(new NanoPopupMenuItem("Show in File Explorer", () -> run("Opening location", () -> applications.reveal(snapshot.getFirst()), false, null), selected && applications.isRevealSupported() && !busy));
+        items.add(new NanoPopupMenuItem("Copy", () -> copy(snapshot, false), selected && !busy));
+        items.add(new NanoPopupMenuItem("Cut", () -> copy(snapshot, true), mutation));
+        items.add(new NanoPopupMenuItem("Paste", () -> paste(folder), canPaste && !busy));
+        items.add(new NanoPopupMenuItem("Copy Path", () -> copyPath(snapshot), selected && !busy));
+        items.add(new NanoPopupMenuItem("Rename...", () -> rename(snapshot.getFirst()), mutation && snapshot.size() == 1));
+        items.add(new NanoPopupMenuItem("Delete...", () -> delete(snapshot, false), mutation));
+        items.add(NanoPopupMenuItem.submenu("New", List.of(
+                new NanoPopupMenuItem("File...", () -> create(folder, false), writable && !busy),
+                new NanoPopupMenuItem("Folder...", () -> create(folder, true), writable && !busy))));
+        items.add(new NanoPopupMenuItem("Refresh", changed, !busy));
         visibleRoot = owner.getRoot();
         popup.items(items);
         popup.showAt(anchor, event.getX(), event.getY(), 238);
@@ -523,14 +522,14 @@ public final class NanoFileContextMenu {
      * @param path captured selected file
      * @return immutable submenu command snapshot
      */
-    private List<Item> applications(Path path) {
-        ArrayList<Item> choices = new ArrayList<>();
+    private List<NanoPopupMenuItem> applications(Path path) {
+        ArrayList<NanoPopupMenuItem> choices = new ArrayList<>();
         for (NanoFileOpenTarget target : targets)
-            if (target.accepts().test(path)) choices.add(new Item(target.name(), () -> target.open().accept(path), !busy));
-        choices.add(new Item("Default Application", () -> run("Opening file", () -> applications.open(path), false, null), applications.isOpenSupported() && !busy));
-        choices.add(new Item("Default Text Editor", () -> run("Opening editor", () -> applications.edit(path), false, null), applications.isEditSupported() && !busy));
-        choices.add(new Item("Choose Application...", () -> run("Choosing application", () -> applications.chooseDefaultApplication(path), false, null), applications.isApplicationChooserSupported() && !busy));
-        choices.add(new Item("Browse for Application...", () -> chooseExecutable(path), !busy));
+            if (target.accepts().test(path)) choices.add(new NanoPopupMenuItem(target.name(), () -> target.open().accept(path), !busy));
+        choices.add(new NanoPopupMenuItem("Default Application", () -> run("Opening file", () -> applications.open(path), false, null), applications.isOpenSupported() && !busy));
+        choices.add(new NanoPopupMenuItem("Default Text Editor", () -> run("Opening editor", () -> applications.edit(path), false, null), applications.isEditSupported() && !busy));
+        choices.add(new NanoPopupMenuItem("Choose Application...", () -> run("Choosing application", () -> applications.chooseDefaultApplication(path), false, null), applications.isApplicationChooserSupported() && !busy));
+        choices.add(new NanoPopupMenuItem("Browse for Application...", () -> chooseExecutable(path), !busy));
         return List.copyOf(choices);
     }
 
@@ -686,8 +685,8 @@ public final class NanoFileContextMenu {
         }
         if (paths.size() > shown)
             names.append("\nand ")
-                    .append(paths.size() - shown)
-                    .append(" more item(s)");
+                .append(paths.size() - shown)
+                .append(" more item(s)");
         NanoLabel entries = new NanoLabel(names.toString());
         entries.getLayout()
                 .widthPercent(100)
@@ -818,14 +817,14 @@ public final class NanoFileContextMenu {
                         IOException failure = null;
                         try {
                             command.execute();
-                        } catch (IOException problem) {
+                } catch (IOException problem) {
                             failure = problem;
-                        } catch (RuntimeException problem) {
+                } catch (RuntimeException problem) {
                             failure = new IOException(activity + " failed.", problem);
-                        }
+                }
                         IOException result = failure;
                         JGL.runTask(() -> complete(activity, mutation, after, result, startingRoot, context));
-                    });
+            });
         } catch (RuntimeException | Error failure) {
             busy = false;
             throw failure;

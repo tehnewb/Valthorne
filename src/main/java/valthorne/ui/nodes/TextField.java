@@ -295,6 +295,9 @@ public class TextField extends Panel {
      * @return the shared caret pixel texture
      */
     private static Texture getCaretPixel() {
+        /*
+         * Measure the requested prefix with the same retained font metrics used for text drawing.
+         */
         if (CARET_PIXEL == null) {
             ByteBuffer buffer = BufferUtils.createByteBuffer(4);
             buffer.put((byte) 255);
@@ -730,12 +733,14 @@ public class TextField extends Panel {
                 float measuredHeight = font.getHeight("Ay", fontSize) + padding * 2f;
 
                 if (getLayout().getWidth().isAuto())
-                    getLayout().width(measuredWidth);
+                    getLayout()
+                        .width(measuredWidth);
 
                 if (getLayout().getHeight().isAuto()) {
                     Float controlHeight = style.get(UITokens.CONTROL_HEIGHT);
                     if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
-                    getLayout().height(measuredHeight);
+                    getLayout()
+                            .height(measuredHeight);
                 }
             }
         } else {
@@ -929,7 +934,8 @@ public class TextField extends Panel {
      * @return the resolved X coordinate
      */
     private float getEventX(MousePressEvent event) {
-        return getEventPosition(event.getX(), event.getY()).x();
+        return getEventPosition(event.getX(), event.getY())
+                .x();
     }
 
     /**
@@ -941,7 +947,8 @@ public class TextField extends Panel {
      * @return the resolved X coordinate
      */
     private float getEventX(MouseDragEvent event) {
-        return getEventPosition(event.getToX(), event.getToY()).x();
+        return getEventPosition(event.getToX(), event.getToY())
+                .x();
     }
 
     /**
@@ -979,7 +986,9 @@ public class TextField extends Panel {
     /**
      * Editing, validation and undo/redo API shared by both field families.
      */
-    public TextEditModel getEditor() {return editor;}
+    public TextEditModel getEditor() {
+        return editor;
+    }
 
     /**
      * Copies text, caret, and selection from the shared editing model into rendering

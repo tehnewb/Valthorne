@@ -166,7 +166,8 @@ public final class FileClipboard implements ClipboardOwner {
      */
     public void clear() throws IOException {
         try {
-            systemClipboard().setContents(new StringSelection(""), null);
+            systemClipboard()
+                    .setContents(new StringSelection(""), null);
             ownedTransferable = null;
         } catch (IllegalStateException | SecurityException failure) {
             throw new IOException("The system clipboard could not be cleared.", failure);
@@ -208,7 +209,8 @@ public final class FileClipboard implements ClipboardOwner {
             normalized.add(Objects.requireNonNull(path, "path").toAbsolutePath().normalize());
         FileTransferable payload = new FileTransferable(List.copyOf(normalized), cut);
         try {
-            systemClipboard().setContents(payload, this);
+            systemClipboard()
+                    .setContents(payload, this);
             ownedTransferable = payload;
         } catch (IllegalStateException | SecurityException failure) {
             throw new IOException("The file selection could not be placed on the system clipboard.", failure);
@@ -223,7 +225,8 @@ public final class FileClipboard implements ClipboardOwner {
      */
     private Clipboard systemClipboard() throws IOException {
         try {
-            return Toolkit.getDefaultToolkit().getSystemClipboard();
+            return Toolkit.getDefaultToolkit()
+                    .getSystemClipboard();
         } catch (UnsupportedOperationException | SecurityException failure) {
             throw new IOException("The system clipboard is unavailable.", failure);
         }
@@ -237,7 +240,8 @@ public final class FileClipboard implements ClipboardOwner {
      */
     private Transferable clipboardContents() throws IOException {
         try {
-            return systemClipboard().getContents(null);
+            return systemClipboard()
+                    .getContents(null);
         } catch (IllegalStateException | SecurityException failure) {
             throw new IOException("The system clipboard could not be read.", failure);
         }

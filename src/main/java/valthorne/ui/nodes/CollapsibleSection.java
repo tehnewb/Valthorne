@@ -45,35 +45,53 @@ public class CollapsibleSection extends Panel {
              *
              * @param event key press delivered to the header
              */
-            @Override public void onKeyPress(KeyPressEvent event) {
+            @Override
+            public void onKeyPress(KeyPressEvent event) {
                 if (isDisabled()) return;
                 if (event.getKey() == Keyboard.LEFT || event.getKey() == Keyboard.RIGHT) {
-                    expanded(event.getKey() == Keyboard.RIGHT); event.consume();
+                    expanded(event.getKey() == Keyboard.RIGHT);
+                    event.consume();
                 } else super.onKeyPress(event);
             }
         }.action(b -> expanded(!expanded));
-        header.getLayout().itemsStart().paddingLeft(24);
+        header.getLayout()
+                .itemsStart()
+                .paddingLeft(24);
         header.add(new NanoDisclosureIndicator(this::isExpanded));
-        getLayout().column().noShrink();
+        getLayout()
+                .column()
+                .noShrink();
         header.setStyleName("section-header");
-        header.getLayout().widthPercent(100).noShrink();
-        body.getLayout().widthPercent(100).minHeight(0).noShrink();
-        content.getLayout().widthPercent(100); body.add(content);
-        super.add(header); super.add(body);
+        header.getLayout()
+                .widthPercent(100)
+                .noShrink();
+        body.getLayout()
+                .widthPercent(100)
+                .minHeight(0)
+                .noShrink();
+        content.getLayout()
+                .widthPercent(100);
+        body.add(content);
+        super.add(header);
+        super.add(body);
     }
     /**
      * Reads the requested disclosure state, which also controls body update calls.
      *
      * @return true while the body is expanded
      */
-    public boolean isExpanded() { return expanded; }
+    public boolean isExpanded() {
+        return expanded;
+    }
     /**
      * Exposes the live header for focus, styling, or application configuration.
      * Its label stays unchanged while a separate vector triangle shows state.
      *
      * @return internally owned header button
      */
-    public Button getHeader() { return header; }
+    public Button getHeader() {
+        return header;
+    }
     /**
      * Subscribes synchronously to actual expansion changes. No event is emitted
      * when setting the current state; the listener sees updated visibility and text.
@@ -82,7 +100,9 @@ public class CollapsibleSection extends Panel {
      * @return handle whose close removes this subscription
      * @throws NullPointerException if listener is null
      */
-    public Runnable onChange(Runnable listener) { return changes.subscribe(listener); }
+    public Runnable onChange(Runnable listener) {
+        return changes.subscribe(listener);
+    }
     /**
      * Applies a new disclosure state and fires change listeners after visibility,
      * height, and header text are updated. On collapse, focus within the body moves
@@ -96,13 +116,22 @@ public class CollapsibleSection extends Panel {
         if (value == expanded) return this;
         if (!value && getRoot() != null) {
             boolean focus = contains(getRoot().getFocused());
-            if (contains(getRoot().getCaptured())) { getRoot().cancelInput(); focus = true; }
-            if (focus) getRoot().setFocusTo(header);
+            if (contains(getRoot().getCaptured())) {
+                getRoot()
+                        .cancelInput();
+                focus = true;
+            }
+            if (focus) getRoot()
+                    .setFocusTo(header);
         }
         expanded = value;
         body.setVisible(value);
-        if (value) body.getLayout().heightAuto(); else body.getLayout().height(0);
-        changes.fire(); return this;
+        if (value) body.getLayout()
+                .heightAuto();
+        else body.getLayout()
+                .height(0);
+        changes.fire();
+        return this;
     }
     /**
      * Walks parent links to determine whether a node is the internal body or one
@@ -122,5 +151,9 @@ public class CollapsibleSection extends Panel {
      *
      * @param delta elapsed update seconds
      */
-    @Override public void update(float delta) { header.update(delta); if (expanded) body.update(delta); }
+    @Override
+    public void update(float delta) {
+        header.update(delta);
+        if (expanded) body.update(delta);
+    }
 }
