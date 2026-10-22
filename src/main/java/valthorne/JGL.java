@@ -127,8 +127,9 @@ public class JGL {
 
             Window.init(config);
             /*
-             * Silent applications can skip opening an OpenAL device while retaining
-             * the same window, input, rendering, and cleanup lifecycle.
+             * Audio startup only schedules its owner thread; slow device/context
+             * initialization must not delay input, application setup, or the first frame.
+             * Silent applications can skip that work entirely.
              */
             if (config.isAudioEnabled())
                 Audio.init();

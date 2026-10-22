@@ -26,44 +26,44 @@ import static org.lwjgl.nanovg.NanoVG.*;
 public class NanoGrid extends NanoContainer {
 
     /**
-     * Theme override for the normal background fill; null preserves the local setting.
+     * Theme override for the normal background fill; absence uses the widget fallback.
      */
     public static final StyleKey<Color> BACKGROUND_COLOR_KEY = StyleKey.of("nano.grid.backgroundColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the hovered background fill; null preserves the local setting.
+     * Theme override for the hovered background fill; absence uses the widget fallback.
      */
     public static final StyleKey<Color> HOVER_BACKGROUND_COLOR_KEY = StyleKey.of("nano.grid.hoverBackgroundColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the focused background fill; null preserves the local setting.
+     * Theme override for the focused background fill; absence uses the widget fallback.
      */
     public static final StyleKey<Color> FOCUSED_BACKGROUND_COLOR_KEY = StyleKey.of("nano.grid.focusedBackgroundColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the pressed background fill; null preserves the local setting.
+     * Theme override for the pressed background fill; absence uses the widget fallback.
      */
     public static final StyleKey<Color> PRESSED_BACKGROUND_COLOR_KEY = StyleKey.of("nano.grid.pressedBackgroundColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the disabled background fill; null preserves the local setting.
+     * Theme override for the disabled background fill; absence uses the widget fallback.
      */
     public static final StyleKey<Color> DISABLED_BACKGROUND_COLOR_KEY = StyleKey.of("nano.grid.disabledBackgroundColor", Color.class, new Color(0xFF242424));
 
     /**
-     * Theme override for the normal border stroke; null preserves the local setting.
+     * Theme override for the normal border stroke; absence uses the widget fallback.
      */
     public static final StyleKey<Color> BORDER_COLOR_KEY = StyleKey.of("nano.grid.borderColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the hovered border stroke; null preserves the local setting.
+     * Theme override for the hovered border stroke; absence uses the widget fallback.
      */
     public static final StyleKey<Color> HOVER_BORDER_COLOR_KEY = StyleKey.of("nano.grid.hoverBorderColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the focused border stroke; null preserves the local setting.
+     * Theme override for the focused border stroke; absence uses the widget fallback.
      */
     public static final StyleKey<Color> FOCUSED_BORDER_COLOR_KEY = StyleKey.of("nano.grid.focusedBorderColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the pressed border stroke; null preserves the local setting.
+     * Theme override for the pressed border stroke; absence uses the widget fallback.
      */
     public static final StyleKey<Color> PRESSED_BORDER_COLOR_KEY = StyleKey.of("nano.grid.pressedBorderColor", Color.class, new Color(0xFF242424));
     /**
-     * Theme override for the disabled border stroke; null preserves the local setting.
+     * Theme override for the disabled border stroke; absence uses the widget fallback.
      */
     public static final StyleKey<Color> DISABLED_BORDER_COLOR_KEY = StyleKey.of("nano.grid.disabledBorderColor", Color.class, new Color(0xFF242424));
 
@@ -271,155 +271,177 @@ public class NanoGrid extends NanoContainer {
 
     /**
      * Retains a non-null color for the normal background fill; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid backgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.backgroundColor = color;
+            setStyle(BACKGROUND_COLOR_KEY, this.backgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the hovered background fill; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid hoverBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverBackgroundColor = color;
+            setStyle(HOVER_BACKGROUND_COLOR_KEY, this.hoverBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the focused background fill; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid focusedBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedBackgroundColor = color;
+            setStyle(FOCUSED_BACKGROUND_COLOR_KEY, this.focusedBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the pressed background fill; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid pressedBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.pressedBackgroundColor = color;
+            setStyle(PRESSED_BACKGROUND_COLOR_KEY, this.pressedBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the disabled background fill; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid disabledBackgroundColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.disabledBackgroundColor = color;
+            setStyle(DISABLED_BACKGROUND_COLOR_KEY, this.disabledBackgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the normal border stroke; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid borderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.borderColor = color;
+            setStyle(BORDER_COLOR_KEY, this.borderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the hovered border stroke; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid hoverBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.hoverBorderColor = color;
+            setStyle(HOVER_BORDER_COLOR_KEY, this.hoverBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the focused border stroke; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid focusedBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.focusedBorderColor = color;
+            setStyle(FOCUSED_BORDER_COLOR_KEY, this.focusedBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the pressed border stroke; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid pressedBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.pressedBorderColor = color;
+            setStyle(PRESSED_BORDER_COLOR_KEY, this.pressedBorderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the disabled border stroke; null leaves it unchanged.
-     * The color is borrowed rather than copied, and resolved styles may replace it.
+     * The color is borrowed rather than copied, and local overrides take precedence over theme values.
      *
      * @param color mutable color reference, or null to keep the current value
      * @return this grid
      */
     public NanoGrid disabledBorderColor(Color color) {
-        if (color != null)
+        if (color != null) {
             this.disabledBorderColor = color;
+            setStyle(DISABLED_BORDER_COLOR_KEY, this.disabledBorderColor);
+        }
         return this;
     }
 
     /**
      * Sets the background corner radius, clamping negative values to zero.
-     * Does not mark layout dirty; a later resolved style can overwrite this value.
+     * Marks layout dirty; the local override takes precedence over theme values.
      *
      * @param cornerRadius requested radius in UI units; supply a finite value
      * @return this grid
      */
     public NanoGrid cornerRadius(float cornerRadius) {
         this.cornerRadius = Math.max(0f, cornerRadius);
+        setStyle(CORNER_RADIUS_KEY, this.cornerRadius);
         return this;
     }
 
     /**
      * Sets the inset border stroke width, clamping negative values to zero.
-     * Zero omits the border. A later resolved style can overwrite this value.
+     * Zero omits the border. The local override takes precedence over theme values.
      *
      * @param borderWidth requested stroke width in UI units; supply a finite value
      * @return this grid
      */
     public NanoGrid borderWidth(float borderWidth) {
         this.borderWidth = Math.max(0f, borderWidth);
+        setStyle(BORDER_WIDTH_KEY, this.borderWidth);
         return this;
     }
 
@@ -432,51 +454,49 @@ public class NanoGrid extends NanoContainer {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
 
-        if (style != null) {
-            Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
-            Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
-            Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
-            Color resolvedPressedBackgroundColor = style.get(PRESSED_BACKGROUND_COLOR_KEY);
-            Color resolvedDisabledBackgroundColor = style.get(DISABLED_BACKGROUND_COLOR_KEY);
+        Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
+        Color resolvedHoverBackgroundColor = style.get(HOVER_BACKGROUND_COLOR_KEY);
+        Color resolvedFocusedBackgroundColor = style.get(FOCUSED_BACKGROUND_COLOR_KEY);
+        Color resolvedPressedBackgroundColor = style.get(PRESSED_BACKGROUND_COLOR_KEY);
+        Color resolvedDisabledBackgroundColor = style.get(DISABLED_BACKGROUND_COLOR_KEY);
 
-            Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
-            Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
-            Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
-            Color resolvedPressedBorderColor = style.get(PRESSED_BORDER_COLOR_KEY);
-            Color resolvedDisabledBorderColor = style.get(DISABLED_BORDER_COLOR_KEY);
+        Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
+        Color resolvedHoverBorderColor = style.get(HOVER_BORDER_COLOR_KEY);
+        Color resolvedFocusedBorderColor = style.get(FOCUSED_BORDER_COLOR_KEY);
+        Color resolvedPressedBorderColor = style.get(PRESSED_BORDER_COLOR_KEY);
+        Color resolvedDisabledBorderColor = style.get(DISABLED_BORDER_COLOR_KEY);
 
-            Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
-            Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
+        Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
+        Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
 
-            if (resolvedBackgroundColor != null)
-                backgroundColor = resolvedBackgroundColor;
-            if (resolvedHoverBackgroundColor != null)
-                hoverBackgroundColor = resolvedHoverBackgroundColor;
-            if (resolvedFocusedBackgroundColor != null)
-                focusedBackgroundColor = resolvedFocusedBackgroundColor;
-            if (resolvedPressedBackgroundColor != null)
-                pressedBackgroundColor = resolvedPressedBackgroundColor;
-            if (resolvedDisabledBackgroundColor != null)
-                disabledBackgroundColor = resolvedDisabledBackgroundColor;
+        if (resolvedBackgroundColor != null)
+            backgroundColor = resolvedBackgroundColor;
+        if (resolvedHoverBackgroundColor != null)
+            hoverBackgroundColor = resolvedHoverBackgroundColor;
+        if (resolvedFocusedBackgroundColor != null)
+            focusedBackgroundColor = resolvedFocusedBackgroundColor;
+        if (resolvedPressedBackgroundColor != null)
+            pressedBackgroundColor = resolvedPressedBackgroundColor;
+        if (resolvedDisabledBackgroundColor != null)
+            disabledBackgroundColor = resolvedDisabledBackgroundColor;
 
-            if (resolvedBorderColor != null)
-                borderColor = resolvedBorderColor;
-            if (resolvedHoverBorderColor != null)
-                hoverBorderColor = resolvedHoverBorderColor;
-            if (resolvedFocusedBorderColor != null)
-                focusedBorderColor = resolvedFocusedBorderColor;
-            if (resolvedPressedBorderColor != null)
-                pressedBorderColor = resolvedPressedBorderColor;
-            if (resolvedDisabledBorderColor != null)
-                disabledBorderColor = resolvedDisabledBorderColor;
+        if (resolvedBorderColor != null)
+            borderColor = resolvedBorderColor;
+        if (resolvedHoverBorderColor != null)
+            hoverBorderColor = resolvedHoverBorderColor;
+        if (resolvedFocusedBorderColor != null)
+            focusedBorderColor = resolvedFocusedBorderColor;
+        if (resolvedPressedBorderColor != null)
+            pressedBorderColor = resolvedPressedBorderColor;
+        if (resolvedDisabledBorderColor != null)
+            disabledBorderColor = resolvedDisabledBorderColor;
 
-            if (resolvedCornerRadius != null)
-                cornerRadius = Math.max(0f, resolvedCornerRadius);
-            if (resolvedBorderWidth != null)
-                borderWidth = Math.max(0f, resolvedBorderWidth);
-        }
+        if (resolvedCornerRadius != null)
+            cornerRadius = Math.max(0f, resolvedCornerRadius);
+        if (resolvedBorderWidth != null)
+            borderWidth = Math.max(0f, resolvedBorderWidth);
 
         int childCount = size();
         int usedColumns = childCount == 0 ? 0 : Math.min(columns, childCount);

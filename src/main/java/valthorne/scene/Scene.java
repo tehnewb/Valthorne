@@ -6,6 +6,7 @@ import valthorne.Window;
 import valthorne.camera.Camera;
 import valthorne.camera.OrthographicCamera;
 import valthorne.event.events.*;
+import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UIRoot;
 import valthorne.viewport.ScreenViewport;
@@ -165,6 +166,7 @@ public abstract class Scene {
      * </p>
      */
     protected void drawScene() {
+        Window.clear(Color.BLACK);
         if (batch == null)
             return;
 
@@ -459,12 +461,15 @@ public abstract class Scene {
     }
 
     /**
-     * Assigns the scene camera.
+     * Assigns the authoritative scene camera and synchronizes the active viewport.
+     * A null camera detaches camera rendering and uses the viewport fallback projection.
+     * Before viewport initialization, the reference is retained for later attachment.
      *
      * @param camera the camera to assign, or null to remove the current camera
      */
     public void setCamera(Camera camera) {
         this.camera = camera;
+        if (viewport != null) viewport.setCamera(camera);
     }
 
     /**
@@ -477,18 +482,19 @@ public abstract class Scene {
     }
 
     /**
-     * Assigns the viewport used by this scene.
+     * Assigns a non-null rendering viewport, updates it to current window dimensions,
+     * and attaches the scene's current camera, including null for camera-free rendering.
+     * The scene camera takes precedence over any camera already assigned to the new
+     * viewport. The UI keeps its independently configured viewport.
      *
-     * <p>
-     * If the scene UI already exists, the same viewport is immediately assigned to the UI so UI
-     * coordinate conversion remains synchronized with the scene.
-     * </p>
-     *
-     * @param viewport the viewport to use for this scene
+     * @param viewport the rendering viewport to use
+     * @throws NullPointerException if viewport is null; the current viewport is unchanged
      */
     public void setViewport(Viewport viewport) {
+        if (viewport == null) throw new NullPointerException("viewport");
+        viewport.update(Window.getWidth(), Window.getHeight());
+        viewport.setCamera(camera);
         this.viewport = viewport;
-        this.viewport.update(Window.getWidth(), Window.getHeight());
     }
 
     /**

@@ -24,7 +24,9 @@ import java.nio.FloatBuffer;
  * own complex rendering state. Instead, it focuses on describing how a rectangular
  * region of a texture should be drawn in world space. It can be created from a file
  * path, raw image bytes, {@link TextureData}, a {@link Texture}, or a
- * {@link TextureRegion}.
+ * {@link TextureRegion}. Constructors using paths, bytes or texture data own the
+ * texture they create until disposal. Texture and region constructors borrow their
+ * texture. Selecting a different region never transfers this ownership.
  * </p>
  *
  * <p>
@@ -102,7 +104,8 @@ public class Sprite implements Poolable, Drawable {
     protected float scaleX = 1f; // Horizontal scale factor
     protected float scaleY = 1f; // Vertical scale factor
     protected Color color = new Color(1, 1, 1, 1); // Tint color used when drawing the sprite
-    protected boolean ownsTexture; // Whether this sprite should dispose its backing texture when released
+    protected boolean ownsTexture; // Whether this sprite should dispose its originally owned texture when released
+    private final Texture ownedTexture; // Original owned texture, or null when this sprite borrows its texture.
     private boolean visible = true; // Whether this drawable participates in rendering and animation updates.
     protected boolean disposed; // Whether this sprite has already released its owned resources
 
@@ -215,6 +218,7 @@ public class Sprite implements Poolable, Drawable {
 
         this.region = region;
         this.ownsTexture = ownsTexture;
+        this.ownedTexture = ownsTexture ? region.getTexture() : null;
         this.bounds = new Rectangle(0, 0, region.getRegionWidth(), region.getRegionHeight());
         updateLocalVertices();
         updateUVBuffer();
@@ -1003,7 +1007,9 @@ public class Sprite implements Poolable, Drawable {
      * </p>
      *
      * <p>
-     * This method does not dispose the underlying texture. It only clears this sprite's
+     * This method disposes the original texture created by an owning constructor,
+     * even after selecting a region from another texture. Borrowed textures are never
+     * disposed. Repeated calls have no effect. It then clears this sprite's
      * references and buffers. After this call, the sprite should no longer be used.
      * </p>
      */
@@ -1012,8 +1018,8 @@ public class Sprite implements Poolable, Drawable {
             return;
         }
 
-        if (ownsTexture && region != null && region.getTexture() != null) {
-            region.getTexture().dispose();
+        if (ownsTexture && ownedTexture != null) {
+            ownedTexture.dispose();
         }
 
         this.region = null;

@@ -515,6 +515,12 @@ public class ScrollPanel extends UIContainer {
         refreshStyleCache();
     }
 
+    @Override
+    protected void applyLayout() {
+        refreshStyleCache();
+        super.applyLayout();
+    }
+
     /**
      * <p>
      * Transforms child hit-test X coordinates by the current horizontal scroll offset.
@@ -775,43 +781,21 @@ public class ScrollPanel extends UIContainer {
      * </p>
      *
      * <p>
-     * The cache is reset to defaults first, then replaced with resolved style values
-     * when a style is available.
+     * The cache is replaced with resolved overrides, theme values, or key defaults
+     * so removing an override cannot leave a stale cached value.
      * </p>
      */
     private void refreshStyleCache() {
-        ResolvedStyle style = getStyle();
-
-        background = null;
-        horizontalBarBackground = null;
-        horizontalBarForeground = null;
-        verticalBarBackground = null;
-        verticalBarForeground = null;
-        horizontalBarHeight = 4f;
-        verticalBarWidth = 4f;
-        barPadding = 4f;
-        minThumbSize = 18f;
-
-        if (style == null) return;
-
+        ResolvedStyle style = getStyleOrDefaults();
         background = style.get(BACKGROUND_KEY);
         horizontalBarBackground = style.get(HORIZONTAL_BAR_BACKGROUND_KEY);
         horizontalBarForeground = style.get(HORIZONTAL_BAR_FOREGROUND_KEY);
         verticalBarBackground = style.get(VERTICAL_BAR_BACKGROUND_KEY);
         verticalBarForeground = style.get(VERTICAL_BAR_FOREGROUND_KEY);
-
-        Float resolvedHorizontalBarHeight = style.get(HORIZONTAL_BAR_HEIGHT_KEY);
-        Float resolvedVerticalBarWidth = style.get(VERTICAL_BAR_WIDTH_KEY);
-        Float resolvedBarPadding = style.get(BAR_PADDING_KEY);
-        Float resolvedMinThumbSize = style.get(MIN_THUMB_SIZE_KEY);
-
-        if (resolvedHorizontalBarHeight != null) horizontalBarHeight = resolvedHorizontalBarHeight;
-
-        if (resolvedVerticalBarWidth != null) verticalBarWidth = resolvedVerticalBarWidth;
-
-        if (resolvedBarPadding != null) barPadding = resolvedBarPadding;
-
-        if (resolvedMinThumbSize != null) minThumbSize = resolvedMinThumbSize;
+        horizontalBarHeight = style.get(HORIZONTAL_BAR_HEIGHT_KEY);
+        verticalBarWidth = style.get(VERTICAL_BAR_WIDTH_KEY);
+        barPadding = style.get(BAR_PADDING_KEY);
+        minThumbSize = style.get(MIN_THUMB_SIZE_KEY);
     }
 
     /**

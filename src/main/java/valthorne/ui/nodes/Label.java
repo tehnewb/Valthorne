@@ -287,30 +287,30 @@ public class Label extends UINode {
     }
 
     /**
-     * Applies nonnull resolved font, color, and alignment values, preserving current
-     * references when a style value is absent. Recalculates exact content width/height
+     * Applies resolved font, color, and alignment values, restoring fallback values
+     * when an override or theme value is removed. Recalculates exact content width/height
      * before delegating to base Yoga style application; this updates intrinsic layout
      * automatic dimensions with measured text dimensions, retaining explicit sizes.
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
+        font = null;
+        color = null;
 
-        if (style != null) {
-            SlugFont resolvedFont = style.get(FONT_KEY);
-            Color resolvedColor = style.get(COLOR_KEY);
-            Alignment resolvedAlignment = style.get(ALIGNMENT_KEY);
-            float resolvedSize = style.get(FONT_SIZE_KEY);
-            if (!Float.isFinite(resolvedSize) || resolvedSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
-            fontSize = resolvedSize;
+        SlugFont resolvedFont = style.get(FONT_KEY);
+        Color resolvedColor = style.get(COLOR_KEY);
+        Alignment resolvedAlignment = style.get(ALIGNMENT_KEY);
+        float resolvedSize = style.get(FONT_SIZE_KEY);
+        if (!Float.isFinite(resolvedSize) || resolvedSize < 0f) throw new IllegalArgumentException("Font size must be finite and nonnegative.");
+        fontSize = resolvedSize;
 
-            if (resolvedFont != null)
-                font = resolvedFont;
-            if (resolvedColor != null)
-                color = resolvedColor;
-            if (resolvedAlignment != null)
-                alignment = resolvedAlignment;
-        }
+        if (resolvedFont != null)
+            font = resolvedFont;
+        if (resolvedColor != null)
+            color = resolvedColor;
+        if (resolvedAlignment != null)
+            alignment = resolvedAlignment;
 
         if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
         recalculateSize();

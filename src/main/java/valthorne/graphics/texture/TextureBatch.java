@@ -218,9 +218,7 @@ public final class TextureBatch {
         this.instanceBytes = BufferUtils.createByteBuffer(Math.multiplyExact(this.maxSprites, TextureBatchContract.INST_STRIDE_BYTES));
         this.instanceBuffer = instanceBytes.asFloatBuffer();
 
-        this.defaultShader = new Shader(TextureBatchContract.defaultVertexShader(), TextureBatchContract.buildDefaultFragmentShader(this.maxTextureUnits));
-        TextureBatchContract.bindAttributes(this.defaultShader);
-        this.defaultShader.reload();
+        this.defaultShader = new Shader(TextureBatchContract.defaultVertexShader(), TextureBatchContract.buildDefaultFragmentShader(this.maxTextureUnits), TextureBatchContract::bindAttributes);
         TextureBatchContract.bindSamplers(this.defaultShader, this.maxTextureUnits);
 
         this.activeShader = this.defaultShader;

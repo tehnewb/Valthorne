@@ -345,15 +345,15 @@ public class NanoCodeEditor extends NanoPanel {
                 nvgFill(vg);
             }
             nvgFillColor(vg, NanoUtility.color1(gutterColor));
-            NanoText.draw(this, vg, x + 8, top, Integer.toString(line + 1), fontSize, gutterColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+            NanoText.draw(this, vg, fontName, x + 8, top, Integer.toString(line + 1), fontSize, gutterColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             if (highlighter == null) {
                 nvgFillColor(vg, NanoUtility.color1(textColor));
-                NanoText.draw(this, vg, x + TEXT_X, top, visible(value), fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+                NanoText.draw(this, vg, fontName, x + TEXT_X, top, visible(value), fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             } else {
                 float cursor = x + TEXT_X;
                 for (NanoColoredRun run : highlighter.apply(value)) {
                     nvgFillColor(vg, NanoUtility.color1(run.color()));
-                    cursor = NanoText.draw(this, vg, cursor, top, visible(run.text()), fontSize, run.color(), NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+                    cursor = NanoText.draw(this, vg, fontName, cursor, top, visible(run.text()), fontSize, run.color(), NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
                 }
             }
         }

@@ -217,8 +217,12 @@ public class SoundPlayer {
      * </p>
      *
      * @param data the sound data that this player will control
+     * @throws IllegalStateException if construction is attempted outside the audio thread;
+     *                               use Audio.create or Audio.createAsync from other threads
      */
     public SoundPlayer(SoundData data) {
+        if (!Audio.isAudioThread() || !Audio.isReady())
+            throw new IllegalStateException("Create sound players with Audio.create or Audio.createAsync");
         this.data = Objects.requireNonNull(data, "data");
         pcmFormat(data.channels(), data.bitsPerSample());
         if (data.sampleRate() <= 0) throw new IllegalArgumentException("Sample rate must be positive");

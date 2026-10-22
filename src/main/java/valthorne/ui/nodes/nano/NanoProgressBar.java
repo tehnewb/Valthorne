@@ -193,6 +193,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
      */
     public NanoProgressBar animationDuration(float animationDuration) {
         this.animationDuration = Math.max(0f, animationDuration);
+        setStyle(ANIMATION_DURATION_KEY, this.animationDuration);
 
         if (this.animationDuration <= 0f) {
             this.displayedProgress = progress;
@@ -260,49 +261,61 @@ public class NanoProgressBar extends UINode implements NanoNode {
 
     /**
      * Retains a non-null color for the unfilled background without copying it.
-     * Null preserves the current reference; resolved styles may later replace it.
+     * Null preserves the current reference; local overrides take precedence over theme values.
      *
      * @param color mutable paint color, or null to keep the current value
      * @return this progress bar
      */
     public NanoProgressBar backgroundColor(Color color) {
-        if (color != null) this.backgroundColor = color;
+        if (color != null) {
+            this.backgroundColor = color;
+            setStyle(BACKGROUND_COLOR_KEY, this.backgroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the filled region without copying it.
-     * Null preserves the current reference; resolved styles may later replace it.
+     * Null preserves the current reference; local overrides take precedence over theme values.
      *
      * @param color mutable paint color, or null to keep the current value
      * @return this progress bar
      */
     public NanoProgressBar foregroundColor(Color color) {
-        if (color != null) this.foregroundColor = color;
+        if (color != null) {
+            this.foregroundColor = color;
+            setStyle(FOREGROUND_COLOR_KEY, this.foregroundColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the border stroke without copying it.
-     * Null preserves the current reference; resolved styles may later replace it.
+     * Null preserves the current reference; local overrides take precedence over theme values.
      *
      * @param color mutable paint color, or null to keep the current value
      * @return this progress bar
      */
     public NanoProgressBar borderColor(Color color) {
-        if (color != null) this.borderColor = color;
+        if (color != null) {
+            this.borderColor = color;
+            setStyle(BORDER_COLOR_KEY, this.borderColor);
+        }
         return this;
     }
 
     /**
      * Retains a non-null color for the percentage text without copying it.
-     * Null preserves the current reference; resolved styles may later replace it.
+     * Null preserves the current reference; local overrides take precedence over theme values.
      *
      * @param color mutable paint color, or null to keep the current value
      * @return this progress bar
      */
     public NanoProgressBar textColor(Color color) {
-        if (color != null) this.textColor = color;
+        if (color != null) {
+            this.textColor = color;
+            setStyle(TEXT_COLOR_KEY, this.textColor);
+        }
         return this;
     }
 
@@ -314,55 +327,62 @@ public class NanoProgressBar extends UINode implements NanoNode {
      * @return this progress bar
      */
     public NanoProgressBar fontName(String fontName) {
-        if (fontName != null && !fontName.isBlank()) this.fontName = fontName;
+        if (fontName != null && !fontName.isBlank()) {
+            this.fontName = fontName;
+            setStyle(FONT_NAME_KEY, this.fontName);
+        }
         return this;
     }
 
     /**
      * Sets percentage font size in UI units, clamping below 1 to 1.
-     * This changes painting rather than measured layout; styles may override it.
+     * This changes painting rather than measured layout; the local override takes precedence over theme values.
      *
      * @param fontSize finite requested percentage font size
      * @return this progress bar
      */
     public NanoProgressBar fontSize(float fontSize) {
         this.fontSize = Math.max(1f, fontSize);
+        setStyle(FONT_SIZE_KEY, this.fontSize);
         return this;
     }
 
     /**
      * Sets rounded-corner radius in UI units, clamping below 0 to 0.
-     * This changes painting rather than measured layout; styles may override it.
+     * This changes painting rather than measured layout; the local override takes precedence over theme values.
      *
      * @param cornerRadius finite requested rounded-corner radius
      * @return this progress bar
      */
     public NanoProgressBar cornerRadius(float cornerRadius) {
         this.cornerRadius = Math.max(0f, cornerRadius);
+        setStyle(CORNER_RADIUS_KEY, this.cornerRadius);
         return this;
     }
 
     /**
      * Sets border width and fill inset in UI units, clamping below 0 to 0.
-     * This changes painting rather than measured layout; styles may override it.
+     * This changes painting rather than measured layout; the local override takes precedence over theme values.
      *
      * @param borderWidth finite requested border width and fill inset
      * @return this progress bar
      */
     public NanoProgressBar borderWidth(float borderWidth) {
         this.borderWidth = Math.max(0f, borderWidth);
+        setStyle(BORDER_WIDTH_KEY, this.borderWidth);
         return this;
     }
 
     /**
      * Sets horizontal percentage padding in UI units, clamping below 0 to 0.
-     * This changes painting rather than measured layout; styles may override it.
+     * This changes painting rather than measured layout; the local override takes precedence over theme values.
      *
      * @param textPaddingX finite requested horizontal percentage padding
      * @return this progress bar
      */
     public NanoProgressBar textPaddingX(float textPaddingX) {
         this.textPaddingX = Math.max(0f, textPaddingX);
+        setStyle(TEXT_PADDING_X_KEY, this.textPaddingX);
         return this;
     }
 
@@ -443,33 +463,31 @@ public class NanoProgressBar extends UINode implements NanoNode {
      */
     @Override
     protected void applyLayout() {
-        ResolvedStyle style = getStyle();
+        ResolvedStyle style = getStyleOrDefaults();
 
-        if (style != null) {
-            Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
-            Color resolvedForegroundColor = style.get(FOREGROUND_COLOR_KEY);
-            Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
-            Color resolvedTextColor = style.get(TEXT_COLOR_KEY);
+        Color resolvedBackgroundColor = style.get(BACKGROUND_COLOR_KEY);
+        Color resolvedForegroundColor = style.get(FOREGROUND_COLOR_KEY);
+        Color resolvedBorderColor = style.get(BORDER_COLOR_KEY);
+        Color resolvedTextColor = style.get(TEXT_COLOR_KEY);
 
-            String resolvedFontName = style.get(FONT_NAME_KEY);
-            Float resolvedFontSize = style.get(FONT_SIZE_KEY);
-            Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
-            Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
-            Float resolvedTextPaddingX = style.get(TEXT_PADDING_X_KEY);
-            Float resolvedAnimationDuration = style.get(ANIMATION_DURATION_KEY);
+        String resolvedFontName = style.get(FONT_NAME_KEY);
+        Float resolvedFontSize = style.get(FONT_SIZE_KEY);
+        Float resolvedCornerRadius = style.get(CORNER_RADIUS_KEY);
+        Float resolvedBorderWidth = style.get(BORDER_WIDTH_KEY);
+        Float resolvedTextPaddingX = style.get(TEXT_PADDING_X_KEY);
+        Float resolvedAnimationDuration = style.get(ANIMATION_DURATION_KEY);
 
-            if (resolvedBackgroundColor != null) backgroundColor = resolvedBackgroundColor;
-            if (resolvedForegroundColor != null) foregroundColor = resolvedForegroundColor;
-            if (resolvedBorderColor != null) borderColor = resolvedBorderColor;
-            if (resolvedTextColor != null) textColor = resolvedTextColor;
+        if (resolvedBackgroundColor != null) backgroundColor = resolvedBackgroundColor;
+        if (resolvedForegroundColor != null) foregroundColor = resolvedForegroundColor;
+        if (resolvedBorderColor != null) borderColor = resolvedBorderColor;
+        if (resolvedTextColor != null) textColor = resolvedTextColor;
 
-            if (resolvedFontName != null && !resolvedFontName.isBlank()) fontName = resolvedFontName;
-            if (resolvedFontSize != null) fontSize = Math.max(1f, resolvedFontSize);
-            if (resolvedCornerRadius != null) cornerRadius = Math.max(0f, resolvedCornerRadius);
-            if (resolvedBorderWidth != null) borderWidth = Math.max(0f, resolvedBorderWidth);
-            if (resolvedTextPaddingX != null) textPaddingX = Math.max(0f, resolvedTextPaddingX);
-            if (resolvedAnimationDuration != null) animationDuration = Math.max(0f, resolvedAnimationDuration);
-        }
+        if (resolvedFontName != null && !resolvedFontName.isBlank()) fontName = resolvedFontName;
+        if (resolvedFontSize != null) fontSize = Math.max(1f, resolvedFontSize);
+        if (resolvedCornerRadius != null) cornerRadius = Math.max(0f, resolvedCornerRadius);
+        if (resolvedBorderWidth != null) borderWidth = Math.max(0f, resolvedBorderWidth);
+        if (resolvedTextPaddingX != null) textPaddingX = Math.max(0f, resolvedTextPaddingX);
+        if (resolvedAnimationDuration != null) animationDuration = Math.max(0f, resolvedAnimationDuration);
 
         super.applyLayout();
     }
@@ -545,7 +563,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
             nvgFontFace(vg, fontName);
             nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, NanoUtility.color1(textColor));
-            NanoText.draw(this, vg, textX, textY, text, fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+            NanoText.draw(this, vg, fontName, textX, textY, text, fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         }
     }
 

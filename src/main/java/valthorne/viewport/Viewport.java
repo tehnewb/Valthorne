@@ -1,5 +1,7 @@
 package valthorne.viewport;
 
+import java.util.Arrays;
+
 import valthorne.Window;
 import valthorne.camera.Camera;
 import valthorne.graphics.DrawFunction;
@@ -7,6 +9,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector2f;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER_BINDING;
 
 /**
  * Base 2D viewport abstraction responsible for mapping a logical world area into a screen-space
@@ -66,8 +69,8 @@ import static org.lwjgl.opengl.GL11.*;
  *
  * <h2>Coordinate system</h2>
  * <p>
- * This class assumes a bottom-left world coordinate system, matching the rest of your engine
- * and standard OpenGL-style orthographic rendering.
+ * Screen input uses bottom-left logical window coordinates. World coordinates follow
+ * the active projection, including top-left UI cameras and custom 2D transforms.
  * </p>
  *
  * <h2>Example</h2>
@@ -112,14 +115,15 @@ public abstract class Viewport {
     private final int[] previousScissor = new int[4]; // Previously active OpenGL scissor rectangle restored by endScissor.
     private final float[] oldProjectionMatrix = new float[16]; // Previously active engine projection restored by unbind or render.
     private final Vector2f screenToWorldCoordinates = new Vector2f(); // Reused return vector for screen-to-world conversion.
-    protected int x; // X position of this viewport in actual screen pixels.
-    protected int y; // Y position of this viewport in actual screen pixels.
-    protected int width; // Width of this viewport in actual screen pixels.
-    protected int height; // Height of this viewport in actual screen pixels.
+    protected int x; // X position in logical window coordinates, or target pixels for offscreen rendering.
+    protected int y; // Y position in logical window coordinates, or target pixels for offscreen rendering.
+    protected int width; // Logical window width, or offscreen target width in pixels.
+    protected int height; // Logical window height, or offscreen target height in pixels.
     protected float worldWidth; // Logical world width visible through this viewport.
     protected float worldHeight; // Logical world height visible through this viewport.
     protected Camera camera; // Optional camera used to build the active projection transform.
-    private boolean scissorWasEnabled; // True when a scissor test was already active before beginScissor was called.
+    private int[] scissorScopes = new int[20]; // Saved box and enable flag for four nested scopes; grows only on deeper nesting.
+    private int scissorDepth; // Number of successful scopes awaiting restoration.
 
     /**
      * Creates a viewport with the specified logical world size.
@@ -151,8 +155,8 @@ public abstract class Viewport {
      *     <li>Updating {@link #projectionMatrix} to match the intended world-space projection</li>
      * </ul>
      *
-     * @param screenWidth  the current window width in pixels
-     * @param screenHeight the current window height in pixels
+     * @param screenWidth current logical window width, or offscreen target pixel width
+     * @param screenHeight current logical window height, or offscreen target pixel height
      */
     public abstract void update(int screenWidth, int screenHeight);
 
@@ -164,10 +168,22 @@ public abstract class Viewport {
      * then updates the engine-managed projection matrix. If a camera is present, the camera is
      * rebuilt using the current world size and its projection matrix is applied. Otherwise the
      * fallback viewport projection is used.
+     * Window-target rectangles are converted from logical coordinates to framebuffer
+     * pixels at application time, including scale-only changes. Offscreen targets use
+     * their supplied pixel coordinates without applying the window's scale. Projection
+     * and pointer conversion retain the original logical rectangle. Rounded edges are
+     * shared by adjacent viewports to avoid gaps at fractional framebuffer scales.
      * </p>
      */
     public void apply() {
-        glViewport(x, y, width, height);
+        boolean windowTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0;
+        float scaleX = getFramebufferScaleX(windowTarget);
+        float scaleY = getFramebufferScaleY(windowTarget);
+        int left = Math.round(x * scaleX);
+        int bottom = Math.round(y * scaleY);
+        int right = Math.round((x + (float) width) * scaleX);
+        int top = Math.round((y + (float) height) * scaleY);
+        glViewport(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
 
         float[] matrixData;
 
@@ -179,6 +195,29 @@ public abstract class Viewport {
         }
 
         Window.setProjectionMatrix(matrixData);
+    }
+
+    /**
+     * Returns horizontal drawable pixels per viewport coordinate. A zero-sized window
+     * framebuffer produces zero scale while preserving logical layout and input sizes.
+     * Subclasses may override for explicitly configured target mappings.
+     *
+     * @param windowTarget whether drawing targets the window's default framebuffer
+     * @return horizontal conversion scale
+     */
+    protected float getFramebufferScaleX(boolean windowTarget) {
+        return windowTarget && Window.getWidth() > 0 ? (float) Window.getFramebufferWidth() / Window.getWidth() : 1f;
+    }
+
+    /**
+     * Returns vertical drawable pixels per viewport coordinate independently of X.
+     * Offscreen target coordinates are already pixels and use a scale of one.
+     *
+     * @param windowTarget whether drawing targets the window's default framebuffer
+     * @return vertical conversion scale
+     */
+    protected float getFramebufferScaleY(boolean windowTarget) {
+        return windowTarget && Window.getHeight() > 0 ? (float) Window.getFramebufferHeight() / Window.getHeight() : 1f;
     }
 
     /**
@@ -270,25 +309,50 @@ public abstract class Viewport {
     }
 
     /**
-     * Converts a captured pointer even after it leaves the viewport rectangle.
+     * Converts bottom-left logical window coordinates into the projection's world XY
+     * plane at Z zero, even outside the viewport rectangle. Rebuilds an assigned camera
+     * from its current state and world dimensions, matching the next apply; otherwise
+     * uses the viewport's current fallback projection. No graphics context is required.
+     * The returned vector is reused and overwritten by the next conversion.
+     *
+     * @param screenX finite horizontal logical window coordinate
+     * @param screenY finite vertical logical window coordinate, increasing upward
+     * @return reused world coordinate vector
+     * @throws IllegalArgumentException if either input is non-finite
+     * @throws IllegalStateException if the viewport has no area or the world plane cannot be unprojected
      */
     public Vector2f screenToWorldUnclipped(float screenX, float screenY) {
+        if (!Float.isFinite(screenX) || !Float.isFinite(screenY))
+            throw new IllegalArgumentException("Screen coordinates must be finite.");
         if (width <= 0 || height <= 0) throw new IllegalStateException("Viewport has no screen area.");
 
-        float vx = screenX - x;
-        float vy = screenY - y;
-
-        float wx = vx * (worldWidth / width);
-        float wy = vy * (worldHeight / height);
-
+        Matrix4f projection = projectionMatrix;
         if (camera != null) {
-            float halfW = worldWidth * 0.5f;
-            float halfH = worldHeight * 0.5f;
-
-            wx = (wx - halfW) / camera.getZoom() + camera.getCenter().x();
-            wy = (wy - halfH) / camera.getZoom() + camera.getCenter().y();
+            camera.rebuild(worldWidth, worldHeight);
+            projection = camera.getProjection();
         }
+        double nx = 2.0 * (screenX - (double) x) / width - 1.0;
+        double ny = 2.0 * (screenY - (double) y) / height - 1.0;
 
+        /*
+         * Solve the two projected XY equations on Z=0 directly. This handles affine
+         * and projective 2D transforms without allocating vectors or inverting a full
+         * 4x4 matrix. Double intermediates reduce cancellation for translated views.
+         */
+        double a = projection.m00() - nx * projection.m03();
+        double b = projection.m10() - nx * projection.m13();
+        double c = nx * projection.m33() - projection.m30();
+        double d = projection.m01() - ny * projection.m03();
+        double e = projection.m11() - ny * projection.m13();
+        double f = ny * projection.m33() - projection.m31();
+        double determinant = a * e - b * d;
+        if (determinant == 0 || !Double.isFinite(determinant))
+            throw new IllegalStateException("Projection cannot unproject the world XY plane.");
+        float wx = (float) ((c * e - b * f) / determinant);
+        float wy = (float) ((a * f - c * d) / determinant);
+        double w = projection.m03() * (double) wx + projection.m13() * (double) wy + projection.m33();
+        if (!Float.isFinite(wx) || !Float.isFinite(wy) || !Double.isFinite(w) || w == 0)
+            throw new IllegalStateException("Projection has no finite world position for these coordinates.");
         return screenToWorldCoordinates.set(wx, wy);
     }
 
@@ -304,7 +368,9 @@ public abstract class Viewport {
      *
      * <p>
      * If the resulting scissor rectangle has no visible area, this method returns {@code false}
-     * and no new scissor state is applied.
+     * and neither OpenGL state nor restoration depth is changed. Successful scopes
+     * may nest on the same instance and must end in reverse order. Storage is reused
+     * without per-scope allocation except when reaching a new capacity.
      * </p>
      *
      * @param wx the world-space x coordinate of the scissor rectangle
@@ -343,7 +409,18 @@ public abstract class Viewport {
             return false;
         }
 
-        scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        boolean windowTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0;
+        float scaleX = getFramebufferScaleX(windowTarget);
+        float scaleY = getFramebufferScaleY(windowTarget);
+        int right = Math.round((sx + (float) sw) * scaleX);
+        int top = Math.round((sy + (float) sh) * scaleY);
+        sx = Math.round(sx * scaleX);
+        sy = Math.round(sy * scaleY);
+        sw = right - sx;
+        sh = top - sy;
+        if (sw <= 0 || sh <= 0) return false;
+
+        boolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
 
         glGetIntegerv(GL_SCISSOR_BOX, previousScissor);
         int prevX = previousScissor[0];
@@ -377,6 +454,14 @@ public abstract class Viewport {
             }
         }
 
+        int offset = scissorDepth * 5;
+        if (offset + 5 > scissorScopes.length) scissorScopes = Arrays.copyOf(scissorScopes, scissorScopes.length * 2);
+        scissorScopes[offset] = prevX;
+        scissorScopes[offset + 1] = prevY;
+        scissorScopes[offset + 2] = prevW;
+        scissorScopes[offset + 3] = prevH;
+        scissorScopes[offset + 4] = scissorWasEnabled ? 1 : 0;
+        scissorDepth++;
         glEnable(GL_SCISSOR_TEST);
         glScissor(fx, fy, fw, fh);
         return true;
@@ -387,15 +472,16 @@ public abstract class Viewport {
      *
      * <p>
      * If a scissor test was already active before this viewport began its scissor scope, the
-     * previous scissor rectangle is restored. Otherwise the OpenGL scissor test is disabled.
+     * previous scissor rectangle and enable state are restored, including the saved box
+     * when scissoring was disabled. Scopes must close in reverse order across instances.
      * </p>
      */
     public void endScissor() {
-        if (scissorWasEnabled) {
-            glScissor(previousScissor[0], previousScissor[1], previousScissor[2], previousScissor[3]);
-        } else {
-            glDisable(GL_SCISSOR_TEST);
-        }
+        if (scissorDepth == 0) throw new IllegalStateException("No active scissor scope");
+        int offset = --scissorDepth * 5;
+        glScissor(scissorScopes[offset], scissorScopes[offset + 1], scissorScopes[offset + 2], scissorScopes[offset + 3]);
+        if (scissorScopes[offset + 4] != 0) glEnable(GL_SCISSOR_TEST);
+        else glDisable(GL_SCISSOR_TEST);
     }
 
     /**

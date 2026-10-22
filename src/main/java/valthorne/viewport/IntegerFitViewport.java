@@ -1,7 +1,5 @@
 package valthorne.viewport;
 
-import static org.lwjgl.opengl.GL11.glViewport;
-
 /**
  * Fits a fixed logical world into a window with an optional whole-number pixel
  * scale. When the window can hold at least one full-sized copy of the world,
@@ -17,6 +15,7 @@ public final class IntegerFitViewport extends FitViewport {
     private boolean integerScalingEnabled = true; // Whether whole-number enlargement is preferred when it fits.
     private float framebufferScaleX = 1f; // Physical framebuffer pixels per window unit on the horizontal axis.
     private float framebufferScaleY = 1f; // Physical framebuffer pixels per window unit on the vertical axis.
+    private boolean explicitFramebufferScale; // Whether callers supplied a mapping instead of automatic window scaling.
 
     /**
      * Creates a centered viewport for the specified positive logical dimensions.
@@ -55,6 +54,8 @@ public final class IntegerFitViewport extends FitViewport {
      * viewport serve both a framebuffer render and logical UI input on HiDPI
      * displays. The scale is normally the framebuffer size divided by the
      * corresponding window size.
+     * Without an explicit mapping, the current window framebuffer scale is used
+     * automatically. Explicit values replace that mapping rather than multiplying it.
      *
      * @param horizontal finite positive horizontal pixel scale
      * @param vertical   finite positive vertical pixel scale
@@ -66,13 +67,18 @@ public final class IntegerFitViewport extends FitViewport {
             throw new IllegalArgumentException("Framebuffer scale must be finite and positive");
         framebufferScaleX = horizontal;
         framebufferScaleY = vertical;
+        explicitFramebufferScale = true;
         return this;
     }
 
     @Override
-    public void apply() {
-        super.apply();
-        glViewport(Math.round(x * framebufferScaleX), Math.round(y * framebufferScaleY), Math.round(width * framebufferScaleX), Math.round(height * framebufferScaleY));
+    protected float getFramebufferScaleX(boolean windowTarget) {
+        return explicitFramebufferScale ? framebufferScaleX : super.getFramebufferScaleX(windowTarget);
+    }
+
+    @Override
+    protected float getFramebufferScaleY(boolean windowTarget) {
+        return explicitFramebufferScale ? framebufferScaleY : super.getFramebufferScaleY(windowTarget);
     }
 
     @Override

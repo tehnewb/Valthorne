@@ -73,16 +73,23 @@ public record TiledObject(int id, String name, String type, float x, float y, fl
      * Reads and parses a TiledObject from the given XMLStreamReader.
      * This method processes various attributes and elements of a TiledObject,
      * including its geometry, properties, and other metadata,
-     * during the parsing of an XML document.
+     * during the parsing of an XML document. A nonempty {@code type} attribute takes
+     * precedence; otherwise the Tiled 1.9 {@code class} attribute supplies classification.
+     * Missing classification becomes an empty string, accessible through {@link #type()}.
      *
      * @param r the XMLStreamReader from which the TiledObject is read and parsed
      * @return a TiledObject instance representing the parsed XML element
      * @throws Exception if an error occurs while parsing the XML
      */
     public static TiledObject readObject(XMLStreamReader r) throws Exception {
+        /*
+         * Prefer the established type attribute while accepting the alternate name
+         * exported by Tiled 1.9 without changing the public record accessor.
+         */
         int id = TiledXML.readInteger(r, "id", 0);
         String name = TiledXML.readAttribute(r, "name", "");
         String type = TiledXML.readAttribute(r, "type", "");
+        if (type.isEmpty()) type = TiledXML.readAttribute(r, "class", "");
         float x = TiledXML.readFloat(r, "x", 0f);
         float y = TiledXML.readFloat(r, "y", 0f);
         float w = TiledXML.readFloat(r, "width", 0f);

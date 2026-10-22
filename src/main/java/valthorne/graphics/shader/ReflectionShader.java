@@ -3,12 +3,14 @@ package valthorne.graphics.shader;
 import valthorne.io.file.ValthorneFiles;
 
 import valthorne.graphics.Sprite;
-import valthorne.graphics.texture.Texture;
+import java.nio.FloatBuffer;
 import valthorne.math.MathUtils;
 
 /**
  * Renders a vertically mirrored, tinted sprite reflection with a fading alpha
- * and optional horizontal ripple. Sampling parameters use backing-texture pixels.
+ * and optional horizontal ripple. Reflection and fade use the selected region,
+ * preserving sprite flips. Ripple sampling is clamped inside that region;
+ * displacement parameters use backing-texture pixels.
  * The shader owns its OpenGL program and requires a current context for creation,
  * drawing, and disposal.
  * <p>Applying the effect temporarily moves and resizes the sprite below its original
@@ -29,7 +31,7 @@ import valthorne.math.MathUtils;
  */
 public class ReflectionShader extends TexturedQuadShader {
 
-    /**
+    /*
      * Fragment source loaded from the packaged reflection effect shader resource.
      */
     private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/reflection.frag");
@@ -81,6 +83,13 @@ public class ReflectionShader extends TexturedQuadShader {
         bind();
         setUniform1i(UNIFORM_TEXTURE, 0);
         setUniform2f("u_texelSize", 1f / sprite.getTexture().getData().width(), 1f / sprite.getTexture().getData().height());
+        FloatBuffer uv = sprite.getUVBuffer();
+        float left = uv.get(0);
+        float bottom = uv.get(1);
+        float right = uv.get(4);
+        float top = uv.get(5);
+        setUniform4f("u_regionBounds", Math.min(left, right), Math.min(bottom, top), Math.max(left, right), Math.max(bottom, top));
+        setUniform2f("u_regionY", bottom, top);
         setUniform1f("u_alpha", alpha);
         setUniform4f("u_tint", tintR, tintG, tintB, 1.0f);
         setUniform1f("u_time", timeSeconds);

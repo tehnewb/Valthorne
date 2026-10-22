@@ -47,11 +47,10 @@ import java.util.regex.Matcher;
  * <pre>{@code
  * Shader shader = new Shader(
  *         TextureBatchContract.defaultVertexShader(),
- *         TextureBatchContract.buildDefaultFragmentShader(8)
+ *         TextureBatchContract.buildDefaultFragmentShader(8),
+ *         TextureBatchContract::bindAttributes
  * );
  *
- * TextureBatchContract.bindAttributes(shader);
- * shader.reload();
  * TextureBatchContract.bindSamplers(shader, 8);
  * }</pre>
  *

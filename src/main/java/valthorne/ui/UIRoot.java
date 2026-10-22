@@ -160,7 +160,7 @@ public class UIRoot extends UIContainer {
     private final UIInspector inspector = new UIInspector(); // Root-owned optional draw inspection controller.
     private final List<FocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
-    private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
+    private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
     private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
     private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
@@ -434,12 +434,17 @@ public class UIRoot extends UIContainer {
 
     /**
      * <p>
-     * Returns the {@link TextureBatch} used by this UI root for rendering.
+     * Returns the root-owned render batch, creating it on first demand. Call only
+     * on the graphics thread with the root's OpenGL context current. Creating or
+     * disposing an unused root does not allocate this batch or compile its shaders.
      * </p>
      *
      * @return the UI render batch
+     * @throws IllegalStateException if this root has been disposed
      */
     public TextureBatch getBatch() {
+        if (disposed) throw new IllegalStateException("UIRoot has been disposed.");
+        if (batch == null) batch = new TextureBatch(4096);
         return batch;
     }
 
@@ -735,6 +740,7 @@ public class UIRoot extends UIContainer {
         if (renderContext != null) throw new IllegalStateException("UIRoot is already drawing.");
         refreshStyles(this);
         if (isLayoutDirty() || Yoga.YGNodeIsDirty(getYogaMemoryAddress())) layout(false);
+        TextureBatch batch = getBatch();
         long renderStarted = System.nanoTime();
         long textureCallsBefore = batch.getTotalDrawCalls();
         inspector.beginFrame();
@@ -921,7 +927,7 @@ public class UIRoot extends UIContainer {
 
         detachFromRoot();
         Yoga.YGConfigFree(yogaConfig);
-        batch.dispose();
+        if (batch != null) batch.dispose();
         if (rotationShader != null) rotationShader.dispose();
         if (nanoSlugFont != null) {
             nanoSlugFont.dispose();
@@ -962,8 +968,7 @@ public class UIRoot extends UIContainer {
         if (nanoVGHandle == 0) return null;
         SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
         if (current != null) return current;
-        current = SlugData.load(SystemFonts.find(code).toString(), 32, 224)
-                .asFont();
+        current = new SlugFont(SlugData.load(SystemFonts.find(code).toString(), 32, 224), true);
         if (code) nanoSlugCodeFont = current;
         else nanoSlugFont = current;
         return current;

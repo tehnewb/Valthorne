@@ -250,7 +250,9 @@ public final class PropertySetIO {
     }
 
     /**
-     * Writes a property set to a file, creating or replacing it.
+     * Writes a property set to a file, creating or replacing it after encoding succeeds.
+     * Unsupported values leave existing content intact. File-system write failures
+     * may still leave a partially written file.
      *
      * @param properties properties to encode
      * @param path       destination path
@@ -258,9 +260,12 @@ public final class PropertySetIO {
      */
     public static void write(PropertySet properties, Path path) throws IOException {
         Objects.requireNonNull(path, "path");
-        try (OutputStream output = Files.newOutputStream(path)) {
-            write(properties, output);
-        }
+        /*
+         * Encode before opening the destination so validation cannot truncate an
+         * existing file. Reuse the byte array already required by stream writing.
+         */
+        byte[] encoded = toBytes(properties);
+        Files.write(path, encoded);
     }
 
     /**

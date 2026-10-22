@@ -3,7 +3,7 @@ package valthorne.ui;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.ui.theme.StyleKey;
-import valthorne.ui.theme.ThemeData;
+import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.nodes.nano.NanoCodeEditor;
 
 import static org.lwjgl.nanovg.NanoVG.*;
@@ -13,15 +13,15 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * for smooth curve glyphs; roots supply smooth defaults when no face is configured.
  * Detached drawing without a root context retains the NanoVG renderer.
  * The active root coordinates backend transitions and painter order. Font
- * ownership stays with the supplying theme or root, and controls retain their
- * normal text input. Source editors resolve a separate monospace face so caret
- * measurement and source rendering share the same glyph advances. Drawing uses
- * the root's graphics thread; this facade creates no font resources.
+ * ownership stays with the theme, and controls retain their normal text input.
+ * <pre>{@code
+ * label.setStyle(NanoText.SLUG_FONT, borrowedFont);
+ * label.clearStyle(NanoText.SLUG_FONT); // Restore current theme/root typography.
+ * }</pre>
  */
 public final class NanoText {
     /**
-     * Optional inherited proportional curve font; absence uses the root's Slug
-     * face while attached, or NanoVG text while detached.
+     * Optional curve font resolved from local overrides, rules, and theme tokens.
      */
     public static final StyleKey<SlugFont> SLUG_FONT = StyleKey.of("nano.slugFont", SlugFont.class);
 
@@ -56,7 +56,7 @@ public final class NanoText {
          * Matching glyph metrics keep carets, selection, and scrolling aligned
          * with smooth text instead of borrowing the NanoVG raster metrics.
          */
-        SlugFont font = font(node);
+        SlugFont font = font(node, name);
         return font == null ? NanoUtility.measureTextWidth(vg, name, size, text) : font.getWidth(text, size);
     }
 
@@ -74,7 +74,7 @@ public final class NanoText {
          * Curve metrics remain available outside a frame, avoiding estimates
          * when editor controls lay out before their first draw.
          */
-        SlugFont font = font(node);
+        SlugFont font = font(node, name);
         return font == null ? NanoUtility.measureTextHeight(vg, name, size) : font.lineHeight() * size;
     }
 
@@ -92,11 +92,32 @@ public final class NanoText {
      * @return end pen X for syntax-highlighted runs
      */
     public static float draw(UINode node, long vg, float x, float y, String text, float size, Color color, int align) {
+        return draw(node, vg, node instanceof NanoCodeEditor ? "code" : "default", x, y, text, size, color, align);
+    }
+
+    /**
+     * Draws using the same named-font selection as measurement. Default and code names
+     * use semantic curve fonts; other registered names retain NanoVG rendering so a
+     * widget's explicit custom font is not silently replaced by the root's default face.
+     * The caller must have selected the named NanoVG font before entering this method.
+     *
+     * @param node owning control
+     * @param vg active NanoVG context
+     * @param name registered NanoVG font name
+     * @param x aligned horizontal coordinate
+     * @param y aligned vertical coordinate
+     * @param text line contents
+     * @param size logical em size
+     * @param color borrowed text tint
+     * @param align NanoVG alignment flags
+     * @return end pen X for subsequent text runs
+     */
+    public static float draw(UINode node, long vg, String name, float x, float y, String text, float size, Color color, int align) {
         /*
          * Themes scope font selection to editor descendants, preserving custom
          * project font previews and scene fonts outside the overlay.
          */
-        SlugFont font = font(node);
+        SlugFont font = font(node, name);
         UIRoot root = node.getRoot();
         if (font == null || root == null || root.getRenderContext() == null) return nvgText(vg, x, y, text);
         float width = font.getWidth(text, size);
@@ -127,32 +148,32 @@ public final class NanoText {
          * Range slicing occurs only for caret measurement, matching the existing
          * editor's prefix measurement semantics.
          */
-        if (font(node) == null) return NanoUtility.measureTextWidth(vg, name, size, text, start, end);
+        if (font(node, name) == null) return NanoUtility.measureTextWidth(vg, name, size, text, start, end);
         return measureTextWidth(node, vg, name, size, text.substring(start, end));
     }
 
     /**
-     * Resolves the semantic font inherited by an editor control.
+     * Resolves semantic typography through the owning node's complete style cascade.
+     * Local overrides and matching rules participate even without an assigned theme.
+     * Heading and code faces retain their semantic priority over the general face;
+     * an absent face falls back to the root's corresponding installed font.
      *
      * @param node owning control
+     * @param name registered face; custom names keep NanoVG measurement and rendering
      * @return borrowed face or null for Nano rendering
      */
-    private static SlugFont font(UINode node) {
+    private static SlugFont font(UINode node, String name) {
         /*
          * Code controls use a matching monospace face while normal controls
          * share the proportional interface face.
          */
-        ThemeData theme = node.getTheme();
-        UIRoot root = node.getRoot();
-        boolean code = node instanceof NanoCodeEditor;
-        if (theme == null) return root == null ? null : root.getNanoTextFont(code);
-        if (code) {
-            SlugFont selected = theme.getToken(SLUG_CODE_FONT);
-            return selected != null ? selected : root == null ? null : root.getNanoTextFont(true);
-        }
-        SlugFont heading = "editor-section".equals(node.getStyleName()) || "window-caption".equals(node.getStyleName()) ? theme.getToken(SLUG_HEADING_FONT) : null;
+        if (!"default".equals(name) && !"code".equals(name)) return null;
+        ResolvedStyle style = node.getStyleOrDefaults();
+        SlugFont heading = "editor-section".equals(node.getStyleName()) || "window-caption".equals(node.getStyleName()) ? style.get(SLUG_HEADING_FONT) : null;
         if (heading != null) return heading;
-        SlugFont selected = theme.getToken(SLUG_FONT);
-        return selected != null ? selected : root == null ? null : root.getNanoTextFont(false);
+        boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);
+        SlugFont code = monospace ? style.get(SLUG_CODE_FONT) : null;
+        SlugFont selected = code == null ? style.get(SLUG_FONT) : code;
+        return selected != null ? selected : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(monospace);
     }
 }

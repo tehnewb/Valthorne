@@ -5,7 +5,7 @@ function validateRelease(properties, request) {
     const matches = [...properties.matchAll(/^version=(\d+\.\d+\.\d+\.\d+)\r?$/gm)];
     if (matches.length !== 1 || matches[0][1] !== request.version)
         throw new Error('Release request must match the exact project version.');
-    if (!['urgent-fix', 'major-or-feature-version'].includes(request.reason))
+    if (!['urgent-fix', 'major-or-feature-version', 'manual-release'].includes(request.reason))
         throw new Error('Unrecognized automatic publication reason.');
     if (!Array.isArray(request.pullRequests) || !request.pullRequests.every(Number.isSafeInteger))
         throw new Error('Invalid release PR list.');
