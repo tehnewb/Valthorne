@@ -243,7 +243,7 @@ final class TextureBatchGlyphs {
         if (mixedShader == null) {
             String vertex = ValthorneFiles.readString("valthorne/shaders/font/slug.vert");
             String fragment = ValthorneFiles.readString("valthorne/shaders/font/slug.frag");
-            mixedShader = new Shader(vertex, fragment.replace("#version 330 core", "#version 330 core\n#define SLUG_CACHED_COVERAGE\n#define SLUG_MIXED_SPRITES"));
+            mixedShader = new Shader(vertex.replace("#version 330 core", "#version 330 core\n#define SLUG_MIXED_SPRITES"), fragment.replace("#version 330 core", "#version 330 core\n#define SLUG_CACHED_COVERAGE\n#define SLUG_MIXED_SPRITES"));
             mixedShader.bind();
             mixedShader.setUniform1i("u_coverageTexture", 2);
             mixedShader.setUniform1i("u_spriteTexture", 3);
