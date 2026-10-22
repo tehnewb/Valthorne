@@ -32,7 +32,8 @@ public class NanoCollapsibleSection extends NanoPanel {
         header.setStyle(NanoButton.PADDING_X_KEY, 24f);
         header.add(new NanoDisclosureIndicator(this::isExpanded));
         getLayout().column().noShrink();
-        header.getLayout().height(36).widthPercent(100).noShrink();
+        header.setStyleName("section-header");
+        header.getLayout().widthPercent(100).noShrink();
         body.getLayout().widthPercent(100).minHeight(0).noShrink();
         content.getLayout().widthPercent(100);
         body.add(content);

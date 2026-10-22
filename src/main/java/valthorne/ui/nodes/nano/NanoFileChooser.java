@@ -9,6 +9,7 @@ import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.UITokens;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -36,6 +37,9 @@ import java.util.function.Consumer;
  * File approval never creates, overwrites, deletes, or launches a file: the application
  * performs file IO after approval and must handle filesystem changes and IO failures.
  * The separate New folder command creates only an explicitly named child directory.
+ * The directory tree also provides file context commands. After a tree mutation,
+ * both panes refresh; removing or moving the visited directory returns navigation
+ * to its nearest existing ancestor without approving a file selection.
  * @author Albert Beaupre
  */
 public class NanoFileChooser extends NanoPanel {
@@ -195,6 +199,7 @@ public class NanoFileChooser extends NanoPanel {
         }
         places.add(home); current.getFileSystem().getRootDirectories().forEach(places::add);
         tree = new NanoDirectoryTree(places).onNavigate(this::navigate).onError(failure -> message(failure.getMessage()));
+        explorer.onFilesChanged(tree::refresh);
         browser = new NanoSplitPane(tree, explorer).ratio(.31f).dividerSize(5).minimumSizes(135, 220);
         browser.getDivider().setStyleName("chooser-divider");
         browser.getLayout().height(0).grow(1).minHeight(100).widthPercent(100);
@@ -295,11 +300,18 @@ public class NanoFileChooser extends NanoPanel {
     private void message(String text) { status.text(text == null ? "Operation failed" : text); messageViewport.getLayout().height(status.getText().isEmpty() ? 0 : 24); }
 
     /**
-     * Refreshes the listing and current tree branch, reporting IO failures inline.
+     * Refreshes the listing and expanded tree snapshots, invalidating collapsed
+     * caches so their next opening reflects filesystem changes. Failures appear inline.
      */
     public void refresh() {
-        try { explorer.refresh(); tree.expand(current); message(""); }
-        catch (IOException failure) { message(failure.getMessage()); }
+        try {
+            explorer.refresh();
+            tree.refreshChecked();
+            clearConfirmation();
+            message("");
+        } catch (IOException | SecurityException failure) {
+            message(failure.getMessage());
+        }
     }
 
     /**
@@ -314,9 +326,19 @@ public class NanoFileChooser extends NanoPanel {
             Path leaf = Path.of(name);
             if (name.isBlank() || name.equals(".") || name.equals("..") || leaf.isAbsolute() || leaf.getNameCount() != 1
                     || name.contains("/") || name.contains("\\")) throw new IOException("Enter a single folder name.");
-            Files.createDirectory(current.resolve(leaf)); explorer.refresh(); tree.expand(current);
-            newFolderRow.setVisible(false); newFolderRow.getLayout().height(0); message(""); return true;
-        } catch (IOException | java.nio.file.InvalidPathException | SecurityException failure) { message(failure.getMessage()); return false; }
+            Files.createDirectory(current.resolve(leaf));
+            explorer.refresh();
+            tree.refreshChecked();
+            tree.expand(current);
+            newFolderRow.setVisible(false);
+            newFolderRow.getLayout().height(0);
+            clearConfirmation();
+            message("");
+            return true;
+        } catch (IOException | InvalidPathException | SecurityException failure) {
+            message(failure.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -425,7 +447,7 @@ public class NanoFileChooser extends NanoPanel {
      */
     private void navigateText() {
         try { if (navigate(Path.of(location.getText()))) displayAddress(); }
-        catch (java.nio.file.InvalidPathException failure) { message("Invalid directory: " + failure.getReason()); }
+        catch (InvalidPathException failure) { message("Invalid directory: " + failure.getReason()); }
     }
 
     /**
@@ -561,7 +583,7 @@ public class NanoFileChooser extends NanoPanel {
                 pendingOverwrite = result.getFirst(); confirmation.setVisible(true); confirmation.getLayout().height(36);
                 message("File exists. Replace it? " + pendingOverwrite.getFileName()); return false;
             }
-        } catch (IOException | java.nio.file.InvalidPathException | SecurityException failure) {
+        } catch (IOException | InvalidPathException | SecurityException failure) {
             message(failure.getMessage()); return false;
         }
         finish(result); return true;
@@ -624,7 +646,7 @@ public class NanoFileChooser extends NanoPanel {
             if (result.size() != 1 || !result.getFirst().equals(expected)) {
                 clearConfirmation(); message("Destination changed. Choose Save again."); return false;
             }
-        } catch (IOException | java.nio.file.InvalidPathException | SecurityException failure) {
+        } catch (IOException | InvalidPathException | SecurityException failure) {
             clearConfirmation(); message(failure.getMessage()); return false;
         }
         finish(result); return true;

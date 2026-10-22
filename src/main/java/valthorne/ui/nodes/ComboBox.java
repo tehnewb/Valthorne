@@ -1,5 +1,7 @@
 package valthorne.ui.nodes;
 
+import valthorne.ui.nodes.nano.NanoDisclosureIndicator;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -30,8 +32,13 @@ public class ComboBox<T> extends Button {
      */
     public ComboBox() {
         super("Select...");
+        setStyleName("combo-trigger");
+        getLayout().itemsStart().paddingHorizontal(8);
+        NanoDisclosureIndicator arrow = new NanoDisclosureIndicator(() -> true);
+        arrow.getLayout().leftAuto().right(8);
+        add(arrow);
         action(button -> { if (popup.isOpen()) popup.close(); else open(); });
-        getLayout().minWidth(160).height(36);
+        getLayout().minWidth(160);
     }
 
     /**

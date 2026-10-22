@@ -926,7 +926,8 @@ public final class Keyboard {
      * @return {@code true} if the key is currently down, otherwise {@code false}
      */
     public static boolean isKeyDown(int key) {
-        return key >= 0 && key <= GLFW_KEY_LAST && keyDown.get(key);
+        WindowContext context = WindowContext.current();
+        return context == null ? key >= 0 && key <= GLFW_KEY_LAST && keyDown.get(key) : context.keyDown(key);
     }
 
     /**
@@ -941,7 +942,8 @@ public final class Keyboard {
      * @return {@code true} if Shift is currently down
      */
     public static boolean isShiftDown() {
-        return (modifierState & GLFW_MOD_SHIFT) != 0;
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_SHIFT) != 0;
     }
 
     /**
@@ -956,7 +958,8 @@ public final class Keyboard {
      * @return {@code true} if Control is currently down
      */
     public static boolean isCtrlDown() {
-        return (modifierState & GLFW_MOD_CONTROL) != 0;
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_CONTROL) != 0;
     }
 
     /**
@@ -971,7 +974,8 @@ public final class Keyboard {
      * @return {@code true} if Alt is currently down
      */
     public static boolean isAltDown() {
-        return (modifierState & GLFW_MOD_ALT) != 0;
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_ALT) != 0;
     }
 
     /**
@@ -988,7 +992,8 @@ public final class Keyboard {
      * @return {@code true} if Super is currently down
      */
     public static boolean isSuperDown() {
-        return (modifierState & GLFW_MOD_SUPER) != 0;
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_SUPER) != 0;
     }
 
     /**
@@ -1004,7 +1009,8 @@ public final class Keyboard {
      * @return {@code true} if Caps Lock is currently on
      */
     public static boolean isCapsLockOn() {
-        return capsLockOn;
+        WindowContext context = WindowContext.current();
+        return context == null ? capsLockOn : context.capsLock();
     }
 
     /**

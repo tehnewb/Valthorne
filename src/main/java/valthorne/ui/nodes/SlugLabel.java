@@ -23,6 +23,8 @@ import java.util.Objects;
  * Container clipping is applied in world coordinates, including rotated labels.
  * The label owns only CPU layout; its root's texture
  * batch owns GPU drawing resources.
+ * Axis-aligned line origins and baselines align to physical pixels while glyph
+ * advances retain fractional precision; rotated placement is preserved.
  * @author Albert Beaupre
  */
 public final class SlugLabel extends UINode {
@@ -120,6 +122,7 @@ public final class SlugLabel extends UINode {
 
     @Override
     public void draw(TextureBatch batch) {
-        run.draw(batch, getRenderX(), getRenderY() + getHeight() - font.ascent() * run.size(), color);
+        float baseline = getRenderY() + getHeight() - font.ascent() * run.size();
+        run.draw(batch, batch.getGlyphs().alignTextOrigin(getRenderX()), batch.getGlyphs().alignTextBaseline(baseline), color);
     }
 }

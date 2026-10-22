@@ -57,6 +57,34 @@ public final class UITokens {
      */
     public static final StyleKey<Color> SURFACE = StyleKey.of("ui.surface", Color.class);
     /**
+     * Raised control and toolbar surface, with no default color.
+     */
+    public static final StyleKey<Color> RAISED = StyleKey.of("ui.raised", Color.class);
+    /**
+     * Pointer-hover surface used without changing selection membership.
+     */
+    public static final StyleKey<Color> HOVER = StyleKey.of("ui.hover", Color.class);
+    /**
+     * Recessed input-field surface, with no default color.
+     */
+    public static final StyleKey<Color> FIELD = StyleKey.of("ui.field", Color.class);
+    /**
+     * Thin outlines and separators between adjacent surfaces.
+     */
+    public static final StyleKey<Color> BORDER = StyleKey.of("ui.border", Color.class);
+    /**
+     * Secondary captions, placeholders, and disabled foreground content.
+     */
+    public static final StyleKey<Color> MUTED = StyleKey.of("ui.muted", Color.class);
+    /**
+     * Selected-row surface, distinct from the brighter control accent.
+     */
+    public static final StyleKey<Color> SELECTION = StyleKey.of("ui.selection", Color.class);
+    /**
+     * Window, tab-strip, and menu chrome behind compact controls.
+     */
+    public static final StyleKey<Color> CHROME = StyleKey.of("ui.chrome", Color.class);
+    /**
      * Primary text color role, with no default color. This semantic value is
      * separate from individual text widgets' concrete style keys.
      */

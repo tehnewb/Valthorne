@@ -30,6 +30,11 @@ import valthorne.ui.behavior.TextEditing;
  * caret rendering, and style-driven visuals.
  * </p>
  *
+ * <p>Text is left-aligned by default. {@link #centered(boolean)} centers text and
+ * placeholders that fit the padded viewport. Caret placement, selection painting,
+ * and pointer hit testing share that text origin; longer text retains ordinary
+ * horizontal scrolling to keep the caret visible.</p>
+ *
  * <p>
  * This class is designed to be the primary editable text input component in the
  * Valthorne UI system. It integrates with keyboard input, mouse interaction,
@@ -227,7 +232,9 @@ public class TextField extends Panel {
     private float caretWidth = 2f; // Width of the rendered caret
     private float caretPadY = 8f; // Vertical inset applied to caret and selection rendering
     private float scissorFudge = 4f; // Small expansion amount applied to the scissor box
-    private float textOffsetX; // Horizontal scroll offset used when text exceeds available width
+    private boolean centered; // Whether fitting text and placeholders are horizontally centered.
+    private float textOffsetX; // Shared centered or scrolling translation for text, selection, caret, and hit testing.
+    private float placeholderOffsetX; // Cached centering translation for an empty field's fitting placeholder.
 
     private float doubleClickTimer; // Timer used for double-click detection
     private float doubleClickWindow = 0.25f; // Maximum time window for recognizing a double-click
@@ -335,6 +342,31 @@ public class TextField extends Panel {
      */
     public TextField text(String text) {
         editor.text(text);
+        return this;
+    }
+
+    /**
+     * Reads whether text and placeholders that fit the padded viewport are centered.
+     *
+     * @return true for centered fitting content, false for default left alignment
+     */
+    public boolean isCentered() {
+        return centered;
+    }
+
+    /**
+     * Sets horizontal alignment for fitting text and placeholders without changing
+     * the text, caret, selection, or undo history. Longer text keeps ordinary caret
+     * scrolling. Painting and pointer hit testing use the same updated origin.
+     *
+     * @param centered true to center fitting content, false to align it to the left
+     * @return this field
+     */
+    public TextField centered(boolean centered) {
+        if (this.centered == centered) return this;
+        this.centered = centered;
+        updateScroll();
+        markLayoutDirty();
         return this;
     }
 
@@ -700,8 +732,11 @@ public class TextField extends Panel {
                 if (getLayout().getWidth().isAuto())
                     getLayout().width(measuredWidth);
 
-                if (getLayout().getHeight().isAuto())
+                if (getLayout().getHeight().isAuto()) {
+                    Float controlHeight = style.get(UITokens.CONTROL_HEIGHT);
+                    if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
                     getLayout().height(measuredHeight);
+                }
             }
         } else {
             background = null;
@@ -716,6 +751,12 @@ public class TextField extends Panel {
         }
 
         super.applyLayout();
+        updateScroll();
+    }
+
+    @Override
+    protected void afterLayout() {
+        super.afterLayout();
         updateScroll();
     }
 
@@ -791,6 +832,8 @@ public class TextField extends Panel {
      * <p>
      * If the visible text is empty, placeholder text is rendered when available.
      * Otherwise the visible text is drawn at the horizontally scrolled text origin.
+     * Axis-aligned Slug line origins and baselines align to physical pixels to
+     * keep small text steady while preserving fractional advances and kerning.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -799,14 +842,17 @@ public class TextField extends Panel {
         String visibleText = getDisplayText();
         boolean empty = visibleText.isEmpty();
 
-        float drawX = getRenderX() + padding + textOffsetX;
-        float drawY = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
+        float drawX = batch.getGlyphs()
+                .alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float baseline = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
+        float drawY = batch.getGlyphs()
+                .alignTextBaseline(baseline);
         if (empty) {
             if (!placeholder.isEmpty()) {
                 if (placeholderRun == null || placeholderRun.font() != font)
                     placeholderRun = font.createRun(placeholder, fontSize);
                 else placeholderRun.rebuild(placeholder, fontSize);
-                placeholderRun.draw(batch, getRenderX() + padding, drawY, placeholderColor);
+                placeholderRun.draw(batch, batch.getGlyphs().alignTextOrigin(getRenderX() + padding + placeholderOffsetX), drawY, placeholderColor);
             }
             return;
         }
@@ -823,7 +869,8 @@ public class TextField extends Panel {
      * <p>
      * The selection rectangle is computed from the measured width up to the selected
      * character indices. A solid color quad is drawn using the shared caret pixel
-     * texture and the resolved or fallback selection color.
+     * texture and the resolved or fallback selection color. Its origin uses the
+     * same physical pixel alignment as the text so their positions remain consistent.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -832,7 +879,8 @@ public class TextField extends Panel {
         int a = Math.min(selectionStart, selectionEnd);
         int b = Math.max(selectionStart, selectionEnd);
 
-        float drawX = getRenderX() + padding + textOffsetX;
+        float drawX = batch.getGlyphs()
+                .alignTextOrigin(getRenderX() + padding + textOffsetX);
         float x1 = drawX + getTextWidthUpTo(a);
         float x2 = drawX + getTextWidthUpTo(b);
 
@@ -850,7 +898,8 @@ public class TextField extends Panel {
      *
      * <p>
      * The caret X position is based on the measured width up to the current caret
-     * index plus the horizontal text offset.
+     * index plus the horizontal text offset. Its origin uses the same physical
+     * pixel alignment as the text, preserving the measured character offsets.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -858,7 +907,8 @@ public class TextField extends Panel {
     private void drawCaret(TextureBatch batch) {
         if (!isFocused() || !caretVisible) return;
 
-        float drawX = getRenderX() + padding + textOffsetX;
+        float drawX = batch.getGlyphs()
+                .alignTextOrigin(getRenderX() + padding + textOffsetX);
         float caretX = drawX + getTextWidthUpTo(caretIndex);
         float caretH = Math.max(0f, getHeight() - caretPadY * 2f);
         float caretY = getRenderY() + (getHeight() - caretH) * 0.5f;
@@ -1206,15 +1256,12 @@ public class TextField extends Panel {
     }
 
     /**
-     * <p>
-     * Updates the horizontal scroll offset so the caret remains visible.
-     * </p>
-     *
-     * <p>
-     * If the visible text fits within the available inner width, no scrolling is used.
-     * Otherwise the offset is clamped and adjusted so the caret stays within the visible
-     * text area.
-     * </p>
+     * Keeps the measured caret inside the padded horizontal viewport. Fitting text
+     * uses zero translation or its positive center offset; longer text clamps the
+     * translation between the full-text left limit and zero. The placeholder has an
+     * independent cached center offset and never scrolls. Nonpositive width clears
+     * both offsets. Recomputed on editing, style, and computed-layout changes rather
+     * than measuring alignment during every draw.
      */
     private void updateScroll() {
         if (font == null) return;
@@ -1222,17 +1269,20 @@ public class TextField extends Panel {
         float available = getWidth() - padding * 2f;
         if (available <= 0f) {
             textOffsetX = 0f;
+            placeholderOffsetX = 0f;
             return;
         }
 
-        float textWidth = font.getWidth(getDisplayText(), fontSize);
-        float caretX = getTextWidthUpTo(caretIndex);
+        String visibleText = getDisplayText();
+        float textWidth = font.getWidth(visibleText, fontSize);
+        placeholderOffsetX = centered && visibleText.isEmpty() ? Math.max(0f, (available - font.getWidth(placeholder, fontSize)) * .5f) : 0f;
 
         if (textWidth <= available) {
-            textOffsetX = 0f;
+            textOffsetX = centered ? (available - textWidth) * .5f : 0f;
             return;
         }
 
+        float caretX = getTextWidthUpTo(caretIndex);
         float minOffset = available - textWidth;
         float maxOffset = 0f;
 

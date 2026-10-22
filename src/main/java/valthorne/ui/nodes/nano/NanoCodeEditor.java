@@ -47,13 +47,19 @@ public class NanoCodeEditor extends NanoPanel {
      */
     public static final StyleKey<Color> CARET_COLOR_KEY = StyleKey.of("nano.codeEditor.caretColor", Color.class, Color.WHITE);
     /**
-     * Line height value used by NanoCodeEditor.
+     * Baseline distance between editor lines in UI units.
      */
-    private static final int LINE_HEIGHT = 20;
+    public static final StyleKey<Float> LINE_HEIGHT_KEY = StyleKey.of("nano.codeEditor.lineHeight", Float.class, 18f);
     /**
-     * Font size value used by NanoCodeEditor.
+     * Font size used for source text, line numbers, hit testing and the caret.
      */
-    private static final float FONT_SIZE = 14, TEXT_X = 64;
+    public static final StyleKey<Float> FONT_SIZE_KEY = StyleKey.of("nano.codeEditor.fontSize", Float.class, 12f);
+    /**
+     * Fixed left gutter reserved for line numbers and their spacing.
+     */
+    private static final float TEXT_X = 64;
+    private float lineHeight = 18f; // Distance between successive editor lines in UI units.
+    private float fontSize = 12f; // Current resolved source and gutter text size.
     private final TextEditModel model = new TextEditModel().multiline(true);
     private final NanoPopupMenu contextMenu = new NanoPopupMenu(); // Standard text commands for a secondary click.
     private final ArrayList<Integer> starts = new ArrayList<>();
@@ -70,6 +76,23 @@ public class NanoCodeEditor extends NanoPanel {
         setFocusable(true);
         model.onChange(this::modelChanged);
         rebuildLines();
+    }
+
+    @Override
+    protected void applyLayout() {
+        ResolvedStyle style = getStyle();
+        if (style != null) {
+            Float size = style.get(FONT_SIZE_KEY);
+            Float height = style.get(LINE_HEIGHT_KEY);
+            float nextSize = size != null && Float.isFinite(size) && size > 0 ? size : fontSize;
+            float nextHeight = height != null && Float.isFinite(height) && height > 0 ? height : lineHeight;
+            if (fontSize != nextSize || lineHeight != nextHeight) {
+                fontSize = nextSize;
+                lineHeight = nextHeight;
+                rebuildLines();
+            }
+        }
+        super.applyLayout();
     }
 
     public String getText() {return model.text();}
@@ -138,7 +161,7 @@ public class NanoCodeEditor extends NanoPanel {
                 start = i + 1;
             }
         longest = Math.max(longest, visualLength(text.substring(start)));
-        getLayout().width(Math.max(500, TEXT_X + 20 + longest * 9f)).height(Math.max(1, starts.size()) * LINE_HEIGHT);
+        getLayout().width(Math.max(500, TEXT_X + 20 + longest * fontSize * 0.65f)).height(Math.max(1, starts.size()) * lineHeight);
         markLayoutDirty();
     }
 
@@ -173,14 +196,14 @@ public class NanoCodeEditor extends NanoPanel {
     }
 
     private float width(String text) {
-        return NanoText.measureTextWidth(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, FONT_SIZE, visible(text));
+        return NanoText.measureTextWidth(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, fontSize, visible(text));
     }
 
     private void revealCaret() {
         NanoScrollPanel panel = scroll();
         if (panel == null) return;
         int line = lineAt(model.caret());
-        float top = line * LINE_HEIGHT, bottom = top + LINE_HEIGHT;
+        float top = line * lineHeight, bottom = top + lineHeight;
         if (top < panel.getScrollY()) panel.scrollY(top);
         else if (bottom > panel.getScrollY() + panel.getHeight()) panel.scrollY(bottom - panel.getHeight());
         float x = TEXT_X + width(model.text().substring(starts.get(line), model.caret()));
@@ -190,7 +213,7 @@ public class NanoCodeEditor extends NanoPanel {
 
     private int positionAt(float screenX, float screenY) {
         var point = screenToLayout(screenX, screenY);
-        int line = Math.clamp((int) ((point.y() - getAbsoluteY()) / LINE_HEIGHT), 0, starts.size() - 1);
+        int line = Math.clamp((int) ((point.y() - getAbsoluteY()) / lineHeight), 0, starts.size() - 1);
         String value = lineText(line);
         float x = point.x() - getAbsoluteX() - TEXT_X;
         if (x <= 0) return starts.get(line);
@@ -301,15 +324,15 @@ public class NanoCodeEditor extends NanoPanel {
         Color selectionColor = style == null ? SELECTION_COLOR_KEY.getDefaultValue() : style.get(SELECTION_COLOR_KEY);
         Color caretColor = style == null ? CARET_COLOR_KEY.getDefaultValue() : style.get(CARET_COLOR_KEY);
         NanoScrollPanel panel = scroll();
-        int first = Math.max(0, (int) ((panel == null ? 0 : panel.getScrollY()) / LINE_HEIGHT) - 1);
-        int last = Math.min(starts.size(), (int) (((panel == null ? getHeight() : panel.getScrollY() + panel.getHeight())) / LINE_HEIGHT) + 2);
+        int first = Math.max(0, (int) ((panel == null ? 0 : panel.getScrollY()) / lineHeight) - 1);
+        int last = Math.min(starts.size(), (int) (((panel == null ? getHeight() : panel.getScrollY() + panel.getHeight())) / lineHeight) + 2);
         float x = getAbsoluteX(), y = getAbsoluteY();
         nvgSave(vg);
         nvgFontFace(vg, fontName);
-        nvgFontSize(vg, FONT_SIZE);
+        nvgFontSize(vg, fontSize);
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
         for (int line = first; line < last; line++) {
-            float top = y + line * LINE_HEIGHT + 2;
+            float top = y + line * lineHeight + 2;
             String value = lineText(line);
             int begin = Math.max(model.start(), starts.get(line));
             int end = Math.min(model.end(), lineEnd(line));
@@ -317,20 +340,20 @@ public class NanoCodeEditor extends NanoPanel {
                 float left = x + TEXT_X + width(model.text().substring(starts.get(line), begin));
                 float right = x + TEXT_X + width(model.text().substring(starts.get(line), end));
                 nvgBeginPath(vg);
-                nvgRect(vg, left, top - 1, Math.max(1, right - left), LINE_HEIGHT);
+                nvgRect(vg, left, top - 1, Math.max(1, right - left), lineHeight);
                 nvgFillColor(vg, NanoUtility.color1(selectionColor));
                 nvgFill(vg);
             }
             nvgFillColor(vg, NanoUtility.color1(gutterColor));
-            NanoText.draw(this, vg, x + 8, top, Integer.toString(line + 1), FONT_SIZE, gutterColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+            NanoText.draw(this, vg, x + 8, top, Integer.toString(line + 1), fontSize, gutterColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             if (highlighter == null) {
                 nvgFillColor(vg, NanoUtility.color1(textColor));
-                NanoText.draw(this, vg, x + TEXT_X, top, visible(value), FONT_SIZE, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+                NanoText.draw(this, vg, x + TEXT_X, top, visible(value), fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             } else {
                 float cursor = x + TEXT_X;
                 for (NanoColoredRun run : highlighter.apply(value)) {
                     nvgFillColor(vg, NanoUtility.color1(run.color()));
-                    cursor = NanoText.draw(this, vg, cursor, top, visible(run.text()), FONT_SIZE, run.color(), NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+                    cursor = NanoText.draw(this, vg, cursor, top, visible(run.text()), fontSize, run.color(), NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
                 }
             }
         }
@@ -339,7 +362,7 @@ public class NanoCodeEditor extends NanoPanel {
             if (line >= first && line < last) {
                 float cursor = x + TEXT_X + width(model.text().substring(starts.get(line), model.caret()));
                 nvgBeginPath(vg);
-                nvgRect(vg, cursor, y + line * LINE_HEIGHT + 2, 1.5f, FONT_SIZE + 3);
+                nvgRect(vg, cursor, y + line * lineHeight + 2, 1.5f, fontSize + 3);
                 nvgFillColor(vg, NanoUtility.color1(caretColor));
                 nvgFill(vg);
             }

@@ -5,19 +5,25 @@ import valthorne.ui.behavior.DirectoryEntry;
 
 import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
+import valthorne.event.events.FileDropEvent;
+import valthorne.ui.UINode;
 import valthorne.ui.UIInputEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * NanoVG variant. Read-only local directory browser with breadcrumbs, parent/refresh/open commands,
+ * NanoVG local directory browser with desktop-file imports, breadcrumbs, parent/refresh/open commands,
  * hidden-file filtering, and virtualized directory rows. Click to select; Enter or
  * Open enters a directory or emits a file callback. Arrows and Home/End select rows;
  * Backspace requests the parent. Navigation never renames, deletes, or launches files.
+ * Desktop drops copy paths into the hovered folder row, or into the current
+ * directory over other content. Transfers run on a worker, keep both entries
+ * on filename collisions, and rescan the listing after completion.
  * <pre>{@code
  * NanoFileExplorer files = new NanoFileExplorer(Path.of("assets"));
  * files.filter(path -> path.toString().endsWith(".png"));
@@ -37,7 +43,8 @@ import java.util.function.Predicate;
  * @author Albert Beaupre
  */
 public class NanoFileExplorer extends NanoPanel {
-    private final DirectoryBrowserModel model;
+    private final DirectoryBrowserModel model; // Checked directory snapshots and retained user selection.
+    private final boolean confined; // Whether imports must remain beneath the construction root.
     private final NanoBreadcrumbBar breadcrumbs = new NanoBreadcrumbBar(); // Owned current-model.getDirectory() navigation.
     private final NanoLabel status = new NanoLabel(); // Owned current path, selection, or error text.
     private final NanoButton up = new NanoButton("Up"); // Owned parent-navigation button.
@@ -49,6 +56,8 @@ public class NanoFileExplorer extends NanoPanel {
     private boolean details; // Whether rows display file icons and metadata columns.
     private final NanoButton nameHeading = new NanoButton("Name  ^"); // Name ordering command and direction indicator.
     private final NanoButton dateHeading = new NanoButton("Date modified"); // Modification ordering command and direction indicator.
+    private NanoFileContextMenu imports; // Lazily owned asynchronous desktop import controller; null before first drop.
+    private Runnable filesChanged = () -> {}; // Optional owner rescan notification after imports, including partial failures.
 
     /**
      * Opens and scans an existing directory, establishing its real path as the root.
@@ -68,6 +77,7 @@ public class NanoFileExplorer extends NanoPanel {
      */
     public NanoFileExplorer(Path root, boolean confined) throws IOException {
         model = new DirectoryBrowserModel(root, confined);
+        this.confined = confined;
         getLayout().column().minWidth(280).minHeight(160);
         toolbar.getLayout().row().height(36).noShrink();
         NanoButton refresh = new NanoButton("Refresh").action(button -> request(model.getDirectory()));
@@ -243,6 +253,53 @@ public class NanoFileExplorer extends NanoPanel {
     public Path getDirectory() { return model.getDirectory(); }
 
     /**
+     * Notifies an enclosing chooser to refresh companion views after imports.
+     *
+     * @param listener nonnull UI-thread mutation callback
+     * @return this explorer
+     */
+    public NanoFileExplorer onFilesChanged(Runnable listener) {
+        filesChanged = Objects.requireNonNull(listener);
+        return this;
+    }
+
+    @Override
+    public void onFileDrop(FileDropEvent event) {
+        if (isDisabled() || event.getPaths().isEmpty() || getRoot() == null) return;
+        Path destination = model.getDirectory();
+        for (UINode node = getRoot().findNodeAt(event.getX(), event.getY(), CLICKABLE_BIT); node != null && node != this; node = node.getParent())
+            if (node instanceof FileRow row) {
+                DirectoryEntry entry = model.getEntries().get(row.index);
+                if (entry.directory()) destination = entry.path();
+                break;
+            }
+        if (imports == null) {
+            imports = new NanoFileContextMenu(this, this::getSelectedPaths, this::getDirectory)
+                    .onChanged(() -> {
+                        request(model.getDirectory());
+                        filesChanged.run();
+                    })
+                    .onError(this::failed)
+                    .onStatus(status::text);
+            if (confined) imports.confinedRoot(model.getBreadcrumbRoot());
+        }
+        event.consume();
+        imports.importFiles(event.getPaths(), destination);
+    }
+
+    @Override
+    public void update(float delta) {
+        if (imports != null) imports.update();
+        super.update(delta);
+    }
+
+    @Override
+    public void onDestroy() {
+        if (imports != null) imports.hide();
+        super.onDestroy();
+    }
+
+    /**
      * Reads the immutable last successful directory snapshot.
      * @return entries in displayed order
      */
@@ -352,6 +409,7 @@ public class NanoFileExplorer extends NanoPanel {
             if (node == list) { rowTarget = true; break; }
         }
         if (!rowTarget) return;
+        if (imports != null && imports.handleShortcut(context)) return;
         if (model.getEntries().isEmpty()) return;
         switch (key.getKey()) {
             case Keyboard.DOWN -> select(Math.min(model.getEntries().size() - 1, model.getSelectedIndex() + 1), key.isShiftDown(), false);

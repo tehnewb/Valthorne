@@ -13,6 +13,7 @@ import valthorne.ui.UIRoot;
 import valthorne.ui.behavior.ActivationBehavior;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 
@@ -723,8 +724,11 @@ public class NanoButton extends NanoContainer {
         if (getLayout().getWidth().isAuto())
             getLayout().width(measuredWidth);
 
-        if (getLayout().getHeight().isAuto())
+        if (getLayout().getHeight().isAuto()) {
+            Float controlHeight = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
+            if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
             getLayout().height(measuredHeight);
+        }
 
         super.applyLayout();
     }

@@ -77,9 +77,22 @@ public final class Window {
      */
     private static GLFWWindowFocusCallback focusCallback;
     /**
-     * Native close callback reference that requests window closure.
+     * Native close callback reference that accepts or defers primary-window closure.
      */
     private static GLFWWindowCloseCallback closeCallback;
+
+    /**
+     * Optional primary-window close policy, borrowed until replaced or shutdown.
+     */
+    private static Runnable closeRequestHandler;
+    /**
+     * Coalesced native close intent awaiting dispatch outside GLFW callbacks.
+     */
+    private static boolean nativeCloseRequested;
+    /**
+     * Accepted primary closure; visibility across threads preserves explicit requests.
+     */
+    private static volatile boolean closeConfirmed;
 
     /**
      * Owned native path-drop callback, released with the window.
@@ -102,6 +115,11 @@ public final class Window {
      * Owned GLFW window handle, or zero when no window is registered.
      */
     private static long address;
+    /**
+     * Thread owning the primary native window and scoped render presentations.
+     */
+    private static volatile Thread renderThread;
+
     /**
      * Shared graphics capabilities state retained by Window.
      */
@@ -276,7 +294,10 @@ public final class Window {
         Window.resizable = config.isResizable();
         Window.swapInterval = config.getSwapInterval();
 
+        renderThread = Thread.currentThread();
         config.applyWindowHints();
+        // Keep windowed creation invisible until positioning and graphics setup finish.
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
 
@@ -358,7 +379,12 @@ public final class Window {
         });
         glfwSetWindowFocusCallback(address, focusCallback);
 
-        closeCallback = GLFWWindowCloseCallback.create(win -> glfwSetWindowShouldClose(win, true));
+        closeCallback = GLFWWindowCloseCallback.create(win -> {
+            if (closeRequestHandler == null || closeConfirmed) return;
+            // GLFW sets this flag before invoking the callback; clear it before returning.
+            glfwSetWindowShouldClose(win, false);
+            nativeCloseRequested = true;
+        });
         glfwSetWindowCloseCallback(address, closeCallback);
         dropCallback = GLFWDropCallback.create((win, count, names) -> {
             ArrayList<Path> paths = new ArrayList<>(count);
@@ -383,8 +409,6 @@ public final class Window {
             }
         }
 
-        if (config.isVisible()) glfwShowWindow(address);
-
         if (config.isMaximized()) glfwMaximizeWindow(address);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -401,6 +425,13 @@ public final class Window {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         updateDefaultProjectionMatrix();
+
+        if (config.isVisible()) {
+            // Initial presentation honors both focus preferences; subsequent shows retain their own policy.
+            glfwSetWindowAttrib(address, GLFW_FOCUS_ON_SHOW, config.isFocused() && config.isFocusOnShow() ? GLFW_TRUE : GLFW_FALSE);
+            glfwShowWindow(address);
+            glfwSetWindowAttrib(address, GLFW_FOCUS_ON_SHOW, config.isFocusOnShow() ? GLFW_TRUE : GLFW_FALSE);
+        }
     }
 
     /**
@@ -490,7 +521,35 @@ public final class Window {
      * @return true if the window should close
      */
     static boolean shouldClose() {
-        return address == NULL || glfwWindowShouldClose(address);
+        /*
+         * An explicit accepted close wins even if another native request arrives
+         * before the loop observes it and clears GLFW's provisional flag.
+         */
+        return address == NULL || closeConfirmed || glfwWindowShouldClose(address);
+    }
+
+    /**
+     * Dispatches one pending primary close request after native event polling.
+     * Application work therefore executes outside GLFW callbacks and follows the
+     * normal runtime failure and cleanup path. Temporarily enters the primary
+     * logical scope even if the event originated during a scoped presentation.
+     */
+    static void dispatchCloseRequest() {
+        /*
+         * Consume intent before invoking user code so reentrant polling cannot
+         * replay this request. No task is captured in an embedded game context.
+         */
+        if (!nativeCloseRequested) return;
+        nativeCloseRequested = false;
+        if (closeConfirmed) return;
+        WindowContext previous = WindowContext.use(null);
+        try {
+            Runnable handler = closeRequestHandler;
+            if (handler == null) requestClose();
+            else handler.run();
+        } finally {
+            WindowContext.use(previous);
+        }
     }
 
     /**
@@ -501,7 +560,8 @@ public final class Window {
      * @param newTitle new window title
      */
     public static void setTitle(String newTitle) {
-        glfwSetWindowTitle(address, newTitle);
+        long handle = getAddress();
+        if (handle != NULL) glfwSetWindowTitle(handle, newTitle);
     }
 
     /**
@@ -514,6 +574,11 @@ public final class Window {
      * @param height new window height (pixels)
      */
     public static void setSize(int width, int height) {
+        WindowContext context = WindowContext.current();
+        if (context != null) {
+            if (context.nativeWindow() != NULL) glfwSetWindowSize(context.nativeWindow(), width, height);
+            return;
+        }
         glfwSetWindowSize(address, width, height);
     }
 
@@ -523,7 +588,8 @@ public final class Window {
      * @return window width in pixels
      */
     public static int getWidth() {
-        return width;
+        WindowContext context = WindowContext.current();
+        return context == null ? width : context.width();
     }
 
     /**
@@ -532,7 +598,8 @@ public final class Window {
      * @return window height in pixels
      */
     public static int getHeight() {
-        return height;
+        WindowContext context = WindowContext.current();
+        return context == null ? height : context.height();
     }
 
     /**
@@ -737,12 +804,50 @@ public final class Window {
     }
 
     /**
-     * Requests the window to close.
+     * Replaces the primary operating-system close policy.
      *
-     * <p>This sets the GLFW should-close flag. Your engine loop should check it and exit cleanly.</p>
+     * <p>A nonnull handler receives coalesced title-bar and Alt+F4 requests on the
+     * render thread after native event polling. The window stays open until the
+     * handler eventually calls {@link #requestClose()}, allowing asynchronous
+     * save decisions. Returning without closing keeps the application running.
+     * Exceptions propagate through the normal JGL lifecycle. A null handler
+     * restores immediate native closure. Explicit close requests bypass this policy.</p>
+     *
+     * <p>Call only on the initialized primary window's render thread, outside a
+     * {@link WindowContext}. The handler is borrowed and released on shutdown.</p>
+     *
+     * @param handler close policy, or null for default behavior
+     * @return previous borrowed handler, or null
+     * @throws IllegalStateException if called outside the primary render scope
+     */
+    public static Runnable setCloseRequestHandler(Runnable handler) {
+        /*
+         * Presentation-scoped scripts must not replace the host's close policy.
+         * Retain one callback rather than allocating a task for each native event.
+         */
+        if (!isRenderThread() || WindowContext.current() != null)
+            throw new IllegalStateException("Close policy requires the primary window render thread.");
+        Runnable previous = closeRequestHandler;
+        closeRequestHandler = handler;
+        return previous;
+    }
+
+    /**
+     * Accepts closure of the active presentation, bypassing any native close policy.
+     *
+     * <p>For the primary window this sets the GLFW should-close flag and allows the
+     * engine loop to exit cleanly. Inside a {@link WindowContext}, only that logical
+     * presentation closes. Does nothing when no primary window exists.</p>
      */
     public static void requestClose() {
+        /*
+         * A completed save workflow must not prompt again. Keep scoped game exits
+         * independent of the host editor's accepted primary close state.
+         */
+        WindowContext context = WindowContext.current();
+        if (context != null) { context.requestClose(); return; }
         if (address == NULL) return;
+        closeConfirmed = true;
         glfwSetWindowShouldClose(address, true);
     }
 
@@ -901,6 +1006,9 @@ public final class Window {
         clearColorFilter = null;
         focusCallback = null;
         closeCallback = null;
+        closeRequestHandler = null;
+        nativeCloseRequested = false;
+        closeConfirmed = false;
         posCallback = null;
         sizeCallback = null;
         address = NULL;
@@ -921,7 +1029,8 @@ public final class Window {
      * @return GLFW window handle (0/NULL if not created)
      */
     public static long getAddress() {
-        return address;
+        WindowContext context = WindowContext.current();
+        return context == null ? address : context.nativeWindow();
     }
 
     /**
@@ -933,7 +1042,8 @@ public final class Window {
      * @return the current projection matrix values in column-major order
      */
     public static float[] getProjectionMatrix() {
-        return projectionValues;
+        WindowContext context = WindowContext.current();
+        return context == null ? projectionValues : context.projection();
     }
 
     /**
@@ -950,6 +1060,8 @@ public final class Window {
     public static void setProjectionMatrix(float[] matrixData) {
         if (matrixData == null) throw new NullPointerException("matrixData");
         if (matrixData.length < 16) throw new IllegalArgumentException("matrixData must contain at least 16 floats");
+        WindowContext context = WindowContext.current();
+        if (context != null) { context.projection(matrixData); return; }
         projectionMatrix.set(matrixData).get(projectionValues);
     }
 
@@ -963,7 +1075,7 @@ public final class Window {
     public static void copyProjectionMatrix(float[] destination) {
         if (destination == null) throw new NullPointerException("destination");
         if (destination.length < 16) throw new IllegalArgumentException("destination must contain at least 16 floats");
-        projectionMatrix.get(destination);
+        System.arraycopy(getProjectionMatrix(), 0, destination, 0, 16);
     }
 
     /**
@@ -1027,4 +1139,19 @@ public final class Window {
         }
         throw new RuntimeException(throwable);
     }
+
+    /**
+     * Checks ownership of native rendering and presentation scope changes.
+     *
+     * @return whether the calling thread owns the primary window
+     */
+    public static boolean isRenderThread() {
+        /*
+         * The volatile owner is read only at context boundaries, not by hot input polling.
+         */
+        return address != NULL && renderThread == Thread.currentThread();
+    }
+
+
+
 }

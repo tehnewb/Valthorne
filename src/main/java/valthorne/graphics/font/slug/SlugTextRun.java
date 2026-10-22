@@ -177,7 +177,8 @@ public final class SlugTextRun {
      */
     public void draw(TextureBatch batch, float x, float y, Color color) {
         if (batch == null) throw new NullPointerException("batch");
-        batch.draw(this, x, y, color);
+        batch.getGlyphs()
+                .draw(this, x, y, color);
     }
 
     /**

@@ -151,6 +151,8 @@ public final class UIRenderContext {
      * Paints curve glyphs within a Nano control while retaining backend order.
      * Coordinates use the same top-left logical space as the Nano callback;
      * clipping intersects the control and its current ancestor clip.
+     * Axis-aligned line origins and baselines align to physical pixels without
+     * changing fractional glyph advances or kerning.
      *
      * @param node owning Nano control
      * @param font borrowed curve font
@@ -176,7 +178,7 @@ public final class UIRenderContext {
         }
         batch.beginScissor(left, bottom, Math.max(0f, right - left), Math.max(0f, top - bottom));
         try {
-            font.draw(batch, text, x, batch.alignTextBaseline(height - baseline), size, color);
+            font.draw(batch, text, batch.getGlyphs().alignTextOrigin(x), batch.getGlyphs().alignTextBaseline(height - baseline), size, color);
         } finally {
             batch.endScissor();
             selectBackend(true);
@@ -265,7 +267,8 @@ public final class UIRenderContext {
         transformCosine = previousCosine * cosine - previousSine * sine;
         transformSine = previousSine * cosine + previousCosine * sine;
         shader.transform(transformCosine, transformSine, transformX, transformY);
-        batch.setTextTransform(transformCosine, transformSine, transformX, transformY);
+        batch.getGlyphs()
+                .setTextTransform(transformCosine, transformSine, transformX, transformY);
         try {
             drawNodeContents(node, restoreBackend);
         } finally {
@@ -276,7 +279,8 @@ public final class UIRenderContext {
                 transformSine = previousSine;
                 transformX = previousX;
                 transformY = previousY;
-                batch.setTextTransform(previousCosine, previousSine, previousX, previousY);
+                batch.getGlyphs()
+                        .setTextTransform(previousCosine, previousSine, previousX, previousY);
                 batch.setShader(previousShader);
                 if (previousShader instanceof UIRotationShader previousRotation)
                     previousRotation.transform(previousCosine, previousSine, previousX, previousY);

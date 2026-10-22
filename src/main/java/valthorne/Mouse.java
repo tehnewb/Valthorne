@@ -746,7 +746,8 @@ public final class Mouse {
      * @return the current cursor X position
      */
     public static short getX() {
-        return x;
+        WindowContext context = WindowContext.current();
+        return context == null ? x : (short) context.mouseX();
     }
 
     /**
@@ -763,7 +764,8 @@ public final class Mouse {
      * @return the converted cursor Y position
      */
     public static short getY() {
-        return (short) (Window.getHeight() - y);
+        WindowContext context = WindowContext.current();
+        return context == null ? (short) (Window.getHeight() - y) : (short) context.mouseY();
     }
 
     /**
@@ -774,7 +776,8 @@ public final class Mouse {
      * @return signed horizontal offsets, retaining native double precision
      */
     public static double getScrollX() {
-        return scrollX;
+        WindowContext context = WindowContext.current();
+        return context == null ? scrollX : context.scrollX();
     }
 
     /**
@@ -785,7 +788,8 @@ public final class Mouse {
      * @return signed vertical offsets, retaining native double precision
      */
     public static double getScrollY() {
-        return scrollY;
+        WindowContext context = WindowContext.current();
+        return context == null ? scrollY : context.scrollY();
     }
 
     /**
@@ -822,7 +826,8 @@ public final class Mouse {
          */
         if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST)
             return false;
-        return (buttonState & (1 << button)) != 0;
+        WindowContext context = WindowContext.current();
+        return context == null ? (buttonState & (1 << button)) != 0 : context.buttonDown(button);
     }
 
     /**

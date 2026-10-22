@@ -201,7 +201,8 @@ public final class SlugFont implements Dimensional {
      */
     public void draw(TextureBatch batch, String text, float x, float y, float size, Color tint) {
         if (batch == null) throw new NullPointerException("batch");
-        batch.draw(this, text, x, y, size, tint);
+        batch.getGlyphs()
+                .draw(this, text, x, y, size, tint);
     }
 
     /**

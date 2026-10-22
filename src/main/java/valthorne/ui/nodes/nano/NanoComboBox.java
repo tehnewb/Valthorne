@@ -30,7 +30,8 @@ public class NanoComboBox<T> extends NanoContainer {
 
     /** Keeps named widget chrome on the actual NanoVG button. */
     @Override protected void applyLayout() {
-        trigger.setStyleName(getStyleName());
+        String name = getStyleName();
+        trigger.setStyleName(name == null || name.isEmpty() ? "combo-trigger" : name);
         super.applyLayout();
     }
 
@@ -52,9 +53,13 @@ public class NanoComboBox<T> extends NanoContainer {
      */
     public NanoComboBox() {
         setClickable(true); setFocusable(true);
+        trigger.leftAligned(true);
+        NanoDisclosureIndicator arrow = new NanoDisclosureIndicator(() -> true);
+        arrow.getLayout().leftAuto().right(8);
+        trigger.add(arrow);
         trigger.setFocusable(false); trigger.getLayout().widthPercent(100).heightPercent(100); add(trigger);
         trigger.action(button -> { if (popup.isOpen()) popup.close(); else open(); });
-        getLayout().minWidth(160).height(36);
+        getLayout().minWidth(160);
     }
 
     /**

@@ -29,6 +29,7 @@ import valthorne.ui.nodes.nano.NanoLabel;
 import valthorne.ui.nodes.nano.NanoPanel;
 import valthorne.ui.theme.ThemeData;
 import valthorne.ui.theme.ThemeDataChangeEvent;
+import valthorne.ui.theme.ProfessionalTheme;
 import valthorne.viewport.Viewport;
 
 import java.nio.file.Path;
@@ -162,6 +163,7 @@ public class UIRoot extends UIContainer {
     private final TextureBatch batch = new TextureBatch(4096); // Batch used to render the full UI tree
     private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
+    private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
     private Set<UINode> externallyPresentedNodes; // Top-level nodes painted and picked by an external editor; allocated only when needed.
@@ -183,6 +185,7 @@ public class UIRoot extends UIContainer {
         route(getFocused(), event, Float.NaN, Float.NaN, node -> node.onTextInput(event), false);
         if (active) event.consume();
     }; // Persistent committed-text listener targeting the current focus.
+    private final EventHandler<FileDropEvent> fileDropListener = this::handleFileDrop; // Routes native path drops through the visible modal-aware hit target.
     private UINode pressed; // Node currently being pressed by the mouse
     private int pressedButton = -1; // Button associated with capture, or -1 when no gesture is captured.
     private final ArrayList<NanoLabel> selectionLabels = new ArrayList<>();
@@ -295,11 +298,8 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigSetUseWebDefaults(yogaConfig, true);
         attachToRoot(yogaConfig);
         setRoot(this);
-        if (nanoVGHandle != 0L) {
-            ThemeData defaults = new ThemeData();
-            defaults.setToken(Label.FONT_KEY, getDefaultFont());
-            setTheme(defaults);
-        }
+        defaultTheme = new ProfessionalTheme();
+        setTheme(defaultTheme.create());
 
         setSize(Window.getWidth(), Window.getHeight());
 
@@ -307,6 +307,7 @@ public class UIRoot extends UIContainer {
         overlayLayer.setClickable(false);
         overlayLayer.setFocusable(false);
         overlayLayer.setScrollable(false);
+        overlayLayer.setStyleName("widget-layout");
         super.add(overlayLayer);
 
         JGL.subscribe(EventTypes.KEY_PRESS, inputPriority, keyListener);
@@ -319,6 +320,7 @@ public class UIRoot extends UIContainer {
         Window.addWindowResizeListener(windowListener);
         JGL.subscribe(EventTypes.WINDOW_FOCUS, focusListener);
         JGL.subscribe(EventTypes.TEXT_INPUT, inputPriority, textListener);
+        JGL.subscribe(EventTypes.FILE_DROP, inputPriority, fileDropListener);
         JGL.subscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
     }
 
@@ -349,6 +351,7 @@ public class UIRoot extends UIContainer {
         JGL.unsubscribe(EventTypes.MOUSE_RELEASE, mouseListener);
         JGL.unsubscribe(EventTypes.MOUSE_SCROLL, scrollListener);
         JGL.unsubscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.unsubscribe(EventTypes.FILE_DROP, fileDropListener);
         JGL.subscribe(EventTypes.KEY_PRESS, priority, keyListener);
         JGL.subscribe(EventTypes.KEY_RELEASE, priority, keyListener);
         JGL.subscribe(EventTypes.MOUSE_MOVE, priority, mouseListener);
@@ -357,6 +360,7 @@ public class UIRoot extends UIContainer {
         JGL.subscribe(EventTypes.MOUSE_RELEASE, priority, mouseListener);
         JGL.subscribe(EventTypes.MOUSE_SCROLL, priority, scrollListener);
         JGL.subscribe(EventTypes.TEXT_INPUT, priority, textListener);
+        JGL.subscribe(EventTypes.FILE_DROP, priority, fileDropListener);
         inputPriority = priority;
     }
 
@@ -671,7 +675,7 @@ public class UIRoot extends UIContainer {
         if (isLayoutDirty()) layout(false);
         updateCursor();
 
-        if (hovered == null) {
+        if (!isNodeInteractiveNow(hovered) || !within(hovered, activeFocusScope())) {
             hideActiveTooltip();
             hoverTime = 0f;
             return;
@@ -909,6 +913,7 @@ public class UIRoot extends UIContainer {
         Window.removeWindowResizeListener(windowListener);
         JGL.unsubscribe(EventTypes.WINDOW_FOCUS, focusListener);
         JGL.unsubscribe(EventTypes.TEXT_INPUT, textListener);
+        JGL.unsubscribe(EventTypes.FILE_DROP, fileDropListener);
         JGL.unsubscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
         cancelInput();
         focusScopes.clear();
@@ -925,6 +930,10 @@ public class UIRoot extends UIContainer {
         if (nanoSlugCodeFont != null) {
             nanoSlugCodeFont.dispose();
             nanoSlugCodeFont = null;
+        }
+        if (defaultTheme != null) {
+            defaultTheme.close();
+            defaultTheme = null;
         }
         if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
         nanoVGHandle = 0L;
@@ -948,7 +957,9 @@ public class UIRoot extends UIContainer {
      * @return borrowed root-owned font, or null before graphics initialization
      */
     SlugFont getNanoTextFont(boolean code) {
-        if (disposed || nanoVGHandle == 0) return null;
+        if (disposed) return null;
+        if (!code && defaultTheme != null) return defaultTheme.getFont();
+        if (nanoVGHandle == 0) return null;
         SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
         if (current != null) return current;
         current = SlugData.load(SystemFonts.find(code).toString(), 32, 224)
@@ -1620,6 +1631,21 @@ public class UIRoot extends UIContainer {
         route(target, event, Mouse.getX(), Mouse.getY(), node -> {
             if (node.isScrollable()) node.onMouseScroll(event);
         }, true);
+    }
+
+    /**
+     * Picks the visible desktop-drop destination using ordinary viewport and modal
+     * boundaries, then bubbles the immutable paths until a receiver consumes them.
+     * Drops require no preceding in-application mouse capture or keyboard focus.
+     *
+     * @param event native window path-drop notification
+     */
+    private void handleFileDrop(FileDropEvent event) {
+        if (disposed || !presentationEnabled || event.isConsumed()) return;
+        UINode target = findNodeAt(event.getX(), event.getY(), UINode.CLICKABLE_BIT);
+        boolean active = blockLowerInput && hasUiAt(event.getX(), event.getY());
+        route(target, event, event.getX(), event.getY(), node -> node.onFileDrop(event), true);
+        if (active) event.consume();
     }
 
     /**

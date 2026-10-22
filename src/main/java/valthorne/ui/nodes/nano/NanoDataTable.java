@@ -4,6 +4,8 @@ import valthorne.ui.UINode;
 import valthorne.ui.behavior.SelectionModel;
 import valthorne.ui.behavior.TableModel;
 import valthorne.ui.nodes.TableColumn;
+import valthorne.ui.theme.ResolvedStyle;
+import valthorne.ui.theme.StyleKey;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -13,6 +15,14 @@ import java.util.function.Predicate;
 
 /** NanoVG-backed sortable, filterable, virtualized data table. */
 public class NanoDataTable<T> extends NanoPanel {
+    /**
+     * Height of the fixed column header strip in UI units.
+     */
+    public static final StyleKey<Float> HEADER_HEIGHT_KEY = StyleKey.of("nano.table.headerHeight", Float.class, 24f);
+    /**
+     * Height shared by all virtualized data rows in UI units.
+     */
+    public static final StyleKey<Float> ROW_HEIGHT_KEY = StyleKey.of("nano.table.rowHeight", Float.class, 24f);
     private final TableModel<T> model = new TableModel<>();
     private final List<TableColumn<T>> columns;
     private final NanoPanel headers = new NanoPanel();
@@ -27,21 +37,23 @@ public class NanoDataTable<T> extends NanoPanel {
         if (columns.isEmpty()) throw new IllegalArgumentException("At least one column is required");
         totalWeight = columns.stream().mapToDouble(TableColumn::weight).sum();
         buttons = new NanoButton[columns.size()];
-        getLayout().column().gap(4).minHeight(0);
-        headers.getLayout().row().height(36).noShrink().paddingRight(16);
+        getLayout().column().gap(0).minHeight(0);
+        headers.setStyleName("table-header-strip");
+        headers.getLayout().row().height(24).noShrink().paddingRight(12);
         for (int i = 0; i < columns.size(); i++) {
             int index = i;
             TableColumn<T> column = columns.get(i);
             reverse.add(column.comparator() == null ? null : column.comparator().reversed());
             NanoButton button = new NanoButton(column.title()).action(value -> toggleSort(index));
+            button.setStyleName("table-header");
             button.getLayout().width(0).grow(column.weight()).minWidth(0).heightPercent(100);
             if (column.comparator() == null) { button.setFocusable(false); button.setClickable(false); }
             headers.add(button); buttons[i] = button;
         }
-        rows = new NanoVirtualList(0, this::createRow).rowHeight(36).gap(2).selectable(true);
+        rows = new NanoVirtualList(0, this::createRow).rowHeight(24).gap(0).selectable(true);
         rows.getLayout().widthPercent(100).height(0).grow().minHeight(0);
         super.add(headers); super.add(rows);
-        empty.setClickable(false); empty.getLayout().absolute().left(8).top(48); super.add(empty);
+        empty.setClickable(false); empty.getLayout().absolute().left(8).top(32); super.add(empty);
         model.onChange(() -> {
             rows.getSelection().clear(); rows.itemCount(model.size()); rows.scrollY(0); empty.setVisible(model.size() == 0);
             int sorted = getSortedColumn();
@@ -58,8 +70,33 @@ public class NanoDataTable<T> extends NanoPanel {
     public NanoButton getHeader(int index) { return buttons[Objects.checkIndex(index, buttons.length)]; }
     public NanoDataTable<T> rows(List<? extends T> data) { model.rows(data); return this; }
     public NanoDataTable<T> filter(Predicate<? super T> predicate) { model.filter(predicate); return this; }
-    public NanoDataTable<T> rowHeight(float height) { rows.rowHeight(height); return this; }
+    /**
+     * Overrides the themed row height with a finite positive value.
+     *
+     * @param height uniform row height in UI units
+     * @return this table
+     */
+    public NanoDataTable<T> rowHeight(float height) {
+        rows.rowHeight(height);
+        setStyle(ROW_HEIGHT_KEY, height);
+        return this;
+    }
     public void scrollToRow(int index) { rows.scrollToIndex(index); }
+
+    @Override
+    protected void applyLayout() {
+        ResolvedStyle style = getStyle();
+        if (style != null) {
+            Float headerHeight = style.get(HEADER_HEIGHT_KEY);
+            Float rowHeight = style.get(ROW_HEIGHT_KEY);
+            if (headerHeight != null && Float.isFinite(headerHeight) && headerHeight > 0) {
+                headers.getLayout().height(headerHeight);
+                empty.getLayout().top(headerHeight + 8);
+            }
+            if (rowHeight != null && Float.isFinite(rowHeight) && rowHeight > 0) rows.rowHeight(rowHeight);
+        }
+        super.applyLayout();
+    }
 
     public int getSortedColumn() {
         if (model.comparator() == null) return -1;
@@ -90,6 +127,7 @@ public class NanoDataTable<T> extends NanoPanel {
         row.setStyleName("table-row"); row.setFocusable(true); row.getLayout().row().itemsCenter();
         for (TableColumn<T> column : columns) {
             NanoPanel cell = new NanoPanel();
+            cell.setStyleName("widget-layout");
             cell.setClickable(false);
             cell.getLayout().widthPercent((float) (column.weight() / totalWeight * 100)).heightPercent(100)
                     .minWidth(0).padding(6).justifyCenter();

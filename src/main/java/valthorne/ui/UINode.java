@@ -16,7 +16,12 @@ import java.util.Objects;
 import valthorne.Mouse;
 import valthorne.ui.nodes.Button;
 import valthorne.ui.nodes.TextField;
+import valthorne.ui.nodes.NumberSpinner;
+import valthorne.ui.nodes.MenuBar;
 import valthorne.ui.nodes.nano.NanoButton;
+import valthorne.ui.nodes.nano.NanoComboBox;
+import valthorne.ui.nodes.nano.NanoNumberSpinner;
+import valthorne.ui.nodes.nano.NanoMenuBar;
 import valthorne.ui.nodes.nano.NanoNode;
 import valthorne.ui.nodes.nano.NanoTextField;
 
@@ -366,6 +371,16 @@ public abstract class UINode implements Dimensional {
      * @param event the mouse scroll event containing scroll offsets
      */
     public void onMouseScroll(MouseScrollEvent event) {}
+
+    /**
+     * Receives an external desktop path drop at this node or a descendant.
+     * The root bubbles drops through the visible hit target's ancestors; consume
+     * the event after accepting it to prevent another owner from importing it.
+     * Paths remain valid after the native callback returns.
+     *
+     * @param event immutable paths and window-relative drop coordinates
+     */
+    public void onFileDrop(FileDropEvent event) {}
 
     /**
      * Called when the window is resized.
@@ -806,7 +821,7 @@ public abstract class UINode implements Dimensional {
      *
      * @return the resolved style, or null when neither a theme nor local overrides exist
      */
-    protected final ResolvedStyle getStyle() {
+    public final ResolvedStyle getStyle() {
         ThemeData theme = getTheme();
 
         if (theme == null) {
@@ -1652,7 +1667,9 @@ public abstract class UINode implements Dimensional {
         ResolvedStyle style = getStyle();
         if (style != null && layout.getMinHeight().isAuto() && layout.getHeight().isAuto()
                 && (this instanceof Button || this instanceof TextField
-                || this instanceof NanoButton || this instanceof NanoTextField)) {
+                || this instanceof NanoButton || this instanceof NanoTextField
+                || this instanceof NanoComboBox || this instanceof NumberSpinner || this instanceof NanoNumberSpinner
+                || this instanceof MenuBar || this instanceof NanoMenuBar)) {
             Float height = style.get(UITokens.CONTROL_HEIGHT);
             if (height != null) Yoga.YGNodeStyleSetMinHeight(yogaMemoryAddress, height);
         }

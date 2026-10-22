@@ -6,6 +6,7 @@ import valthorne.event.events.MousePressEvent;
 import valthorne.ui.UIInputEvent;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
+import valthorne.ui.theme.UITokens;
 import java.util.List;
 import java.util.Objects;
 
@@ -89,7 +90,10 @@ public class PopupMenu extends Panel {
         Objects.requireNonNull(anchor);
         close();
         if (isDisabled() || items.isEmpty() || anchor.getRoot() == null || anchor.isDisabled()) return;
+        setTheme(anchor.getTheme());
         UIRoot root = anchor.getRoot();
+        Float themedHeight = getTheme() == null ? null : getTheme().getToken(UITokens.CONTROL_HEIGHT);
+        float rowHeight = themedHeight != null && Float.isFinite(themedHeight) && themedHeight > 0 ? themedHeight : 26f;
         clear();
         options = new VirtualList(items.size(), index -> {
             Item item = items.get(index);
@@ -99,10 +103,10 @@ public class PopupMenu extends Panel {
             row.setEnabled(item.enabled());
             return row;
         });
-        options.rowHeight(32).gap(0);
+        options.rowHeight(rowHeight).gap(0);
         options.setStyleName("menu-surface");
         float width = Math.min(root.getWidth(), Math.max(180, anchor.getWidth()));
-        float height = Math.min(root.getHeight(), Math.min(8, items.size()) * 32f);
+        float height = Math.min(root.getHeight(), Math.min(8, items.size()) * rowHeight);
         var content = anchor.screenToContent(0, 0);
         var world = anchor.screenToWorld(0, 0);
         float x = anchor.getAbsoluteX() - content.x() + world.x();

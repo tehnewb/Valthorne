@@ -13,6 +13,9 @@ import static org.lwjgl.glfw.GLFW.glfwGetTime;
 import static org.lwjgl.glfw.GLFW.glfwInit;
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
+import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
+import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
 
 
 /**
@@ -138,6 +141,10 @@ public class JGL {
             frameApplication = application;
             application.init();
             applicationInitialized = true;
+            // Request startup focus after application setup, which may open dialogs or initialize native subsystems.
+            if (config.isVisible() && config.isFocused() && config.isFocusOnShow()
+                    && glfwGetWindowAttrib(Window.getAddress(), GLFW_VISIBLE) == GLFW_TRUE)
+                Window.focus();
             double lastTime = glfwGetTime();
 
             while (!Window.shouldClose()) {
@@ -148,6 +155,8 @@ public class JGL {
                 lastTime = now;
 
                 glfwPollEvents();
+                Window.dispatchCloseRequest();
+                if (Window.shouldClose()) break;
 
                 frameApplication.update(deltaTime);
                 frameApplication.render();
@@ -202,7 +211,8 @@ public class JGL {
     public static void runTask(Runnable task) {
         if (task == null)
             throw new NullPointerException("A null task cannot be executed.");
-        tasks.add(task);
+        WindowContext context = WindowContext.current();
+        tasks.add(context == null ? task : new ContextTask(context, task));
     }
 
     /**
@@ -434,4 +444,21 @@ public class JGL {
         if (application == null) throw new NullPointerException("Application cannot be null");
         frameApplication = application;
     }
+
+    /**
+     * Releases subscriptions owned by one logical presentation without clearing the application.
+     *
+     * @param context presentation being disposed
+     * @return removed subscription count
+     */
+    public static int unsubscribeContext(WindowContext context) {
+        /*
+         * Disposal is a cold-path operation; the primary application's subscriptions
+         * remain installed while an offscreen or secondary presentation is replaced.
+         */
+        return events.unregisterContext(context);
+    }
+
+
+
 }

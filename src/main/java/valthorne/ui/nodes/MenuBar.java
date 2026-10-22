@@ -23,9 +23,9 @@ public class MenuBar extends Panel {
     private final List<Button> headings = new ArrayList<>(); // Owned, ordered menu-heading controls.
 
     /**
-     * Creates an empty horizontal bar with a fixed default height of 36 layout units.
+     * Creates an empty horizontal bar whose minimum height follows the control theme.
      */
-    public MenuBar() { getLayout().row().height(36).noShrink(); }
+    public MenuBar() { getLayout().row().noShrink(); }
 
     /**
      * Appends a heading with an immutable command snapshot. An empty command list
@@ -43,7 +43,8 @@ public class MenuBar extends Panel {
             boolean wasOpen = menu.isOpen(); closeMenus();
             if (!wasOpen) menu.showBelow(button);
         });
-        heading.getLayout().minWidth(64).heightPercent(100).padding(8).noShrink();
+        heading.setStyleName("menu-heading");
+        heading.getLayout().heightPercent(100).paddingHorizontal(8).noShrink();
         menus.add(menu); headings.add(heading); add(heading); return this;
     }
 

@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.nodes.nano.NanoLabel;
+import valthorne.ui.theme.ResolvedStyle;
+import valthorne.ui.theme.StyleKey;
 
 /**
  * Sortable, filterable table with fixed headers and virtualized fixed-height rows.
@@ -32,6 +34,14 @@ import valthorne.ui.nodes.nano.NanoLabel;
  * @author Albert Beaupre
  */
 public class DataTable<T> extends Panel {
+    /**
+     * Height of the fixed column header strip in UI units.
+     */
+    public static final StyleKey<Float> HEADER_HEIGHT_KEY = StyleKey.of("table.headerHeight", Float.class, 24f);
+    /**
+     * Height shared by all virtualized data rows in UI units.
+     */
+    public static final StyleKey<Float> ROW_HEIGHT_KEY = StyleKey.of("table.rowHeight", Float.class, 24f);
     private final TableModel<T> model = new TableModel<>(); // Owned source/filter/sort projection model.
     private final List<TableColumn<T>> columns; // Immutable column-membership snapshot.
     private final Panel headers = new Panel(); // Owned fixed header row.
@@ -42,8 +52,9 @@ public class DataTable<T> extends Panel {
     private final List<Comparator<? super T>> reverse = new ArrayList<>(); // Cached reverse comparator identities aligned with columns.
 
     /**
-     * Copies column membership and builds a 36-unit header plus selectable virtual
-     * rows initially 36 units high with a two-unit gap. Registers synchronous model
+     * Copies column membership and builds a compact header plus selectable virtual
+     * rows initially 24 units high without gaps. Theme keys scale both heights.
+     * Registers synchronous model
      * change handling for rows, empty-state visibility, selection, and sort markers.
      *
      * @param columns nonempty list of non-null immutable column definitions
@@ -55,13 +66,15 @@ public class DataTable<T> extends Panel {
         if (columns.isEmpty()) throw new IllegalArgumentException("At least one column is required");
         totalWeight = columns.stream().mapToDouble(TableColumn::weight).sum();
         buttons = new Button[columns.size()];
-        getLayout().column().gap(4).minHeight(0);
-        headers.getLayout().row().height(36).noShrink().paddingRight(16);
+        getLayout().column().gap(0).minHeight(0);
+        headers.setStyleName("table-header-strip");
+        headers.getLayout().row().height(24).noShrink().paddingRight(12);
         for (int i = 0; i < columns.size(); i++) {
             int index = i;
             TableColumn<T> column = columns.get(i);
             reverse.add(column.comparator() == null ? null : column.comparator().reversed());
             Button button = new Button(column.title()).action(b -> toggleSort(index));
+            button.setStyleName("table-header");
             button.getLayout().width(0).grow(column.weight()).minWidth(0).heightPercent(100);
             if (column.comparator() == null) {
                 button.setFocusable(false);
@@ -70,12 +83,12 @@ public class DataTable<T> extends Panel {
             headers.add(button);
             buttons[i] = button;
         }
-        rows = new VirtualList(0, this::createRow).rowHeight(36).gap(2).selectable(true);
+        rows = new VirtualList(0, this::createRow).rowHeight(24).gap(0).selectable(true);
         rows.getLayout().widthPercent(100).height(0).grow().minHeight(0);
         super.add(headers);
         super.add(rows);
         empty.setClickable(false);
-        empty.getLayout().absolute().left(8).top(48);
+        empty.getLayout().absolute().left(8).top(32);
         super.add(empty);
         model.onChange(() -> {
             rows.getSelection().clear();
@@ -162,7 +175,7 @@ public class DataTable<T> extends Panel {
 
     /**
      * Sets the virtual list's fixed row height and invalidates its geometry.
-     * All cells share this height; the header remains 36 units high.
+     * All cells share this height; the header retains its separately themed height.
      *
      * @param height finite positive row height in UI units
      * @return this table
@@ -170,7 +183,23 @@ public class DataTable<T> extends Panel {
      */
     public DataTable<T> rowHeight(float height) {
         rows.rowHeight(height);
+        setStyle(ROW_HEIGHT_KEY, height);
         return this;
+    }
+
+    @Override
+    protected void applyLayout() {
+        ResolvedStyle style = getStyle();
+        if (style != null) {
+            Float headerHeight = style.get(HEADER_HEIGHT_KEY);
+            Float rowHeight = style.get(ROW_HEIGHT_KEY);
+            if (headerHeight != null && Float.isFinite(headerHeight) && headerHeight > 0) {
+                headers.getLayout().height(headerHeight);
+                empty.getLayout().top(headerHeight + 8);
+            }
+            if (rowHeight != null && Float.isFinite(rowHeight) && rowHeight > 0) rows.rowHeight(rowHeight);
+        }
+        super.applyLayout();
     }
 
     /**
@@ -246,6 +275,7 @@ public class DataTable<T> extends Panel {
         row.getLayout().row().itemsCenter();
         for (TableColumn<T> column : columns) {
             Panel cell = new Cell();
+            cell.setStyleName("widget-layout");
             cell.setClickable(false);
             cell.getLayout().widthPercent((float) (column.weight() / totalWeight * 100)).heightPercent(100).minWidth(0).padding(6).justifyCenter();
             UINode node = Objects.requireNonNull(column.cell().apply(item), "Cell factory returned null");

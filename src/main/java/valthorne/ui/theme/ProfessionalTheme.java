@@ -7,6 +7,7 @@ import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugData;
 import valthorne.graphics.texture.NinePatchTexture;
 import valthorne.graphics.texture.TextureData;
+import valthorne.ui.NanoText;
 import valthorne.ui.nodes.*;
 import valthorne.ui.nodes.nano.*;
 
@@ -16,7 +17,17 @@ import java.util.List;
 import valthorne.graphics.texture.NinePatchDrawable;
 
 /**
- * Builds a density-scaled light or dark skin for texture and NanoVG UI controls.
+ * Builds a compact desktop-editor skin for texture and NanoVG UI controls.
+ * The default dark palette uses neutral charcoal surfaces, recessed inputs,
+ * muted foregrounds, and restrained blue focus and selection feedback.
+ * Both rendering backends share fourteen-unit live Slug typography and
+ * twenty-six-unit controls at unit density. The optional light palette retains
+ * the same layout.
+ * Directory hierarchies use twenty-four-unit rows, sixteen-unit indentation,
+ * and warm folder accents. Row height, indentation, and text size follow display density.
+ * Numeric spinners share a single rounded input surface with small stacked
+ * arrow controls. Their text editor and arrow buttons remain transparent so
+ * focus feedback belongs to the complete input rather than its individual parts.
  * The theme owns its installed font and all nine-patch textures allocated by
  * {@link #create()}. Theme data shares these resources and palette colors, so keep
  * this object alive while any styled root uses them. Create and close it on the
@@ -33,6 +44,11 @@ import valthorne.graphics.texture.NinePatchDrawable;
  * @author Albert Beaupre
  */
 public final class ProfessionalTheme implements Theme, AutoCloseable {
+    /**
+     * Readable live-outline UI em size before display-density scaling.
+     */
+    private static final float UI_FONT_SIZE = 14f;
+
     public final Color surface; // Shared base surface color.
     public final Color raised; // Shared raised surface color.
     public final Color hover; // Shared hovered surface color.
@@ -41,6 +57,9 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
     public final Color accent; // Shared accent color.
     public final Color border; // Shared border color.
     public final Color disabled; // Shared disabled surface color.
+    public final Color field; // Recessed text and numeric input surface.
+    public final Color selection; // Muted blue row-selection surface, separate from focus ink.
+    public final Color chrome; // Dark title bars, tab strips, and surrounding editor chrome.
     public final Color error = new Color(0xFFF87171); // Shared validation-error accent color.
     private final SlugFont font; // Owned font shared by all generated texture-control styles.
     private final List<NinePatchTexture> skins = new ArrayList<>(); // Owned skins accumulated across create calls.
@@ -52,7 +71,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
     /**
      * Selects a palette and loads installed UI live outlines independent
      * of pixel size. The regular UI uses an em size
-     * of {@code 16 * density}. Nine-patch skins are deferred
+     * of {@code 14 * density}. Nine-patch skins are deferred
      * until {@link #create()}; the font is allocated immediately.
      *
      * @param light   true for the light palette, false for the dark palette
@@ -65,14 +84,17 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
             throw new IllegalArgumentException("Density must be between 0.5 and 3");
         this.density = density;
         this.lightPalette = light;
-        surface = new Color(light ? 0xFFF4F6FA : 0xFF121823);
-        raised = new Color(light ? 0xFFFFFFFF : 0xFF1C2533);
-        hover = new Color(light ? 0xFFE4EAF5 : 0xFF29374B);
-        text = new Color(light ? 0xFF172338 : 0xFFEAF0FA);
-        muted = new Color(light ? 0xFF52627A : 0xFF9AAAC0);
-        accent = new Color(light ? 0xFF285DCE : 0xFF76A5FF);
-        border = new Color(light ? 0xFFBCC9DA : 0xFF3E506A);
-        disabled = new Color(light ? 0xFFDDE3EC : 0xFF27303D);
+        surface = new Color(light ? 0xFFE7E7E7 : 0xFF202020);
+        raised = new Color(light ? 0xFFF4F4F4 : 0xFF2B2B2B);
+        hover = new Color(light ? 0xFFDDDDDD : 0xFF353535);
+        text = new Color(light ? 0xFF292929 : 0xFFDEDEDE);
+        muted = new Color(light ? 0xFF666666 : 0xFFA0A0A0);
+        accent = new Color(0xFF0078D4);
+        border = new Color(light ? 0xFFB9B9B9 : 0xFF3B3B3B);
+        disabled = new Color(light ? 0xFFE0E0E0 : 0xFF252525);
+        field = new Color(light ? 0xFFFFFFFF : 0xFF111111);
+        selection = new Color(light ? 0xFFB8D1E4 : 0xFF40576D);
+        chrome = new Color(light ? 0xFFD6D6D6 : 0xFF181818);
         font = SlugData.load(SystemFonts.find(false).toString(), 32, 224)
                 .asFont();
     }
@@ -106,6 +128,10 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * @param value color reference to store
      */
     private static void color(ThemeRule rule, String name, String key, Color value) {
+        /*
+         * Resolve the existing registered key namespace so composite controls
+         * and leaf widgets can share palette references without extra wrappers.
+         */
         rule.set(StyleKey.of("nano." + name + "." + key, Color.class), value);
     }
 
@@ -132,96 +158,193 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         for (Class<?> type : List.of(NanoPanel.class, NanoButton.class, NanoTextField.class, NanoCheckbox.class,
                 NanoSlider.class, NanoProgressBar.class, NanoScrollPanel.class, NanoGrid.class, NanoComboBox.class,
                 NanoCollapsibleSection.class, NanoDataTable.class, NanoSplitPane.class, NanoTabbedPane.class,
-                NanoTooltip.class, NanoVirtualList.class)) {
+                NanoTooltip.class, NanoVirtualList.class, NanoDirectoryTree.class)) {
             try {
                 Class.forName(type.getName(), true, type.getClassLoader());
-            } catch (ClassNotFoundException impossible) {throw new AssertionError(impossible);}
+            } catch (ClassNotFoundException impossible) {
+                throw new AssertionError(impossible);
+            }
         }
         ThemeData data = new ThemeData();
-        data.setToken(UITokens.CONTROL_HEIGHT, 36 * density);
-        data.setToken(UITokens.SPACING, 8 * density);
-        data.setToken(UITokens.RADIUS, 0f);
-        data.setToken(UITokens.FONT_SIZE, 16 * density);
+        data.setToken(UITokens.CONTROL_HEIGHT, 26 * density);
+        data.setToken(UITokens.SPACING, 6 * density);
+        data.setToken(UITokens.RADIUS, 2 * density);
+        data.setToken(UITokens.FONT_SIZE, UI_FONT_SIZE * density);
         data.setToken(UITokens.SURFACE, surface);
+        data.setToken(UITokens.RAISED, raised);
+        data.setToken(UITokens.HOVER, hover);
+        data.setToken(UITokens.FIELD, field);
+        data.setToken(UITokens.BORDER, border);
+        data.setToken(UITokens.MUTED, muted);
+        data.setToken(UITokens.SELECTION, selection);
+        data.setToken(UITokens.CHROME, chrome);
         data.setToken(UITokens.TEXT, text);
         data.setToken(UITokens.ACCENT, accent);
         data.setToken(UITokens.ERROR, error);
         data.setToken(Label.FONT_KEY, font);
         data.setToken(Label.COLOR_KEY, text);
+        data.setToken(NanoText.SLUG_FONT, font);
         Drawable normal = skin(raised, border), over = skin(hover, border), focus = skin(raised, accent);
-        Drawable pressed = skin(hover, accent), inactive = skin(disabled, border);
-        Drawable track = skin(surface, border), fill = skin(accent, accent);
-        data.rule(Panel.class, "surface").set(Panel.BACKGROUND_KEY, normal);
-        data.rule(Panel.class, "table-row").set(Panel.BACKGROUND_KEY, normal);
-        data.rule(Panel.class, "table-row", StyleState.SELECTED).set(Panel.BACKGROUND_KEY, focus);
-        data.rule(Panel.class, "table-row", StyleState.FOCUSED).set(Panel.BACKGROUND_KEY, focus);
-        data.rule(Button.class).set(Button.BACKGROUND_KEY, normal);
-        data.rule(Button.class, StyleState.SELECTED).set(Button.BACKGROUND_KEY, focus);
-        data.rule(Button.class, StyleState.HOVERED).set(Button.BACKGROUND_KEY, over);
-        data.rule(Button.class, StyleState.FOCUSED).set(Button.BACKGROUND_KEY, focus);
-        data.rule(Button.class, StyleState.PRESSED).set(Button.BACKGROUND_KEY, pressed);
-        data.rule(Button.class, StyleState.DISABLED).set(Button.BACKGROUND_KEY, inactive);
-        data.rule(Panel.class, "window-frame").set(Panel.BACKGROUND_KEY, normal);
-        data.rule(Button.class, "window-title").set(Button.BACKGROUND_KEY, over);
-        data.rule(Button.class, "window-title", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, focus);
-        data.rule(Button.class, "window-title", StyleState.PRESSED).set(Button.BACKGROUND_KEY, pressed);
-        data.rule(Button.class, "window-close").set(Button.BACKGROUND_KEY, over);
-        data.rule(Button.class, "window-close", StyleState.HOVERED).set(Button.BACKGROUND_KEY, skin(error, error));
-        data.rule(Button.class, "window-close", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, focus);
-        data.rule(Button.class, "window-close", StyleState.PRESSED).set(Button.BACKGROUND_KEY, skin(error, accent));
+        Drawable selected = skin(selection, selection), pressed = skin(selection, accent), inactive = skin(disabled, border);
+        Drawable track = skin(field, border), fill = skin(accent, accent);
+        Drawable panelSurface = squareSkin(surface, surface);
+        Drawable transparent = squareSkin(new Color(0x00000000), new Color(0x00000000));
+        data.rule(Panel.class)
+                .set(Panel.BACKGROUND_KEY, panelSurface);
+        data.rule(Panel.class, "widget-layout")
+                .set(Panel.BACKGROUND_KEY, transparent);
+        data.rule(Panel.class, "surface")
+                .set(Panel.BACKGROUND_KEY, normal);
+        data.rule(Panel.class, "table-row")
+                .set(Panel.BACKGROUND_KEY, panelSurface);
+        data.rule(Panel.class, "table-row", StyleState.SELECTED)
+                .set(Panel.BACKGROUND_KEY, selected);
+        data.rule(Panel.class, "table-row", StyleState.FOCUSED)
+                .set(Panel.BACKGROUND_KEY, selected);
+        data.rule(Button.class)
+                .set(Button.BACKGROUND_KEY, normal);
+        data.rule(Button.class, StyleState.SELECTED)
+                .set(Button.BACKGROUND_KEY, selected);
+        data.rule(Button.class, StyleState.HOVERED)
+                .set(Button.BACKGROUND_KEY, over);
+        data.rule(Button.class, StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, focus);
+        data.rule(Button.class, StyleState.PRESSED)
+                .set(Button.BACKGROUND_KEY, pressed);
+        data.rule(Button.class, StyleState.DISABLED)
+                .set(Button.BACKGROUND_KEY, inactive);
+        data.rule(Panel.class, "window-frame")
+                .set(Panel.BACKGROUND_KEY, normal);
+        data.rule(Button.class, "window-title")
+                .set(Button.BACKGROUND_KEY, over);
+        data.rule(Button.class, "window-title", StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, focus);
+        data.rule(Button.class, "window-title", StyleState.PRESSED)
+                .set(Button.BACKGROUND_KEY, pressed);
+        data.rule(Button.class, "window-close")
+                .set(Button.BACKGROUND_KEY, over);
+        data.rule(Button.class, "window-close", StyleState.HOVERED)
+                .set(Button.BACKGROUND_KEY, skin(error, error));
+        data.rule(Button.class, "window-close", StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, focus);
+        data.rule(Button.class, "window-close", StyleState.PRESSED)
+                .set(Button.BACKGROUND_KEY, skin(error, accent));
         Drawable clearGrip = squareSkin(new Color(0x00000000), new Color(0x00000000));
-        data.rule(Button.class, "window-grip").set(Button.BACKGROUND_KEY, clearGrip);
-        data.rule(Button.class, "window-grip", StyleState.HOVERED).set(Button.BACKGROUND_KEY, clearGrip);
-        data.rule(Button.class, "window-grip", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, clearGrip);
-        data.rule(Button.class, "window-grip", StyleState.PRESSED).set(Button.BACKGROUND_KEY, clearGrip);
-        Drawable pane = squareSkin(raised, raised), chrome = squareSkin(surface, border);
+        data.rule(Button.class, "window-grip")
+                .set(Button.BACKGROUND_KEY, clearGrip);
+        data.rule(Button.class, "window-grip", StyleState.HOVERED)
+                .set(Button.BACKGROUND_KEY, clearGrip);
+        data.rule(Button.class, "window-grip", StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, clearGrip);
+        data.rule(Button.class, "window-grip", StyleState.PRESSED)
+                .set(Button.BACKGROUND_KEY, clearGrip);
+        Drawable pane = panelSurface, chromeSkin = squareSkin(chrome, border);
         Drawable flat = squareSkin(surface, surface), rowHover = squareSkin(hover, hover);
-        Drawable rowSelected = squareSkin(hover, accent), editor = squareSkin(raised, border);
-        Drawable editorFocus = squareSkin(raised, accent), command = squareSkin(hover, border);
-        data.rule(ScrollPanel.class, "menu-surface").set(Panel.BACKGROUND_KEY, chrome);
-        data.rule(Button.class, "menu-item").set(Button.BACKGROUND_KEY, pane);
-        data.rule(Button.class, "menu-item", StyleState.HOVERED).set(Button.BACKGROUND_KEY, rowHover);
-        data.rule(Button.class, "menu-item", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, rowHover);
-        data.rule(Button.class, "menu-item", StyleState.PRESSED).set(Button.BACKGROUND_KEY, rowHover);
-        data.rule(Panel.class, "chooser-pane").set(Panel.BACKGROUND_KEY, pane);
-        data.rule(Panel.class, "chooser-chrome").set(Panel.BACKGROUND_KEY, chrome);
-        data.rule(Button.class, "chooser-row").set(Button.BACKGROUND_KEY, pane);
-        data.rule(Button.class, "chooser-row", StyleState.HOVERED).set(Button.BACKGROUND_KEY, rowHover);
-        data.rule(Button.class, "chooser-row", StyleState.SELECTED).set(Button.BACKGROUND_KEY, rowSelected);
-        data.rule(Button.class, "chooser-row", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, rowSelected);
+        Drawable rowSelected = selected, editor = squareSkin(field, border);
+        Drawable editorFocus = squareSkin(field, accent), command = squareSkin(raised, border);
+        data.rule(ScrollPanel.class, "menu-surface")
+                .set(Panel.BACKGROUND_KEY, chromeSkin);
+        data.rule(Button.class, "menu-item")
+                .set(Button.BACKGROUND_KEY, pane);
+        data.rule(Button.class, "menu-item", StyleState.HOVERED)
+                .set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Button.class, "menu-item", StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Button.class, "menu-item", StyleState.PRESSED)
+                .set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Panel.class, "chooser-pane")
+                .set(Panel.BACKGROUND_KEY, pane);
+        data.rule(Panel.class, "chooser-chrome")
+                .set(Panel.BACKGROUND_KEY, chromeSkin);
+        data.rule(Button.class, "chooser-row")
+                .set(Button.BACKGROUND_KEY, pane);
+        data.rule(Button.class, "chooser-row", StyleState.HOVERED)
+                .set(Button.BACKGROUND_KEY, rowHover);
+        data.rule(Button.class, "chooser-row", StyleState.SELECTED)
+                .set(Button.BACKGROUND_KEY, rowSelected);
+        data.rule(Button.class, "chooser-row", StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, rowSelected);
         for (String name : List.of("chooser-tool", "chooser-heading", "chooser-divider")) {
-            data.rule(Button.class, name).set(Button.BACKGROUND_KEY, name.equals("chooser-heading") ? pane : flat);
-            data.rule(Button.class, name, StyleState.HOVERED).set(Button.BACKGROUND_KEY, rowHover);
-            data.rule(Button.class, name, StyleState.FOCUSED).set(Button.BACKGROUND_KEY, editorFocus);
+            data.rule(Button.class, name)
+                    .set(Button.BACKGROUND_KEY, name.equals("chooser-heading") ? pane : flat);
+            data.rule(Button.class, name, StyleState.HOVERED)
+                    .set(Button.BACKGROUND_KEY, rowHover);
+            data.rule(Button.class, name, StyleState.FOCUSED)
+                    .set(Button.BACKGROUND_KEY, editorFocus);
         }
-        data.rule(Button.class, "chooser-action").set(Button.BACKGROUND_KEY, command);
-        data.rule(Button.class, "chooser-action", StyleState.FOCUSED).set(Button.BACKGROUND_KEY, editorFocus);
-        data.rule(Button.class, "chooser-primary").set(Button.BACKGROUND_KEY, rowSelected);
-        data.rule(TextField.class, "chooser-editor").set(TextField.BACKGROUND_KEY, editor)
-                .set(TextField.HOVER_BACKGROUND_KEY, editor).set(TextField.FOCUSED_BACKGROUND_KEY, editorFocus)
+        data.rule(Button.class, "chooser-action")
+                .set(Button.BACKGROUND_KEY, command);
+        data.rule(Button.class, "chooser-action", StyleState.FOCUSED)
+                .set(Button.BACKGROUND_KEY, editorFocus);
+        data.rule(Button.class, "chooser-primary")
+                .set(Button.BACKGROUND_KEY, rowSelected);
+        data.rule(TextField.class, "chooser-editor")
+                .set(TextField.BACKGROUND_KEY, editor)
+                .set(TextField.HOVER_BACKGROUND_KEY, editor)
+                .set(TextField.FOCUSED_BACKGROUND_KEY, editorFocus)
                 .set(TextField.PADDING_KEY, 6f);
-        data.rule(TextField.class).set(TextField.BACKGROUND_KEY, normal).set(TextField.HOVER_BACKGROUND_KEY, over)
-                .set(TextField.FOCUSED_BACKGROUND_KEY, focus).set(TextField.PLACEHOLDER_COLOR_KEY, muted)
-                .set(TextField.CARET_COLOR_KEY, accent).set(TextField.SELECTION_COLOR_KEY, new Color(0x665B8DEF))
-                .set(TextField.PADDING_KEY, 10 * density);
-        data.rule(Slider.class).set(Slider.TRACK_KEY, track).set(Slider.FILL_KEY, fill).set(Slider.THUMB_KEY, focus)
-                .set(Slider.THUMB_WIDTH_KEY, 18 * density).set(Slider.THUMB_HEIGHT_KEY, 18 * density)
-                .set(Slider.TRACK_HEIGHT_KEY, 6 * density);
-        data.rule(Checkbox.class).set(Checkbox.BACKGROUND_KEY, normal).set(Checkbox.CHECKMARK_KEY, fill);
-        data.rule(Checkbox.class, StyleState.FOCUSED).set(Checkbox.BACKGROUND_KEY, focus);
-        data.rule(ProgressBar.class).set(ProgressBar.BACKGROUND_KEY, track).set(ProgressBar.FOREGROUND_KEY, fill);
-        data.rule(ScrollPanel.class).set(ScrollPanel.VERTICAL_BAR_BACKGROUND_KEY, track).set(ScrollPanel.VERTICAL_BAR_FOREGROUND_KEY, focus)
-                .set(ScrollPanel.HORIZONTAL_BAR_BACKGROUND_KEY, track).set(ScrollPanel.HORIZONTAL_BAR_FOREGROUND_KEY, focus);
-        data.rule(Modal.class).set(Modal.BACKGROUND_KEY, skin(new Color(0xAA070C15), new Color(0xAA070C15)))
+        data.rule(TextField.class)
+                .set(TextField.BACKGROUND_KEY, editor)
+                .set(TextField.HOVER_BACKGROUND_KEY, editor)
+                .set(TextField.FOCUSED_BACKGROUND_KEY, editorFocus)
+                .set(TextField.PLACEHOLDER_COLOR_KEY, muted)
+                .set(TextField.CARET_COLOR_KEY, text)
+                .set(TextField.SELECTION_COLOR_KEY, selection)
+                .set(TextField.PADDING_KEY, 4 * density)
+                .set(TextField.CARET_WIDTH_KEY, density)
+                .set(TextField.CARET_PADDING_Y_KEY, 5 * density);
+        data.rule(Slider.class)
+                .set(Slider.TRACK_KEY, track)
+                .set(Slider.FILL_KEY, fill)
+                .set(Slider.THUMB_KEY, squareSkin(muted, muted))
+                .set(Slider.THUMB_WIDTH_KEY, 10 * density)
+                .set(Slider.THUMB_HEIGHT_KEY, 14 * density)
+                .set(Slider.TRACK_HEIGHT_KEY, 4 * density);
+        data.rule(Checkbox.class)
+                .set(Checkbox.BACKGROUND_KEY, normal)
+                .set(Checkbox.CHECKMARK_KEY, fill);
+        data.rule(Checkbox.class, StyleState.FOCUSED)
+                .set(Checkbox.BACKGROUND_KEY, focus);
+        data.rule(ProgressBar.class)
+                .set(ProgressBar.BACKGROUND_KEY, track)
+                .set(ProgressBar.FOREGROUND_KEY, fill);
+        Drawable scrollTrack = squareSkin(chrome, chrome), scrollThumb = squareSkin(muted, muted);
+        data.rule(ScrollPanel.class)
+                .set(ScrollPanel.VERTICAL_BAR_BACKGROUND_KEY, scrollTrack)
+                .set(ScrollPanel.VERTICAL_BAR_FOREGROUND_KEY, scrollThumb)
+                .set(ScrollPanel.HORIZONTAL_BAR_BACKGROUND_KEY, scrollTrack)
+                .set(ScrollPanel.HORIZONTAL_BAR_FOREGROUND_KEY, scrollThumb)
+                .set(ScrollPanel.HORIZONTAL_BAR_HEIGHT_KEY, 7 * density)
+                .set(ScrollPanel.VERTICAL_BAR_WIDTH_KEY, 7 * density)
+                .set(ScrollPanel.BAR_PADDING_KEY, 0f);
+        data.rule(Tooltip.class)
+                .set(Panel.BACKGROUND_KEY, normal);
+        data.rule(Modal.class)
+                .set(Modal.BACKGROUND_KEY, skin(new Color(0x99000000), new Color(0x99000000)))
                 .set(Modal.DIALOG_BACKGROUND_KEY, normal);
-        nanoPanel(data.rule(NanoPanel.class), raised, border, 1f);
+        nanoPanel(data.rule(NanoPanel.class), surface, border, 1f);
         nano(data.rule(NanoButton.class), "button");
         data.rule(NanoButton.class, StyleState.SELECTED)
-                .set(NanoButton.BORDER_COLOR_KEY, accent)
-                .set(NanoButton.HOVER_BORDER_COLOR_KEY, accent)
+                .set(NanoButton.BORDER_COLOR_KEY, selection)
+                .set(NanoButton.HOVER_BORDER_COLOR_KEY, selection)
                 .set(NanoButton.FOCUSED_BORDER_COLOR_KEY, accent)
-                .set(NanoButton.BACKGROUND_COLOR_KEY, hover);
+                .set(NanoButton.BACKGROUND_COLOR_KEY, selection)
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, selection)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, selection);
+        data.rule(NanoButton.class)
+                .set(NanoButton.PADDING_X_KEY, 8 * density)
+                .set(NanoButton.PADDING_Y_KEY, 3 * density)
+                .set(NanoButton.BORDER_WIDTH_KEY, density);
         nano(data.rule(NanoTextField.class), "textfield");
+        data.rule(NanoTextField.class)
+                .set(NanoTextField.BACKGROUND_COLOR_KEY, field)
+                .set(NanoTextField.HOVER_BACKGROUND_COLOR_KEY, field)
+                .set(NanoTextField.FOCUSED_BACKGROUND_COLOR_KEY, field)
+                .set(NanoTextField.PADDING_KEY, 4 * density)
+                .set(NanoTextField.CARET_PADDING_Y_KEY, 5 * density)
+                .set(NanoTextField.CARET_WIDTH_KEY, density)
+                .set(NanoTextField.CARET_COLOR_KEY, text)
+                .set(NanoTextField.DEFAULT_SELECTION_COLOR_KEY, selection);
         nano(data.rule(NanoCheckbox.class), "checkbox");
         nano(data.rule(NanoSlider.class), "slider");
         nano(data.rule(NanoProgressBar.class), "progressbar");
@@ -231,45 +354,133 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
             String namespace = panelType == NanoScrollPanel.class ? "scrollpanel" : "grid";
             for (String key : List.of("backgroundColor", "hoverBackgroundColor", "focusedBackgroundColor", "pressedBackgroundColor", "disabledBackgroundColor",
                     "borderColor", "hoverBorderColor", "focusedBorderColor", "pressedBorderColor", "disabledBorderColor"))
-                color(data.rule(panelType), namespace, key, key.endsWith("BorderColor") || key.equals("borderColor") ? border : raised);
+                color(data.rule(panelType), namespace, key, key.endsWith("BorderColor") || key.equals("borderColor") ? border : surface);
         }
         nano(data.rule(NanoComboBox.class), "combobox");
-        data.rule(NanoLabel.class).set(NanoLabel.COLOR_KEY, text).set(NanoLabel.FONT_SIZE_KEY, 16 * density);
-        data.rule(NanoSlider.class).set(NanoSlider.TRACK_HEIGHT_KEY, 6 * density).set(NanoSlider.THUMB_SIZE_KEY, 18 * density);
-        data.rule(NanoScrollPanel.class).set(NanoScrollPanel.VERTICAL_BAR_FOREGROUND_COLOR_KEY, muted)
+        data.rule(NanoLabel.class)
+                .set(NanoLabel.COLOR_KEY, text)
+                .set(NanoLabel.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoLabel.SELECTION_COLOR_KEY, selection);
+        data.rule(NanoSlider.class)
+                .set(NanoSlider.TRACK_HEIGHT_KEY, 4 * density)
+                .set(NanoSlider.THUMB_SIZE_KEY, 12 * density)
+                .set(NanoSlider.THUMB_COLOR_KEY, muted)
+                .set(NanoSlider.HOVER_THUMB_COLOR_KEY, text)
+                .set(NanoSlider.FOCUSED_THUMB_COLOR_KEY, accent)
+                .set(NanoSlider.PRESSED_THUMB_COLOR_KEY, accent)
+                .set(NanoSlider.THUMB_CORNER_RADIUS_KEY, 2 * density);
+        data.rule(NanoScrollPanel.class)
+                .set(NanoScrollPanel.VERTICAL_BAR_FOREGROUND_COLOR_KEY, muted)
                 .set(NanoScrollPanel.HORIZONTAL_BAR_FOREGROUND_COLOR_KEY, muted)
-                .set(NanoScrollPanel.VERTICAL_BAR_BACKGROUND_COLOR_KEY, surface)
-                .set(NanoScrollPanel.HORIZONTAL_BAR_BACKGROUND_COLOR_KEY, surface);
-        data.rule(NanoModal.class).set(NanoPanel.BACKGROUND_COLOR_KEY, new Color(0xAA070C15))
-                .set(NanoPanel.HOVER_BACKGROUND_COLOR_KEY, new Color(0xAA070C15))
-                .set(NanoPanel.FOCUSED_BACKGROUND_COLOR_KEY, new Color(0xAA070C15))
-                .set(NanoPanel.PRESSED_BACKGROUND_COLOR_KEY, new Color(0xAA070C15))
+                .set(NanoScrollPanel.VERTICAL_BAR_BACKGROUND_COLOR_KEY, chrome)
+                .set(NanoScrollPanel.HORIZONTAL_BAR_BACKGROUND_COLOR_KEY, chrome)
+                .set(NanoScrollPanel.VERTICAL_BAR_HOVER_FOREGROUND_COLOR_KEY, text)
+                .set(NanoScrollPanel.HORIZONTAL_BAR_HOVER_FOREGROUND_COLOR_KEY, text)
+                .set(NanoScrollPanel.VERTICAL_BAR_PRESSED_FOREGROUND_COLOR_KEY, accent)
+                .set(NanoScrollPanel.HORIZONTAL_BAR_PRESSED_FOREGROUND_COLOR_KEY, accent)
+                .set(NanoScrollPanel.HORIZONTAL_BAR_HEIGHT_KEY, 7 * density)
+                .set(NanoScrollPanel.VERTICAL_BAR_WIDTH_KEY, 7 * density)
+                .set(NanoScrollPanel.BAR_PADDING_KEY, 0f);
+        data.rule(NanoModal.class)
+                .set(NanoPanel.BACKGROUND_COLOR_KEY, new Color(0x99000000))
+                .set(NanoPanel.HOVER_BACKGROUND_COLOR_KEY, new Color(0x99000000))
+                .set(NanoPanel.FOCUSED_BACKGROUND_COLOR_KEY, new Color(0x99000000))
+                .set(NanoPanel.PRESSED_BACKGROUND_COLOR_KEY, new Color(0x99000000))
                 .set(NanoPanel.BORDER_WIDTH_KEY, 0f)
-                .set(NanoModal.DIALOG_BACKGROUND_COLOR_KEY, raised).set(NanoModal.DIALOG_BORDER_COLOR_KEY, border);
+                .set(NanoModal.DIALOG_BACKGROUND_COLOR_KEY, raised)
+                .set(NanoModal.DIALOG_BORDER_COLOR_KEY, border);
         nanoWidgets(data);
+        compositeWidgets(data);
+        spinnerWidgets(data, transparent);
         return data;
     }
 
-    /** Applies matching chrome to the composite NanoVG widgets in either palette. */
+    /**
+     * Gives both spinner backends one density-scaled input surface. Named child
+     * rules override the generic field and button state chrome while retaining
+     * inherited typography, caret, selection, and foreground colors.
+     *
+     * @param data theme receiving spinner and owned-child rules
+     * @param transparent shared borrowed drawable that paints no visible chrome
+     */
+    private void spinnerWidgets(ThemeData data, Drawable transparent) {
+        Color clear = new Color(0x00000000);
+        data.rule(NumberSpinner.class)
+                .set(Panel.BACKGROUND_KEY, transparent)
+                .set(NanoSpinnerSurface.CORNER_RADIUS_KEY, 4 * density)
+                .set(NanoSpinnerSurface.BORDER_WIDTH_KEY, density);
+        data.rule(NanoNumberSpinner.class)
+                .set(NanoSpinnerSurface.CORNER_RADIUS_KEY, 4 * density)
+                .set(NanoSpinnerSurface.BORDER_WIDTH_KEY, density);
+        data.rule(TextField.class, "spinner-editor")
+                .set(TextField.BACKGROUND_KEY, transparent)
+                .set(TextField.HOVER_BACKGROUND_KEY, transparent)
+                .set(TextField.FOCUSED_BACKGROUND_KEY, transparent);
+        data.rule(NanoTextField.class, "spinner-editor")
+                .set(NanoTextField.BACKGROUND_COLOR_KEY, clear)
+                .set(NanoTextField.HOVER_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoTextField.FOCUSED_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoTextField.BORDER_COLOR_KEY, clear)
+                .set(NanoTextField.HOVER_BORDER_COLOR_KEY, clear)
+                .set(NanoTextField.FOCUSED_BORDER_COLOR_KEY, clear)
+                .set(NanoTextField.BORDER_WIDTH_KEY, 0f)
+                .set(NanoTextField.CORNER_RADIUS_KEY, 0f);
+        data.rule(Button.class, "spinner-step")
+                .set(Button.BACKGROUND_KEY, transparent);
+        data.rule(NanoButton.class, "spinner-step")
+                .set(NanoButton.BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.DISABLED_BACKGROUND_COLOR_KEY, clear)
+                .set(NanoButton.BORDER_COLOR_KEY, clear)
+                .set(NanoButton.HOVER_BORDER_COLOR_KEY, clear)
+                .set(NanoButton.FOCUSED_BORDER_COLOR_KEY, clear)
+                .set(NanoButton.PRESSED_BORDER_COLOR_KEY, clear)
+                .set(NanoButton.DISABLED_BORDER_COLOR_KEY, clear)
+                .set(NanoButton.BORDER_WIDTH_KEY, 0f)
+                .set(NanoButton.CORNER_RADIUS_KEY, 0f)
+                .set(NanoButton.PADDING_X_KEY, 0f)
+                .set(NanoButton.PADDING_Y_KEY, 0f);
+    }
+
+    /**
+     * Applies matching window, chooser, and menu chrome to composite Nano widgets.
+     *
+     * @param data theme receiving named style rules
+     */
     private void nanoWidgets(ThemeData data) {
         Color clear = new Color(0x00000000);
         nanoPanel(data.rule(NanoPanel.class, "widget-layout"), clear, clear, 0);
         data.rule(NanoScrollPanel.class, "widget-layout")
                 .set(NanoScrollPanel.BACKGROUND_COLOR_KEY, clear)
                 .set(NanoScrollPanel.BORDER_WIDTH_KEY, 0f);
-        nanoPanel(data.rule(NanoPanel.class, "surface"), raised, border, 1);
-        nanoPanel(data.rule(NanoPanel.class, "window-frame"), raised, border, 1);
-        data.rule(NanoPanel.class, "window-frame").set(NanoPanel.CORNER_RADIUS_KEY, 0f);
-        Color windowHeader = new Color(lightPalette ? 0xFFF2F5FA : 0xFF222D3C);
-        Color windowHeaderHover = new Color(lightPalette ? 0xFFE8EDF5 : 0xFF2B384B);
-        Color windowDivider = new Color(lightPalette ? 0xFFDFE5EE : 0xFF354357);
+        nanoPanel(data.rule(NanoPanel.class, "surface"), surface, border, 1);
+        nanoPanel(data.rule(NanoPanel.class, "window-frame"), surface, border, 1);
+        data.rule(NanoPanel.class, "window-frame")
+                .set(NanoPanel.CORNER_RADIUS_KEY, 0f);
+        Color windowHeader = chrome;
+        Color windowHeaderHover = raised;
+        Color windowDivider = new Color(lightPalette ? 0xFFB9B9B9 : 0xFF141414);
         nanoPanel(data.rule(NanoPanel.class, "window-divider"), windowDivider, windowDivider, 0);
-        data.rule(NanoLabel.class, "window-caption").set(NanoLabel.FONT_SIZE_KEY, 14f * density)
+        data.rule(NanoLabel.class, "window-caption")
+                .set(NanoLabel.FONT_SIZE_KEY, UI_FONT_SIZE * density)
                 .set(NanoLabel.COLOR_KEY, text);
-        nanoPanel(data.rule(NanoPanel.class, "chooser-pane"), raised, raised, 0);
-        nanoPanel(data.rule(NanoPanel.class, "chooser-chrome"), surface, border, 1);
+        nanoPanel(data.rule(NanoPanel.class, "chooser-pane"), surface, surface, 0);
+        nanoPanel(data.rule(NanoPanel.class, "chooser-chrome"), raised, border, 0);
+        data.rule(NanoDirectoryTree.class)
+                .set(NanoDirectoryTree.ROW_HEIGHT_KEY, 24 * density)
+                .set(NanoDirectoryTree.INDENT_KEY, 16 * density)
+                .set(NanoDirectoryTree.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoDirectoryTree.FOLDER_COLOR_KEY, new Color(lightPalette ? 0xFFAD854B : 0xFFC5A066))
+                .set(UITokens.SELECTION, selection)
+                .set(UITokens.HOVER, hover)
+                .set(UITokens.TEXT, text)
+                .set(UITokens.MUTED, muted)
+                .set(UITokens.ACCENT, accent);
         for (String name : List.of("chooser-pane", "chooser-chrome"))
-            data.rule(NanoPanel.class, name).set(NanoPanel.CORNER_RADIUS_KEY, 0f);
+            data.rule(NanoPanel.class, name)
+                    .set(NanoPanel.CORNER_RADIUS_KEY, 0f);
 
         nanoButton(data.rule(NanoButton.class, "window-title"), windowHeader, windowHeader);
         data.rule(NanoButton.class, "window-title")
@@ -277,46 +488,150 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, windowHeader)
                 .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, windowHeader);
         nanoButton(data.rule(NanoButton.class, "window-close"), windowHeader, windowHeader);
-        data.rule(NanoButton.class, "window-close").set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, error)
+        data.rule(NanoButton.class, "window-close")
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, error)
                 .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, windowHeaderHover)
                 .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, error);
         nanoButton(data.rule(NanoButton.class, "window-grip"), clear, clear);
-        data.rule(NanoButton.class, "window-grip").set(NanoButton.BORDER_WIDTH_KEY, 0f)
+        data.rule(NanoButton.class, "window-grip")
+                .set(NanoButton.BORDER_WIDTH_KEY, 0f)
                 .set(NanoButton.CORNER_RADIUS_KEY, 0f)
                 .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, clear)
                 .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, clear)
                 .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, clear);
         for (String name : List.of("chooser-row", "chooser-tool", "chooser-heading", "chooser-divider", "chooser-action", "chooser-primary")) {
-            nanoButton(data.rule(NanoButton.class, name), name.equals("chooser-row") || name.equals("chooser-heading") ? raised : surface, border);
-            data.rule(NanoButton.class, name).set(NanoButton.CORNER_RADIUS_KEY, 0f)
+            nanoButton(data.rule(NanoButton.class, name), name.equals("chooser-row") || name.equals("chooser-heading") ? surface : raised, border);
+            data.rule(NanoButton.class, name)
+                    .set(NanoButton.CORNER_RADIUS_KEY, 0f)
                     .set(NanoButton.BORDER_WIDTH_KEY, name.equals("chooser-action") || name.equals("chooser-primary") ? 1f : 0f)
-                    .set(NanoButton.FONT_SIZE_KEY, 14 * density);
+                    .set(NanoButton.FONT_SIZE_KEY, UI_FONT_SIZE * density);
         }
         data.rule(NanoButton.class, "chooser-row", StyleState.SELECTED)
-                .set(NanoButton.BACKGROUND_COLOR_KEY, hover)
-                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, hover);
-        data.rule(NanoButton.class, "chooser-primary").set(NanoButton.BORDER_COLOR_KEY, accent);
-        data.rule(NanoTextField.class, "chooser-editor").set(NanoTextField.CORNER_RADIUS_KEY, 0f)
-                .set(NanoTextField.FONT_SIZE_KEY, 14 * density).set(NanoTextField.PADDING_KEY, 6f * density);
+                .set(NanoButton.BACKGROUND_COLOR_KEY, selection)
+                .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, selection)
+                .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, selection);
+        data.rule(NanoButton.class, "chooser-primary")
+                .set(NanoButton.BORDER_COLOR_KEY, accent);
+        data.rule(NanoTextField.class, "chooser-editor")
+                .set(NanoTextField.CORNER_RADIUS_KEY, 2 * density)
+                .set(NanoTextField.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoTextField.PADDING_KEY, 4f * density);
 
         data.rule(NanoScrollPanel.class, "menu-surface")
-                .set(NanoScrollPanel.BACKGROUND_COLOR_KEY, raised)
+                .set(NanoScrollPanel.BACKGROUND_COLOR_KEY, surface)
                 .set(NanoScrollPanel.BORDER_COLOR_KEY, border)
                 .set(NanoScrollPanel.CORNER_RADIUS_KEY, 0f);
         data.rule(NanoButton.class, "menu-item")
-                .set(NanoButton.BACKGROUND_COLOR_KEY, raised)
+                .set(NanoButton.BACKGROUND_COLOR_KEY, surface)
                 .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, hover)
                 .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, hover)
                 .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, hover)
-                .set(NanoButton.DISABLED_BACKGROUND_COLOR_KEY, raised)
+                .set(NanoButton.DISABLED_BACKGROUND_COLOR_KEY, surface)
                 .set(NanoButton.BORDER_WIDTH_KEY, 0f)
                 .set(NanoButton.CORNER_RADIUS_KEY, 0f)
-                .set(NanoButton.PADDING_X_KEY, 12f * density)
+                .set(NanoButton.PADDING_X_KEY, 8f * density)
                 .set(NanoButton.PADDING_Y_KEY, 0f)
-                .set(NanoButton.FONT_SIZE_KEY, 15f * density);
+                .set(NanoButton.FONT_SIZE_KEY, UI_FONT_SIZE * density);
     }
 
-    /** Sets every panel state so layout-only surfaces stay transparent during input. */
+    /**
+     * Styles compact data rows, neutral section headers, tab strips, and editing
+     * tools consistently across the texture and Nano rendering backends.
+     *
+     * @param data theme receiving composite rules and density-scaled metrics
+     */
+    private void compositeWidgets(ThemeData data) {
+        Drawable header = squareSkin(chrome, chrome);
+        Drawable headerHover = squareSkin(hover, hover);
+        Drawable activeHeader = squareSkin(raised, raised);
+        Drawable body = squareSkin(surface, surface);
+        for (String name : List.of("table-header-strip", "tab-header-strip")) {
+            data.rule(Panel.class, name)
+                    .set(Panel.BACKGROUND_KEY, header);
+            nanoPanel(data.rule(NanoPanel.class, name), chrome, chrome, 0);
+        }
+        data.rule(Panel.class, "tab-body")
+                .set(Panel.BACKGROUND_KEY, body);
+        nanoPanel(data.rule(NanoPanel.class, "tab-body"), surface, surface, 0);
+        for (String name : List.of("table-header", "tab-header", "menu-heading", "section-header")) {
+            data.rule(Button.class, name)
+                    .set(Button.BACKGROUND_KEY, header);
+            data.rule(Button.class, name, StyleState.HOVERED)
+                    .set(Button.BACKGROUND_KEY, headerHover);
+            data.rule(Button.class, name, StyleState.FOCUSED)
+                    .set(Button.BACKGROUND_KEY, headerHover);
+            data.rule(Button.class, name, StyleState.PRESSED)
+                    .set(Button.BACKGROUND_KEY, headerHover);
+            data.rule(Button.class, name, StyleState.SELECTED)
+                    .set(Button.BACKGROUND_KEY, activeHeader);
+            nanoButton(data.rule(NanoButton.class, name), chrome, chrome);
+            data.rule(NanoButton.class, name)
+                    .set(NanoButton.BORDER_WIDTH_KEY, 0f)
+                    .set(NanoButton.CORNER_RADIUS_KEY, 0f);
+            data.rule(NanoButton.class, name, StyleState.SELECTED)
+                    .set(NanoButton.BACKGROUND_COLOR_KEY, raised)
+                    .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, hover)
+                    .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, raised);
+        }
+        data.rule(Button.class, "window-title")
+                .set(Button.BACKGROUND_KEY, header);
+        data.rule(Button.class, "window-close")
+                .set(Button.BACKGROUND_KEY, header);
+        data.rule(Panel.class, "window-frame")
+                .set(Panel.BACKGROUND_KEY, body);
+        data.rule(DataTable.class)
+                .set(DataTable.HEADER_HEIGHT_KEY, 24 * density)
+                .set(DataTable.ROW_HEIGHT_KEY, 24 * density);
+        data.rule(NanoDataTable.class)
+                .set(NanoDataTable.HEADER_HEIGHT_KEY, 24 * density)
+                .set(NanoDataTable.ROW_HEIGHT_KEY, 24 * density);
+        data.rule(TabbedPane.class)
+                .set(TabbedPane.HEADER_HEIGHT_KEY, 26 * density);
+        data.rule(NanoTabbedPane.class)
+                .set(NanoTabbedPane.HEADER_HEIGHT_KEY, 26 * density);
+        data.rule(NanoTree.class)
+                .set(NanoTree.SELECTION_COLOR_KEY, selection)
+                .set(NanoTree.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoTree.ROW_HEIGHT_KEY, 22 * density)
+                .set(NanoTree.HOVER_COLOR_KEY, hover)
+                .set(NanoTree.DISCLOSURE_STROKE_COLOR_KEY, muted)
+                .set(NanoTree.DISCLOSURE_BACKGROUND_COLOR_KEY, surface)
+                .set(NanoTree.LINE_COLOR_KEY, border)
+                .set(NanoTree.LEAF_COLOR_KEY, muted)
+                .set(NanoTree.FOLDER_COLOR_KEY, new Color(0xFF9E8050));
+        data.rule(NanoTooltip.class)
+                .set(NanoTooltip.BACKGROUND_COLOR_KEY, raised)
+                .set(NanoTooltip.BORDER_COLOR_KEY, border)
+                .set(NanoTooltip.TEXT_COLOR_KEY, text)
+                .set(NanoTooltip.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoTooltip.CORNER_RADIUS_KEY, 2 * density)
+                .set(NanoTooltip.PADDING_KEY, 6 * density);
+        data.rule(NanoCodeEditor.class)
+                .set(NanoCodeEditor.TEXT_COLOR_KEY, text)
+                .set(NanoCodeEditor.GUTTER_COLOR_KEY, muted)
+                .set(NanoCodeEditor.CARET_COLOR_KEY, text)
+                .set(NanoCodeEditor.SELECTION_COLOR_KEY, selection)
+                .set(NanoCodeEditor.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoCodeEditor.LINE_HEIGHT_KEY, 20 * density);
+        data.rule(NanoHyperlink.class)
+                .set(NanoHyperlink.COLOR_KEY, accent)
+                .set(NanoHyperlink.HOVER_COLOR_KEY, text)
+                .set(NanoHyperlink.FOCUSED_COLOR_KEY, text)
+                .set(NanoHyperlink.PRESSED_COLOR_KEY, accent)
+                .set(NanoHyperlink.DISABLED_COLOR_KEY, muted)
+                .set(NanoHyperlink.VISITED_COLOR_KEY, accent)
+                .set(NanoHyperlink.FONT_SIZE_KEY, UI_FONT_SIZE * density)
+                .set(NanoHyperlink.UNDERLINE_THICKNESS_KEY, density);
+    }
+
+    /**
+     * Sets every panel state to the same surface and outline.
+     *
+     * @param rule destination style rule
+     * @param fill shared surface color
+     * @param edge shared outline color
+     * @param width unscaled outline thickness
+     */
     private void nanoPanel(ThemeRule rule, Color fill, Color edge, float width) {
         for (String key : List.of("backgroundColor", "hoverBackgroundColor", "focusedBackgroundColor", "pressedBackgroundColor", "disabledBackgroundColor"))
             color(rule, "panel", key, fill);
@@ -325,9 +640,16 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         rule.set(NanoPanel.BORDER_WIDTH_KEY, width * density);
     }
 
-    /** Supplies the baseline chrome while retaining normal focus and hover feedback. */
+    /**
+     * Supplies baseline button chrome with distinct hover and focus feedback.
+     *
+     * @param rule destination style rule
+     * @param fill normal and focused surface color
+     * @param edge normal outline color
+     */
     private void nanoButton(ThemeRule rule, Color fill, Color edge) {
-        rule.set(NanoButton.BACKGROUND_COLOR_KEY, fill).set(NanoButton.BORDER_COLOR_KEY, edge)
+        rule.set(NanoButton.BACKGROUND_COLOR_KEY, fill)
+                .set(NanoButton.BORDER_COLOR_KEY, edge)
                 .set(NanoButton.FOCUSED_BACKGROUND_COLOR_KEY, fill)
                 .set(NanoButton.HOVER_BACKGROUND_COLOR_KEY, hover)
                 .set(NanoButton.PRESSED_BACKGROUND_COLOR_KEY, hover);
@@ -357,9 +679,9 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         color(rule, name, "disabledTextColor", muted);
         color(rule, name, "placeholderColor", muted);
         color(rule, name, "trackColor", surface);
-        color(rule, name, "selectionColor", new Color(0x665B8DEF));
-        rule.set(StyleKey.of("nano." + name + ".fontSize", Float.class), 16 * density);
-        rule.set(StyleKey.of("nano." + name + ".cornerRadius", Float.class), 0f);
+        color(rule, name, "selectionColor", selection);
+        rule.set(StyleKey.of("nano." + name + ".fontSize", Float.class), UI_FONT_SIZE * density);
+        rule.set(StyleKey.of("nano." + name + ".cornerRadius", Float.class), 2 * density);
     }
 
     /**
@@ -384,7 +706,10 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
                 float alpha = Math.clamp(.5f - distance, 0, 1);
                 boolean outline = distance > -1.5f || x == 0 || y == 0 || x == size - 1 || y == size - 1;
                 Color c = outline ? edge : fill;
-                pixels.put((byte) (c.r() * 255)).put((byte) (c.g() * 255)).put((byte) (c.b() * 255)).put((byte) (c.a() * alpha * 255));
+                pixels.put((byte) (c.r() * 255))
+                        .put((byte) (c.g() * 255))
+                        .put((byte) (c.b() * 255))
+                        .put((byte) (c.a() * alpha * 255));
             }
         pixels.flip();
         var skin = new NinePatchTexture(new TextureData(pixels, size, size), radius, radius, radius, radius);
@@ -395,6 +720,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
     /**
      * Creates a square one-pixel bordered skin for desktop-style chooser chrome.
      * The texture is owned with the rest of this theme and disposed by close.
+     *
      * @param fill interior color
      * @param edge one-pixel edge color, equal to fill for borderless rows
      * @return borrowed nine-patch drawable
@@ -402,12 +728,17 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
     private Drawable squareSkin(Color fill, Color edge) {
         int size = 4;
         var pixels = BufferUtils.createByteBuffer(size * size * 4);
-        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) {
-            Color color = x == 0 || y == 0 || x == size - 1 || y == size - 1 ? edge : fill;
-            pixels.put((byte) (color.r() * 255)).put((byte) (color.g() * 255)).put((byte) (color.b() * 255)).put((byte) (color.a() * 255));
-        }
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++) {
+                Color color = x == 0 || y == 0 || x == size - 1 || y == size - 1 ? edge : fill;
+                pixels.put((byte) (color.r() * 255))
+                        .put((byte) (color.g() * 255))
+                        .put((byte) (color.b() * 255))
+                        .put((byte) (color.a() * 255));
+            }
         pixels.flip();
-        var texture = new NinePatchTexture(new TextureData(pixels, size, size), 1, 1, 1, 1); skins.add(texture);
+        var texture = new NinePatchTexture(new TextureData(pixels, size, size), 1, 1, 1, 1);
+        skins.add(texture);
         return new NinePatchDrawable(texture);
     }
 

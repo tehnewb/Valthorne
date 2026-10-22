@@ -7,12 +7,14 @@ import valthorne.event.events.KeyPressEvent;
 import valthorne.event.events.MouseMoveEvent;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseScrollEvent;
+import valthorne.ui.NanoText;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.UIInputEvent;
 import valthorne.ui.UINode;
 import valthorne.ui.UIRoot;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Objects;
@@ -43,7 +45,7 @@ public class NanoPopupMenu extends NanoContainer {
      * Shows typical editor context menus without hiding their final commands;
      * larger menus continue to scroll within the root's available height.
      */
-    private static final int MAX_VISIBLE_ROWS = 10;
+    private static final int MAX_VISIBLE_ROWS = 16;
 
     /**
      * Theme key controlling checkbox corner radius.
@@ -167,9 +169,10 @@ public class NanoPopupMenu extends NanoContainer {
     public void showBelow(UINode anchor) {
         Objects.requireNonNull(anchor);
         if (anchor.getRoot() == null) { close(); return; }
+        setTheme(anchor.getTheme());
         UIRoot root = anchor.getRoot();
         float width = Math.min(root.getWidth(), Math.max(anchor.getWidth(), preferredWidth(root, items)));
-        float height = Math.min(root.getHeight(), Math.min(MAX_VISIBLE_ROWS, items.size()) * 32f);
+        float height = Math.min(root.getHeight(), Math.min(MAX_VISIBLE_ROWS, items.size()) * rowHeight());
         var content = anchor.screenToContent(0, 0);
         var world = anchor.screenToWorld(0, 0);
         float x = anchor.getAbsoluteX() - content.x() + world.x();
@@ -184,10 +187,11 @@ public class NanoPopupMenu extends NanoContainer {
         if (!Float.isFinite(screenX) || !Float.isFinite(screenY) || !Float.isFinite(width) || width <= 0)
             throw new IllegalArgumentException("Invalid popup position or width");
         if (anchor.getRoot() == null) { close(); return; }
+        setTheme(anchor.getTheme());
         UIRoot root = anchor.getRoot();
         var point = root.screenToLocal(screenX, screenY);
         show(anchor, point.x(), point.y(), Math.min(root.getWidth(), Math.max(width, preferredWidth(root, items))),
-                Math.min(root.getHeight(), Math.min(MAX_VISIBLE_ROWS, items.size()) * 32f));
+                Math.min(root.getHeight(), Math.min(MAX_VISIBLE_ROWS, items.size()) * rowHeight()));
     }
 
     private void show(UINode anchor, float x, float y, float width, float height) {
@@ -218,7 +222,7 @@ public class NanoPopupMenu extends NanoContainer {
             row.setEnabled(item.enabled());
             return row;
         });
-        panel.rowHeight(32).gap(0);
+        panel.rowHeight(rowHeight()).gap(0);
         panel.setStyleName("menu-surface");
         panel.getLayout().absolute().left(Math.clamp(x, 0, Math.max(0, owner.getWidth() - width)))
                 .top(Math.clamp(y, 0, Math.max(0, owner.getHeight() - height))).width(width).height(height);
@@ -268,7 +272,7 @@ public class NanoPopupMenu extends NanoContainer {
         UINode row = parent.getItemNode(index);
         if (row == null) return;
         float width = Math.min(owner.getWidth(), preferredWidth(owner, children));
-        float height = Math.min(owner.getHeight(), Math.min(MAX_VISIBLE_ROWS, children.size()) * 32f);
+        float height = Math.min(owner.getHeight(), Math.min(MAX_VISIBLE_ROWS, children.size()) * rowHeight());
         float parentX = parent.getAbsoluteX() - owner.getAbsoluteX();
         float x = parentX + parent.getWidth();
         if (x + width > owner.getWidth()) x = parentX - width;
@@ -286,17 +290,31 @@ public class NanoPopupMenu extends NanoContainer {
      * Sizes a popup to its longest command, including space for an indicator
      * and the submenu arrow. This is calculated only when a menu opens.
      *
-     * @param root root supplying the current NanoVG text measurements
+     * @param root root supplying the fallback NanoVG context
      * @param commands entries that will appear in this popup page
      * @return preferred width in UI units
      */
     private float preferredWidth(UIRoot root, List<Item> commands) {
         float width = 180f;
+        ResolvedStyle style = getStyle();
+        Float size = style == null ? null : style.get(UITokens.FONT_SIZE);
+        float fontSize = size == null ? 14f : size;
         for (Item item : commands) {
-            float label = NanoUtility.measureTextWidth(root.getNanoVGHandle(), "default", 16f, item.text());
+            float label = NanoText.measureTextWidth(this, root.getNanoVGHandle(), "default", fontSize, item.text());
             width = Math.max(width, label + 80f);
         }
         return width;
+    }
+
+    /**
+     * Reads the opening theme's compact control height for every popup page.
+     *
+     * @return finite positive row height in UI units
+     */
+    private float rowHeight() {
+        ResolvedStyle style = getStyle();
+        Float height = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
+        return height != null && Float.isFinite(height) && height > 0 ? height : 26f;
     }
 
     /**

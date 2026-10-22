@@ -4,6 +4,8 @@ import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
 import valthorne.ui.UINode;
 import valthorne.ui.behavior.ChangeSignal;
+import valthorne.ui.theme.ResolvedStyle;
+import valthorne.ui.theme.StyleKey;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -29,6 +31,10 @@ import java.util.function.Supplier;
  * @author Albert Beaupre
  */
 public class TabbedPane extends Panel {
+    /**
+     * Height of the tab header strip in UI units.
+     */
+    public static final StyleKey<Float> HEADER_HEIGHT_KEY = StyleKey.of("tabbedPane.headerHeight", Float.class, 26f);
     private final Panel headers = new Panel(); // Owned horizontal strip of tab buttons.
     private final Panel deck = new Panel(); // Owned container retaining every instantiated page.
     private final ArrayList<Tab> tabs = new ArrayList<>(); // Ordered tab metadata matching header order.
@@ -36,14 +42,24 @@ public class TabbedPane extends Panel {
     private int selected = -1; // Active tab index, or -1 when no tab is selected.
 
     /**
-     * Creates a vertical tab layout with an eight-unit gap, a 36-unit header strip,
+     * Creates a contiguous vertical tab layout with a themed 26-unit header strip,
      * and a growing page deck. No tab or page is initially selected.
      */
     public TabbedPane() {
-        getLayout().column().gap(8);
-        headers.getLayout().row().gap(4).height(36).noShrink();
+        getLayout().column().gap(0);
+        headers.setStyleName("tab-header-strip");
+        headers.getLayout().row().gap(1).height(26).noShrink();
+        deck.setStyleName("tab-body");
         deck.getLayout().height(0).minHeight(0).grow();
         super.add(headers); super.add(deck);
+    }
+
+    @Override
+    protected void applyLayout() {
+        ResolvedStyle style = getStyle();
+        Float height = style == null ? null : style.get(HEADER_HEIGHT_KEY);
+        if (height != null && Float.isFinite(height) && height > 0) headers.getLayout().height(height);
+        super.applyLayout();
     }
     /**
      * Returns the number of registered tabs, including tabs whose pages have not
@@ -242,7 +258,8 @@ public class TabbedPane extends Panel {
                     } else super.onKeyPress(event);
                 }
             }.action(b -> select(tabs.indexOf(this)));
-            button.getLayout().padding(8).minWidth(80).heightPercent(100);
+            button.setStyleName("tab-header");
+            button.getLayout().paddingHorizontal(8).minWidth(64).heightPercent(100);
         }
     }
 }

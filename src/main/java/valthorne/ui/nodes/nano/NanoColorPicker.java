@@ -2,6 +2,8 @@ package valthorne.ui.nodes.nano;
 
 import valthorne.graphics.Color;
 import valthorne.ui.Canvas2D;
+import valthorne.ui.theme.ResolvedStyle;
+import valthorne.ui.theme.UITokens;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -67,13 +69,13 @@ public class NanoColorPicker extends NanoContainer {
         brightnessRow.add(brightnessLabel, brightness); add(brightnessRow);
         String[] names = {"Red", "Green", "Blue", "Alpha"};
         for (int i = 0; i < 4; i++) {
-            NanoPanel row = NanoWidgetSupport.panel(); row.getLayout().row().itemsCenter().height(32).widthPercent(100).noShrink();
+            NanoPanel row = NanoWidgetSupport.panel(); row.getLayout().row().itemsCenter().height(26).widthPercent(100).noShrink();
             NanoLabel label = new NanoLabel(names[i]); label.getLayout().minWidth(56).noShrink();
             NanoSlider slider = new NanoSlider(0, 255, 255).stepSize(1).action(s -> editChannels());
             slider.getLayout().grow(1).minWidth(0).heightPercent(100);
             channels[i] = slider; channelRows[i] = row; row.add(label, slider); add(row);
         }
-        hex.getLayout().height(36).widthPercent(100).noShrink();
+        hex.getLayout().widthPercent(100).noShrink();
         hex.action(field -> commitHex()); add(hex); color(value); mode(Mode.SLIDERS);
     }
 
@@ -106,20 +108,40 @@ public class NanoColorPicker extends NanoContainer {
 
     /**
      * Switches visible editing surfaces while preserving color and listeners.
-     * Wheel modes require 220 additional layout units plus a 32-unit brightness row.
+     * Wheel modes require 220 additional layout units plus a themed brightness row.
      * @param mode nonnull editor mode
      * @return this picker
      */
     public NanoColorPicker mode(Mode mode) {
         this.mode = Objects.requireNonNull(mode);
+        float height = controlHeight();
         boolean showWheel = mode != Mode.SLIDERS;
         wheel.setVisible(showWheel); wheel.getLayout().height(showWheel ? 220 : 0);
-        brightnessRow.setVisible(showWheel); brightnessRow.getLayout().height(showWheel ? 32 : 0);
+        brightnessRow.setVisible(showWheel); brightnessRow.getLayout().height(showWheel ? height : 0);
         for (int i = 0; i < 4; i++) {
             boolean show = i == 3 || mode != Mode.WHEEL;
-            channelRows[i].setVisible(show); channelRows[i].getLayout().height(show ? 32 : 0);
+            channelRows[i].setVisible(show); channelRows[i].getLayout().height(show ? height : 0);
         }
         markLayoutDirty(); return this;
+    }
+
+    @Override
+    protected void applyLayout() {
+        float height = controlHeight();
+        brightnessRow.getLayout().height(brightnessRow.isVisible() ? height : 0);
+        for (NanoPanel row : channelRows) row.getLayout().height(row.isVisible() ? height : 0);
+        super.applyLayout();
+    }
+
+    /**
+     * Reads the active theme's height for channel and brightness editors.
+     *
+     * @return finite positive height in UI units
+     */
+    private float controlHeight() {
+        ResolvedStyle style = getStyle();
+        Float height = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
+        return height != null && Float.isFinite(height) && height > 0 ? height : 26f;
     }
 
     /**

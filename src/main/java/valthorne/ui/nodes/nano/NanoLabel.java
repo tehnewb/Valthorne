@@ -28,10 +28,10 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * does not load or own font resources. Width and height are measured from the
  * root's context when available, otherwise estimated from character count.
  *
- * <p>Layout replaces auto width/height with measured numeric values. Subsequent
- * text changes mark layout dirty but do not restore those dimensions to auto;
- * set them back to auto when another content-size measurement is desired.
- * Text is normalized for measurement and drawing without modifying getText().</p>
+ * <p>Layout replaces automatic dimensions with measured values and refreshes them
+ * while they still match its previous measurement. Explicit application sizes
+ * retain their alignment and clipping bounds. Text is normalized for measurement
+ * and drawing without modifying getText().</p>
  *
  * @author Albert Beaupre
  */
@@ -68,12 +68,19 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     public static final StyleKey<Alignment> VERTICAL_ALIGNMENT_KEY = StyleKey.of("nano.label.verticalAlignment", Alignment.class);
 
+    /**
+     * Background of read-only text selections, shared with the editor palette.
+     */
+    public static final StyleKey<Color> SELECTION_COLOR_KEY = StyleKey.of("nano.label.selectionColor", Color.class, new Color(0xFF40576D));
+
     private String text = ""; // Raw non-null text before newline and tab normalization.
     private String fontName = "default"; // Borrowed NanoVG font registration name.
     private float fontSize = 18f; // Text measurement and drawing size in UI units.
     private Color color = Color.WHITE; // Borrowed mutable text color, initially the shared white constant.
     private float tabSize = 4f; // Requested tab-stop interval rounded to integer character columns.
     private float lineSpacing; // Extra UI-unit distance between successive lines.
+    private float intrinsicWidth = Float.NaN; // Last width supplied by text measurement; NaN before measurement.
+    private float intrinsicHeight = Float.NaN; // Last height supplied by text measurement; NaN before measurement.
     private Alignment horizontalAlignment = Alignment.START; // Horizontal placement of each line within the resolved label width.
     private Alignment verticalAlignment = Alignment.START; // Vertical placement of the complete text block; START is top.
     private boolean fontLoaded; // Reserved font state; current implementation does not read or update it.
@@ -83,11 +90,6 @@ public class NanoLabel extends UINode implements NanoNode {
     private long lastPressTime;
     private float lastPressX, lastPressY;
     private int clickCount;
-    /**
-     * Selection color value used by NanoLabel.
-     */
-    private static final Color SELECTION_COLOR = new Color(0x995298CE);
-
     /** Opts into read-only pointer selection and Ctrl/Cmd+C. Disabled by default. */
     public NanoLabel selectable(boolean enabled) {
         if (enabled && selection == null) {
@@ -461,8 +463,9 @@ public class NanoLabel extends UINode implements NanoNode {
     /**
      * Applies resolved font/color/spacing values, normalizes text, and measures
      * all lines. Without a root NanoVG handle, estimates width as half font size
-     * per UTF-16 unit and line height as font size. Replaces only dimensions still
-     * marked auto, then delegates base layout. Font and color resources are borrowed.
+     * per UTF-16 unit and line height as font size. Refreshes automatic dimensions
+     * that still match the previous measurement, then delegates base layout.
+     * Font and color resources are borrowed.
      */
     @Override
     protected void applyLayout() {
@@ -514,8 +517,14 @@ public class NanoLabel extends UINode implements NanoNode {
             measuredHeight = lines.length == 0 ? estimatedLineHeight : (lines.length * estimatedLineHeight) + Math.max(0, lines.length - 1) * lineSpacing;
         }
 
-        if (getLayout().getWidth().isAuto()) getLayout().width(measuredWidth);
-        if (getLayout().getHeight().isAuto()) getLayout().height(measuredHeight);
+        if (getLayout().getWidth().isAuto() || getLayout().getWidth().isPoints() && getLayout().getWidth().getValue() == intrinsicWidth) {
+            getLayout().width(measuredWidth);
+            intrinsicWidth = measuredWidth;
+        }
+        if (getLayout().getHeight().isAuto() || getLayout().getHeight().isPoints() && getLayout().getHeight().getValue() == intrinsicHeight) {
+            getLayout().height(measuredHeight);
+            intrinsicHeight = measuredHeight;
+        }
 
         super.applyLayout();
     }
@@ -554,7 +563,8 @@ public class NanoLabel extends UINode implements NanoNode {
                     float right = measure(vg, lines[i].substring(0, end));
                     nvgBeginPath(vg);
                     nvgRect(vg, lineX + left, y + i * (lineHeight + lineSpacing), right - left, lineHeight);
-                    nvgFillColor(vg, NanoUtility.color1(SELECTION_COLOR));
+                    Color selectionColor = getStyle() == null ? SELECTION_COLOR_KEY.getDefaultValue() : getStyle().get(SELECTION_COLOR_KEY);
+                    nvgFillColor(vg, NanoUtility.color1(selectionColor));
                     nvgFill(vg);
                     nvgFillColor(vg, NanoUtility.color1(color));
                 }

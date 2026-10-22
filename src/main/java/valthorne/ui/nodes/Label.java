@@ -43,6 +43,9 @@ import valthorne.ui.theme.UITokens;
  *
  * <p>
  * Per-line layouts are retained so drawing does not split strings or repeat kerning.
+ * Axis-aligned line origins and baselines align to physical pixels for consistent
+ * small UI text while preserving fractional advances and kerning. Rotated or
+ * nonuniform projections retain their original placement.
  * The font is borrowed and must outlive pending draws.
  * The class does not perform its own interaction behavior and is typically used as
  * a child inside higher-level components such as buttons, tooltips, or form controls.
@@ -383,7 +386,7 @@ public class Label extends UINode {
                 case CENTER -> x + (availableWidth - line.width()) * .5f;
                 case END -> x + availableWidth - line.width();
             };
-            line.draw(batch, lineX, baseline - i * advance, color);
+            line.draw(batch, batch.getGlyphs().alignTextOrigin(lineX), batch.getGlyphs().alignTextBaseline(baseline - i * advance), color);
         }
     }
 }

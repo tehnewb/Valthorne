@@ -42,6 +42,8 @@ public class Particle implements Poolable {
     private final Color color = new Color(1f, 1f, 1f, 1f);      // Current interpolated color used for rendering.
     private boolean active;                                    // Whether this particle is currently alive and should be updated/drawn.
     private long generation; // Pool recycle counter distinguishing successive lives of this state object.
+    int physicsSlot = -1; // Package-owned native slot; released before pooling or detachment.
+    private boolean physicsEnabled = true; // Per-lifetime participation in optional system physics.
     private float x, y;                                        // Current world-space particle position.
     private float velX, velY;                                  // Current world-space particle velocity (units per second).
     private float age;                                         // Current age in seconds since spawn.
@@ -72,6 +74,7 @@ public class Particle implements Poolable {
     public void reset() {
         generation++;
         active = false;
+        physicsEnabled = true;
 
         x = y = 0f;
         velX = velY = 0f;
@@ -118,6 +121,21 @@ public class Particle implements Poolable {
     public void setActive(boolean active) {
         this.active = active;
     }
+
+    /**
+     * Reports whether this particle requests its system's optional rigid body.
+     * Ordinary particles remain lightweight when the system has no physics world.
+     * @return per-particle physics participation
+     */
+    public boolean isPhysicsEnabled() { return physicsEnabled; }
+
+    /**
+     * Enables or opts this live particle out of rigid-body motion. The change is
+     * applied on the next system update; disabling preserves position and velocity
+     * and resumes ordinary emitter integration. Pool reuse restores true.
+     * @param enabled requested native physics participation
+     */
+    public void setPhysicsEnabled(boolean enabled) { physicsEnabled = enabled; }
 
     /**
      * Returns the particle's world-space x position.
