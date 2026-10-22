@@ -169,11 +169,14 @@ public final class NanoText {
          */
         if (!"default".equals(name) && !"code".equals(name)) return null;
         ResolvedStyle style = node.getStyleOrDefaults();
+        boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);
+        if (monospace) {
+            SlugFont code = style.get(SLUG_CODE_FONT);
+            return code != null ? code : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(true);
+        }
         SlugFont heading = "editor-section".equals(node.getStyleName()) || "window-caption".equals(node.getStyleName()) ? style.get(SLUG_HEADING_FONT) : null;
         if (heading != null) return heading;
-        boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);
-        SlugFont code = monospace ? style.get(SLUG_CODE_FONT) : null;
-        SlugFont selected = code == null ? style.get(SLUG_FONT) : code;
+        SlugFont selected = style.get(SLUG_FONT);
         return selected != null ? selected : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(monospace);
     }
 }

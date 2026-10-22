@@ -170,7 +170,7 @@ public final class EventPublisher {
             EventHandler<Event> rawHandler = (EventHandler<Event>) (EventHandler<?>) handler;
 
             boolean input = typeId <= EventTypes.WINDOW_RESIZE.id() || typeId == EventTypes.TEXT_INPUT.id()
-                    || typeId == EventTypes.WINDOW_FOCUS.id() || typeId == EventTypes.FILE_DROP.id();
+                    || typeId == EventTypes.WINDOW_FOCUS.id() || typeId == EventTypes.FILE_DROP.id() || typeId == EventTypes.FRAMEBUFFER_RESIZE.id();
             EventHandler<Event> invoker = input ? new ContextEventHandler(rawHandler, context) : rawHandler;
             list.add(new EventRegistration(rawHandler, invoker, context, priority, registrationSequence++));
             rebuildRoute(typeId, list);
