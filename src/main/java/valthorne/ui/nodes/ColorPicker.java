@@ -15,7 +15,7 @@ import java.util.function.Consumer;
  * boundaries so a listener cannot silently mutate the editor's internal value.
  * Hexadecimal text uses #RRGGBB or Valthorne's #AARRGGBB order, not CSS RRGGBBAA.
  * <pre>{@code
- * ColorPicker picker = new ColorPicker().mode(ColorPicker.Mode.WHEEL).color(Color.RED);
+ * ColorPicker picker = new ColorPicker().mode(ColorPickerMode.WHEEL).color(Color.RED);
  * picker.getLayout().width(300).height(360);
  * picker.onChange(color -> material.setTint(color));
  * root.add(picker);

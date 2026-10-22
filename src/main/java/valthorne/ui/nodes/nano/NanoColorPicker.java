@@ -15,7 +15,7 @@ import java.util.function.Consumer;
  * boundaries so a listener cannot silently mutate the editor's internal value.
  * Hexadecimal text uses #RRGGBB or Valthorne's #AARRGGBB order, not CSS RRGGBBAA.
  * <pre>{@code
- * NanoColorPicker picker = new NanoColorPicker().mode(NanoColorPicker.Mode.WHEEL).color(Color.RED);
+ * NanoColorPicker picker = new NanoColorPicker().mode(NanoColorPickerMode.WHEEL).color(Color.RED);
  * picker.getLayout().width(300).height(360);
  * picker.onChange(color -> material.setTint(color));
  * root.add(picker);
