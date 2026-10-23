@@ -242,7 +242,7 @@ public final class ParticleSystem {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(settings, "settings");
         if (externalMotion) throw new IllegalStateException("External motion and particle physics cannot both own motion");
-        ParticlePhysics next = new ParticlePhysics(world, settings, maxParticles);
+        ParticlePhysics next = new JoltParticlePhysics(world, settings, maxParticles);
         disablePhysics();
         physics = next;
         return this;

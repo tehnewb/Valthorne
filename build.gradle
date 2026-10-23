@@ -25,7 +25,6 @@ if (prototype3d && !file('.prototype3d/prototype.gradle').isFile())
 def lwjglModules = [
         "lwjgl",
         "lwjgl-glfw",
-        "lwjgl-opengl",
         "lwjgl-bgfx",
         "lwjgl-stb",
         "lwjgl-openal",
@@ -181,8 +180,8 @@ mavenPublishing {
 
 apply from: 'gradle/release.gradle'
 
-// Shared-source desktop/web application entry point.
-apply from: 'portable/desktop.gradle'
+// Compile and run application sources against the desktop engine.
+apply from: 'gradle/application.gradle'
 
 // The publishing plugin owns the single Javadoc archive producer.
 tasks.named('assemble') { dependsOn tasks.matching { it.name == 'plainJavadocJar' } }

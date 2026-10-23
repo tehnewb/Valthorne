@@ -80,13 +80,45 @@ public final class BgfxResources {
         BgfxPlatform.validate(backend);
         if (resetting) throw new IllegalStateException("A graphics transition is already active");
         if (window.backend() == backend) return;
+        replaceDevice(backend, true);
+    }
+
+    /**
+     * Recreates the active device after the platform has restored a lost context.
+     * Application objects retain their identity and resources recover from the
+     * same descriptors used for backend switching. The lost frame is discarded.
+     * Call only on the graphics owner after the native surface becomes usable.
+     *
+     * @throws GraphicsRecoveryException if device recovery and rollback both fail
+     */
+    public static void recoverDevice() {
+        /*
+         * Context restoration requires a new resource generation even when the
+         * selected backend is unchanged; stale GPU contents cannot be presented.
+         */
+        replaceDevice(BgfxGraphics.device().backend(), false);
+    }
+
+    /**
+     * Restores the registered resource graph behind the current presentation.
+     * @param backend replacement rendering API
+     * @param finishFrame whether the old device can still present queued work
+     */
+    private static void replaceDevice(GraphicsBackend backend, boolean finishFrame) {
+        /*
+         * Keep dependency ordering and failure cleanup identical for explicit
+         * switching and context recovery, with no scene lifecycle callbacks.
+         */
+        BgfxDesktopWindow window = BgfxGraphics.device();
+        BgfxPlatform.validate(backend);
+        if (resetting) throw new IllegalStateException("A graphics transition is already active");
         GraphicsResource[] snapshot = resources.toArray(new GraphicsResource[0]);
         GraphicsBackend previous = window.backend();
         resetting = true;
         try {
             for (GraphicsResource resource : snapshot) resource.validateGraphicsReset(backend);
             try {
-                BgfxGraphics.finishFrame();
+                if (finishFrame) BgfxGraphics.finishFrame();
                 release(snapshot);
                 BgfxGraphics.restart(backend);
                 restore(snapshot);

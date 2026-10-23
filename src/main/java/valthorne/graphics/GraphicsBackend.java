@@ -26,8 +26,8 @@ public enum GraphicsBackend {
      */
     DIRECTX12(BGFX_RENDERER_TYPE_DIRECT3D12, "dx11"),
     /**
-     * Browser WebGL 2 shader target. Requires browser platform integration,
-     * which is not supplied by the desktop JNI runtime.
+     * Browser WebGL 2 through the browser runtime's bgfx WebAssembly device.
+     * Launch browser exports with this backend; desktop launchers use native APIs.
      */
     WEBGL(BGFX_RENDERER_TYPE_OPENGLES, "essl");
 

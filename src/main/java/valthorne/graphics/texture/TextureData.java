@@ -13,24 +13,14 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 
 /**
- * Immutable container holding OpenGL texture information and its decoded width/height.
+ * Immutable description of decoded CPU-side RGBA pixels and their dimensions.
+ * Loading uses STB without creating a GPU resource. Construct a {@link Texture}
+ * on the graphics owner to upload these pixels through the selected bgfx backend.
  *
- * <p>This record acts as a lightweight wrapper around a created OpenGL texture.
- * It stores the OpenGL-generated texture ID along with the pixel dimensions obtained
- * from STBImage. No rendering functionality is included—only loading and metadata.</p>
- *
- * <p>The texture loading pipeline performs the following operations:</p>
- * <ol>
- *     <li>Converts raw bytes into a direct {@link ByteBuffer}</li>
- *     <li>Decodes image buffer using {@link STBImage#stbi_load_from_memory}</li>
- *     <li>Creates an OpenGL texture via {@code glGenTextures()}</li>
- *     <li>Uploads RGBA8 buffer to GPU memory</li>
- *     <li>Applies texture parameters (min/mag filter, wrap mode)</li>
- *     <li>Frees decoded image memory</li>
- * </ol>
- *
- * <p>This class always forces the loaded image into 4-channel RGBA format for consistency.
- * STBImage is configured to vertically flip textures to match OpenGL UV orientation.</p>
+ * <p>Image factories request four channels and flip rows by default to match the
+ * engine's UV convention. The explicit flip overload can preserve source row
+ * order. Pixel storage is borrowed by the record and must remain valid until its
+ * owning texture or caller disposes the data.</p>
  *
  * @param buffer the raw binary buffer containing the texture image buffer
  * @param width  the width of the decoded texture in pixels
@@ -50,10 +40,10 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
     private static final Set<ByteBuffer> disposedBuffers = Collections.newSetFromMap(new IdentityHashMap<>());
 
     /**
-     * Loads a texture from the specified file path, decodes it, and uploads it to OpenGL.
+     * Reads and decodes image bytes into CPU-side RGBA pixel storage.
      *
      * @param path the file path to the texture image (e.g., PNG, JPEG)
-     * @return a new {@link TextureData} instance containing the GPU texture ID and pixel size
+     * @return decoded RGBA pixels and their dimensions
      * @throws RuntimeException if an I/O error occurs or if the image decoding fails
      */
     public static TextureData load(String path) {
@@ -91,19 +81,19 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
     }
 
     /**
-     * Loads a texture from raw image bytes, decodes it, and uploads it to OpenGL.
+     * Decodes encoded image bytes into owned CPU-side RGBA pixels.
      *
      * <p>This method handles:</p>
      * <ul>
      *     <li>ByteBuffer preparation</li>
      *     <li>STB image decoding</li>
-     *     <li>Texture creation</li>
-     *     <li>Texture parameter configuration</li>
-     *     <li>GL texture upload</li>
+     *     <li>Optional image-row flipping</li>
+     *     <li>RGBA output and pixel dimensions</li>
      * </ul>
      *
      * @param data raw PNG/JPEG/etc. bytes
-     * @return a new {@link TextureData} containing the GPU texture ID and pixel size
+     * @param flipVertically whether to reverse decoded image rows
+     * @return decoded RGBA pixels and their dimensions
      * @throws RuntimeException if STBImage fails to decode the image
      */
     public static TextureData load(byte[] data, boolean flipVertically) {
