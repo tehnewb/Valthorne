@@ -162,6 +162,15 @@ public final class BrowserNative {
     public static native void readBytes(int address, @JSBuffer(JSBufferType.UINT8) ByteBuffer destination, int size);
 
     /**
+     * Converts a native font alpha atlas directly into Java-owned RGBA pixels.
+     * @param address first native alpha byte
+     * @param destination direct RGBA destination with four bytes per pixel
+     * @param pixels checked pixel count
+     */
+    @JSBody(params = {"address", "destination", "pixels"}, script = "var source=globalThis.valthorneNative.HEAPU8, offset=0; for (var i=0;i<pixels;i++) { destination[offset++]=255; destination[offset++]=255; destination[offset++]=255; destination[offset++]=source[address+i]; }")
+    static native void readAlphaRgba(int address, @JSBuffer(JSBufferType.UINT8) ByteBuffer destination, int pixels);
+
+    /**
      * Executes a UTF-8 string command without allocating Java encoding buffers.
      * @param operation native operation identifier
      * @param text input string

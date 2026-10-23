@@ -196,6 +196,24 @@ EMSCRIPTEN_KEEPALIVE uint32_t valthorne_command(uint32_t operation, uint32_t* w,
         w[0] = ascent; w[1] = descent; w[2] = gap;
         w[3] = floatBits(stbtt_ScaleForMappingEmToPixels(info, 1.0f)); return 0;
     }
+    case FONT_BAKE: {
+        const uint32_t pointer = w[0], side = w[1], first = w[2], count = w[3];
+        if (!pointer || side < 1 || side > 8192 || first > 65535 || count < 1 || count > 65536 - first || !(f[0] > 0)) return 0;
+        static_assert(sizeof(stbtt_packedchar) == 28, "Review browser packed glyph layout");
+        const size_t pixels = size_t(side) * side;
+        auto* allocation = static_cast<uint8_t*>(std::calloc(1, pixels + size_t(count) * sizeof(stbtt_packedchar)));
+        if (!allocation) return 0;
+        auto* chars = reinterpret_cast<stbtt_packedchar*>(allocation + pixels);
+        stbtt_pack_context packing;
+        if (!stbtt_PackBegin(&packing, allocation, int(side), int(side), 0, 1, nullptr)) {
+            std::free(allocation); return 0;
+        }
+        stbtt_PackSetOversampling(&packing, 1, 1);
+        int packed = stbtt_PackFontRange(&packing, font(pointer)->data, 0, f[0], int(first), int(count), chars);
+        stbtt_PackEnd(&packing);
+        if (!packed) { std::free(allocation); return 0; }
+        return reinterpret_cast<uintptr_t>(allocation);
+    }
     case FONT_HORIZONTAL: {
         int advance, bearing;
         stbtt_GetCodepointHMetrics(&font(w[0])->info, int(w[1]), &advance, &bearing);

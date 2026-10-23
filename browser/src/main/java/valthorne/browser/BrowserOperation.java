@@ -227,11 +227,6 @@ public final class BrowserOperation {
     public static final int TEXTURE_UPDATE = 54;
 
     /**
-     * Prevents constructing protocol constant holders.
-     */
-    private BrowserOperation() {
-    }
-    /**
      * Native image decode operation.
      */
     public static final int IMAGE_DECODE = 55;
@@ -520,5 +515,14 @@ public final class BrowserOperation {
      * Native nvg line to operation.
      */
     public static final int NVG_LINE_TO = 112;
+    /**
+     * Bakes one checked font atlas and packed glyph range into temporary CPU storage.
+     */
+    public static final int FONT_BAKE = 113;
 
+    /**
+     * Prevents constructing protocol constant holders.
+     */
+    private BrowserOperation() {
+    }
 }

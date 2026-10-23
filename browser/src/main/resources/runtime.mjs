@@ -1,3 +1,4 @@
+import { BrowserFiles } from "./files.mjs";
 import { BrowserPhysics } from "./physics.mjs";
 import createBgfx from "./native/bgfx.mjs";
 import { BrowserYoga } from "./yoga.mjs";
@@ -70,6 +71,7 @@ export class BrowserHost {
     constructor(canvas, native) {
         if (typeof FinalizationRegistry !== "function")
             throw new Error("This browser runtime requires native-allocation finalization support");
+        this.files = new BrowserFiles();
         this.yoga = new BrowserYoga();
         this.physics = new BrowserPhysics();
         this.audioBackend = new BrowserAudio(this);
@@ -520,12 +522,14 @@ export class BrowserHost {
     /** Requests the ordinary JGL close path and returns actual teardown completion. */
     requestClose() {
         this.closing = true;
+        this.files.cancelDialogs();
         this.emit(8);
         return this.completion;
     }
 
     /** Releases host-owned memory after the Java application has finished all sessions. */
     async dispose() {
+        this.files.close();
         this.close();
         try {
             await this.audioBackend.close();

@@ -1,6 +1,8 @@
 package valthorne.browser;
 
 import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
 import valthorne.graphics.bgfx.BgfxResources;
 import org.lwjgl.glfw.*;
@@ -88,6 +90,7 @@ public final class BrowserRuntime {
          * Retain browser state on the single application coroutine.
          */
         if (!loaded()) throw new IllegalStateException("Load the generated Valthorne browser launcher before starting JGL");
+        BrowserFiles.home();
         install(BrowserRuntime::post);
     }
 
@@ -109,6 +112,11 @@ public final class BrowserRuntime {
      * Waits for a frame and dispatches queued DOM events.
      */
     public static void poll() {
+        try {
+            BrowserFiles.flush(false);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Browser save failed", failure);
+        }
         /*
          * Retain browser state on the single application coroutine.
          */
@@ -220,23 +228,29 @@ public final class BrowserRuntime {
      * Clears Java callbacks and detaches DOM event ownership.
      */
     public static void close() {
-        /*
-         * Retain browser state on the single application coroutine.
-         */
-        input.clear();
-        pendingFrame = null;
-        windowFocusCallback = null;
-        windowCloseCallback = null;
-        dropCallback = null;
-        windowPosCallback = null;
-        windowSizeCallback = null;
-        framebufferSizeCallback = null;
-        charCallback = null;
-        keyCallback = null;
-        cursorPosCallback = null;
-        mouseButtonCallback = null;
-        scrollCallback = null;
-        closeHost();
+        try {
+            BrowserFiles.flush(true);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Browser save failed during shutdown", failure);
+        } finally {
+            /*
+             * Retain browser state on the single application coroutine.
+             */
+            input.clear();
+            pendingFrame = null;
+            windowFocusCallback = null;
+            windowCloseCallback = null;
+            dropCallback = null;
+            windowPosCallback = null;
+            windowSizeCallback = null;
+            framebufferSizeCallback = null;
+            charCallback = null;
+            keyCallback = null;
+            cursorPosCallback = null;
+            mouseButtonCallback = null;
+            scrollCallback = null;
+            closeHost();
+        }
     }
 
     /**

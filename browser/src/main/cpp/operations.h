@@ -114,5 +114,6 @@ enum BrowserOperation {
     NVG_DELETE = 109,
     NVG_VIEW = 110,
     NVG_MOVE_TO = 111,
-    NVG_LINE_TO = 112
+    NVG_LINE_TO = 112,
+    FONT_BAKE = 113
 };

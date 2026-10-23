@@ -83,6 +83,43 @@ public final class STBTruetype {
     }
 
     /**
+     * Computes STB's scale from ascent-to-descent height rather than em size.
+     * @param info initialized parser
+     * @param pixels requested character height
+     * @return raw-unit-to-pixel multiplier
+     */
+    public static float stbtt_ScaleForPixelHeight(STBTTFontinfo info, float pixels) {
+        /*
+         * The same raw metric difference is used by stbtt_ScaleForPixelHeight.
+         */
+        BrowserNative.word(0, info.pointer());
+        BrowserNative.call(FONT_METRICS);
+        return pixels / (BrowserNative.word(0) - BrowserNative.word(1));
+    }
+
+    /**
+     * Bakes an atlas with STB's native packer; the caller owns the returned block.
+     * @param info initialized parser retaining encoded bytes
+     * @param side checked power-of-two atlas dimension
+     * @param pixels requested pixel height
+     * @param first first code point
+     * @param count contiguous glyph count
+     * @return native alpha pixels followed by 28-byte packed glyphs, or zero on failure
+     */
+    public static int browserBakeAtlas(STBTTFontinfo info, int side, int pixels, int first, int count) {
+        /*
+         * One allocation holds pixels and metrics; no per-character bridge calls
+         * or lasting native packing contexts are required.
+         */
+        BrowserNative.word(0, info.pointer());
+        BrowserNative.word(1, side);
+        BrowserNative.word(2, first);
+        BrowserNative.word(3, count);
+        BrowserNative.value(0, pixels);
+        return BrowserNative.call(FONT_BAKE);
+    }
+
+    /**
      * Copies one character's raw horizontal metrics.
      * @param info initialized parser
      * @param codepoint requested Unicode value

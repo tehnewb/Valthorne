@@ -1,3 +1,4 @@
+import { prepareBrowserLoaders } from "./prepare-loaders.mjs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -471,3 +472,5 @@ for (const name of [
 }
 
 await import("./prepare-physics.mjs");
+
+await prepareBrowserLoaders(root, output);

@@ -12,6 +12,34 @@ repositories { mavenCentral() }
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 def replacements = [
+    'valthorne/ui/behavior/file/FileTransferable',
+    'valthorne/graphics/map/tiled/TiledResolvers',
+    'valthorne/graphics/map/ldtk/LdtkLoader', 'valthorne/graphics/map/tiled/TiledMapLoader',
+    'valthorne/ui/behavior/DirectoryBrowserModel', 'valthorne/ui/behavior/file/FileCopyVisitor', 'valthorne/graphics/map/tiled/TiledDecoding',
+    'valthorne/graphics/map/tiled/TiledXML',
+    'valthorne/graphics/map/tiled/TileAnimationFrame',
+    'valthorne/graphics/map/tiled/TileDefinition',
+    'valthorne/graphics/map/tiled/TileSetData',
+    'valthorne/graphics/map/tiled/TiledMapData',
+    'valthorne/graphics/map/tiled/TiledTileMapLayer',
+    'valthorne/graphics/map/tiled/TiledObjectMapLayer',
+    'valthorne/graphics/map/tiled/TiledImageMapLayerData',
+    'valthorne/graphics/map/tiled/TiledObject',
+    'valthorne/graphics/map/tiled/FileSystemResolver',
+    'valthorne/graphics/map/ldtk/LdtkProject',
+    'valthorne/graphics/map/ldtk/LdtkResolvers',
+    'valthorne/asset/Assets',
+    'valthorne/graphics/font/FontData',
+    'valthorne/ui/behavior/file/FileOperations',
+    'valthorne/ui/behavior/file/FileClipboard',
+    'valthorne/ui/behavior/file/FileOpenActions',
+    'valthorne/ui/nodes/DirectoryTree',
+    'valthorne/ui/nodes/nano/NanoDirectoryTree',
+    'valthorne/ui/nodes/FileChooser',
+    'valthorne/ui/nodes/nano/NanoFileChooser',
+    'valthorne/ui/nodes/nano/NanoFileContextMenu',
+    'valthorne/io/file/NativeFileDialog',
+
     'valthorne/JGL', 'valthorne/JGLConfiguration', 'valthorne/Window', 'valthorne/Keyboard', 'valthorne/Mouse',
     'valthorne/graphics/shader/ComputeBuffer', 'valthorne/Audio', 'valthorne/AudioRuntime', 'valthorne/PlatformTools',
     'valthorne/audio/SoundData', 'valthorne/audio/SoundPlayer', 'valthorne/audio/WaveSoundDecoder', 'valthorne/audio/OggSoundDecoder', 'valthorne/audio/Mp3SoundDecoder',
@@ -92,7 +120,7 @@ tasks.register('webExport', Sync) {
 
 // Generate platform variants from current engine sources rather than stale copies.
 def preparePlatform = tasks.register('preparePlatform', Exec) {
-    inputs.files('prepare-platform.mjs', 'prepare-physics.mjs')
+    inputs.files('prepare-platform.mjs', 'prepare-physics.mjs', 'prepare-loaders.mjs')
     inputs.dir(rootProject.file('src/main/java'))
     outputs.dir(layout.buildDirectory.dir('generated/platform'))
     commandLine 'node', 'prepare-platform.mjs'
