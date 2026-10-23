@@ -286,8 +286,14 @@ public final class BgfxGraphics {
         if (path == null) throw new NullPointerException("path");
         BgfxRenderState saved = new BgfxRenderState();
         saved.store();
-        long before = device().requestScreenshot(path);
         try {
+            beginFrame();
+            setTarget(BGFX_INVALID_HANDLE, device.width(), device.height());
+            setViewport(0, 0, device.width(), device.height());
+            setScissor(0, 0, 0, 0, false);
+            // Vulkan needs a backbuffer view even when no draws preceded this request.
+            bgfx_touch(view());
+            long before = device.requestScreenshot(path);
             for (int attempt = 0; attempt < 4; attempt++) {
                 device.flush();
                 frameActive = false;

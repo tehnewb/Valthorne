@@ -1511,9 +1511,13 @@ public class UIRoot extends UIContainer implements GraphicsResource {
             clearDocumentSelection();
 
         if (event.getKey() == Keyboard.TAB) {
-            if (event.isShiftDown()) focusPrevious();
-            else focusNext();
-            event.consume();
+            // Editors may consume Tab for indentation before normal focus traversal.
+            route(focused, event, Float.NaN, Float.NaN, node -> node.onKeyPress(event), true);
+            if (!event.isConsumed()) {
+                if (event.isShiftDown()) focusPrevious();
+                else focusNext();
+                event.consume();
+            }
             return;
         }
 
@@ -1801,8 +1805,9 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      * fonts on the replacement. The root will delete the stored nonzero handle during
      * disposal, so callers must arrange ownership of both contexts.
      *
+     * <p>Nonzero external contexts prevent automatic backend switching.</p>
+     *
      * @param nanoVGHandle replacement handle, or zero to disable NanoVG rendering
-     * @implNote Nonzero external contexts prevent automatic backend switching.
      */
     public void setNanoVGHandle(long nanoVGHandle) {
         nanoFonts.detach();

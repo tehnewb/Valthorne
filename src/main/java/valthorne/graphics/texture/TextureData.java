@@ -12,6 +12,8 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
+import static org.lwjgl.system.MemoryUtil.memAddress0;
+
 /**
  * Immutable description of decoded CPU-side RGBA pixels and their dimensions.
  * Loading uses STB without creating a GPU resource. Construct a {@link Texture}
@@ -19,8 +21,10 @@ import java.util.Set;
  *
  * <p>Image factories request four channels and flip rows by default to match the
  * engine's UV convention. The explicit flip overload can preserve source row
- * order. Pixel storage is borrowed by the record and must remain valid until its
- * owning texture or caller disposes the data.</p>
+ * order. The loading factories own their native pixel allocations until
+ * {@link #dispose()}. Explicitly supplied buffers are borrowed: their original
+ * allocator or garbage collector controls their lifetime. Disposing such a view
+ * never frees caller-owned storage.</p>
  *
  * @param buffer the raw binary buffer containing the texture image buffer
  * @param width  the width of the decoded texture in pixels
@@ -31,13 +35,13 @@ import java.util.Set;
 public record TextureData(ByteBuffer buffer, int width, int height) {
 
     /**
-     * Serializes STB image operations and access to decoded-buffer disposal tracking.
+     * Serializes STB image operations and access to decoded-buffer ownership.
      */
     private static final Object STB_LOCK = new Object();
     /**
-     * Identity-based registry of freed pixel buffers used to avoid releasing the same buffer twice.
+     * Live factory-owned records, removed on disposal without retaining freed buffers.
      */
-    private static final Set<ByteBuffer> disposedBuffers = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<TextureData> nativeImages = Collections.newSetFromMap(new IdentityHashMap<>());
 
     /**
      * Reads and decodes image bytes into CPU-side RGBA pixel storage.
@@ -97,6 +101,10 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
      * @throws RuntimeException if STBImage fails to decode the image
      */
     public static TextureData load(byte[] data, boolean flipVertically) {
+        /*
+         * Track the owning record by identity so borrowed views of the same
+         * buffer cannot release an allocation owned by a factory result.
+         */
         final IntBuffer w = BufferUtils.createIntBuffer(1);
         final IntBuffer h = BufferUtils.createIntBuffer(1);
         final IntBuffer comp = BufferUtils.createIntBuffer(1);
@@ -117,7 +125,11 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
         int width = w.get(0);
         int height = h.get(0);
 
-        return new TextureData(image, (short) width, (short) height);
+        TextureData decoded = new TextureData(image, width, height);
+        synchronized (STB_LOCK) {
+            nativeImages.add(decoded);
+        }
+        return decoded;
     }
 
     /**
@@ -143,23 +155,17 @@ public record TextureData(ByteBuffer buffer, int width, int height) {
     }
 
     /**
-     * Releases the native resources associated with the texture data.
-     * <p>
-     * This method frees the memory associated with the image buffer to prevent
-     * memory leaks. It should be called when the texture data is no longer needed.
+     * Releases a factory-owned STB allocation exactly once. Explicit constructor
+     * buffers remain owned by their caller. The buffer's current position does not
+     * affect the allocation address. Disposed factory data must no longer be read
+     * or uploaded; the record retains its dimensions but no usable native pixels.
      */
     public void dispose() {
-        if (buffer == null) {
-            return;
+        if (buffer == null) return;
+        synchronized (STB_LOCK) {
+            if (!nativeImages.remove(this)) return;
+            STBImage.nstbi_image_free(memAddress0(buffer));
         }
-
-        synchronized (disposedBuffers) {
-            if (!disposedBuffers.add(buffer)) {
-                return;
-            }
-        }
-
-        STBImage.stbi_image_free(buffer());
     }
 
 }
