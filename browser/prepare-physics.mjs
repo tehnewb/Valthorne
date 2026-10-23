@@ -79,9 +79,9 @@ import valthorne.browser.physics.BrowserPhysics;
 /**
  * Initializes optional browser Jolt without loading a JVM native library.
  * Loading suspends the calling Java coroutine; failures propagate to that caller.
- * Each world owns an independent native module because Jolt's browser interface
- * owns global factory/type registration. Worlds may close in any order, and
- * application teardown releases remaining worlds. No graphics context is needed.
+ * Worlds share a bounded native heap with reference-counted factory/type
+ * registration. Worlds may close in any order, and application teardown releases
+ * remaining worlds. No graphics context is needed.
  */
 public final class JoltRuntime {
     /**
@@ -142,7 +142,7 @@ public final class JoltRuntime {
             source.slice(0, init) +
             `        JoltRuntime.initialize();
         try {
-            system = BrowserPhysics.createWorld(settings.maxBodies, settings.maxBodyPairs, settings.maxContacts);
+            system = BrowserPhysics.createWorld(settings.maxBodies, settings.maxBodyPairs, settings.maxContacts, settings.scratchBytes);
             bodies = system;
             system.setGravity(gravityX, gravityY, 0);
         } catch (RuntimeException | Error failure) {
@@ -195,15 +195,9 @@ public final class JoltRuntime {
         source = replace(
             source,
             "            int errors = system.update(fixedTimeStep, collisionSteps, allocator, jobs);",
-            "            system.update(fixedTimeStep, collisionSteps);",
+            "            int errors = system.update(fixedTimeStep, collisionSteps);",
         );
         source = replace(source, "system.getNumActiveBodies(EBodyType.RigidBody)", "system.getNumActiveBodies()");
-        source = replace(
-            source,
-            `            if (errors != 0)
-                throw new IllegalStateException("Jolt simulation capacity exhausted (error flags " + errors + ")");`,
-            "",
-        );
         const release = bounds(source, "private void releaseResources()");
         let releaseBody = source.slice(release.open + 1, release.end - 1);
         const poseStart = releaseBody.indexOf("        if (poses != null)");
@@ -246,27 +240,62 @@ public final class JoltRuntime {
         );
     }
     if (name === "PhysicsWorld2D") {
-        source = source.replace(
-            "reusable arena with malloc fallback.",
-            "fixed ten-megabyte arena owned by Jolt's browser interface.",
+        source = replace(
+            source,
+            "        return failed;",
+            "        return failed || system != null && system.isFailed();",
+        );
+        source = replace(
+            source,
+            '        if (closed) throw new IllegalStateException("Physics world is closed");',
+            `        if (closed) throw new IllegalStateException("Physics world is closed");
+        if (system != null && system.isUnavailable()) {
+            failed = true;
+            throw new IllegalStateException("Browser physics memory became unavailable; close this world and create a replacement");
+        }`,
+        );
+        source = replace(
+            source,
+            "            clear();",
+            "            if (system == null || !system.isUnavailable()) clear();",
+        );
+        source = replace(
+            source,
+            "        if (closed) return;\n        if (advancing)",
+            "        if (closed) return;\n        failed |= system != null && system.isFailed();\n        if (advancing)",
         );
         source = source.replace(
-            "If native solver capacities are exhausted, the world is\n * marked failed because Jolt may already have advanced an incomplete step;\n * inspect or dispose it, then create a suitably sized replacement.",
-            "The upstream browser Step binding does not expose native pair/contact\n * capacity error flags. Size these capacities conservatively before advancing;\n * native exceptions fail the world because its state may already have advanced.",
+            "The shared {@link JoltRuntime} remains loaded so",
+            "Shared native registration is retained while other worlds are open, so",
+        );
+        source = source.replace(
+            " * Native temporary storage uses a",
+            ` * Browser worlds share a heap that starts at 16 MiB and grows to at most
+ * 256 MiB for the application session. Each world's configured scratch arena
+ * falls back to that bounded heap. A native allocation abort makes existing
+ * worlds unavailable; close them and create replacement worlds on a fresh module.
+ * Native temporary storage uses a`,
         );
     }
     if (name === "PhysicsWorldSettings2D") {
         source = source.replace(
-            "a four-megabyte reusable native scratch arena, and no worker threads. Increase",
-            "a synchronous WASM solver with its fixed ten-megabyte scratch arena. Increase",
-        );
-        source = source.replace(
-            "pair/contact capacities for dense scenes; exhausted solver capacities make\n * the world fail explicitly rather than silently accept incomplete contacts.",
-            "pair/contact capacities for dense scenes. The upstream browser Step binding\n * does not expose candidate-pair or contact-capacity error flags; allocate\n * sufficient capacity before advancing dense scenes.",
-        );
-        source = source.replace(
             "Optional subsystems default to",
-            "Browser workerThreads and scratchBytes values are retained for source\n * compatibility; the native browser job system and arena are fixed.\n * Optional subsystems default to",
+            `Browser workerThreads accepts zero only; positive counts are rejected.
+ * Worlds share a growing WASM heap bounded at 256 MiB per application session.
+ * Optional subsystems default to`,
+        );
+        source = replace(
+            source,
+            '        if (count < 0) throw new IllegalArgumentException("Worker threads must be nonnegative");',
+            `        if (count < 0) throw new IllegalArgumentException("Worker threads must be nonnegative");
+        if (count != 0) throw new UnsupportedOperationException("Browser physics supports workerThreads(0) only");`,
+        );
+        source = replace(
+            source,
+            "     * Selects native worker threads while retaining owner-thread public access.",
+            `     * Selects the single-threaded browser scheduler.
+     * Positive worker counts require an unsupported threaded WASM target.
+     * @throws UnsupportedOperationException if count is positive`,
         );
     }
     if (name === "RigidBody2D") {
@@ -313,7 +342,8 @@ public final class JoltRuntime {
         }
         current[count * 2] = (float) (centerX / count);
         current[count * 2 + 1] = (float) (centerY / count);
-        mesh = world.bodies.createSoftBody(current, originX, originY, DEFAULT_COMPLIANCE, DEFAULT_ITERATIONS, world.toMeters(1));
+        PhysicsSoftTopology2D topology = new PhysicsSoftTopology2D(current);
+        mesh = world.bodies.createSoftBody(current, topology.triangles, topology.edges, originX, originY, DEFAULT_COMPLIANCE, DEFAULT_ITERATIONS, world.toMeters(1));
         id = mesh.getId();
         try {
             vertices = new PhysicsVertex[count + 1];

@@ -10,6 +10,8 @@ import org.teavm.jso.JSObject;
  * suspends the Java caller, keeping the browser responsive and preserving its
  * owner coroutine. Module failures propagate to that caller. Worlds belong to
  * the current application host, which also closes leaked worlds during teardown.
+ * Worlds share one heap starting at 16 MiB and bounded at 256 MiB. Native
+ * allocation aborts invalidate its worlds; replacement worlds use a fresh module.
  */
 public final class BrowserPhysics {
     /**
@@ -68,24 +70,26 @@ public final class BrowserPhysics {
      * @param maxBodies native body capacity
      * @param maxPairs native broadphase pair capacity
      * @param maxContacts native contact constraint capacity
+     * @param scratchBytes initial temporary arena capacity, with native heap fallback
      * @return world owned by both the Java handle and current host
      */
     @Async
-    public static native BrowserPhysicsWorld createWorld(int maxBodies, int maxPairs, int maxContacts);
+    public static native BrowserPhysicsWorld createWorld(int maxBodies, int maxPairs, int maxContacts, int scratchBytes);
 
     /**
-     * Preserves owner coroutine identity while creating an independent native module.
+     * Preserves owner coroutine identity while creating a world on the shared module.
      * @param maxBodies native body capacity
      * @param maxPairs native pair capacity
      * @param maxContacts native contact capacity
+     * @param scratchBytes initial temporary arena capacity, with native heap fallback
      * @param callback suspended world constructor
      */
-    private static void createWorld(int maxBodies, int maxPairs, int maxContacts, AsyncCallback<BrowserPhysicsWorld> callback) {
+    private static void createWorld(int maxBodies, int maxPairs, int maxContacts, int scratchBytes, AsyncCallback<BrowserPhysicsWorld> callback) {
         /*
-         * Each world needs independent factory globals; module creation must not
+         * Worlds share reference-counted native registration; module creation must not
          * block the browser or register another Java application frame.
          */
-        requestWorld(maxBodies, maxPairs, maxContacts, (world, error) -> {
+        requestWorld(maxBodies, maxPairs, maxContacts, scratchBytes, (world, error) -> {
             if (error == null) callback.complete(world);
             else callback.error(new IllegalStateException("Unable to create browser Jolt world: " + error));
         });
@@ -96,10 +100,11 @@ public final class BrowserPhysics {
      * @param maxBodies native body capacity
      * @param maxPairs native pair capacity
      * @param maxContacts native contact capacity
+     * @param scratchBytes initial temporary arena capacity, with native heap fallback
      * @param callback one-shot creation result
      */
-    @JSBody(params = {"maxBodies", "maxPairs", "maxContacts", "callback"}, script = "globalThis.valthorneHost.physics.createWorld(maxBodies,maxPairs,maxContacts).then(world=>callback(world,null),error=>callback(null,String(error)));")
-    private static native void requestWorld(int maxBodies, int maxPairs, int maxContacts, PhysicsWorldResult callback);
+    @JSBody(params = {"maxBodies", "maxPairs", "maxContacts", "scratchBytes", "callback"}, script = "globalThis.valthorneHost.physics.createWorld(maxBodies,maxPairs,maxContacts,scratchBytes).then(world=>callback(world,null),error=>callback(null,String(error)));")
+    private static native void requestWorld(int maxBodies, int maxPairs, int maxContacts, int scratchBytes, PhysicsWorldResult callback);
 
     /**
      * Describes collision geometry for synchronous native body creation.

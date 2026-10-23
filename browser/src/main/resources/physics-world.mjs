@@ -1,10 +1,13 @@
 import { BrowserSoftMesh } from "./physics-soft.mjs";
 import { BrowserPhysicsQueries } from "./physics-query.mjs";
 
-// The native module belongs exclusively to this world. Java retains all timing,
+// Worlds share one bounded native module and reference-counted registration. Java retains all timing,
 // interpolation, body validation, geometry synchronization and contact delivery.
 export class BrowserJoltWorld {
-    constructor(runtime, J, maxBodies, maxPairs, maxContacts) {
+    constructor(runtime, device, maxBodies, maxPairs, maxContacts, scratchBytes) {
+        const J = device.J;
+        this.device = device;
+        this.failed = false;
         this.runtime = runtime;
         this.J = J;
         this.handles = new Map();
@@ -21,6 +24,7 @@ export class BrowserJoltWorld {
             settings.mMaxBodyPairs = maxPairs;
             settings.mMaxContactConstraints = maxContacts;
             settings.mMaxWorkerThreads = 0;
+            settings.mTempAllocatorSize = scratchBytes;
             const pairs = new J.ObjectLayerPairFilterTable(2);
             transferred.push(pairs);
             pairs.EnableCollision(0, 1);
@@ -34,10 +38,10 @@ export class BrowserJoltWorld {
                 try {
                     mapping.MapObjectToBroadPhaseLayer(1, moving);
                 } finally {
-                    J.destroy(moving);
+                    if (!device.failure) J.destroy(moving);
                 }
             } finally {
-                J.destroy(layer);
+                if (!device.failure) J.destroy(layer);
             }
             const broad = new J.ObjectVsBroadPhaseLayerFilterTable(mapping, 2, pairs, 2);
             transferred.push(broad);
@@ -52,12 +56,14 @@ export class BrowserJoltWorld {
             this.position = this.own(new J.RVec3(0, 0, 0));
             this.rotation = this.own(new J.Quat(0, 0, 0, 1));
         } catch (failure) {
-            while (this.owners.length) J.destroy(this.owners.pop());
-            if (this.physics) J.destroy(this.physics);
-            while (transferred.length) J.destroy(transferred.pop());
+            if (!device.failure) {
+                while (this.owners.length) J.destroy(this.owners.pop());
+                if (this.physics) J.destroy(this.physics);
+                while (transferred.length) J.destroy(transferred.pop());
+            }
             throw failure;
         } finally {
-            J.destroy(settings);
+            if (!device.failure) J.destroy(settings);
         }
     }
     own(resource) {
@@ -66,6 +72,13 @@ export class BrowserJoltWorld {
     }
     check() {
         if (this.closed) throw new Error("Physics world is closed");
+        if (this.device.failure) throw this.device.failure;
+    }
+    isFailed() {
+        return this.failed || !!this.device.failure;
+    }
+    isUnavailable() {
+        return !!this.device.failure;
     }
     body(id) {
         this.check();
@@ -74,15 +87,45 @@ export class BrowserJoltWorld {
         return body;
     }
     v(value) {
-        this.vector.Set(value.getX(), value.getY(), value.getZ());
+        const x = value.getX(),
+            y = value.getY(),
+            z = value.getZ();
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+            this.failed = true;
+            throw new Error("Non-finite vector cannot enter the native physics solver");
+        }
+        this.vector.Set(x, y, z);
         return this.vector;
     }
     p(value) {
-        this.position.Set(value.getX(), value.getY(), value.getZ());
+        const x = value.getX(),
+            y = value.getY(),
+            z = value.getZ();
+        // Match the pinned Jolt broadphase's cLargeFloat bounds.
+        if (
+            !Number.isFinite(x) ||
+            !Number.isFinite(y) ||
+            !Number.isFinite(z) ||
+            Math.abs(x) > 1e15 ||
+            Math.abs(y) > 1e15 ||
+            Math.abs(z) > 1e15
+        ) {
+            this.failed = true;
+            throw new Error("Position exceeds the native physics coordinate range");
+        }
+        this.position.Set(x, y, z);
         return this.position;
     }
     q(value) {
-        this.rotation.Set(value.getX(), value.getY(), value.getZ(), value.getW());
+        const x = value.getX(),
+            y = value.getY(),
+            z = value.getZ(),
+            w = value.getW();
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !Number.isFinite(w)) {
+            this.failed = true;
+            throw new Error("Non-finite rotation cannot enter the native physics solver");
+        }
+        this.rotation.Set(x, y, z, w);
         return this.rotation;
     }
     shape(description) {
@@ -112,15 +155,24 @@ export class BrowserJoltWorld {
                 return shape;
             } finally {
                 // WebIDL value returns borrow a static temporary, not a heap owner.
-                result.Clear();
+                if (!this.device.failure) result.Clear();
             }
         } finally {
-            settings.Release();
+            if (!this.device.failure) settings.Release();
         }
     }
     createBody(description, values) {
         this.check();
         const J = this.J;
+        if (
+            !Number.isFinite(values[1]) ||
+            !Number.isFinite(values[2]) ||
+            Math.abs(values[1]) > 1e15 ||
+            Math.abs(values[2]) > 1e15
+        )
+            throw new RangeError("Body position exceeds the native physics coordinate range");
+        if (values[0] === 2 && !Number.isFinite(Math.fround(1 / values[16])))
+            throw new RangeError("Body mass is too small for finite native inverse mass");
         const shape = this.shape(description);
         let settings,
             body,
@@ -161,19 +213,21 @@ export class BrowserJoltWorld {
             this.handles.set(id, body);
             return id;
         } catch (failure) {
-            if (body && J.getPointer(body)) {
+            if (!this.device.failure && body && J.getPointer(body)) {
                 if (added) this.bodies.RemoveBody(body.GetID());
                 this.bodies.DestroyBody(body.GetID());
             }
             throw failure;
         } finally {
-            if (settings) J.destroy(settings);
-            shape.Release();
+            if (!this.device.failure) {
+                if (settings) J.destroy(settings);
+                shape.Release();
+            }
         }
     }
-    createSoftBody(positions, originX, originY, compliance, iterations, radius) {
+    createSoftBody(positions, triangles, edges, originX, originY, compliance, iterations, radius) {
         this.check();
-        return new BrowserSoftMesh(this, positions, originX, originY, compliance, iterations, radius);
+        return new BrowserSoftMesh(this, positions, triangles, edges, originX, originY, compliance, iterations, radius);
     }
     destroyBody(id) {
         const body = this.body(id);
@@ -195,8 +249,30 @@ export class BrowserJoltWorld {
     getPositionAndRotation(id, position, rotation) {
         const body = this.body(id);
         this.bodies.GetPositionAndRotation(body.GetID(), this.position, this.rotation);
-        position.set(this.position.GetX(), this.position.GetY(), this.position.GetZ());
-        rotation.set(this.rotation.GetX(), this.rotation.GetY(), this.rotation.GetZ(), this.rotation.GetW());
+        const x = this.position.GetX(),
+            y = this.position.GetY(),
+            z = this.position.GetZ();
+        const qx = this.rotation.GetX(),
+            qy = this.rotation.GetY(),
+            qz = this.rotation.GetZ(),
+            qw = this.rotation.GetW();
+        if (
+            !Number.isFinite(x) ||
+            !Number.isFinite(y) ||
+            !Number.isFinite(z) ||
+            !Number.isFinite(qx) ||
+            !Number.isFinite(qy) ||
+            !Number.isFinite(qz) ||
+            !Number.isFinite(qw) ||
+            Math.abs(x) > 1e15 ||
+            Math.abs(y) > 1e15 ||
+            Math.abs(z) > 1e15
+        ) {
+            this.failed = true;
+            throw new Error("Jolt produced an invalid body pose; replace this physics world");
+        }
+        position.set(x, y, z);
+        rotation.set(qx, qy, qz, qw);
     }
     setPositionAndRotation(id, position, rotation, activation) {
         this.bodies.SetPositionAndRotation(this.body(id).GetID(), this.p(position), this.q(rotation), activation);
@@ -208,14 +284,24 @@ export class BrowserJoltWorld {
         this.bodies.MoveKinematic(this.body(id).GetID(), this.p(position), this.q(rotation), seconds);
     }
     getLinearVelocity(id, destination) {
-        destination.copy(this.body(id).GetLinearVelocity());
+        this.readVector(this.body(id).GetLinearVelocity(), destination);
+    }
+    readVector(value, destination) {
+        const x = value.GetX(),
+            y = value.GetY(),
+            z = value.GetZ();
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+            this.failed = true;
+            throw new Error("Jolt produced a non-finite velocity; replace this physics world");
+        }
+        destination.set(x, y, z);
     }
     setLinearVelocity(id, x, y, z) {
         this.vector.Set(x, y, z);
         this.bodies.SetLinearVelocity(this.body(id).GetID(), this.vector);
     }
     getAngularVelocity(id, destination) {
-        destination.copy(this.body(id).GetAngularVelocity());
+        this.readVector(this.body(id).GetAngularVelocity(), destination);
     }
     setAngularVelocity(id, velocity) {
         this.bodies.SetAngularVelocity(this.body(id).GetID(), this.v(velocity));
@@ -261,12 +347,25 @@ export class BrowserJoltWorld {
     }
     update(seconds, collisionSteps) {
         this.check();
-        this.physics.Step(seconds, collisionSteps);
+        if (this.failed) throw new Error("Physics world failed; create a replacement before stepping");
+        try {
+            const errors = this.physics.Step(seconds, collisionSteps);
+            if (errors) this.failed = true;
+            return errors;
+        } catch (failure) {
+            this.failed = true;
+            if (failure instanceof WebAssembly.RuntimeError) this.runtime.poison(this.device, failure);
+            throw failure;
+        }
     }
     getNumActiveBodies() {
         return this.system.GetNumActiveBodies(this.J.EBodyType_RigidBody);
     }
     setContactListener(callback) {
+        if (this.device.failure) {
+            this.listener = null;
+            return;
+        }
         this.system.SetContactListener(0);
         if (this.listener) this.J.destroy(this.listener);
         this.listener = null;
@@ -331,15 +430,16 @@ export class BrowserJoltWorld {
             this.constraints.add(result);
             return result;
         } finally {
-            settings.Release();
+            if (!this.device.failure) settings.Release();
         }
     }
     addConstraint(constraint) {
+        this.check();
         this.system.AddConstraint(constraint.native);
         constraint.added = true;
     }
     removeConstraint(constraint) {
-        if (constraint.added) this.system.RemoveConstraint(constraint.native);
+        if (constraint.added && !this.device.failure) this.system.RemoveConstraint(constraint.native);
         constraint.added = false;
     }
     prepareQueries(callback) {
@@ -378,6 +478,7 @@ export class BrowserJoltWorld {
         release(() => this.closeQueries());
         for (const constraint of this.constraints) release(() => constraint.close());
         for (const [id, body] of this.handles) {
+            if (this.device.failure) break;
             release(() => {
                 if (this.bodies.IsAdded(body.GetID())) this.bodies.RemoveBody(body.GetID());
             });
@@ -388,12 +489,13 @@ export class BrowserJoltWorld {
         this.runtime.worlds.delete(this);
         while (this.owners.length) {
             const owned = this.owners.pop();
-            release(() => this.J.destroy(owned));
+            if (!this.device.failure) release(() => this.J.destroy(owned));
         }
-        release(() => this.J.destroy(this.physics));
+        if (!this.device.failure) release(() => this.J.destroy(this.physics));
         this.physics = this.system = this.bodies = null;
         this.vector = this.position = this.rotation = null;
         this.J = null;
+        if (this.device.failure && this.runtime.device === this.device) this.runtime.device = null;
         this.handles.clear();
         this.constraints.clear();
         this.softMeshes.clear();
@@ -429,7 +531,7 @@ class BrowserConstraint {
     close() {
         if (!this.native) return;
         this.world.removeConstraint(this);
-        this.native.Release();
+        if (!this.world.device.failure) this.native.Release();
         this.native = null;
         this.world.constraints.delete(this);
     }

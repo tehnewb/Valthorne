@@ -18,7 +18,7 @@ public interface BrowserPhysicsWorld extends JSObject {
     /**
      * Creates an optimized convex perimeter and center soft mesh.
      */
-    PhysicsSoftMesh createSoftBody(float[] positions, float originX, float originY, float compliance, int iterations, float radius);
+    PhysicsSoftMesh createSoftBody(float[] positions, int[] triangles, int[] edges, float originX, float originY, float compliance, int iterations, float radius);
 
     /**
      * Destroys a removed native body.
@@ -147,8 +147,21 @@ public interface BrowserPhysicsWorld extends JSObject {
 
     /**
      * Advances one native step synchronously.
+     * @return native update error flags; zero indicates a complete update
      */
-    void update(float seconds, int collisionSteps);
+    int update(float seconds, int collisionSteps);
+
+    /**
+     * Reports a failed native update or an unavailable shared native device.
+     * @return whether stepping must stop and this world must be replaced
+     */
+    boolean isFailed();
+
+    /**
+     * Reports whether native memory became unusable after an abort or trap.
+     * @return whether cleanup must drop owners without invoking native code
+     */
+    boolean isUnavailable();
 
     /**
      * Reports the active rigid-body population.

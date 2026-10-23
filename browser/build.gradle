@@ -196,14 +196,12 @@ tasks.named('processApplicationResources') {
 // The official Yoga browser distribution contains its own WebAssembly module.
 def browserDependencies = tasks.register('browserDependencies', Exec) {
     inputs.files('package.json', 'package-lock.json')
-    outputs.files('node_modules/yoga-layout/package.json', 'node_modules/mpg123-decoder/package.json', 'node_modules/@wasm-audio-decoders/ogg-vorbis/package.json', 'node_modules/jolt-physics/package.json')
+    outputs.files('node_modules/yoga-layout/package.json', 'node_modules/mpg123-decoder/package.json', 'node_modules/@wasm-audio-decoders/ogg-vorbis/package.json')
     commandLine System.getProperty('os.name').startsWith('Windows') ? 'npm.cmd' : 'npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'
 }
 tasks.named('webExport', Sync) {
     dependsOn browserDependencies
     from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
-    from('node_modules/jolt-physics/dist') { include 'jolt-physics.wasm.js', 'jolt-physics.wasm.wasm'; into 'vendor/physics' }
-    from('node_modules/jolt-physics/LICENSE') { rename { 'jolt.txt' }; into 'META-INF/licenses' }
     from('node_modules/yoga-layout/LICENSE') { into 'vendor/yoga' }
     from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }
     from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include '*.min.js'; into 'vendor/audio' }
@@ -228,8 +226,6 @@ tasks.named('jar', Jar) {
     from { zipTree(browserJoml.get().archiveFile) }
     from(browserCompatibility.map { it.destinationDirectory })
     from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
-    from('node_modules/jolt-physics/dist') { include 'jolt-physics.wasm.js', 'jolt-physics.wasm.wasm'; into 'vendor/physics' }
-    from('node_modules/jolt-physics/LICENSE') { rename { 'jolt.txt' }; into 'META-INF/licenses' }
     from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }
     from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include '*.min.js'; into 'vendor/audio' }
     exclude 'module-info.class', 'META-INF/versions/**/module-info.class'

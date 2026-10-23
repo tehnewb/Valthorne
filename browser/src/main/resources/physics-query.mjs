@@ -74,7 +74,10 @@ export class BrowserPhysicsQueries {
             .CollideAABox(this.bounds, this.collector, this.broadFilter, this.objectFilter);
     }
     close() {
-        while (this.owners.length) this.world.J.destroy(this.owners.pop());
+        while (this.owners.length) {
+            const owner = this.owners.pop();
+            if (!this.world.device.failure) this.world.J.destroy(owner);
+        }
         this.callback = null;
     }
 }

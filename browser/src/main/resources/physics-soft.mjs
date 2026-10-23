@@ -2,8 +2,11 @@ import { PhysicsVector } from "./physics-vector.mjs";
 
 // The Java handle owns this settings reference after the native body is removed.
 export class BrowserSoftMesh {
-    constructor(world, positions, originX, originY, compliance, iterations, radius) {
+    constructor(world, positions, triangles, edgeIndices, originX, originY, compliance, iterations, radius) {
         const J = world.J;
+        for (let i = 0; i < positions.length; i++)
+            if (!Number.isFinite(positions[i]) || Math.abs(positions[i]) > 1e15)
+                throw new RangeError("Soft body exceeds the native physics coordinate range");
         this.world = world;
         this.originX = originX;
         this.originY = originY;
@@ -24,29 +27,24 @@ export class BrowserSoftMesh {
                 try {
                     this.mesh.mVertices.push_back(vertex);
                 } finally {
-                    J.destroy(vertex);
+                    if (!world.device.failure) J.destroy(vertex);
                 }
             }
             const edges = this.mesh.mEdgeConstraints;
-            for (let i = 0; i < count; i++) {
-                const next = (i + 1) % count;
-                const area =
-                    (positions[next * 2] - positions[i * 2]) * (positions[count * 2 + 1] - positions[i * 2 + 1]) -
-                    (positions[next * 2 + 1] - positions[i * 2 + 1]) * (positions[count * 2] - positions[i * 2]);
-                if (area === 0) throw new Error("Soft mesh contains a degenerate triangle");
-                for (let n = 0; n < 2; n++) {
-                    const edge = new J.SoftBodySharedSettingsEdge(i, n === 0 ? next : count, compliance);
-                    try {
-                        edges.push_back(edge);
-                    } finally {
-                        J.destroy(edge);
-                    }
+            for (let i = 0; i < edgeIndices.length; i += 2) {
+                const edge = new J.SoftBodySharedSettingsEdge(edgeIndices[i], edgeIndices[i + 1], compliance);
+                try {
+                    edges.push_back(edge);
+                } finally {
+                    if (!world.device.failure) J.destroy(edge);
                 }
-                const face = new J.SoftBodySharedSettingsFace(count, i, next, 0);
+            }
+            for (let i = 0; i < triangles.length; i += 3) {
+                const face = new J.SoftBodySharedSettingsFace(triangles[i], triangles[i + 1], triangles[i + 2], 0);
                 try {
                     this.mesh.AddFace(face);
                 } finally {
-                    J.destroy(face);
+                    if (!world.device.failure) J.destroy(face);
                 }
             }
             this.mesh.CalculateEdgeLengths();
@@ -67,22 +65,22 @@ export class BrowserSoftMesh {
             this.properties = J.castObject(this.body.GetMotionProperties(), J.SoftBodyMotionProperties);
             this.vertices = new Array(count + 1);
             for (let i = 0; i <= count; i++) this.vertices[i] = new BrowserSoftVertex(this.properties.GetVertex(i));
-            this.edges = new Array(count * 2);
+            this.edges = new Array(edges.size());
             for (let i = 0; i < this.edges.length; i++) this.edges[i] = edges.at(i);
             world.handles.set(this.id, this.body);
             world.bodies.AddBody(this.body.GetID(), J.EActivation_Activate);
             world.softMeshes.add(this);
         } catch (failure) {
-            if (created) {
+            if (created && !world.device.failure) {
                 if (world.bodies.IsAdded(this.body.GetID())) world.bodies.RemoveBody(this.body.GetID());
                 world.bodies.DestroyBody(this.body.GetID());
                 world.handles.delete(this.id);
             }
-            this.mesh.Release();
+            if (!world.device.failure) this.mesh.Release();
             this.mesh = null;
             throw failure;
         } finally {
-            if (settings) J.destroy(settings);
+            if (settings && !world.device.failure) J.destroy(settings);
         }
     }
     getId() {
@@ -109,15 +107,33 @@ export class BrowserSoftMesh {
     capture(positions) {
         for (let i = 0; i < this.vertices.length; i++) {
             const p = this.vertices[i].position;
-            positions[i * 3] = this.originX + p.GetX();
-            positions[i * 3 + 1] = this.originY + p.GetY();
-            positions[i * 3 + 2] = p.GetZ();
+            const x = Math.fround(this.originX + p.GetX()),
+                y = Math.fround(this.originY + p.GetY()),
+                z = p.GetZ();
+            const velocity = this.vertices[i].velocity;
+            if (
+                !Number.isFinite(x) ||
+                !Number.isFinite(y) ||
+                !Number.isFinite(z) ||
+                !Number.isFinite(velocity.GetX()) ||
+                !Number.isFinite(velocity.GetY()) ||
+                !Number.isFinite(velocity.GetZ()) ||
+                Math.abs(x) > 1e15 ||
+                Math.abs(y) > 1e15 ||
+                Math.abs(z) > 1e15
+            ) {
+                this.world.failed = true;
+                throw new Error("Jolt produced an invalid soft-body state; replace this physics world");
+            }
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
         }
     }
     close() {
         if (this.closed) return;
         this.closed = true;
-        this.mesh.Release();
+        if (!this.world.device.failure) this.mesh.Release();
         this.mesh = null;
         for (const vertex of this.vertices) vertex.close();
         this.vertices = this.edges = null;
