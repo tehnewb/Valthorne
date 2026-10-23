@@ -77,6 +77,7 @@ final class BgfxCallbacks implements AutoCloseable {
     /**
      * Writes one pitched RGBA/BGRA backbuffer image or completes a synchronization
      * request whose name is empty. Pixel orientation follows the native flip flag.
+     * The final row needs only its pixel bytes, without trailing alignment padding.
      *
      * @param file native UTF-8 output path
      * @param width captured width
@@ -94,8 +95,10 @@ final class BgfxCallbacks implements AutoCloseable {
             if (!name.isEmpty()) {
                 if (format != BGFX_TEXTURE_FORMAT_BGRA8 && format != BGFX_TEXTURE_FORMAT_RGBA8)
                     throw new UnsupportedOperationException("Unsupported screenshot format: " + format);
-                if (width < 1 || height < 1 || pitch < (long) width * 4 || (long) pitch * height > size)
-                    throw new IllegalArgumentException("Invalid native screenshot bounds");
+                // Native readbacks may omit alignment padding after the last row's pixels.
+                long rowBytes = (long) width * 4;
+                if (width < 1 || height < 1 || data == NULL || pitch < rowBytes || (long) pitch * (height - 1) + rowBytes > size)
+                    throw new IllegalArgumentException("Invalid native screenshot bounds: " + width + "x" + height + ", pitch=" + pitch + ", size=" + size);
                 ByteBuffer pixels = memByteBuffer(data, size);
                 BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
                 int[] output = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
