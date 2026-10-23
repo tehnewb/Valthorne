@@ -48,7 +48,7 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * OpenGL 3.3 dual-source factors preserve straight sprite blending and
  * premultiplied text, including their distinct destination-alpha behavior.
  * Matching sprite triangulation preserves texture sampling at texel boundaries.
- * Custom shaders, custom blending, depth/cull state, sRGB attachments and text
+ * Custom shaders, custom blending, sampler overrides, depth/cull state, sRGB attachments and text
  * transforms retain independent pipeline boundaries.</p>
  *
  * <p>All calls are confined to the parent's graphics thread. Clip and tint values
@@ -88,6 +88,7 @@ final class TextureBatchGlyphs {
     private final ByteBuffer instances; // Borrowed native staging storage, shared exclusively with sprites.
     private final int quadVBO; // Borrowed static quad VBO owned by the parent batch.
     private final int instanceVBO; // Borrowed streaming VBO owned by the parent batch.
+    private final int textureUnits; // Sprite sampler units whose external overrides require the original pipeline.
     private final int capacity; // Maximum glyph count fitting the shared staging and stream storage.
     private final int[] viewport = new int[4]; // Reused viewport query storage for coverage and rejection bounds.
     private final int[] query = new int[1]; // Reused scalar GL query storage avoids per-segment NIO wrappers.
@@ -153,12 +154,14 @@ final class TextureBatchGlyphs {
      * @param quadVBO shared static geometry VBO
      * @param instanceVBO shared streaming VBO
      * @param capacity number of instances supported by shared storage
+     * @param textureUnits sampler units addressable by the parent sprite shader
      */
-    TextureBatchGlyphs(ByteBuffer instances, int quadVBO, int instanceVBO, int capacity) {
+    TextureBatchGlyphs(ByteBuffer instances, int quadVBO, int instanceVBO, int capacity, int textureUnits) {
         this.instances = instances;
         this.quadVBO = quadVBO;
         this.instanceVBO = instanceVBO;
         this.capacity = capacity;
+        this.textureUnits = textureUnits;
     }
 
     /**
@@ -271,6 +274,7 @@ final class TextureBatchGlyphs {
 
     /**
      * Checks the destination only when sprites first try to join a text segment.
+     * Sampler overrides retain the parent's texture filtering and unit selection.
      * Additional active color targets retain independent blending, including
      * sparse configurations with an unused target between active attachments.
      * Pure text submissions incur no extra framebuffer queries.
@@ -280,6 +284,17 @@ final class TextureBatchGlyphs {
     private boolean supportsMixedTarget() {
         if (mixedTargetKnown) return mixedTargetSupported;
         mixedTargetKnown = true;
+        mixedTargetSupported = false;
+        if (oldSampler0 != 0 || textureUnits > 1 && oldSampler1 != 0 || textureUnits > 2 && oldSampler2 != 0) return false;
+        int active = readInteger(GL_ACTIVE_TEXTURE);
+        try {
+            for (int unit = 3; unit < textureUnits; unit++) {
+                glActiveTexture(GL_TEXTURE0 + unit);
+                if (readInteger(GL_SAMPLER_BINDING) != 0) return false;
+            }
+        } finally {
+            glActiveTexture(active);
+        }
         mixedTargetSupported = true;
         int targets = readInteger(GL_MAX_DRAW_BUFFERS);
         for (int target = 1; target < targets; target++) {

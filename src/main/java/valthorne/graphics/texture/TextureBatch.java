@@ -1832,7 +1832,7 @@ public final class TextureBatch {
      * @return this batch's reusable glyph component
      */
     private TextureBatchGlyphs getGlyphs() {
-        if (glyphs == null) glyphs = new TextureBatchGlyphs(instanceBytes, quadVBO, instanceVBO, maxSprites);
+        if (glyphs == null) glyphs = new TextureBatchGlyphs(instanceBytes, quadVBO, instanceVBO, maxSprites, maxTextureUnits);
         return glyphs;
     }
 
