@@ -152,6 +152,7 @@ public final class TextureBatchGlyphs {
     /**
      * Borrows shared storage without creating GPU resources or reading GL state.
      *
+     * @param parent owning batch and drawing scope
      * @param instances shared native staging buffer
      * @param quadVBO shared static geometry VBO
      * @param instanceVBO shared streaming VBO
@@ -329,34 +330,6 @@ public final class TextureBatchGlyphs {
     }
 
     /**
-     * Compares a validated transform with the retained scope transform.
-     *
-     * @param cosine rotation cosine
-     * @param sine rotation sine
-     * @param x horizontal transform offset
-     * @param y vertical transform offset
-     * @return true when no scope flush is necessary
-     */
-    boolean matchesTransform(float cosine, float sine, float x, float y) {
-        return this.cosine == cosine && this.sine == sine && transformX == x && transformY == y;
-    }
-
-    /**
-     * Stores a validated transform after the parent has flushed queued work.
-     *
-     * @param cosine rotation cosine
-     * @param sine rotation sine
-     * @param x horizontal transform offset
-     * @param y vertical transform offset
-     */
-    void setTransform(float cosine, float sine, float x, float y) {
-        this.cosine = cosine;
-        this.sine = sine;
-        transformX = x;
-        transformY = y;
-    }
-
-    /**
      * Appends an unrotated default sprite to a compatible coverage segment.
      * Dual-source blending retains the sprite pipeline's squared source alpha
      * while glyphs retain ordinary source-over alpha. Custom blending, sRGB
@@ -442,28 +415,6 @@ public final class TextureBatchGlyphs {
             }
         }
         return mixedTargetSupported;
-    }
-
-    /**
-     * Establishes a segment and copies submission tint, opacity and clip values.
-     * The parent must already have flushed its sprite queue.
-     *
-     * @param tint selected nonnull tint
-     * @param opacity parent opacity multiplier
-     * @param clipped whether a logical world clip is enabled
-     * @param x clip minimum X
-     * @param y clip minimum Y
-     * @param width clip width
-     * @param height clip height
-     */
-    void prepare(Color tint, float opacity, boolean clipped, float x, float y, float width, float height) {
-        beginGlyphSegment();
-        packedColor = colorByte(tint.r()) << 24 | colorByte(tint.g()) << 16 | colorByte(tint.b()) << 8 | colorByte(tint.a() * opacity);
-        clipEnabled = clipped;
-        clipX = x;
-        clipY = y;
-        clipW = width;
-        clipH = height;
     }
 
     /**
@@ -634,21 +585,6 @@ public final class TextureBatchGlyphs {
         entry.generation = coverageCache.generation();
         entry.scope = geometryScope;
         entry.projection.set(projection);
-    }
-
-    /**
-     * Starts a segment and snaps a translated baseline for uniform axis-aligned
-     * projections. General projections preserve the supplied baseline.
-     *
-     * @param baseline finite baseline before parent translation
-     * @param translationY current parent vertical translation
-     * @return baseline in the same local coordinates
-     */
-    float alignBaseline(float baseline, float translationY) {
-        beginGlyphSegment();
-        if (projectionScale <= 0f) return baseline;
-        float translated = baseline + translationY;
-        return viewMinY + Math.round((translated - viewMinY) * projectionScale) / projectionScale - translationY;
     }
 
     /**

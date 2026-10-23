@@ -842,8 +842,8 @@ public class TextField extends Panel {
      * <p>
      * If the visible text is empty, placeholder text is rendered when available.
      * Otherwise the visible text is drawn at the horizontally scrolled text origin.
-     * Axis-aligned Slug line origins and baselines align to physical pixels to
-     * keep small text steady while preserving fractional advances and kerning.
+     * Text, selection and caret share the same fractional line origin. Slug
+     * evaluates hinted coverage at that position without rounding shaped advances.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -877,7 +877,7 @@ public class TextField extends Panel {
      * The selection rectangle is computed from the measured width up to the selected
      * character indices. A solid color quad is drawn using the shared caret pixel
      * texture and the resolved or fallback selection color. Its origin uses the
-     * same physical pixel alignment as the text so their positions remain consistent.
+     * same fractional position as the text so their positions remain consistent.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -886,8 +886,7 @@ public class TextField extends Panel {
         int a = Math.min(selectionStart, selectionEnd);
         int b = Math.max(selectionStart, selectionEnd);
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float drawX = getRenderX() + padding + textOffsetX;
         float x1 = drawX + getTextWidthUpTo(a);
         float x2 = drawX + getTextWidthUpTo(b);
 
@@ -895,10 +894,10 @@ public class TextField extends Panel {
         float selectionY = getRenderY() + (getHeight() - selectionH) * 0.5f;
 
         Color drawSelectionColor = selectionColor != null ? selectionColor : defaultSelectionColor;
-        TextSelection nativeSelection = UIText.selection(this, font, getDisplayText(), fontSize, a, b);
-        if (nativeSelection != null) {
-            for (int index = 0; index < nativeSelection.size(); index++)
-                batch.draw(getCaretPixel(), drawX + nativeSelection.left(index), selectionY, nativeSelection.width(index), selectionH, drawSelectionColor);
+        TextSelection shapedSelection = UIText.selection(this, font, getDisplayText(), fontSize, a, b);
+        if (shapedSelection != null) {
+            for (int index = 0; index < shapedSelection.size(); index++)
+                batch.draw(getCaretPixel(), drawX + shapedSelection.left(index), selectionY, shapedSelection.width(index), selectionH, drawSelectionColor);
             return;
         }
         batch.draw(getCaretPixel(), x1, selectionY, x2 - x1, selectionH, drawSelectionColor);
@@ -911,8 +910,8 @@ public class TextField extends Panel {
      *
      * <p>
      * The caret X position is based on the measured width up to the current caret
-     * index plus the horizontal text offset. Its origin uses the same physical
-     * pixel alignment as the text, preserving the measured character offsets.
+     * index plus the horizontal text offset. Its origin uses the same fractional
+     * position as the text, preserving the measured character offsets.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -920,8 +919,7 @@ public class TextField extends Panel {
     private void drawCaret(TextureBatch batch) {
         if (!isFocused() || !caretVisible) return;
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float drawX = getRenderX() + padding + textOffsetX;
         float caretX = drawX + getTextWidthUpTo(caretIndex);
         float caretH = Math.max(0f, getHeight() - caretPadY * 2f);
         float caretY = getRenderY() + (getHeight() - caretH) * 0.5f;
