@@ -274,6 +274,22 @@ public final class Window {
      */
     private static boolean fullscreen = false;
     /**
+     * Horizontal position restored when leaving fullscreen.
+     */
+    private static int windowedX;
+    /**
+     * Vertical position restored when leaving fullscreen.
+     */
+    private static int windowedY;
+    /**
+     * Content width retained independently of fullscreen resize callbacks.
+     */
+    private static int windowedWidth;
+    /**
+     * Content height retained independently of fullscreen resize callbacks.
+     */
+    private static int windowedHeight;
+    /**
      * Cached undecorated window preference/state.
      */
     private static boolean borderless = false;
@@ -400,6 +416,17 @@ public final class Window {
         Window.width = config.getWidth();
         Window.height = config.getHeight();
         Window.fullscreen = config.isFullscreen();
+        windowedWidth = width;
+        windowedHeight = height;
+        windowedX = 0;
+        windowedY = 0;
+        if (fullscreen) {
+            GLFWVidMode mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+            if (mode != null) {
+                windowedX = (mode.width() - width) / 2;
+                windowedY = (mode.height() - height) / 2;
+            }
+        }
         Window.borderless = !config.isDecorated();
         Window.resizable = config.isResizable();
         Window.swapInterval = config.getSwapInterval();
@@ -848,7 +875,9 @@ public final class Window {
      * <p>When entering fullscreen, this sets the window monitor to the primary monitor and uses the monitor's
      * current video mode dimensions and refresh rate.</p>
      *
-     * <p>When leaving fullscreen, this restores the window to its cached position and size.</p>
+     * <p>When leaving fullscreen, this restores the position and size saved before entering fullscreen.
+     * Applications started fullscreen use their configured windowed dimensions. Repeating the
+     * current mode leaves the saved bounds unchanged.</p>
      *
      * @param fullscreen true for fullscreen, false for windowed
      * @throws RuntimeException if the primary monitor video mode cannot be queried
@@ -857,17 +886,23 @@ public final class Window {
         /*
          * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
          */
-        if (address == NULL) return;
+        if (address == NULL || Window.fullscreen == fullscreen) return;
 
         GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
         if (vid == null) throw new RuntimeException("Failed to get video mode");
 
+        if (fullscreen) {
+            windowedX = x;
+            windowedY = y;
+            windowedWidth = width;
+            windowedHeight = height;
+        }
         Window.fullscreen = fullscreen;
 
         if (fullscreen) {
             glfwSetWindowMonitor(address, glfwGetPrimaryMonitor(), 0, 0, vid.width(), vid.height(), vid.refreshRate());
         } else {
-            glfwSetWindowMonitor(address, NULL, getX(), getY(), getWidth(), getHeight(), vid.refreshRate());
+            glfwSetWindowMonitor(address, NULL, windowedX, windowedY, windowedWidth, windowedHeight, GLFW_DONT_CARE);
         }
     }
 
@@ -1239,6 +1274,10 @@ public final class Window {
         width = 0;
         height = 0;
         fullscreen = false;
+        windowedX = 0;
+        windowedY = 0;
+        windowedWidth = 0;
+        windowedHeight = 0;
         borderless = false;
         resizable = true;
         swapInterval = SwapInterval.OFF;

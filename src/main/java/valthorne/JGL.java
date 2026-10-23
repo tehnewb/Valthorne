@@ -27,8 +27,9 @@ import static org.lwjgl.glfw.GLFW.glfwPollEvents;
  * <ul>
  *   <li>Framework Initialization: Initializes GLFW as a windowing system and configures
  *       systems like audio, input devices (keyboard, mouse), and window display.</li>
- *   <li>Main Application Loop: Ensures consistent updates to the game state and renders
- *       every frame, calculating delta time and frame rates for precise updates.</li>
+ *   <li>Main Application Loop: Updates game state and renders while the framebuffer has
+ *       nonzero dimensions. Input, queued tasks and updates continue while minimized;
+ *       rendering resumes after restoration. Frame rates count rendered frames.</li>
  *   <li>Event-Driven Design: Provides a centralized event bus to facilitate communication
  *       between various components by subscribing, unsubscribing, and broadcasting events.</li>
  *   <li>Resource Cleanup: At the end of the application's lifecycle, ensures proper
@@ -165,10 +166,13 @@ public class JGL {
 
                 BgfxGraphics.beginFrame();
                 frameApplication.update(deltaTime);
-                frameApplication.render();
+                // Updates may minimize the window, so check its drawable extent afterward.
+                if (Window.getFramebufferWidth() > 0 && Window.getFramebufferHeight() > 0) {
+                    frameApplication.render();
+                    frames++;
+                }
 
                 fpsTime += deltaTime;
-                frames++;
 
                 if (fpsTime >= 1) {
                     framesPerSecond = frames;
