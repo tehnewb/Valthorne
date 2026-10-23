@@ -17,7 +17,7 @@ def replacements = [
     'valthorne/audio/SoundData', 'valthorne/audio/SoundPlayer', 'valthorne/audio/WaveSoundDecoder', 'valthorne/audio/OggSoundDecoder', 'valthorne/audio/Mp3SoundDecoder',
     'valthorne/graphics/font/slug/SlugOutlines', 'valthorne/graphics/font/slug/SlugData',
     'valthorne/graphics/texture/TextureData', 'valthorne/graphics/font/SystemFonts',
-    'valthorne/ui/behavior/TextEditing', 'valthorne/ui/NanoUtility',
+    'valthorne/ui/behavior/TextEditing', 'valthorne/ui/behavior/TextEditModel', 'valthorne/ui/nodes/nano/NanoHyperlink', 'valthorne/ui/NanoUtility',
     'valthorne/graphics/bgfx/BgfxDesktopWindow', 'valthorne/graphics/bgfx/BgfxCallbacks',
     'valthorne/graphics/bgfx/BgfxPlatform', 'valthorne/graphics/bgfx/BgfxWindowsSurface',
     'valthorne/graphics/bgfx/BgfxGraphics', 'valthorne/graphics/bgfx/BgfxBatchRenderer', 'valthorne/graphics/bgfx/BgfxMeshRenderer',

@@ -56,6 +56,8 @@ for (const name of [
     "audio/SoundData",
     "graphics/shader/ComputeBuffer",
     "ui/behavior/TextEditing",
+    "ui/behavior/TextEditModel",
+    "ui/nodes/nano/NanoHyperlink",
     "ui/NanoUtility",
     "JGL",
     "PlatformTools",
@@ -334,6 +336,46 @@ for (const name of [
                 end = closing(source, begin, "{", "}");
             source = source.slice(0, begin + 1) + "\n" + body + "\n    " + source.slice(end);
         }
+    }
+    if (name === "ui/behavior/TextEditModel") {
+        source = source.replaceAll("\r\n", "\n");
+        source = replace(source, "import java.util.regex.Pattern;", "import valthorne.browser.BrowserGraphemes;");
+        const field = source.indexOf("    private static final Pattern GRAPHEME");
+        if (field < 0) throw new Error("Review browser grapheme segmentation");
+        source = source.slice(0, source.lastIndexOf("    /**", field)) + source.slice(source.indexOf("\n", field) + 1);
+        source = replace(source,
+            `        boundaryCount = 1;
+        boundaries[0] = 0;
+        var matcher = GRAPHEME.matcher(text);
+        while (matcher.find()) {
+            if (boundaryCount == boundaries.length)
+                boundaries = Arrays.copyOf(boundaries, boundaries.length * 2);
+            boundaries[boundaryCount++] = matcher.end();
+        }`,
+            `        int count = BrowserGraphemes.fill(text, boundaries);
+        if (count > boundaries.length) {
+            boundaries = Arrays.copyOf(boundaries, Math.max(count, boundaries.length * 2));
+            count = BrowserGraphemes.fill(text, boundaries);
+        }
+        boundaryCount = count;`);
+        source = source.replace("non-ASCII text uses the cached matcher result.", "non-ASCII text uses the cached browser segmentation result.");
+    }
+    if (name === "ui/nodes/nano/NanoHyperlink") {
+        source = source.replace(/^import java\.awt\.Desktop;\s*$/gm, "import valthorne.browser.BrowserRuntime;");
+        source = source.replace(/^import java\.(?:io\.IOException|net\.URI|net\.URISyntaxException);\s*$/gm, "");
+        const method = source.indexOf("    private boolean openInBrowser(String link) {");
+        if (method < 0) throw new Error("Review browser hyperlink navigation");
+        const begin = source.indexOf("{", method), end = closing(source, begin, "{", "}");
+        source = source.slice(0, source.lastIndexOf("    /**", method)) + `    /**
+     * Requests safe browser navigation during the current activation callback.
+     * Pop-up policy remains controlled by the browser; no OS process is started.
+     *
+     * @param link destination URL relative to the hosting page
+     * @return whether a supported navigation request was dispatched
+     */
+    private boolean openInBrowser(String link) {
+        return BrowserRuntime.openLink(link);
+    }` + source.slice(end + 1);
     }
     if (name === "ui/NanoUtility")
         source = replace(

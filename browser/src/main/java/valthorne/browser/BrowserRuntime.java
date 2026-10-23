@@ -675,4 +675,16 @@ public final class BrowserRuntime {
     @JSBody(script = "return globalThis.valthorneHost.canvasSelector;")
     public static native String canvasSelector();
 
+    /**
+     * Dispatches hyperlink activation without invoking desktop launchers. Relative
+     * HTTP(S), mail and telephone destinations are supported; script, file and
+     * other privileged schemes are rejected. Call within a trusted activation
+     * event so browser pop-up policy can allow the new browsing context.
+     *
+     * @param link nonnull destination resolved against the hosting document
+     * @return whether a supported request was dispatched, not whether it loaded
+     */
+    @JSBody(params = "link", script = "if (!link || !link.trim()) return false; var url; try { url=new URL(link,document.baseURI); } catch(error) { return false; } if (['http:','https:','mailto:','tel:'].indexOf(url.protocol)<0) return false; var anchor=document.createElement('a'); anchor.href=url.href; anchor.target='_blank'; anchor.rel='noopener noreferrer'; anchor.click(); return true;")
+    public static native boolean openLink(String link);
+
 }
