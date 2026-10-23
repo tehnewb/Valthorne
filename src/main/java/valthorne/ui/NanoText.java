@@ -10,15 +10,14 @@ import valthorne.ui.nodes.nano.NanoCodeEditor;
 import static org.lwjgl.nanovg.NanoVG.*;
 
 /**
- * Shared text bridge for Nano controls. Eligible Windows UI uses Microsoft's real
- * DirectWrite layout and grayscale rasterization from the theme font's exact bytes.
- * Other platforms and transformed UI retain Slug curves; roots supply defaults
+ * Shared text bridge for Nano controls. Slug uses full-context shaping and
+ * physical-size hinted outlines from the theme font's exact bytes. Roots supply defaults
  * when no face is configured. Caret/selection measurements share the selected shaped layout.
  * Detached drawing without a root context retains the NanoVG renderer.
  * The active root coordinates backend transitions and painter order. Font
  * ownership stays with the theme, and controls retain their normal text input.
  * Custom names registered with {@link UIRoot#registerTextFont(String, SlugFont)}
- * participate in both native/scalable backends. NanoVG-only registered names retain
+ * participate in hinted and scalable rendering. NanoVG-only registered names retain
  * that renderer because an opaque handle does not expose the encoded source file.
  * <pre>{@code
  * label.setStyle(NanoText.SLUG_FONT, borrowedFont);
@@ -170,9 +169,9 @@ public final class NanoText {
      * @param x logical horizontal position relative to text origin
      * @return shaped UTF-16 insertion position, or -1 for a custom NanoVG face
      */
-    public static int nativeHitTest(UINode node, String name, String text, float size, float x) {
+    public static int shapedHitTest(UINode node, String name, String text, float size, float x) {
         /*
-         * Native cluster boundaries preserve ligatures and bidirectional shaping.
+         * Shaped cluster boundaries preserve ligatures and bidirectional shaping.
          */
         SlugFont selected = font(node, name);
         return selected != null ? UIText.hitTest(node, selected, text, size, x) : -1;

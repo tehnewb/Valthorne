@@ -178,7 +178,7 @@ public class NanoCodeEditor extends NanoPanel {
     }
 
     /**
-     * Measures a caret in the fully shaped displayed line, retaining native kerning
+     * Measures a caret in the fully shaped displayed line, retaining contextual kerning
      * and expanding source tabs consistently with painting.
      *
      * @param line source line index
@@ -208,11 +208,11 @@ public class NanoCodeEditor extends NanoPanel {
         int line = Math.clamp((int) ((point.y() - getAbsoluteY()) / LINE_HEIGHT), 0, starts.size() - 1);
         String value = lineText(line);
         float x = point.x() - getAbsoluteX() - TEXT_X;
-        int nativePosition = NanoText.nativeHitTest(this, fontName, visible(value), FONT_SIZE, x);
-        if (nativePosition >= 0) {
+        int shapedPosition = NanoText.shapedHitTest(this, fontName, visible(value), FONT_SIZE, x);
+        if (shapedPosition >= 0) {
             int raw = 0;
             int displayed = 0;
-            while (raw < value.length() && displayed < nativePosition) displayed += value.charAt(raw++) == '\t' ? 4 : 1;
+            while (raw < value.length() && displayed < shapedPosition) displayed += value.charAt(raw++) == '\t' ? 4 : 1;
             return starts.get(line) + raw;
         }
         if (x <= 0) return starts.get(line);
@@ -339,11 +339,11 @@ public class NanoCodeEditor extends NanoPanel {
                 float left = x + TEXT_X + caretX(line, begin - starts.get(line));
                 float right = x + TEXT_X + caretX(line, end - starts.get(line));
                 nvgBeginPath(vg);
-                TextSelection nativeSelection = NanoText.selection(this, fontName, visible(value), FONT_SIZE,
+                TextSelection shapedSelection = NanoText.selection(this, fontName, visible(value), FONT_SIZE,
                         visible(value.substring(0, begin - starts.get(line))).length(), visible(value.substring(0, end - starts.get(line))).length());
-                if (nativeSelection == null) nvgRect(vg, left, top - 1, Math.max(1, right - left), LINE_HEIGHT);
-                else for (int index = 0; index < nativeSelection.size(); index++)
-                    nvgRect(vg, x + TEXT_X + nativeSelection.left(index), top - 1, nativeSelection.width(index), LINE_HEIGHT);
+                if (shapedSelection == null) nvgRect(vg, left, top - 1, Math.max(1, right - left), LINE_HEIGHT);
+                else for (int index = 0; index < shapedSelection.size(); index++)
+                    nvgRect(vg, x + TEXT_X + shapedSelection.left(index), top - 1, shapedSelection.width(index), LINE_HEIGHT);
                 nvgFillColor(vg, NanoUtility.color1(selectionColor));
                 nvgFill(vg);
             }

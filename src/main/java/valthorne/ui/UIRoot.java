@@ -17,7 +17,6 @@ import valthorne.event.listeners.MouseScrollListener;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.font.SystemFonts;
 import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.slug.SlugData;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.behavior.TextEditing;
@@ -163,14 +162,12 @@ public class UIRoot extends UIContainer {
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
     private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
-    private boolean windowsTextEnabled; // DirectWrite is an explicit Windows comparison/override; Slug is the portable default.
     private boolean slugHintingEnabled = true; // Physical-size hinting for eligible axis-aligned UI; world outlines remain scalable.
     private SlugUIText slugText; // Lazily owned physical-size hinted outline views.
-    private WindowsUIText windowsText; // Lazily owned native shaping, raster, and GPU caches for this root.
-    private UITextRenderingMode lastTextMode = UITextRenderingMode.NOT_DRAWN; // Renderer and native target mode of the latest text submission.
-    private UITextFallbackReason lastTextFallback = UITextFallbackReason.NONE; // Why that submission bypassed native drawing or produced no pixels.
-    private float lastTextScaleX; // Physical framebuffer pixels per DIP of the latest native submission.
-    private float lastTextScaleY; // Vertical physical framebuffer pixels per DIP of the latest native submission.
+    private UITextRenderingMode lastTextMode = UITextRenderingMode.NOT_DRAWN; // Renderer mode of the latest text submission.
+    private UITextFallbackReason lastTextFallback = UITextFallbackReason.NONE; // Why that submission bypassed hinted drawing or produced no pixels.
+    private float lastTextScaleX; // Physical framebuffer pixels per DIP of the latest hinted submission.
+    private float lastTextScaleY; // Vertical physical framebuffer pixels per DIP of the latest hinted submission.
     private Map<String, SlugFont> namedTextFonts; // Optional borrowed exact-file faces for custom Nano text names.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
@@ -934,10 +931,6 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigFree(yogaConfig);
         if (batch != null) batch.dispose();
         if (rotationShader != null) rotationShader.dispose();
-        if (windowsText != null) {
-            windowsText.close();
-            windowsText = null;
-        }
         if (slugText != null) {
             slugText.close();
             slugText = null;
@@ -1743,31 +1736,9 @@ public class UIRoot extends UIContainer {
     public SlugFont getDefaultFont() {return getNanoTextFont(false);}
 
     /**
-     * Explicitly selects Microsoft's native shaping and rasterization for ordinary
-     * Windows UI text instead of the default hinted Slug path. Rotated/zoomed UI
-     * and explicit SlugLabel nodes retain scalable curves. Other operating systems
-     * retain portable Slug. Set this before
-     * laying out controls so their dimensions and caret metrics use the same backend.
-     *
-     * @param enabled whether eligible Windows UI text should use DirectWrite
-     */
-    public void setWindowsTextEnabled(boolean enabled) {
-        windowsTextEnabled = enabled && DirectWriteBackend.isSupported();
-        invalidateTextLayout(this);
-    }
-
-    /**
-     * Reports the root's native Windows text policy before transform eligibility.
-     *
-     * @return whether DirectWrite is enabled on this Windows root
-     */
-    public boolean isWindowsTextEnabled() { return windowsTextEnabled; }
-
-    /**
      * Enables physical-size FreeType hinting for Slug's axis-aligned UI outlines.
      * Enabled by default on every platform. Disabling retains HarfBuzz shaping but
      * uses ordinary scalable outlines; direct world text is unaffected either way.
-     * DirectWrite, when explicitly enabled, takes priority over this policy.
      * Hinted UI uses the published Microsoft Terminal default grayscale response
      * (gamma 1.8, grayscale contrast 1) consistently across platforms, independently
      * of local Windows calibration. It does not simulate LCD subpixel ClearType.
@@ -1803,24 +1774,24 @@ public class UIRoot extends UIContainer {
 
     /**
      * Snapshots the most recent text submission through the shared UI typography
-     * facade. This reports the target mode actually queried from Direct2D, including
-     * cached rasters, rather than ClearType eligibility. It does not summarize every
+     * facade. This reports hinted, scalable or NanoVG rendering for the last draw.
+     * It does not summarize every
      * control or direct world-font draw. Read on this root's rendering thread after
      * the control of interest draws; each explicit query allocates one snapshot.
      *
-     * @return last renderer, fallback reason, physical scaling, and native settings
+     * @return last renderer, fallback reason, physical scaling
      */
     public UITextDiagnostics getTextRenderingDiagnostics() {
-        return new UITextDiagnostics(lastTextMode, lastTextFallback, lastTextScaleX, lastTextScaleY, windowsText == null ? null : windowsText.settings());
+        return new UITextDiagnostics(lastTextMode, lastTextFallback, lastTextScaleX, lastTextScaleY);
     }
 
     /**
      * Records the last text submission without allocating diagnostic objects.
      *
-     * @param mode renderer and native target mode
+     * @param mode renderer mode
      * @param reason fallback or skipped-drawing reason
-     * @param scaleX native physical pixels per DIP, or zero for a fallback
-     * @param scaleY native vertical pixels per DIP, or zero for a fallback
+     * @param scaleX physical pixels per DIP, or zero for a fallback
+     * @param scaleY vertical pixels per DIP, or zero for a fallback
      */
     void recordTextRendering(UITextRenderingMode mode, UITextFallbackReason reason, float scaleX, float scaleY) {
         lastTextMode = mode;
@@ -1831,7 +1802,7 @@ public class UIRoot extends UIContainer {
 
     /**
      * Associates a custom Nano font name with an exact encoded source for consistent
-     * native Windows and scalable non-Windows UI typography. Fonts are borrowed and
+     * portable UI typography. Fonts are borrowed and
      * must outlive controls using the name. This avoids substituting a similarly
      * named system face for custom NanoVG-only handles, which expose no font bytes.
      *
@@ -1856,30 +1827,6 @@ public class UIRoot extends UIContainer {
      * @return borrowed source face, or null when only a NanoVG handle is registered
      */
     SlugFont registeredTextFont(String name) { return namedTextFonts == null ? null : namedTextFonts.get(name); }
-
-    /**
-     * Borrows the lazy native cache owner for UI text measurement and drawing.
-     *
-     * @return owned Windows text resources
-     */
-    WindowsUIText windowsText() {
-        if (windowsText == null) windowsText = new WindowsUIText(this);
-        return windowsText;
-    }
-
-    /**
-     * Reloads Windows font smoothing/rendering preferences and invalidates cached
-     * raster images. Call on the root's rendering thread after Windows text settings
-     * change; pending root draws are flushed before their textures are released.
-     *
-     * @param monitor HMONITOR for the destination display, or zero for defaults
-     */
-    public void refreshWindowsTextSettings(long monitor) {
-        if (windowsText == null) return;
-        if (renderContext != null) batch.flush();
-        windowsText.refresh(monitor);
-        invalidateTextLayout(this);
-    }
 
     /**
      * Invalidates intrinsic text measurements throughout a root after its backend

@@ -176,7 +176,7 @@ public final class UIRenderContext {
         }
         batch.beginScissor(left, bottom, Math.max(0f, right - left), Math.max(0f, top - bottom));
         try {
-            UIText.draw(node, batch, null, font, text, x, UIText.usesWindows(node) || UIText.usesHintedSlug(node) ? height - baseline : batch.alignTextBaseline(height - baseline), size, color);
+            UIText.draw(node, batch, null, font, text, x, UIText.usesHintedSlug(node) ? height - baseline : batch.alignTextBaseline(height - baseline), size, color);
         } finally {
             batch.endScissor();
             selectBackend(true);

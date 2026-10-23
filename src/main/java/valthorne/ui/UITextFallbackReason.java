@@ -2,24 +2,20 @@ package valthorne.ui;
 
 /**
  * Reason a text submission used a scalable/NanoVG fallback or submitted no pixels.
- * NONE accompanies supported native submissions. This describes the last text
+ * NONE accompanies supported hinted submissions. This describes the last text
  * submission, not every control in the root or future eligibility.
  */
 public enum UITextFallbackReason {
     /**
-     * Native rendering handled the submission, or no submission has occurred yet.
+     * Hinted rendering handled the submission, or no submission has occurred yet.
      */
     NONE,
     /**
-     * The control has no root that can own native resources.
+     * The control has no root that can own hinted resources.
      */
     DETACHED,
     /**
-     * The platform does not support this Windows backend.
-     */
-    NON_WINDOWS,
-    /**
-     * The root explicitly disabled Windows text rendering.
+     * The root explicitly disabled Slug hinting.
      */
     DISABLED,
     /**
@@ -31,11 +27,11 @@ public enum UITextFallbackReason {
      */
     ROTATION,
     /**
-     * The active projection cannot preserve native axis-aligned bitmap pixels.
+     * The active projection cannot preserve axis-aligned hinted outlines.
      */
     UNSUPPORTED_PROJECTION,
     /**
-     * Physical scale is nonfinite or exceeds the supported raster range.
+     * Physical scale is nonfinite or exceeds the supported hinting range.
      */
     UNSUPPORTED_SCALE,
     /**
@@ -43,11 +39,7 @@ public enum UITextFallbackReason {
      */
     EMPTY_VIEWPORT,
     /**
-     * The complete native raster lies outside the physical viewport.
-     */
-    OUTSIDE_VIEWPORT,
-    /**
-     * The named NanoVG font has no registered encoded source for native shaping.
+     * The named NanoVG font has no registered encoded source for portable shaping.
      */
     NANOVG_ONLY_FONT,
     /**

@@ -49,12 +49,6 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * A bounded atlas caches Slug's own exact GPU coverage for axis-aligned sampling;
  * cold tiles share a bounded staging buffer, without per-glyph scratch allocation.
  * </p>
- * <p>
- * Native pre-rendered display pixels can use {@link #drawEncoded(Texture, float, float, float, float)}.
- * These submissions preserve their encoded colors and coverage on display targets,
- * restore framebuffer conversion/blend state after drawing, and remain grouped
- * separately from ordinary sprites. Submit them after HDR scene tone mapping.
- * </p>
  *
  * <p>
  * Instead of immediately sending every individual sprite to the GPU, this class stores
@@ -124,9 +118,6 @@ public final class TextureBatch {
     private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
     private TextureBatchGlyphs glyphs; // Lazily owned live-outline implementation sharing the sprite buffers.
     private float opacityMultiplier = 1f; // Multiplies final per-sprite alpha for temporary translucent rendering.
-    private boolean encodedSubmission; // Whether the current submission contains final display-encoded pixels.
-    private boolean encodedInstances; // Whether queued instances require display-space blending without sRGB conversion.
-    private int[] encodedBlendValue; // Lazily allocated native query storage avoids per-flush temporary IntBuffer views.
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
@@ -169,7 +160,8 @@ public final class TextureBatch {
     private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
     private long totalDrawCalls; // Cumulative nonempty sprite draw count, combined with glyph counts by the getter.
     private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
-    private long totalSubmittedSprites, totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalSubmittedSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
 
     /**
      * <p>
@@ -239,13 +231,31 @@ public final class TextureBatch {
 
         FloatBuffer quad = BufferUtils.createFloatBuffer(TextureBatchContract.QUAD_VERTS * TextureBatchContract.QUAD_FLOATS_PER_VERT);
 
-        quad.put(0f).put(0f).put(0f).put(0f);
-        quad.put(1f).put(0f).put(1f).put(0f);
-        quad.put(1f).put(1f).put(1f).put(1f);
+        quad.put(0f)
+                .put(0f)
+                .put(0f)
+                .put(0f);
+        quad.put(1f)
+                .put(0f)
+                .put(1f)
+                .put(0f);
+        quad.put(1f)
+                .put(1f)
+                .put(1f)
+                .put(1f);
 
-        quad.put(1f).put(1f).put(1f).put(1f);
-        quad.put(0f).put(1f).put(0f).put(1f);
-        quad.put(0f).put(0f).put(0f).put(0f);
+        quad.put(1f)
+                .put(1f)
+                .put(1f)
+                .put(1f);
+        quad.put(0f)
+                .put(1f)
+                .put(0f)
+                .put(1f);
+        quad.put(0f)
+                .put(0f)
+                .put(0f)
+                .put(0f);
 
         quad.flip();
 
@@ -272,6 +282,9 @@ public final class TextureBatch {
      * @return the adjusted float value based on the size parameter
      */
     private static float insetMin(float value, float size) {
+        /*
+         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
+         */
         return size > 1f ? value + 0.5f : value;
     }
 
@@ -286,6 +299,9 @@ public final class TextureBatch {
      * modification for sizes greater than 1
      */
     private static float insetMax(float value, float size) {
+        /*
+         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
+         */
         return size > 1f ? value + size - 0.5f : value + size;
     }
 
@@ -304,6 +320,9 @@ public final class TextureBatch {
      * @return the detected and clamped texture unit count
      */
     private static int detectTextureUnitsClamped(int clampTo) {
+        /*
+         * Clamp native texture capacity to the supported batch contract before allocating indexed storage.
+         */
         int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
         if (units <= 0) {
             units = 8;
@@ -474,14 +493,6 @@ public final class TextureBatch {
     }
 
     /**
-     * Borrows the batch's current default tint for renderers that prepare their own
-     * colored pixel data. Per-draw tint overrides still take precedence.
-     *
-     * @return mutable borrowed default tint
-     */
-    public Color getColor() { return color; }
-
-    /**
      * Returns the current multiplier applied to every queued sprite's final
      * alpha, including sprites with their own tint.
      *
@@ -605,35 +616,45 @@ public final class TextureBatch {
      *
      * @return whether logical clipping is active
      */
-    public boolean isClipEnabled() {return clipEnabled;}
+    public boolean isClipEnabled() {
+        return clipEnabled;
+    }
 
     /**
      * Returns the active logical clip's X coordinate in batch drawing space.
      *
      * @return clip X; meaningful when clipping is enabled
      */
-    public float getClipX() {return clipX;}
+    public float getClipX() {
+        return clipX;
+    }
 
     /**
      * Returns the active logical clip's Y coordinate in batch drawing space.
      *
      * @return clip Y; meaningful when clipping is enabled
      */
-    public float getClipY() {return clipY;}
+    public float getClipY() {
+        return clipY;
+    }
 
     /**
      * Returns the active logical clip width before conversion to framebuffer scissor pixels.
      *
      * @return clip width
      */
-    public float getClipWidth() {return clipW;}
+    public float getClipWidth() {
+        return clipW;
+    }
 
     /**
      * Returns the active logical clip height before conversion to framebuffer scissor pixels.
      *
      * @return clip height
      */
-    public float getClipHeight() {return clipH;}
+    public float getClipHeight() {
+        return clipH;
+    }
 
     /**
      * Restores GPU bindings after another renderer has drawn. Call flush() before
@@ -1339,38 +1360,6 @@ public final class TextureBatch {
     }
 
     /**
-     * Queues final display-encoded RGBA pixels, such as native operating-system text,
-     * with neutral tint and the current opacity, translation, and clip. The source
-     * texture must return encoded RGB samples rather than perform sRGB decoding.
-     * Submit after scene tone mapping to a display-encoded destination; this is not
-     * linear-light HDR composition. Native coverage and encoded colors are blended
-     * as supplied, without an additional framebuffer sRGB conversion.
-     *
-     * <p>Consecutive encoded images remain batched. Ordinary and encoded submissions
-     * flush at their boundary. During the encoded GPU draw, framebuffer sRGB conversion
-     * is disabled and destination alpha uses source-over factors so translucent glyph
-     * edges do not punch alpha holes in an opaque surface. Previous blend factors and
-     * framebuffer conversion are restored before returning.
-     * As with other batch operations, flush before changing external GL state.</p>
-     *
-     * @param tex prepared display-encoded straight-alpha texture
-     * @param x destination left in logical units
-     * @param y destination bottom in logical units
-     * @param w destination width in logical units
-     * @param h destination height in logical units
-     */
-    public void drawEncoded(Texture tex, float x, float y, float w, float h) {
-        if (encodedBlendValue == null) encodedBlendValue = new int[1];
-        boolean previous = encodedSubmission;
-        encodedSubmission = true;
-        try {
-            draw(tex, x, y, w, h, Color.WHITE);
-        } finally {
-            encodedSubmission = previous;
-        }
-    }
-
-    /**
      * <p>
      * Queues a pixel-space source region from a {@link Texture} for rendering without
      * a tint override.
@@ -1708,13 +1697,9 @@ public final class TextureBatch {
             return;
         }
 
-        if (glyphs != null && activeShader == defaultShader && !encodedSubmission && sinRot == 0f && cosRot == 1f && w > 0f && h > 0f
+        if (glyphs != null && activeShader == defaultShader && sinRot == 0f && cosRot == 1f && w > 0f && h > 0f
                 && glyphs.appendSprite(tex.getTextureID(), x + translationX, y + translationY, w, h, u0, v0, u1, v1, tint != null ? tint : color, opacityMultiplier, clipEnabled, clipX, clipY, clipW, clipH)) return;
         finishGlyphs();
-        if (encodedInstances != encodedSubmission) {
-            if (instanceCount != 0) flush();
-            encodedInstances = encodedSubmission;
-        }
         if (instanceCount >= maxSprites) {
             flush();
         }
@@ -1745,18 +1730,35 @@ public final class TextureBatch {
 
         a *= opacityMultiplier;
 
-        instanceBuffer.put(x).put(y).put(w).put(h);
-        instanceBuffer.put(r).put(g).put(b).put(a);
+        instanceBuffer.put(x)
+                .put(y)
+                .put(w)
+                .put(h);
+        instanceBuffer.put(r)
+                .put(g)
+                .put(b)
+                .put(a);
         instanceBuffer.put((float) texUnit);
-        instanceBuffer.put(u0).put(v0).put(u1).put(v1);
-        instanceBuffer.put(originX).put(originY);
-        instanceBuffer.put(sinRot).put(cosRot);
+        instanceBuffer.put(u0)
+                .put(v0)
+                .put(u1)
+                .put(v1);
+        instanceBuffer.put(originX)
+                .put(originY);
+        instanceBuffer.put(sinRot)
+                .put(cosRot);
 
         if (clipEnabled) {
-            instanceBuffer.put(clipX).put(clipY).put(clipW).put(clipH);
+            instanceBuffer.put(clipX)
+                    .put(clipY)
+                    .put(clipW)
+                    .put(clipH);
             instanceBuffer.put(1f);
         } else {
-            instanceBuffer.put(0f).put(0f).put(0f).put(0f);
+            instanceBuffer.put(0f)
+                    .put(0f)
+                    .put(0f)
+                    .put(0f);
             instanceBuffer.put(0f);
         }
 
@@ -1951,7 +1953,9 @@ public final class TextureBatch {
      *
      * @return configured culling flag
      */
-    public boolean isCullingEnabled() {return cullingEnabled;}
+    public boolean isCullingEnabled() {
+        return cullingEnabled;
+    }
 
     /**
      * Standard-quad viewport culling. Custom shaders are conservatively exempt.
@@ -2005,29 +2009,7 @@ public final class TextureBatch {
         glBufferSubData(GL_ARRAY_BUFFER, 0, instanceBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        boolean restoreSrgb = encodedInstances && glIsEnabled(GL_FRAMEBUFFER_SRGB);
-        int sourceRgb = 0;
-        int destinationRgb = 0;
-        int sourceAlpha = 0;
-        int destinationAlpha = 0;
-        if (encodedInstances) {
-            glGetIntegerv(GL_BLEND_SRC_RGB, encodedBlendValue);
-            sourceRgb = encodedBlendValue[0];
-            glGetIntegerv(GL_BLEND_DST_RGB, encodedBlendValue);
-            destinationRgb = encodedBlendValue[0];
-            glGetIntegerv(GL_BLEND_SRC_ALPHA, encodedBlendValue);
-            sourceAlpha = encodedBlendValue[0];
-            glGetIntegerv(GL_BLEND_DST_ALPHA, encodedBlendValue);
-            destinationAlpha = encodedBlendValue[0];
-            glBlendFuncSeparate(sourceRgb, destinationRgb, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        }
-        if (restoreSrgb) glDisable(GL_FRAMEBUFFER_SRGB);
-        try {
-            glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
-        } finally {
-            if (restoreSrgb) glEnable(GL_FRAMEBUFFER_SRGB);
-            if (encodedInstances) glBlendFuncSeparate(sourceRgb, destinationRgb, sourceAlpha, destinationAlpha);
-        }
+        glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
         totalDrawCalls++;
 
         instanceBuffer.clear();

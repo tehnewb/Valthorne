@@ -870,10 +870,10 @@ public class NanoTextField extends UINode implements NanoNode {
             float selectionY = y + (height - selectionH) * 0.5f;
 
             nvgBeginPath(vg);
-            TextSelection nativeSelection = NanoText.selection(this, fontName, visibleText, fontSize, a, b);
-            if (nativeSelection == null) nvgRect(vg, x1, selectionY, Math.max(0f, x2 - x1), selectionH);
-            else for (int index = 0; index < nativeSelection.size(); index++)
-                nvgRect(vg, drawX + nativeSelection.left(index), selectionY, nativeSelection.width(index), selectionH);
+            TextSelection shapedSelection = NanoText.selection(this, fontName, visibleText, fontSize, a, b);
+            if (shapedSelection == null) nvgRect(vg, x1, selectionY, Math.max(0f, x2 - x1), selectionH);
+            else for (int index = 0; index < shapedSelection.size(); index++)
+                nvgRect(vg, drawX + shapedSelection.left(index), selectionY, shapedSelection.width(index), selectionH);
             nvgFillColor(vg, aux);
             nvgFill(vg);
         }
@@ -1164,8 +1164,8 @@ public class NanoTextField extends UINode implements NanoNode {
     private int getIndexAtMouseX(float mouseX) {
         String visibleText = getDisplayText();
         float local = mouseX - (getAbsoluteX() + padding + textOffsetX);
-        int nativeIndex = NanoText.nativeHitTest(this, fontName, visibleText, fontSize, local);
-        if (nativeIndex >= 0) return nativeIndex;
+        int shapedIndex = NanoText.shapedHitTest(this, fontName, visibleText, fontSize, local);
+        if (shapedIndex >= 0) return shapedIndex;
         if (local <= 0f)
             return 0;
 

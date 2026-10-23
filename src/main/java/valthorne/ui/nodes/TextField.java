@@ -1171,15 +1171,7 @@ public class TextField extends Panel {
 
         float local = mouseX - (getRenderX() + padding + textOffsetX);
         String visibleText = getDisplayText();
-        if (UIText.usesWindows(this)) return UIText.hitTest(this, font, visibleText, fontSize, local);
-        if (local <= 0f) return 0;
-        int length = visibleText.length();
-
-        for (int i = editor.next(0); i <= length && i > 0; i = i == length ? length + 1 : editor.next(i)) {
-            if (font.getWidth(visibleText, 0, i, fontSize) >= local) return i;
-        }
-
-        return length;
+        return UIText.hitTest(this, font, visibleText, fontSize, local);
     }
 
     /**

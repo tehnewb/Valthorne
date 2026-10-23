@@ -2,7 +2,6 @@ package valthorne.ui.nodes;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
@@ -40,16 +39,15 @@ import valthorne.ui.theme.UITokens;
  * <p>
  * During drawing, if a font is present, the label renders its text at its render
  * position. If a color is also present, that color is used; otherwise the batch
- * color is used. Eligible Windows UI uses the installed DirectWrite rasterizer;
- * other platforms and rotated/camera-zoomed controls retain live Slug curves.
+ * color is used. Axis-aligned UI uses hinted Slug outlines;
+ * rotated and camera-zoomed controls retain scalable Slug curves.
  * </p>
  *
  * <p>
  * Per-line layouts are retained so drawing does not split strings or repeat kerning.
- * Native layout, caret metrics, DPI-specific raster images, and transparent grayscale
- * composition are owned by the UI root. Logical sizes map to framebuffer pixels
- * through its viewport; point sizes can be converted with
- * {@link DirectWriteBackend#pointsToDips(float)}.
+ * Shaped layout and caret metrics share the source font, while the UI root owns
+ * physical-size hinted views. Logical sizes map to framebuffer pixels through
+ * its viewport.
  * The font is borrowed and must outlive pending draws.
  * The class does not perform its own interaction behavior and is typically used as
  * a child inside higher-level components such as buttons, tooltips, or form controls.
@@ -111,7 +109,6 @@ public class Label extends UINode {
     private SlugFont layoutFont; // Font used to build the current retained lines.
     private String layoutText; // Source text used to build the current retained lines.
     private float layoutSize; // Em scale used to build the current retained lines.
-    private boolean layoutWindows; // Typography backend used for the retained intrinsic measurements.
     private float textWidth; // Cached maximum line advance in world units.
     private float textHeight; // Cached total line-box height in world units.
     private Color color; // Borrowed draw tint, or null for the batch's default color.
@@ -347,9 +344,7 @@ public class Label extends UINode {
      * lines without regex or temporary arrays in the drawing path.
      */
     private void updateTextLayout() {
-        boolean nativeText = UIText.usesWindows(this);
-        if (layoutFont == font && layoutSize == fontSize && text.equals(layoutText) && layoutWindows == nativeText) return;
-        layoutWindows = nativeText;
+        if (layoutFont == font && layoutSize == fontSize && text.equals(layoutText)) return;
         layoutFont = font;
         layoutText = text;
         layoutSize = fontSize;

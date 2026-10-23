@@ -1,52 +1,22 @@
 package valthorne.ui;
 
 import valthorne.graphics.Color;
-import valthorne.graphics.font.directwrite.DirectWriteBackend;
 import valthorne.graphics.font.TextSelection;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
-import valthorne.ui.theme.StyleKey;
 
 /**
  * Shared typography for UI controls. Slug is the portable default: HarfBuzz supplies
  * full-context glyph positions and FreeType hints axis-aligned UI geometry at its
  * physical size. Rotated and camera-zoomed controls retain scalable world outlines.
- * DirectWrite is an explicit Windows comparison/override. Measurement, caret
- * positioning, selection, and painting share the selected shaping backend.
+ * Measurement, caret positioning, selection, and painting share HarfBuzz shaping.
  */
 public final class UIText {
-    /**
-     * Optional final uniform opaque destination color for native ClearType. Set only
-     * when the entire glyph/overhang rectangle already has this exact opaque color
-     * and contains no background image, gradient, or underlying overlapping content.
-     * Null preserves native transparent grayscale. Partial batch opacity always
-     * selects grayscale, even when this hint is present. The backend never guesses
-     * a background or inserts an opaque rectangle into ordinary transparent controls.
-     */
-    public static final StyleKey<Color> OPAQUE_BACKGROUND_KEY = StyleKey.of("text.nativeOpaqueBackground", Color.class);
-    /**
-     * Stable platform eligibility avoids repeating operating-system string work per draw.
-     */
-    private static final boolean WINDOWS_SUPPORTED = DirectWriteBackend.isSupported();
     /**
      * Prevents construction of the typography facade.
      */
     private UIText() {}
-
-    /**
-     * Checks transform and platform eligibility without initializing native factories.
-     *
-     * @param node owning UI node
-     * @return whether this node uses the root's native Windows text policy
-     */
-    public static boolean usesWindows(UINode node) {
-        /*
-         * Physical DPI scaling is supported. World camera zoom and node rotations
-         * intentionally preserve live outline rendering instead of scaling bitmaps.
-         */
-        return fallbackReason(node) == UITextFallbackReason.NONE;
-    }
 
     /**
      * Checks portable hinted-outline policy without querying OpenGL or loading native fonts.
@@ -61,7 +31,7 @@ public final class UIText {
          * World camera zoom and node rotations retain continuous scalable geometry.
          */
         UIRoot root = node.getRoot();
-        return root != null && !root.isWindowsTextEnabled() && slugFallbackReason(node) == UITextFallbackReason.NONE;
+        return root != null && slugFallbackReason(node) == UITextFallbackReason.NONE;
     }
 
     /**
@@ -72,33 +42,11 @@ public final class UIText {
      */
     private static UITextFallbackReason slugFallbackReason(UINode node) {
         /*
-         * Portable eligibility does not depend on the Windows-only comparison policy.
+         * Hinting depends only on the root policy and its actual transform.
          */
         UIRoot root = node.getRoot();
         if (root == null) return UITextFallbackReason.DETACHED;
         if (!root.isSlugHintingEnabled()) return UITextFallbackReason.DISABLED;
-        var viewport = root.getViewport();
-        if (viewport != null && viewport.getCamera() != null && viewport.getCamera().getZoom() != 1) return UITextFallbackReason.CAMERA_ZOOM;
-        for (UINode current = node; current != null; current = current.getParent())
-            if (current.getRotation() != 0) return UITextFallbackReason.ROTATION;
-        return UITextFallbackReason.NONE;
-    }
-
-    /**
-     * Determines the transform/policy fallback without initializing native resources.
-     *
-     * @param node owning UI node
-     * @return NONE for native eligibility, otherwise the relevant fallback reason
-     */
-    private static UITextFallbackReason fallbackReason(UINode node) {
-        /*
-         * Keep measurement and drawing eligibility identical while retaining a
-         * precise reason for diagnostics on an actual text submission.
-         */
-        UIRoot root = node.getRoot();
-        if (root == null) return UITextFallbackReason.DETACHED;
-        if (!WINDOWS_SUPPORTED) return UITextFallbackReason.NON_WINDOWS;
-        if (!root.isWindowsTextEnabled()) return UITextFallbackReason.DISABLED;
         var viewport = root.getViewport();
         if (viewport != null && viewport.getCamera() != null && viewport.getCamera().getZoom() != 1) return UITextFallbackReason.CAMERA_ZOOM;
         for (UINode current = node; current != null; current = current.getParent())
@@ -113,18 +61,18 @@ public final class UIText {
      * @param font borrowed font
      * @param text complete text
      * @param size logical DIPs/world units per em
-     * @return native or scalable advance width
+     * @return shaped advance width
      */
     public static float width(UINode node, SlugFont font, String text, float size) {
         /*
-         * Empty and zero-sized controls avoid native allocation entirely.
+         * Empty and zero-sized controls avoid shaping work entirely.
          */
         if (font == null || text == null || text.isEmpty() || size == 0) return 0;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).width() : font.getWidth(text, size);
+        return font.getWidth(text, size);
     }
 
     /**
-     * Measures native/scalable line-box height for consistent intrinsic layout.
+     * Measures shaped line-box height for consistent intrinsic layout.
      *
      * @param node owning node
      * @param font borrowed font
@@ -133,10 +81,10 @@ public final class UIText {
      */
     public static float lineHeight(UINode node, SlugFont font, float size) {
         /*
-         * DirectWrite supplies the empty line's actual baseline and line box.
+         * Use the source font's line metrics for both hinted and scalable geometry.
          */
         if (font == null || size == 0) return 0;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, "", size).height() : font.lineHeight() * size;
+        return font.lineHeight() * size;
     }
 
     /**
@@ -150,10 +98,10 @@ public final class UIText {
      */
     public static float height(UINode node, SlugFont font, String text, float size) {
         /*
-         * DirectWrite retains native line breaks and fallback-font metrics.
+         * Measure line breaks with the same source font used for rendering.
          */
         if (font == null || size == 0) return 0;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).height() : font.getHeight(text, size);
+        return font.getHeight(text, size);
     }
 
     /**
@@ -166,10 +114,10 @@ public final class UIText {
      */
     public static float ascent(UINode node, SlugFont font, float size) {
         /*
-         * Use the same native line-box convention during placement and editing.
+         * Use the same source line-box convention during placement and editing.
          */
         if (font == null || size == 0) return 0;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, "", size).baseline() : font.ascent() * size;
+        return font.ascent() * size;
     }
 
     /**
@@ -184,7 +132,7 @@ public final class UIText {
         /*
          * Existing controls use negative descent in their vertical centering formula.
          */
-        return usesWindows(node) ? ascent(node, font, size) - lineHeight(node, font, size) : font.descent() * size;
+        return font.descent() * size;
     }
 
     /**
@@ -199,14 +147,14 @@ public final class UIText {
      */
     public static float caretX(UINode node, SlugFont font, String text, float size, int position) {
         /*
-         * Native hit metrics retain ligatures and kerning context across the caret.
+         * Full shaping retains ligatures and kerning context across the caret.
          */
         if (size == 0 || text.isEmpty()) return 0;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).caretX(position) : font.shape(text).caretX(position) * size;
+        return font.shape(text).caretX(position) * size;
     }
 
     /**
-     * Maps a point to an insertion position, preserving native glyph cluster boundaries.
+     * Maps a point to an insertion position, preserving shaped glyph cluster boundaries.
      *
      * @param node owning editor
      * @param font borrowed font
@@ -217,10 +165,9 @@ public final class UIText {
      */
     public static int hitTest(UINode node, SlugFont font, String text, float size, float x) {
         /*
-         * Both backends hit-test complete shaped context rather than prefix widths.
+         * Hit-test complete shaped context rather than separately shaped prefixes.
          */
         if (size == 0 || text.isEmpty()) return 0;
-        if (usesWindows(node)) return node.getRoot().windowsText().layout(font, text, size).hitTest(x, lineHeight(node, font, size) * .5f);
         return font.shape(text).hitTest(x / size, font.lineHeight() * .5f);
     }
 
@@ -240,7 +187,7 @@ public final class UIText {
          * Bidirectional selections cannot be represented by subtracting caret widths.
          */
         if (font == null || size <= 0) return null;
-        return usesWindows(node) ? node.getRoot().windowsText().layout(font, text, size).selection(start, end) : font.shape(text).selection(start, end, size);
+        return font.shape(text).selection(start, end, size);
     }
 
     /**
@@ -258,26 +205,15 @@ public final class UIText {
      */
     public static void draw(UINode node, TextureBatch batch, SlugTextRun run, SlugFont font, String text, float x, float baseline, float size, Color color) {
         /*
-         * Hinted Slug is the default for ordinary UI. Explicit DirectWrite and
-         * transformed scalable runs preserve the same batch ordering/clipping.
+         * Hinted Slug is the default for ordinary UI. Transformed scalable runs
+         * preserve the same batch ordering and clipping.
          */
         if (text == null || text.isEmpty() || size == 0) return;
-        int background = -1;
-        Color opaque = node.getStyleOrDefaults().get(OPAQUE_BACKGROUND_KEY);
-        if (opaque != null && opaque.getAlpha() == 255 && batch.getOpacityMultiplier() == 1)
-            background = opaque.getRed() << 16 | opaque.getGreen() << 8 | opaque.getBlue();
-        UITextFallbackReason reason = fallbackReason(node);
+        UITextFallbackReason reason = slugFallbackReason(node);
         UIRoot root = node.getRoot();
         if (reason == UITextFallbackReason.NONE) {
-            reason = root.windowsText().draw(batch, font, text, x, baseline, size, color, background);
+            reason = root.slugText().draw(batch, font, text, x, baseline, size, color);
             if (reason == UITextFallbackReason.NONE) return;
-        }
-        if (root != null && !root.isWindowsTextEnabled()) {
-            reason = slugFallbackReason(node);
-            if (reason == UITextFallbackReason.NONE) {
-                reason = root.slugText().draw(batch, font, text, x, baseline, size, color);
-                if (reason == UITextFallbackReason.NONE) return;
-            }
         }
         if (run != null) run.draw(batch, x, baseline, color);
         else font.draw(batch, text, x, baseline, size, color);
