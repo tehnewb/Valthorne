@@ -1,5 +1,11 @@
 package valthorne.ui.nodes;
 
+import java.util.ArrayList;
+import valthorne.Keyboard;
+import valthorne.event.events.KeyPressEvent;
+
+import valthorne.ui.nodes.nano.NanoDisclosureIndicator;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -30,8 +36,20 @@ public class ComboBox<T> extends Button {
      */
     public ComboBox() {
         super("Select...");
-        action(button -> { if (popup.isOpen()) popup.close(); else open(); });
-        getLayout().minWidth(160).height(36);
+        setStyleName("combo-trigger");
+        getLayout()
+                .itemsStart()
+                .paddingHorizontal(8);
+        NanoDisclosureIndicator arrow = new NanoDisclosureIndicator(() -> true);
+        arrow.getLayout()
+                .leftAuto()
+                .right(8);
+        add(arrow);
+        action(button -> {
+            if (popup.isOpen()) popup.close(); else open();
+        });
+        getLayout()
+                .minWidth(160);
     }
 
     /**
@@ -41,26 +59,36 @@ public class ComboBox<T> extends Button {
      */
     public ComboBox<T> items(List<T> items) {
         List<T> copy = List.copyOf(items);
-        popup.close(); this.items = copy; selected = -1; text("Select..."); return this;
+        popup.close();
+        this.items = copy;
+        selected = -1;
+        text("Select...");
+        return this;
     }
 
     /**
      * Returns the immutable option list; individual values are not deep copied.
      * @return options in menu order
      */
-    public List<T> getItems() { return items; }
+    public List<T> getItems() {
+        return items;
+    }
 
     /**
      * Reads the selected index without notifying listeners.
      * @return index or -1 when empty
      */
-    public int getSelectedIndex() { return selected; }
+    public int getSelectedIndex() {
+        return selected;
+    }
 
     /**
      * Borrows the selected value; no selection returns null.
      * @return selected option or null
      */
-    public T getSelected() { return selected < 0 ? null : items.get(selected); }
+    public T getSelected() {
+        return selected < 0 ? null : items.get(selected);
+    }
 
     /**
      * Sets selection silently, dismissing options only when the index or formatted
@@ -101,7 +129,10 @@ public class ComboBox<T> extends Button {
     public ComboBox<T> formatter(Function<? super T, String> formatter) {
         Objects.requireNonNull(formatter);
         String label = selected < 0 ? "Select..." : Objects.requireNonNull(formatter.apply(getSelected()));
-        popup.close(); this.formatter = formatter; text(label); return this;
+        popup.close();
+        this.formatter = formatter;
+        text(label);
+        return this;
     }
 
     /**
@@ -109,7 +140,10 @@ public class ComboBox<T> extends Button {
      * @param listener nonnull callback
      * @return this dropdown
      */
-    public ComboBox<T> onChange(Consumer<? super T> listener) { change = Objects.requireNonNull(listener); return this; }
+    public ComboBox<T> onChange(Consumer<? super T> listener) {
+        change = Objects.requireNonNull(listener);
+        return this;
+    }
 
     /**
      * Builds labels for a new opening and presents options below this control.
@@ -117,12 +151,13 @@ public class ComboBox<T> extends Button {
      */
     public void open() {
         if (isDisabled() || getRoot() == null || items.isEmpty()) return;
-        var commands = new java.util.ArrayList<PopupMenu.Item>();
+        var commands = new ArrayList<PopupMenuItem>();
         for (int i = 0; i < items.size(); i++) {
             int index = i;
-            commands.add(new PopupMenu.Item(Objects.requireNonNull(formatter.apply(items.get(i))), () -> select(index), true));
+            commands.add(new PopupMenuItem(Objects.requireNonNull(formatter.apply(items.get(i))), () -> select(index), true));
         }
-        popup.items(commands).showBelow(this);
+        popup.items(commands)
+                .showBelow(this);
         if (selected >= 0) popup.highlight(selected);
     }
 
@@ -131,10 +166,12 @@ public class ComboBox<T> extends Button {
      * Enter and Space use the normal button toggle action; disabled controls ignore keys.
      * @param event routed control key press
      */
-    @Override public void onKeyPress(valthorne.event.events.KeyPressEvent event) {
+    @Override
+    public void onKeyPress(KeyPressEvent event) {
         if (isDisabled()) return;
-        if (event.getKey() == valthorne.Keyboard.DOWN || event.getKey() == valthorne.Keyboard.UP) {
-            open(); event.consume();
+        if (event.getKey() == Keyboard.DOWN || event.getKey() == Keyboard.UP) {
+            open();
+            event.consume();
         } else super.onKeyPress(event);
     }
 
@@ -142,15 +179,22 @@ public class ComboBox<T> extends Button {
      * Reports whether the dropdown currently owns an attached option overlay.
      * @return true while open
      */
-    public boolean isOpen() { return popup.isOpen(); }
+    public boolean isOpen() {
+        return popup.isOpen();
+    }
 
     /**
      * Dismisses options without modifying selection or notifying listeners.
      */
-    public void close() { popup.close(); }
+    public void close() {
+        popup.close();
+    }
 
     /**
      * Removes the option overlay when its anchor leaves the UI tree.
      */
-    @Override public void onDestroy() { close(); }
+    @Override
+    public void onDestroy() {
+        close();
+    }
 }

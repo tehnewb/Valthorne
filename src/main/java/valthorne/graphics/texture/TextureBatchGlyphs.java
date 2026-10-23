@@ -13,6 +13,7 @@ import valthorne.io.file.ValthorneFiles;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.lang.ref.WeakReference;
+import java.util.Objects;
 
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.system.MemoryUtil.memAlloc;
@@ -54,9 +55,10 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * <p>All calls are confined to the parent's graphics thread. Clip and tint values
  * are copied per submission; glyph loops allocate no temporary objects. Cold
  * capture suspends caller masking state and restores it before composition.
- * Package visibility keeps this implementation out of the public drawing API.</p>
+ * The parent owns the drawing scope and all resources.</p>
  */
-final class TextureBatchGlyphs {
+public final class TextureBatchGlyphs {
+    private final TextureBatch parent; // Owning batch for public drawing and alignment entry points.
     /**
      * Fixed set-associative table for repeatedly submitted run geometry.
      */
@@ -156,12 +158,148 @@ final class TextureBatchGlyphs {
      * @param capacity number of instances supported by shared storage
      * @param textureUnits sampler units addressable by the parent sprite shader
      */
-    TextureBatchGlyphs(ByteBuffer instances, int quadVBO, int instanceVBO, int capacity, int textureUnits) {
+    TextureBatchGlyphs(TextureBatch parent, ByteBuffer instances, int quadVBO, int instanceVBO, int capacity, int textureUnits) {
+        this.parent = parent;
         this.instances = instances;
         this.quadVBO = quadVBO;
         this.instanceVBO = instanceVBO;
         this.capacity = capacity;
         this.textureUnits = textureUnits;
+    }
+
+    /**
+     * Queues live Slug outlines at a baseline origin in the normal batch scope.
+     * Consecutive text calls share a glyph queue; switching to sprites preserves
+     * submission order. Null tint selects the batch color. Translation, logical
+     * clipping and opacity apply exactly once when glyphs are submitted.
+     *
+     * @param font borrowed live font, kept alive through flush
+     * @param text UTF-16 text; null or empty submits nothing
+     * @param x baseline X in world units before batch translation
+     * @param y baseline Y in world units before batch translation
+     * @param size finite nonnegative world units per em
+     * @param tint copied tint, or null for the batch color
+     * @throws IllegalStateException if the batch is not drawing or the font is disposed
+     * @throws IllegalArgumentException if size is negative or nonfinite
+     */
+    public void draw(SlugFont font, String text, float x, float y, float size, Color tint) {
+        if (!parent.isDrawing()) throw new IllegalStateException("Call begin() before draw().");
+        Objects.requireNonNull(font, "font");
+        if (!Float.isFinite(size) || size < 0f)
+            throw new IllegalArgumentException("Size must be finite and nonnegative.");
+        if (text == null || text.isEmpty() || size == 0f || parent.getOpacityMultiplier() == 0f) return;
+        Color selected = tint == null ? parent.getDefaultTint() : tint;
+        if (selected.a() <= 0f) return;
+        if (font.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
+        prepare(selected);
+        draw(font, text, x + parent.getTranslationX(), y + parent.getTranslationY(), size);
+    }
+
+    /**
+     * Queues a retained layout using live curves without repeating text layout.
+     * The run and its font are borrowed; the font must outlive queued draws.
+     *
+     * @param run precomputed glyph positions and size
+     * @param x baseline X before batch translation
+     * @param y baseline Y before batch translation
+     * @param tint copied tint, or null for the batch color
+     * @throws IllegalStateException if the batch is not drawing or the font is disposed
+     */
+    public void draw(SlugTextRun run, float x, float y, Color tint) {
+        if (!parent.isDrawing()) throw new IllegalStateException("Call begin() before draw().");
+        Objects.requireNonNull(run, "run");
+        if (run.glyphCount() == 0 || run.size() == 0f || parent.getOpacityMultiplier() == 0f) return;
+        Color selected = tint == null ? parent.getDefaultTint() : tint;
+        if (selected.a() <= 0f) return;
+        SlugFont font = run.font();
+        if (font.isDisposed()) throw new IllegalStateException("Slug font is disposed.");
+        prepare(selected);
+        draw(run, x + parent.getTranslationX(), y + parent.getTranslationY());
+    }
+
+    /**
+     * Applies a rigid world transform to text, matching a caller's custom sprite
+     * transform. UI scopes use this for composed node rotations. Previously queued
+     * work is flushed before the transform changes; begin resets it to identity.
+     *
+     * @param cosine finite rotation cosine
+     * @param sine finite rotation sine
+     * @param x finite horizontal transform offset
+     * @param y finite vertical transform offset
+     * @throws IllegalStateException if the parent batch has not begun drawing
+     * @throws IllegalArgumentException if any transform component is nonfinite
+     */
+    public void setTextTransform(float cosine, float sine, float x, float y) {
+        if (!parent.isDrawing()) throw new IllegalStateException("Call begin() before setTextTransform().");
+        if (!Float.isFinite(cosine) || !Float.isFinite(sine) || !Float.isFinite(x) || !Float.isFinite(y))
+            throw new IllegalArgumentException("Text transform must be finite.");
+        if (this.cosine == cosine && this.sine == sine && transformX == x && transformY == y) return;
+        parent.flush();
+        this.cosine = cosine;
+        this.sine = sine;
+        transformX = x;
+        transformY = y;
+    }
+
+    /**
+     * Flushes preceding sprites, starts a segment and snaps a translated baseline for uniform axis-aligned
+     * projections. General projections preserve the supplied baseline.
+     *
+     * @param baseline finite baseline before parent translation
+     * @return baseline in the same local coordinates
+     * @throws IllegalStateException if the parent batch has not begun drawing
+     * @throws IllegalArgumentException if baseline is not finite
+     */
+    public float alignTextBaseline(float baseline) {
+        if (!parent.isDrawing()) throw new IllegalStateException("Call begin() before alignTextBaseline().");
+        if (!Float.isFinite(baseline)) throw new IllegalArgumentException("Baseline must be finite.");
+        if (!drawing) parent.flush();
+        beginGlyphSegment();
+        if (projectionScale <= 0f) return baseline;
+        float translationY = parent.getTranslationY();
+        float translated = baseline + translationY;
+        return viewMinY + Math.round((translated - viewMinY) * projectionScale) / projectionScale - translationY;
+    }
+
+    /**
+     * Aligns a text line's horizontal origin to the nearest physical pixel
+     * boundary when the combined camera/text projection is axis-aligned and
+     * uniformly scaled. Glyph advances and kerning retain their fractional
+     * precision. Flushes preceding sprites and begins a glyph segment so the
+     * subsequent text reuses the same projection and viewport snapshot; other
+     * projections preserve the origin. Uses the owning batch's live translation.
+     *
+     * @param x finite horizontal pen coordinate before parent translation
+     * @return origin in the same local coordinates
+     * @throws IllegalStateException if the parent batch has not begun drawing
+     * @throws IllegalArgumentException if x is not finite
+     */
+    public float alignTextOrigin(float x) {
+        if (!parent.isDrawing()) throw new IllegalStateException("Call begin() before alignTextOrigin().");
+        if (!Float.isFinite(x)) throw new IllegalArgumentException("Text origin must be finite.");
+        if (!drawing) parent.flush();
+        beginGlyphSegment();
+        if (projectionScale <= 0f) return x;
+        float translationX = parent.getTranslationX();
+        float translated = x + translationX;
+        return viewMinX + Math.round((translated - viewMinX) * projectionScale) / projectionScale - translationX;
+    }
+
+    /**
+     * Flushes preceding sprites and copies the parent's current submission state.
+     * Consecutive glyph submissions retain exclusive use of shared storage.
+     *
+     * @param tint validated nonnull text tint
+     */
+    private void prepare(Color tint) {
+        if (!drawing) parent.flush();
+        beginGlyphSegment();
+        packedColor = colorByte(tint.r()) << 24 | colorByte(tint.g()) << 16 | colorByte(tint.b()) << 8 | colorByte(tint.a() * parent.getOpacityMultiplier());
+        clipEnabled = parent.isClipEnabled();
+        clipX = parent.getClipX();
+        clipY = parent.getClipY();
+        clipW = parent.getClipWidth();
+        clipH = parent.getClipHeight();
     }
 
     /**

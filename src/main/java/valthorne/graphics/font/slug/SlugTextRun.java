@@ -165,7 +165,8 @@ public final class SlugTextRun {
      */
     public void draw(TextureBatch batch, float x, float y, Color color) {
         if (batch == null) throw new NullPointerException("batch");
-        batch.draw(this, x, y, color);
+        batch.getGlyphs()
+                .draw(this, x, y, color);
     }
 
     /**
@@ -257,7 +258,9 @@ public final class SlugTextRun {
      *
      * @return layout font
      */
-    public SlugFont font() { return font; }
+    public SlugFont font() {
+        return font;
+    }
 
     /**
      * Returns one drawable glyph in retained submission order.
@@ -265,7 +268,9 @@ public final class SlugTextRun {
      * @param index glyph index from zero through glyphCount minus one
      * @return immutable outline metadata
      */
-    public SlugGlyph glyph(int index) { return glyphs[index]; }
+    public SlugGlyph glyph(int index) {
+        return glyphs[index];
+    }
 
     /**
      * Returns a glyph's horizontal baseline offset from the run origin.
@@ -273,7 +278,9 @@ public final class SlugTextRun {
      * @param index glyph index from zero through glyphCount minus one
      * @return offset in world units
      */
-    public float xOffset(int index) { return xOffsets[index]; }
+    public float xOffset(int index) {
+        return xOffsets[index];
+    }
 
     /**
      * Returns a glyph's vertical baseline offset, including line spacing.
@@ -281,7 +288,9 @@ public final class SlugTextRun {
      * @param index glyph index from zero through glyphCount minus one
      * @return offset in world units
      */
-    public float yOffset(int index) { return yOffsets[index]; }
+    public float yOffset(int index) {
+        return yOffsets[index];
+    }
 
     /**
      * Tests retained ink bounds against a rectangle without iterating glyphs.

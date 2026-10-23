@@ -1,6 +1,5 @@
 package valthorne.ui;
 
-import valthorne.Window;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.shader.Shader;
@@ -85,7 +84,9 @@ public final class UIRenderContext {
     private float transformY; // Accumulated rigid transform translation in world coordinates.
     private boolean nanoActive; // True while NanoVG is selected; false while texture painting is selected.
     private float dragOpacity = 1f; // Opacity applied only while painting the lifted item.
-    private int nodesDrawn, backendSwitches, nanoFlushes; // Node attempts, backend transitions, and NanoVG submissions for this draw.
+    private int nodesDrawn; // Node attempts, backend transitions, and NanoVG submissions for this draw.
+    private int backendSwitches; // Node attempts, backend transitions, and NanoVG submissions for this draw.
+    private int nanoFlushes; // Node attempts, backend transitions, and NanoVG submissions for this draw.
 
     /**
      * Borrows the root's drawing resources and captures its render-space camera
@@ -117,7 +118,9 @@ public final class UIRenderContext {
      *
      * @return the current draw's visible-node attempt count
      */
-    public int getNodesDrawn() {return nodesDrawn;}
+    public int getNodesDrawn() {
+        return nodesDrawn;
+    }
 
     /**
      * Returns attempted changes between painting backends. Selecting the current
@@ -126,7 +129,9 @@ public final class UIRenderContext {
      *
      * @return backend transitions attempted during this root draw
      */
-    public int getBackendSwitches() {return backendSwitches;}
+    public int getBackendSwitches() {
+        return backendSwitches;
+    }
 
     /**
      * Returns NanoVG end-frame submissions made when returning to texture painting.
@@ -135,7 +140,9 @@ public final class UIRenderContext {
      *
      * @return NanoVG submissions completed by this context so far
      */
-    public int getNanoFlushes() {return nanoFlushes;}
+    public int getNanoFlushes() {
+        return nanoFlushes;
+    }
 
     /**
      * Returns the active batch shared by all nodes in this draw. This is the
@@ -145,12 +152,16 @@ public final class UIRenderContext {
      *
      * @return the borrowed batch to pass to {@link UINode#render(TextureBatch)}
      */
-    public TextureBatch getBatch() {return batch;}
+    public TextureBatch getBatch() {
+        return batch;
+    }
 
     /**
      * Paints curve glyphs within a Nano control while retaining backend order.
      * Coordinates use the same top-left logical space as the Nano callback;
      * clipping intersects the control and its current ancestor clip.
+     * Axis-aligned line origins and baselines align to physical pixels without
+     * changing fractional glyph advances or kerning.
      *
      * @param node owning Nano control
      * @param font borrowed curve font
@@ -176,7 +187,7 @@ public final class UIRenderContext {
         }
         batch.beginScissor(left, bottom, Math.max(0f, right - left), Math.max(0f, top - bottom));
         try {
-            UIText.draw(node, batch, null, font, text, x, UIText.usesHintedSlug(node) ? height - baseline : batch.alignTextBaseline(height - baseline), size, color);
+            UIText.draw(node, batch, null, font, text, x, UIText.usesHintedSlug(node) ? height - baseline : batch.getGlyphs().alignTextBaseline(height - baseline), size, color);
         } finally {
             batch.endScissor();
             selectBackend(true);
@@ -200,7 +211,9 @@ public final class UIRenderContext {
      * @throws IllegalStateException if a visible NanoVG node is drawn without an
      *                               available NanoVG context
      */
-    public void draw(UINode node) {drawNode(node, true);}
+    public void draw(UINode node) {
+        drawNode(node, true);
+    }
 
     /**
      * Paints a lifted item without a separate background. NanoVG and texture
@@ -265,7 +278,8 @@ public final class UIRenderContext {
         transformCosine = previousCosine * cosine - previousSine * sine;
         transformSine = previousSine * cosine + previousCosine * sine;
         shader.transform(transformCosine, transformSine, transformX, transformY);
-        batch.setTextTransform(transformCosine, transformSine, transformX, transformY);
+        batch.getGlyphs()
+                .setTextTransform(transformCosine, transformSine, transformX, transformY);
         try {
             drawNodeContents(node, restoreBackend);
         } finally {
@@ -276,7 +290,8 @@ public final class UIRenderContext {
                 transformSine = previousSine;
                 transformX = previousX;
                 transformY = previousY;
-                batch.setTextTransform(previousCosine, previousSine, previousX, previousY);
+                batch.getGlyphs()
+                        .setTextTransform(previousCosine, previousSine, previousX, previousY);
                 batch.setShader(previousShader);
                 if (previousShader instanceof UIRotationShader previousRotation)
                     previousRotation.transform(previousCosine, previousSine, previousX, previousY);
@@ -293,7 +308,8 @@ public final class UIRenderContext {
      */
     private void drawNodeContents(UINode node, boolean restoreBackend) {
         nodesDrawn++;
-        root.getInspector().record(node, root);
+        root.getInspector()
+                .record(node, root);
         boolean previousBackend = nanoActive;
         if (node instanceof NanoNode nano) {
             if (vg == 0L) throw new IllegalStateException("NanoVG context is unavailable.");

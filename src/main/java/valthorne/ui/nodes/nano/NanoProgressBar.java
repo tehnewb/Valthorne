@@ -142,7 +142,6 @@ public class NanoProgressBar extends UINode implements NanoNode {
         return this;
     }
 
-
     /**
      * Replaces the synchronous displayed-value callback. It runs during animated
      * updates or immediate target snaps, and can read both target and displayed
@@ -553,7 +552,7 @@ public class NanoProgressBar extends UINode implements NanoNode {
         if (displayPercentage) {
             String text = String.format("%.2f%%", percentage * 100f);
             float textWidth = NanoText.measureTextWidth(this, vg, fontName, fontSize, text);
-            float textY = NanoUtility.getTextCenterY(vg, fontName, fontSize, y, height);
+            float textY = y + height * 0.5f;
 
             float textX = x + (width - textWidth) * 0.5f;
             textX = Math.max(x + textPaddingX, textX);
@@ -561,9 +560,9 @@ public class NanoProgressBar extends UINode implements NanoNode {
 
             nvgFontSize(vg, fontSize);
             nvgFontFace(vg, fontName);
-            nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+            nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, NanoUtility.color1(textColor));
-            NanoText.draw(this, vg, fontName, textX, textY, text, fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+            NanoText.draw(this, vg, fontName, textX, textY, text, fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         }
     }
 

@@ -37,6 +37,14 @@ import java.util.*;
  * bottom-left world. Because of that, finite layers are vertically flipped during rendering so tiles
  * appear in the expected world-space positions.
  * </p>
+ * <p>
+ * Diamond isometric maps project columns and storage rows using half of the
+ * declared tile width and height. Diagonals render from back to front, and tall
+ * tiles retain their tileset image dimensions with bottom-center alignment.
+ * The public tile-range and lookup APIs still use bottom-up logical rows.
+ * {@link #getPixelWidth()} and {@link #getPixelHeight()} report the projected
+ * floor extent, which may differ from the ordinary column/row products.
+ * </p>
  *
  * <p>
  * Infinite map chunks are handled differently. Chunk coordinates are already relative to the chunk
@@ -102,6 +110,9 @@ public final class TiledMap {
     private final int tileHeight; // The height of one tile in pixels.
     private final boolean infinite; // Whether this map uses Tiled's infinite-map chunk format.
     private final String orientation; // The declared map orientation, usually orthogonal.
+    private final boolean isometric; // Whether square-grid coordinates project onto a diamond plane.
+    private final float pixelWidth; // Native projected width before world scaling or rotation.
+    private final float pixelHeight; // Native projected height before world scaling or rotation.
     private final Map<String, String> properties; // Arbitrary custom properties attached to the map.
     private final List<TileSet> tileSets; // Runtime tilesets used for tile resolution and rendering.
     private final List<MapLayer> mapLayers; // All layers contained in the map, including non-tile layers.
@@ -113,6 +124,8 @@ public final class TiledMap {
     private float originY; // Vertical world offset applied to every rendered tile.
     private float scaleX = 1f; // Horizontal scale of the map's native pixel extent.
     private float scaleY = 1f; // Vertical scale of the map's native pixel extent.
+    private float layerOffsetX; // Current layer translation in world units; restored after drawing.
+    private float layerOffsetY; // Current top-down layer offset converted to world Y.
     private boolean visible = true; // Whether this drawable participates in rendering and animation updates.
     private boolean disposed; // Whether this runtime map has already released its owned resources.
 
@@ -136,12 +149,15 @@ public final class TiledMap {
     public TiledMap(TiledMapData data) {
         Objects.requireNonNull(data, "data");
         this.name = data.getName();
-        this.width = data.getWidth();
-        this.height = data.getHeight();
+        this.width = data.isInfinite() ? Math.max(1, data.getWidth()) : data.getWidth();
+        this.height = data.isInfinite() ? Math.max(1, data.getHeight()) : data.getHeight();
         this.tileWidth = data.getTileWidth();
         this.tileHeight = data.getTileHeight();
         this.infinite = data.isInfinite();
         this.orientation = data.getOrientation();
+        this.isometric = "isometric".equals(orientation);
+        this.pixelWidth = Math.max(1f, isometric ? (width + height) * tileWidth * .5f : width * tileWidth);
+        this.pixelHeight = Math.max(1f, isometric ? (width + height) * tileHeight * .5f : height * tileHeight);
         this.properties = data.getProperties() != null ? data.getProperties() : new HashMap<>();
         this.mapLayers = data.getMapLayers() != null ? data.getMapLayers() : new ArrayList<>();
         this.tileSets = new ArrayList<>();
@@ -182,8 +198,8 @@ public final class TiledMap {
             throw new IllegalArgumentException("Map bounds must have positive width and height");
         originX = x;
         originY = y;
-        scaleX = width / Math.max(1, this.width * tileWidth);
-        scaleY = height / Math.max(1, this.height * tileHeight);
+        scaleX = width / pixelWidth;
+        scaleY = height / pixelHeight;
     }
 
     /**
@@ -192,8 +208,7 @@ public final class TiledMap {
      * @return current bounds in world units
      */
     public Rectangle getBounds() {
-        return new Rectangle(originX, originY, Math.max(1, width * tileWidth) * scaleX,
-                Math.max(1, height * tileHeight) * scaleY);
+        return new Rectangle(originX, originY, pixelWidth * scaleX, pixelHeight * scaleY);
     }
 
     /**
@@ -201,7 +216,9 @@ public final class TiledMap {
      *
      * @return degrees about the map center
      */
-    public float getRotation() {return rotation;}
+    public float getRotation() {
+        return rotation;
+    }
 
     /**
      * Rotates rendered layers without rewriting their canonical tile coordinates.
@@ -236,7 +253,7 @@ public final class TiledMap {
     public void render(TextureBatch batch) {
         if (!visible) return;
         Objects.requireNonNull(batch, "batch");
-        render(batch, 0, 0, width - 1, height - 1);
+        render(batch, infinite ? -100000 : 0, infinite ? -100000 : 0, infinite ? 100000 : width - 1, infinite ? 100000 : height - 1);
     }
 
     /**
@@ -419,6 +436,33 @@ public final class TiledMap {
      * @param maxTileY final row
      */
     private void renderTileLayer(TextureBatch batch, TiledTileMapLayer layer, int minTileX, int minTileY, int maxTileX, int maxTileY) {
+        if (!layer.isVisible() || layer.getOpacity() <= 0) return;
+        float previousOpacity = batch.getOpacityMultiplier();
+        float previousX = layerOffsetX;
+        float previousY = layerOffsetY;
+        layerOffsetX = layer.getOffsetX() * scaleX;
+        layerOffsetY = -layer.getOffsetY() * scaleY;
+        batch.setOpacityMultiplier(previousOpacity * Math.clamp(layer.getOpacity(), 0, 1));
+        try {
+            renderTileLayerData(batch, layer, minTileX, minTileY, maxTileX, maxTileY);
+        }
+        finally {
+            layerOffsetX = previousX;
+            layerOffsetY = previousY;
+            batch.setOpacityMultiplier(previousOpacity);
+        }
+    }
+
+    /**
+     * Draws finite/chunk storage under the already scoped layer transform.
+     * @param batch active batch
+     * @param layer retained tile data
+     * @param minTileX first included column
+     * @param minTileY first included bottom-up logical row
+     * @param maxTileX last included column
+     * @param maxTileY last included bottom-up logical row
+     */
+    private void renderTileLayerData(TextureBatch batch, TiledTileMapLayer layer, int minTileX, int minTileY, int maxTileX, int maxTileY) {
         if (!layer.isVisible()) {
             return;
         }
@@ -426,15 +470,15 @@ public final class TiledMap {
         if (layer.isInfinite() && !layer.getChunks().isEmpty()) {
             for (MapChunk chunk : layer.getChunks().values()) {
                 int chunkMinX = chunk.x();
-                int chunkMinY = chunk.y();
+                int chunkMinY = height - chunk.y() - chunk.height();
                 int chunkMaxX = chunk.x() + chunk.width() - 1;
-                int chunkMaxY = chunk.y() + chunk.height() - 1;
+                int chunkMaxY = height - chunk.y() - 1;
 
                 if (chunkMaxX < minTileX || chunkMinX > maxTileX || chunkMaxY < minTileY || chunkMinY > maxTileY) {
                     continue;
                 }
 
-                drawGrid(batch, chunk.width(), chunk.height(), chunk.globalTileIDs(), chunk.x(), chunk.y(), minTileX, minTileY, maxTileX, maxTileY);
+                drawGrid(batch, chunk.width(), chunk.height(), chunk.globalTileIDs(), chunk.x(), isometric ? chunk.y() : chunkMinY, minTileX, minTileY, maxTileX, maxTileY);
             }
             return;
         }
@@ -500,6 +544,10 @@ public final class TiledMap {
      * @param maxTileY      the maximum visible tile index in the Y axis
      */
     private void drawGrid(TextureBatch batch, int widthTiles, int heightTiles, int[] globalTileIDs, int offsetXTiles, int offsetYTiles, int minTileX, int minTileY, int maxTileX, int maxTileY) {
+        if (isometric) {
+            drawIsometricGrid(batch, widthTiles, heightTiles, globalTileIDs, offsetXTiles, offsetYTiles, minTileX, minTileY, maxTileX, maxTileY);
+            return;
+        }
         final float tilePixelWidth = this.tileWidth * scaleX;
         final float tilePixelHeight = this.tileHeight * scaleY;
         final float pivotX = originX + Math.max(1, width * tileWidth) * scaleX * .5f;
@@ -543,13 +591,133 @@ public final class TiledMap {
                     continue;
                 }
 
-                float worldX = originX + (offsetXTiles + localTileX) * tilePixelWidth;
-                float worldY = originY + worldTileY * tilePixelHeight;
+                float worldX = originX + (offsetXTiles + localTileX) * tilePixelWidth + layerOffsetX;
+                float worldY = originY + worldTileY * tilePixelHeight + layerOffsetY;
 
-                if (rotation == 0) batch.draw(region, worldX, worldY, tilePixelWidth, tilePixelHeight);
-                else batch.drawUV(region.getTexture(), worldX, worldY, tilePixelWidth, tilePixelHeight, region.getU(), region.getV(), region.getU2(), region.getV2(), pivotX - worldX, pivotY - worldY, rotationSine, rotationCosine, null);
+                drawTile(batch, region, raw, worldX, worldY, tilePixelWidth, tilePixelHeight, pivotX, pivotY);
             }
         }
+    }
+
+    /**
+     * Projects a diamond tile grid into the same bottom-left world used by the
+     * rest of the renderer. Back diagonals draw first so tall tiles overlap
+     * correctly. Tile-range arguments retain the public bottom-left row
+     * convention; storage rows and Tiled chunk offsets are converted once per
+     * tile. Tileset image dimensions remain independent of the floor diamond.
+     *
+     * @param batch active destination batch
+     * @param widthTiles stored column count
+     * @param heightTiles stored row count
+     * @param gids row-major global tile identifiers
+     * @param offsetX chunk column offset
+     * @param offsetY chunk row offset
+     * @param minX first included logical column
+     * @param minY first included bottom-up logical row
+     * @param maxX last included logical column
+     * @param maxY last included bottom-up logical row
+     */
+    private void drawIsometricGrid(TextureBatch batch, int widthTiles, int heightTiles, int[] gids, int offsetX, int offsetY, int minX, int minY, int maxX, int maxY) {
+        float halfWidth = tileWidth * .5f;
+        float halfHeight = tileHeight * .5f;
+        float pivotX = originX + pixelWidth * scaleX * .5f;
+        float pivotY = originY + pixelHeight * scaleY * .5f;
+        int firstVisibleColumn = Math.max(0, minX - offsetX);
+        int lastVisibleColumn = Math.min(widthTiles - 1, maxX - offsetX);
+        int firstVisibleRow = Math.max(0, height - 1 - maxY - offsetY);
+        int lastVisibleRow = Math.min(heightTiles - 1, height - 1 - minY - offsetY);
+        if (firstVisibleColumn > lastVisibleColumn || firstVisibleRow > lastVisibleRow) return;
+        // Restrict diagonal traversal itself; a small viewport must not scan the whole map.
+        for (int diagonal = firstVisibleColumn + firstVisibleRow; diagonal <= lastVisibleColumn + lastVisibleRow; diagonal++) {
+            int firstColumn = Math.max(firstVisibleColumn, diagonal - lastVisibleRow);
+            int lastColumn = Math.min(lastVisibleColumn, diagonal - firstVisibleRow);
+            for (int column = firstColumn; column <= lastColumn; column++) {
+                int row = diagonal - column;
+                int logicalX = offsetX + column;
+                int raw = gids[row * widthTiles + column];
+                int gid = raw & GID_MASK;
+                if (gid == 0) continue;
+                TileSet tileSet = findTilesetForGID(gid);
+                if (tileSet == null) continue;
+                int localId = tileSet.resolveAnimatedLocalId(gid - tileSet.getFirstGlobalTileID(), animationTimeSeconds);
+                TextureRegion region = tileSet.getRegionForLocalId(localId);
+                if (region == null) continue;
+                int projectedRow = offsetY + row;
+                float drawWidth = tileSet.getTileWidth() * scaleX;
+                float drawHeight = tileSet.getTileHeight() * scaleY;
+                float centerX = (height + logicalX - projectedRow) * halfWidth;
+                float bottomY = pixelHeight - (logicalX + projectedRow + 2) * halfHeight;
+                float x = originX + centerX * scaleX - drawWidth * .5f + layerOffsetX;
+                float y = originY + bottomY * scaleY + layerOffsetY;
+                drawTile(batch, region, raw, x, y, drawWidth, drawHeight, pivotX, pivotY);
+            }
+        }
+    }
+
+    /**
+     * Returns the native projected horizontal extent of the floor grid.
+     *
+     * @return width in pixels before scaling
+     */
+    public float getPixelWidth() {
+        return pixelWidth;
+    }
+
+    /**
+     * Returns the native projected vertical extent of the floor grid.
+     *
+     * @return height in pixels before scaling
+     */
+    public float getPixelHeight() {
+        return pixelHeight;
+    }
+
+    /**
+     * Emits an atlas tile with Tiled flip flags and the current map rotation.
+     * Diagonal flags transpose texture axes while preserving the destination
+     * rectangle, including non-square/tall isometric artwork. No temporary
+     * regions, vertices or colors are allocated per tile.
+     * @param batch active batch
+     * @param region borrowed atlas region
+     * @param raw raw GID including H/V/diagonal flags
+     * @param x world rectangle left
+     * @param y world rectangle bottom
+     * @param width destination width
+     * @param height destination height
+     * @param pivotX map rotation center X
+     * @param pivotY map rotation center Y
+     */
+    private void drawTile(TextureBatch batch, TextureRegion region, int raw, float x, float y, float width, float height, float pivotX, float pivotY) {
+        boolean horizontal = (raw & 0x80000000) != 0;
+        boolean vertical = (raw & 0x40000000) != 0;
+        boolean diagonal = (raw & 0x20000000) != 0;
+        if (!horizontal && !vertical && !diagonal && rotation == 0) {
+            batch.draw(region, x, y, width, height);
+            return;
+        }
+        float u0 = region.getU();
+        float u1 = region.getU2();
+        float v0 = region.getV();
+        float v1 = region.getV2();
+        if (diagonal ? !vertical : horizontal) {
+            float swap = u0;
+            u0 = u1;
+            u1 = swap;
+        }
+        if (diagonal ? horizontal : vertical) {
+            float swap = v0;
+            v0 = v1;
+            v1 = swap;
+        }
+        if (!diagonal) {
+            batch.drawUV(region.getTexture(), x, y, width, height, u0, v0, u1, v1, pivotX - x, pivotY - y, rotationSine, rotationCosine, null);
+            return;
+        }
+        float centerX = x + width * .5f - pivotX;
+        float centerY = y + height * .5f - pivotY;
+        float rotatedX = pivotX + centerX * rotationCosine - centerY * rotationSine;
+        float rotatedY = pivotY + centerX * rotationSine + centerY * rotationCosine;
+        batch.drawUV(region.getTexture(), rotatedX - height * .5f, rotatedY - width * .5f, height, width, u0, v0, u1, v1, height * .5f, width * .5f, rotationCosine, -rotationSine, null);
     }
 
     /**
@@ -610,8 +778,8 @@ public final class TiledMap {
      * Returns the orientation string defined by the Tiled map.
      *
      * <p>
-     * Common values include {@code orthogonal}, {@code isometric}, and related layout types,
-     * though this runtime class currently renders as an orthogonal grid-oriented implementation.
+     * Orthogonal and diamond {@code isometric} tile layers use their native
+     * projection. Staggered and hexagonal layouts are not projected specially.
      * </p>
      *
      * @return the orientation string
@@ -895,7 +1063,9 @@ public final class TiledMap {
      *
      * @return current visibility
      */
-    public boolean isVisible() {return visible;}
+    public boolean isVisible() {
+        return visible;
+    }
 
     /**
      * Changes visibility without releasing resources or changing the object's
@@ -903,5 +1073,7 @@ public final class TiledMap {
      *
      * @param visible whether rendering and animation updates are enabled
      */
-    public void setVisible(boolean visible) {this.visible = visible;}
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
 }

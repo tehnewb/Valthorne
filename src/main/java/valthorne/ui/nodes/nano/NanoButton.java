@@ -13,6 +13,7 @@ import valthorne.ui.UIRoot;
 import valthorne.ui.behavior.ActivationBehavior;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 
@@ -53,7 +54,9 @@ public class NanoButton extends NanoContainer {
             label = new NanoLabel(text);
             label.setClickable(false);
             label.applyCaptionStyle(fontName, fontSize, textColor, getStyleOrDefaults());
-            getLayout().itemsCenter().justifyCenter();
+            getLayout()
+                    .itemsCenter()
+                    .justifyCenter();
             add(label);
         }
         return label;
@@ -762,10 +765,15 @@ public class NanoButton extends NanoContainer {
         float measuredHeight = measureTextHeight() + paddingY * 2f;
 
         if (getLayout().getWidth().isAuto())
-            getLayout().width(measuredWidth);
+            getLayout()
+                .width(measuredWidth);
 
-        if (getLayout().getHeight().isAuto())
-            getLayout().height(measuredHeight);
+        if (getLayout().getHeight().isAuto()) {
+            Float controlHeight = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
+            if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
+            getLayout()
+                    .height(measuredHeight);
+        }
 
         super.applyLayout();
     }

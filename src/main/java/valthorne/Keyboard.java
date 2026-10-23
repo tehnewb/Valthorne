@@ -793,6 +793,9 @@ public final class Keyboard {
      * </p>
      */
     static void init() {
+        /*
+         * Keep lifecycle initialization on the calling engine thread so native handles and callbacks share one owner.
+         */
         dispose();
         resetState();
 
@@ -850,6 +853,9 @@ public final class Keyboard {
      * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void addKeyListener(KeyListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null KeyListener cannot be added");
         JGL.subscribe(EventTypes.KEY_PRESS, listener);
         JGL.subscribe(EventTypes.KEY_RELEASE, listener);
@@ -869,6 +875,9 @@ public final class Keyboard {
      * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void removeKeyListener(KeyListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null KeyListener cannot be removed");
         JGL.unsubscribe(EventTypes.KEY_PRESS, listener);
         JGL.unsubscribe(EventTypes.KEY_RELEASE, listener);
@@ -886,6 +895,9 @@ public final class Keyboard {
      * </p>
      */
     static void dispose() {
+        /*
+         * Release retained native state in lifecycle order; cleanup failures must not hide later release attempts.
+         */
         if (textCallback != null) {
             if (Window.getAddress() != 0) glfwSetCharCallback(Window.getAddress(), null);
             textCallback.free();
@@ -905,6 +917,9 @@ public final class Keyboard {
      * operating system's actual Caps Lock setting.
      */
     static void resetState() {
+        /*
+         * Restore reusable singleton state without retaining callbacks or stale native handles from a prior lifecycle.
+         */
         keyDown.clear();
         currentKey = -1;
         modifierState = 0;
@@ -926,7 +941,11 @@ public final class Keyboard {
      * @return {@code true} if the key is currently down, otherwise {@code false}
      */
     public static boolean isKeyDown(int key) {
-        return key >= 0 && key <= GLFW_KEY_LAST && keyDown.get(key);
+        /*
+         * Select logical presentation input when active; otherwise read the primary keyboard cache without native polling.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? key >= 0 && key <= GLFW_KEY_LAST && keyDown.get(key) : context.keyDown(key);
     }
 
     /**
@@ -941,7 +960,11 @@ public final class Keyboard {
      * @return {@code true} if Shift is currently down
      */
     public static boolean isShiftDown() {
-        return (modifierState & GLFW_MOD_SHIFT) != 0;
+        /*
+         * Combine cached left and right modifier keys without a native query or temporary key collection.
+         */
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_SHIFT) != 0;
     }
 
     /**
@@ -956,7 +979,11 @@ public final class Keyboard {
      * @return {@code true} if Control is currently down
      */
     public static boolean isCtrlDown() {
-        return (modifierState & GLFW_MOD_CONTROL) != 0;
+        /*
+         * Combine cached left and right modifier keys without a native query or temporary key collection.
+         */
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_CONTROL) != 0;
     }
 
     /**
@@ -971,7 +998,11 @@ public final class Keyboard {
      * @return {@code true} if Alt is currently down
      */
     public static boolean isAltDown() {
-        return (modifierState & GLFW_MOD_ALT) != 0;
+        /*
+         * Combine cached left and right modifier keys without a native query or temporary key collection.
+         */
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_ALT) != 0;
     }
 
     /**
@@ -988,7 +1019,11 @@ public final class Keyboard {
      * @return {@code true} if Super is currently down
      */
     public static boolean isSuperDown() {
-        return (modifierState & GLFW_MOD_SUPER) != 0;
+        /*
+         * Combine cached left and right modifier keys without a native query or temporary key collection.
+         */
+        WindowContext context = WindowContext.current();
+        return ((context == null ? modifierState : context.modifiers()) & GLFW_MOD_SUPER) != 0;
     }
 
     /**
@@ -1004,7 +1039,11 @@ public final class Keyboard {
      * @return {@code true} if Caps Lock is currently on
      */
     public static boolean isCapsLockOn() {
-        return capsLockOn;
+        /*
+         * Read presentation-local lock state when installed, preserving independent embedded input.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? capsLockOn : context.capsLock();
     }
 
     /**
@@ -1029,6 +1068,9 @@ public final class Keyboard {
      * @return the printable character for the given key, or {@code '\0'} if none exists
      */
     public static char getKeyChar(int key) {
+        /*
+         * Map cached key and modifier state directly; committed Unicode input remains the separate text-input route.
+         */
         boolean shift = isShiftDown();
         boolean caps = isCapsLockOn();
 

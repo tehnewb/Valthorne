@@ -29,10 +29,13 @@ public final class NanoText {
      * Optional curve font resolved from local overrides, rules, and theme tokens.
      */
     public static final StyleKey<SlugFont> SLUG_FONT = StyleKey.of("nano.slugFont", SlugFont.class);
+
     /**
-     * Optional monospace face for editable source and line-number glyphs.
+     * Optional monospace face for editable source and line-number glyphs;
+     * attached editors fall back to the root's monospace Slug face.
      */
     public static final StyleKey<SlugFont> SLUG_CODE_FONT = StyleKey.of("nano.slugCodeFont", SlugFont.class);
+
     /**
      * Semibold face for window captions and inspector section headings.
      */
@@ -94,6 +97,9 @@ public final class NanoText {
      * @return end pen X for syntax-highlighted runs
      */
     public static float draw(UINode node, long vg, float x, float y, String text, float size, Color color, int align) {
+        /*
+         * Delegate to named-font drawing so the default and explicit typography paths share layout and batching behavior.
+         */
         return draw(node, vg, node instanceof NanoCodeEditor ? "code" : "default", x, y, text, size, color, align);
     }
 
@@ -235,11 +241,14 @@ public final class NanoText {
         if (registered != null) return registered;
         if (!"default".equals(name) && !"code".equals(name)) return null;
         ResolvedStyle style = node.getStyleOrDefaults();
+        boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);
+        if (monospace) {
+            SlugFont code = style.get(SLUG_CODE_FONT);
+            return code != null ? code : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(true);
+        }
         SlugFont heading = "editor-section".equals(node.getStyleName()) || "window-caption".equals(node.getStyleName()) ? style.get(SLUG_HEADING_FONT) : null;
         if (heading != null) return heading;
-        boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);
-        SlugFont code = monospace ? style.get(SLUG_CODE_FONT) : null;
-        SlugFont selected = code == null ? style.get(SLUG_FONT) : code;
+        SlugFont selected = style.get(SLUG_FONT);
         return selected != null ? selected : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(monospace);
     }
 }

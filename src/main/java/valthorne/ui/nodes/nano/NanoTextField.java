@@ -15,6 +15,7 @@ import valthorne.ui.NodeAction;
 import valthorne.ui.UINode;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
+import valthorne.ui.theme.UITokens;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 import valthorne.Mouse;
@@ -31,6 +32,11 @@ import valthorne.ui.behavior.TextEditing;
  * shared shortcuts; raw text remains available from getText and getEditor. One
  * mask character is emitted per UTF-16 code unit, not per grapheme. Pointer presses
  * within the double-click interval select all, without a spatial proximity test.</p>
+ *
+ * <p>Text is left-aligned by default. {@link #centered(boolean)} centers text and
+ * placeholders that fit the padded viewport. Caret placement, selection painting,
+ * and pointer hit testing share that text origin; longer text retains ordinary
+ * horizontal scrolling to keep the caret visible.</p>
  *
  * <p>Attach to a root before operations requiring caret measurement: substring
  * measurement and styled auto layout dereference the root. The root owns NanoVG
@@ -156,7 +162,9 @@ public class NanoTextField extends UINode implements NanoNode {
     private float caretWidth = 2f; // Requested caret stroke width, drawn at least one UI unit wide.
     private float caretPadY = 8f; // Vertical inset for caret and selection geometry.
     private float scissorFudge = 4f; // Extra horizontal text-clip width beyond padded content bounds.
-    private float textOffsetX; // Nonpositive horizontal text translation keeping the caret visible.
+    private boolean centered; // Whether fitting text and placeholders are horizontally centered.
+    private float textOffsetX; // Shared centered or scrolling translation for text, selection, caret, and hit testing.
+    private float placeholderOffsetX; // Cached centering translation for an empty field's fitting placeholder.
 
     private float doubleClickTimer; // Elapsed seconds since the pending initial click.
     private float doubleClickWindow = 0.25f; // Maximum interval recognizing a second click as select-all.
@@ -222,6 +230,31 @@ public class NanoTextField extends UINode implements NanoNode {
      */
     public NanoTextField text(String text) {
         editor.text(text);
+        return this;
+    }
+
+    /**
+     * Reads whether text and placeholders that fit the padded viewport are centered.
+     *
+     * @return true for centered fitting content, false for default left alignment
+     */
+    public boolean isCentered() {
+        return centered;
+    }
+
+    /**
+     * Sets horizontal alignment for fitting text and placeholders without changing
+     * the text, caret, selection, or undo history. Longer text keeps ordinary caret
+     * scrolling. Painting and pointer hit testing use the same updated origin.
+     *
+     * @param centered true to center fitting content, false to align it to the left
+     * @return this field
+     */
+    public NanoTextField centered(boolean centered) {
+        if (this.centered == centered) return this;
+        this.centered = centered;
+        updateScroll();
+        markLayoutDirty();
         return this;
     }
 
@@ -790,12 +823,23 @@ public class NanoTextField extends UINode implements NanoNode {
         float measuredHeight = NanoText.measureTextHeight(this, (getRoot() == null ? 0L : getRoot().getNanoVGHandle()), fontName, fontSize) + padding * 2f;
 
         if (getLayout().getWidth().isAuto())
-            getLayout().width(measuredWidth);
+            getLayout()
+                .width(measuredWidth);
 
-        if (getLayout().getHeight().isAuto())
-            getLayout().height(measuredHeight);
+        if (getLayout().getHeight().isAuto()) {
+            Float controlHeight = style.get(UITokens.CONTROL_HEIGHT);
+            if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
+            getLayout()
+                    .height(measuredHeight);
+        }
 
         super.applyLayout();
+        updateScroll();
+    }
+
+    @Override
+    protected void afterLayout() {
+        super.afterLayout();
         updateScroll();
     }
 
@@ -811,7 +855,6 @@ public class NanoTextField extends UINode implements NanoNode {
     public void draw(long vg) {
         if (!isVisible() || vg == 0L)
             return;
-
 
         String visibleText = getDisplayText();
         boolean empty = visibleText.isEmpty();
@@ -879,7 +922,7 @@ public class NanoTextField extends UINode implements NanoNode {
         }
 
         nvgFillColor(vg, fg);
-        NanoText.draw(this, vg, fontName, drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        NanoText.draw(this, vg, fontName, empty ? x + padding + placeholderOffsetX : drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
         if (isFocused() && caretVisible) {
             float caretX = drawX + NanoText.caretX(this, vg, fontName, visibleText, fontSize, Math.min(caretIndex, visibleText.length()));
@@ -943,7 +986,8 @@ public class NanoTextField extends UINode implements NanoNode {
      * @return content-space X used for caret hit testing
      */
     private float getEventX(MousePressEvent event) {
-        return getEventPosition(event.getX(), event.getY()).x();
+        return getEventPosition(event.getX(), event.getY())
+                .x();
     }
 
     /**
@@ -966,7 +1010,8 @@ public class NanoTextField extends UINode implements NanoNode {
      * @return content-space X used for selection hit testing
      */
     private float getEventX(MouseDragEvent event) {
-        return getEventPosition(event.getToX(), event.getToY()).x();
+        return getEventPosition(event.getToX(), event.getToY())
+                .x();
     }
 
     /**
@@ -997,7 +1042,9 @@ public class NanoTextField extends UINode implements NanoNode {
      *
      * @return owned mutable editor
      */
-    public TextEditModel getEditor() {return editor;}
+    public TextEditModel getEditor() {
+        return editor;
+    }
 
     /**
      * Copies current text, caret, and anchor into renderer state after any editor
@@ -1200,24 +1247,28 @@ public class NanoTextField extends UINode implements NanoNode {
     }
 
     /**
-     * Keeps the measured caret inside the padded horizontal viewport, clamping the
-     * text offset between the full-text left limit and zero. Resets offset if content
-     * fits or available width is nonpositive. Substring measurement requires a root
-     * when that path is reached.
+     * Keeps the measured caret inside the padded horizontal viewport. Fitting text
+     * uses zero translation or its positive center offset; longer text clamps the
+     * translation between the full-text left limit and zero. The placeholder has an
+     * independent cached center offset and never scrolls. Nonpositive width clears
+     * both offsets. Recomputed on editing, style, and computed-layout changes rather
+     * than measuring alignment during every draw.
      */
     private void updateScroll() {
         float available = getWidth() - padding * 2f;
         if (available <= 0f) {
             textOffsetX = 0f;
+            placeholderOffsetX = 0f;
             return;
         }
 
         String visibleText = getDisplayText();
         float textWidth = measureTextWidth(visibleText);
         float caretX = NanoText.caretX(this, getRoot() == null ? 0 : getRoot().getNanoVGHandle(), fontName, visibleText, fontSize, Math.min(caretIndex, visibleText.length()));
+        placeholderOffsetX = centered && visibleText.isEmpty() ? Math.max(0f, (available - measureTextWidth(placeholder)) * .5f) : 0f;
 
         if (textWidth <= available) {
-            textOffsetX = 0f;
+            textOffsetX = centered ? (available - textWidth) * .5f : 0f;
             return;
         }
 

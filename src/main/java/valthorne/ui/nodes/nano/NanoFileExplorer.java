@@ -5,19 +5,24 @@ import valthorne.ui.behavior.DirectoryEntry;
 
 import valthorne.Keyboard;
 import valthorne.event.events.KeyPressEvent;
+import valthorne.event.events.FileDropEvent;
+import valthorne.ui.UINode;
 import valthorne.ui.UIInputEvent;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * NanoVG variant. Read-only local directory browser with breadcrumbs, parent/refresh/open commands,
+ * NanoVG local directory browser with desktop-file imports, breadcrumbs, parent/refresh/open commands,
  * hidden-file filtering, and virtualized directory rows. Click to select; Enter or
  * Open enters a directory or emits a file callback. Arrows and Home/End select rows;
  * Backspace requests the parent. Navigation never renames, deletes, or launches files.
+ * Desktop drops copy paths into the hovered folder row, or into the current
+ * directory over other content. Transfers run on a worker, keep both entries
+ * on filename collisions, and rescan the listing after completion.
  * <pre>{@code
  * NanoFileExplorer files = new NanoFileExplorer(Path.of("assets"));
  * files.filter(path -> path.toString().endsWith(".png"));
@@ -37,18 +42,21 @@ import java.util.function.Predicate;
  * @author Albert Beaupre
  */
 public class NanoFileExplorer extends NanoPanel {
-    private final DirectoryBrowserModel model;
+    final DirectoryBrowserModel model; // Checked directory snapshots and retained user selection.
+    private final boolean confined; // Whether imports must remain beneath the construction root.
     private final NanoBreadcrumbBar breadcrumbs = new NanoBreadcrumbBar(); // Owned current-model.getDirectory() navigation.
     private final NanoLabel status = new NanoLabel(); // Owned current path, selection, or error text.
     private final NanoButton up = new NanoButton("Up"); // Owned parent-navigation button.
-    private final NanoVirtualList list; // Owned virtualized model.getDirectory() rows.
+    final NanoVirtualList list; // Owned virtualized model.getDirectory() rows.
     private final NanoPanel toolbar = NanoWidgetSupport.panel(); // Optional standalone navigation commands.
     private final NanoScrollPanel trail = NanoWidgetSupport.viewport(); // Optional standalone breadcrumb viewport.
     private final NanoScrollPanel statusViewport = NanoWidgetSupport.viewport(); // Optional standalone status viewport.
     private final NanoPanel header = NanoWidgetSupport.panel(); // Detail column headings above the virtual rows.
-    private boolean details; // Whether rows display file icons and metadata columns.
+    boolean details; // Whether rows display file icons and metadata columns.
     private final NanoButton nameHeading = new NanoButton("Name  ^"); // Name ordering command and direction indicator.
     private final NanoButton dateHeading = new NanoButton("Date modified"); // Modification ordering command and direction indicator.
+    private NanoFileContextMenu imports; // Lazily owned asynchronous desktop import controller; null before first drop.
+    private Runnable filesChanged = () -> {}; // Optional owner rescan notification after imports, including partial failures.
 
     /**
      * Opens and scans an existing directory, establishing its real path as the root.
@@ -68,28 +76,74 @@ public class NanoFileExplorer extends NanoPanel {
      */
     public NanoFileExplorer(Path root, boolean confined) throws IOException {
         model = new DirectoryBrowserModel(root, confined);
-        getLayout().column().minWidth(280).minHeight(160);
-        toolbar.getLayout().row().height(36).noShrink();
-        NanoButton refresh = new NanoButton("Refresh").action(button -> request(model.getDirectory()));
-        NanoButton activate = new NanoButton("Open").action(button -> openSelection());
-        up.action(button -> { if (model.canGoUp()) request(model.getDirectory().getParent()); });
-        for (NanoButton button : List.of(up, refresh, activate)) button.getLayout().width(72).heightPercent(100).noShrink();
+        this.confined = confined;
+        getLayout()
+                .column()
+                .minWidth(280)
+                .minHeight(160);
+        toolbar.getLayout()
+                .row()
+                .height(36)
+                .noShrink();
+        NanoButton refresh = new NanoButton("Refresh")
+                .action(button -> request(model.getDirectory()));
+        NanoButton activate = new NanoButton("Open")
+                .action(button -> openSelection());
+        up.action(button -> {
+            if (model.canGoUp()) request(model.getDirectory().getParent());
+        });
+        for (NanoButton button : List.of(up, refresh, activate)) button.getLayout()
+                .width(72)
+                .heightPercent(100)
+                .noShrink();
         toolbar.add(up, refresh, activate);
         breadcrumbs.onNavigate(this::request);
-        trail.horizontal(true).vertical(false);
-        trail.getLayout().height(36).noShrink(); trail.setContent(breadcrumbs);
+        trail.horizontal(true)
+                .vertical(false);
+        trail.getLayout()
+                .height(36)
+                .noShrink();
+        trail.setContent(breadcrumbs);
         list = new NanoVirtualList(0, index -> {
-            NanoButton row = new FileRow(index);
+            NanoButton row = new NanoFileExplorerRow(this, index);
             row.setSelected(model.isSelected(index)); return row;
         });
-        list.rowHeight(32).gap(0); list.getLayout().height(0).grow(1).shrink(1).minHeight(0).widthPercent(100);
-        statusViewport.horizontal(false).vertical(false).horizontalBar(false).verticalBar(false);
-        statusViewport.getLayout().height(28).widthPercent(100).noShrink();
+        list.rowHeight(32)
+                .gap(0);
+        list.getLayout()
+                .height(0)
+                .grow(1)
+                .shrink(1)
+                .minHeight(0)
+                .widthPercent(100);
+        statusViewport.horizontal(false)
+                .vertical(false)
+                .horizontalBar(false)
+                .verticalBar(false);
+        statusViewport.getLayout()
+                .height(28)
+                .widthPercent(100)
+                .noShrink();
         statusViewport.setContent(status);
-        header.getLayout().row().height(0).noShrink(); header.setVisible(false);
-        nameHeading.action(button -> requestSort(false)); dateHeading.action(button -> requestSort(true));
-        nameHeading.setStyleName("chooser-heading"); nameHeading.getLayout().widthPercent(56).heightPercent(100).itemsStart().paddingLeft(12);
-        dateHeading.setStyleName("chooser-heading"); dateHeading.getLayout().widthPercent(44).heightPercent(100).itemsStart().paddingLeft(4);
+        header.getLayout()
+                .row()
+                .height(0)
+                .noShrink();
+        header.setVisible(false);
+        nameHeading.action(button -> requestSort(false));
+        dateHeading.action(button -> requestSort(true));
+        nameHeading.setStyleName("chooser-heading");
+        nameHeading.getLayout()
+                .widthPercent(56)
+                .heightPercent(100)
+                .itemsStart()
+                .paddingLeft(12);
+        dateHeading.setStyleName("chooser-heading");
+        dateHeading.getLayout()
+                .widthPercent(44)
+                .heightPercent(100)
+                .itemsStart()
+                .paddingLeft(4);
         header.add(nameHeading, dateHeading);
         add(toolbar, trail, header, list, statusViewport);
         model.bindView(this::synchronizeListing, this::synchronizeSelection, failure -> status.text(failure.getMessage()));
@@ -103,9 +157,16 @@ public class NanoFileExplorer extends NanoPanel {
      * @return this explorer
      */
     public NanoFileExplorer chrome(boolean visible) {
-        toolbar.setVisible(visible); toolbar.getLayout().height(visible ? 36 : 0);
-        trail.setVisible(visible); trail.getLayout().height(visible ? 36 : 0);
-        statusViewport.setVisible(visible); statusViewport.getLayout().height(visible ? 28 : 0); return this;
+        toolbar.setVisible(visible);
+        toolbar.getLayout()
+                .height(visible ? 36 : 0);
+        trail.setVisible(visible);
+        trail.getLayout()
+                .height(visible ? 36 : 0);
+        statusViewport.setVisible(visible);
+        statusViewport.getLayout()
+                .height(visible ? 28 : 0);
+        return this;
     }
 
     /**
@@ -115,9 +176,14 @@ public class NanoFileExplorer extends NanoPanel {
      * @return this explorer
      */
     public NanoFileExplorer details(boolean details) {
-        this.details = details; setStyleName(details ? "chooser-pane" : "");
-        header.setVisible(details); header.getLayout().height(details ? 30 : 0);
-        list.rowHeight(details ? 28 : 32); list.refreshItems(); return this;
+        this.details = details;
+        setStyleName(details ? "chooser-pane" : "");
+        header.setVisible(details);
+        header.getLayout()
+                .height(details ? 30 : 0);
+        list.rowHeight(details ? 28 : 32);
+        list.refreshItems();
+        return this;
     }
 
     /**
@@ -136,7 +202,9 @@ public class NanoFileExplorer extends NanoPanel {
      * Exposes the owned virtual row viewport for focus, inspection, and accessibility.
      * @return listing viewport; its child factory belongs to this explorer
      */
-    public NanoVirtualList getList() { return list; }
+    public NanoVirtualList getList() {
+        return list;
+    }
 
     /**
      * Changes detail-row ordering after a successful scan, always keeping folders first.
@@ -157,8 +225,12 @@ public class NanoFileExplorer extends NanoPanel {
      * @param modified whether the modification-date heading was activated
      */
     private void requestSort(boolean modified) {
-        try { sort(modified, model.isSortModified() == modified && !model.isDescending()); }
-        catch (IOException failure) { failed(failure); }
+        try {
+            sort(modified, model.isSortModified() == modified && !model.isDescending());
+        }
+        catch (IOException failure) {
+            failed(failure);
+        }
     }
 
     /**
@@ -178,21 +250,29 @@ public class NanoFileExplorer extends NanoPanel {
      * @param multiple whether multiple entries may be selected
      * @return this explorer
      */
-    public NanoFileExplorer multipleSelection(boolean multiple) { model.multipleSelection(multiple); return this; }
+    public NanoFileExplorer multipleSelection(boolean multiple) {
+        model.multipleSelection(multiple);
+        return this;
+    }
 
     /**
      * Copies selected paths in current listing order. Directory and file entries are
      * both selectable; a chooser applies its final selection-type policy at approval.
      * @return immutable selected-path snapshot
      */
-    public List<Path> getSelectedPaths() { return model.getSelectedPaths(); }
+    public List<Path> getSelectedPaths() {
+        return model.getSelectedPaths();
+    }
 
     /**
      * Replaces the selection callback; successful refreshes notify an empty selection.
      * @param listener nonnull synchronous listener
      * @return this explorer
      */
-    public NanoFileExplorer onSelectionChange(Consumer<List<Path>> listener) { model.onSelectionChange(listener); return this; }
+    public NanoFileExplorer onSelectionChange(Consumer<List<Path>> listener) {
+        model.onSelectionChange(listener);
+        return this;
+    }
 
     /**
      * Replaces the callback for actual successful directory changes. Filter-only refreshes
@@ -200,7 +280,10 @@ public class NanoFileExplorer extends NanoPanel {
      * @param listener nonnull synchronous listener
      * @return this explorer
      */
-    public NanoFileExplorer onDirectoryChange(Consumer<Path> listener) { model.onDirectoryChange(listener); return this; }
+    public NanoFileExplorer onDirectoryChange(Consumer<Path> listener) {
+        model.onDirectoryChange(listener);
+        return this;
+    }
 
     /**
      * Changes the file-only filter after successfully scanning with it. Directories
@@ -240,19 +323,73 @@ public class NanoFileExplorer extends NanoPanel {
      * Reads the canonical current directory; no filesystem query occurs.
      * @return current absolute directory
      */
-    public Path getDirectory() { return model.getDirectory(); }
+    public Path getDirectory() {
+        return model.getDirectory();
+    }
+
+    /**
+     * Notifies an enclosing chooser to refresh companion views after imports.
+     *
+     * @param listener nonnull UI-thread mutation callback
+     * @return this explorer
+     */
+    public NanoFileExplorer onFilesChanged(Runnable listener) {
+        filesChanged = Objects.requireNonNull(listener);
+        return this;
+    }
+
+    @Override
+    public void onFileDrop(FileDropEvent event) {
+        if (isDisabled() || event.getPaths().isEmpty() || getRoot() == null) return;
+        Path destination = model.getDirectory();
+        for (UINode node = getRoot().findNodeAt(event.getX(), event.getY(), CLICKABLE_BIT); node != null && node != this; node = node.getParent())
+            if (node instanceof NanoFileExplorerRow row) {
+                DirectoryEntry entry = model.getEntries()
+                    .get(row.index);
+                if (entry.directory()) destination = entry.path();
+                break;
+        }
+        if (imports == null) {
+            imports = new NanoFileContextMenu(this, this::getSelectedPaths, this::getDirectory)
+                    .onChanged(() -> {
+                        request(model.getDirectory());
+                        filesChanged.run();
+            })
+                    .onError(this::failed)
+                    .onStatus(status::text);
+            if (confined) imports.confinedRoot(model.getBreadcrumbRoot());
+        }
+        event.consume();
+        imports.importFiles(event.getPaths(), destination);
+    }
+
+    @Override
+    public void update(float delta) {
+        if (imports != null) imports.update();
+        super.update(delta);
+    }
+
+    @Override
+    public void onDestroy() {
+        if (imports != null) imports.hide();
+        super.onDestroy();
+    }
 
     /**
      * Reads the immutable last successful directory snapshot.
      * @return entries in displayed order
      */
-    public List<DirectoryEntry> getEntries() { return model.getEntries(); }
+    public List<DirectoryEntry> getEntries() {
+        return model.getEntries();
+    }
 
     /**
      * Reads the selected path from the snapshot without resolving it again.
      * @return selected path or null when nothing is selected
      */
-    public Path getSelected() { return model.getSelected(); }
+    public Path getSelected() {
+        return model.getSelected();
+    }
 
     /**
      * Selects and reveals a row without opening it. Invalid indices leave state intact;
@@ -282,18 +419,29 @@ public class NanoFileExplorer extends NanoPanel {
      */
     private void synchronizeSelection() {
         for (int i = 0; i < model.getEntries().size(); i++) {
-            var row = list.getItemNode(i); if (row != null) row.setSelected(model.isSelected(i));
+            var row = list.getItemNode(i);
+            if (row != null) row.setSelected(model.isSelected(i));
         }
         int selected = model.getSelectedIndex();
         status.text(selected < 0 ? model.getDirectory().toString() : model.getEntries().get(selected).path().toString());
     }
 
+    /**
+     * Refreshes virtual row membership, breadcrumbs, and status after a successful model scan.
+     */
     private void synchronizeListing() {
-        list.itemCount(model.getEntries().size()); list.refreshItems(); list.scrollY(0);
-        breadcrumbs.path(model.getBreadcrumbRoot(), model.getDirectory()); up.setEnabled(model.canGoUp());
-        status.text(model.getDirectory().toString()); updateSortHeadings();
+        list.itemCount(model.getEntries().size());
+        list.refreshItems();
+        list.scrollY(0);
+        breadcrumbs.path(model.getBreadcrumbRoot(), model.getDirectory());
+        up.setEnabled(model.canGoUp());
+        status.text(model.getDirectory().toString());
+        updateSortHeadings();
     }
 
+    /**
+     * Updates heading captions to reflect the current column and direction.
+     */
     private void updateSortHeadings() {
         boolean modified = model.isSortModified(), descending = model.isDescending();
         nameHeading.text("Name" + (modified ? "" : descending ? "  v" : "  ^"));
@@ -305,14 +453,19 @@ public class NanoFileExplorer extends NanoPanel {
      * existing file. IO failures update status and notify onError; callback exceptions
      * propagate. No native application is launched and no filesystem data is changed.
      */
-    public void openSelection() { if (!isDisabled()) model.openSelection(); }
+    public void openSelection() {
+        if (!isDisabled()) model.openSelection();
+    }
 
     /**
      * Replaces the callback for file activation; directory navigation does not emit it.
      * @param listener nonnull callback receiving the current canonical file path
      * @return this explorer
      */
-    public NanoFileExplorer onOpen(Consumer<Path> listener) { model.onOpen(listener); return this; }
+    public NanoFileExplorer onOpen(Consumer<Path> listener) {
+        model.onOpen(listener);
+        return this;
+    }
 
     /**
      * Replaces the listener for user-triggered IO failures. Direct navigate/filter calls
@@ -320,7 +473,10 @@ public class NanoFileExplorer extends NanoPanel {
      * @param listener nonnull synchronous failure callback
      * @return this explorer
      */
-    public NanoFileExplorer onError(Consumer<IOException> listener) { model.onError(listener); return this; }
+    public NanoFileExplorer onError(Consumer<IOException> listener) {
+        model.onError(listener);
+        return this;
+    }
 
     /**
      * Attempts user navigation, retaining the old listing and displaying failures.
@@ -328,30 +484,43 @@ public class NanoFileExplorer extends NanoPanel {
      */
     private void request(Path path) {
         if (isDisabled()) return;
-        try { navigate(path); } catch (IOException failure) { failed(failure); }
+        try {
+            navigate(path);
+        } catch (IOException failure) {
+            failed(failure);
+        }
     }
 
     /**
      * Displays an IO failure before notifying its listener; listing state is retained.
      * @param failure underlying navigation or activation failure
      */
-    private void failed(IOException failure) { model.reportFailure(failure); }
+    private void failed(IOException failure) {
+        model.reportFailure(failure);
+    }
 
     /**
      * Navigates rows and opens the selection before child buttons handle keys.
      * Parent navigation stops at the construction root; empty lists ignore row keys.
      * @param context routed preview event
      */
-    @Override public void onInputPreview(UIInputEvent context) {
+    @Override
+    public void onInputPreview(UIInputEvent context) {
         if (isDisabled() || !(context.event() instanceof KeyPressEvent key)) return;
         if (key.getKey() == Keyboard.BACKSPACE) {
-            if (model.canGoUp()) request(model.getDirectory().getParent()); context.consume(); return;
+            if (model.canGoUp()) request(model.getDirectory().getParent());
+            context.consume();
+            return;
         }
         boolean rowTarget = false;
         for (var node = context.target(); node != null && node != this; node = node.getParent()) {
-            if (node == list) { rowTarget = true; break; }
+            if (node == list) {
+                rowTarget = true;
+                break;
+            }
         }
         if (!rowTarget) return;
+        if (imports != null && imports.handleShortcut(context)) return;
         if (model.getEntries().isEmpty()) return;
         switch (key.getKey()) {
             case Keyboard.DOWN -> select(Math.min(model.getEntries().size() - 1, model.getSelectedIndex() + 1), key.isShiftDown(), false);
@@ -362,61 +531,15 @@ public class NanoFileExplorer extends NanoPanel {
                 if (!key.isCtrlDown() && !key.isSuperDown()) return;
                 model.selectAll();
             }
-            case Keyboard.ENTER -> { if (model.getSelectedIndex() < 0) return; openSelection(); }
-            default -> { return; }
+            case Keyboard.ENTER -> {
+                if (model.getSelectedIndex() < 0) return;
+                openSelection();
+            }
+            default -> {
+                return;
+            }
         }
         context.consume();
     }
 
-    /**
-     * Directory row supporting modifier selection and plain double-click activation.
-     * The index refers to one immutable listing generation and is discarded on refresh.
-     * @author Albert Beaupre
-     */
-    private final class FileRow extends NanoButton {
-        private final int index; // Position represented by this transient row.
-
-        /**
-         * Formats a file or folder name without querying the filesystem again.
-         * @param index valid current listing index
-         */
-        private FileRow(int index) {
-            super(model.getEntries().get(index).path().getFileName().toString());
-            this.index = index; action(button -> select(index));
-            setStyleName("chooser-row"); leftAligned(true);
-            setStyle(NanoButton.PADDING_X_KEY, 32f);
-            if (details) {
-                getLabel().setVisible(false);
-                NanoScrollPanel name = NanoWidgetSupport.viewport(); name.horizontal(false).vertical(false).horizontalBar(false).verticalBar(false);
-                name.setClickable(false);
-                name.getLayout().absolute().left(30).top(0).widthPercent(48).heightPercent(100);
-                NanoLabel text = new NanoLabel(model.getEntries().get(index).path().getFileName().toString()); text.setClickable(false); text.getLayout().marginTop(6);
-                name.setContent(text); add(name);
-                NanoFileIcon icon = new NanoFileIcon(model.getEntries().get(index).directory()); icon.getLayout().absolute().left(9).top(5).width(16).height(18); add(icon);
-                String date;
-                try { date = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                        .format(Files.getLastModifiedTime(model.getEntries().get(index).path()).toInstant().atZone(java.time.ZoneId.systemDefault())); }
-                catch (IOException | SecurityException failure) { date = "Unavailable"; }
-                NanoLabel modified = new NanoLabel(date); modified.setClickable(false); modified.getLayout().absolute().leftPercent(57).top(6); add(modified);
-            } else {
-                NanoFileIcon icon = new NanoFileIcon(model.getEntries().get(index).directory());
-                icon.getLayout().absolute().left(9).top(7).width(16).height(18);
-                add(icon);
-            }
-        }
-
-        /**
-         * Selects on an accepted primary release, honoring range/toggle modifiers.
-         * Two plain releases on the same entry within 500 ms activate it; modifier
-         * selection resets double-click tracking and never opens an entry.
-         * @param event routed mouse release
-         */
-        @Override public void onMouseRelease(valthorne.event.events.MouseReleaseEvent event) {
-            if (!isActivationRelease(event) || NanoFileExplorer.this.isDisabled()) return;
-            event.consume();
-            boolean twice = model.click(index, event.isShiftDown(), event.isCtrlDown() || event.isSuperDown(), System.nanoTime());
-            list.revealIndex(index);
-            if (twice) openSelection();
-        }
-    }
 }

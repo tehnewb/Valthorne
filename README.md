@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.2.4.4" src="https://img.shields.io/badge/version-1.2.4.4-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.3.1.0" src="https://img.shields.io/badge/version-1.3.1.0-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -55,14 +55,14 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
   objects, and configurable asset loaders.
 - **Audio:** OpenAL playback with buffered and streaming WAV, OGG, and MP3 audio,
   sound sources, and sound areas.
-- **Game data and utilities:** Artemis ECS integration, primitive collections,
+- **Game data and utilities:** Primitive collections,
   object pooling, geometry, dynamic byte buffers, property sets, serialization,
   compression, encryption, hashing, and native file dialogs.
 - **Plugins:** Asynchronous discovery and loading of plugins from JAR files.
 
 ## Release version
 
-**Current Valthorne version: 1.2.4.4.** Versions use four numbers:
+**Current Valthorne version: 1.3.1.0.** Versions use four numbers:
 
 | Position | Meaning |
 | --- | --- |
@@ -105,7 +105,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:1.2.4.4'
+    implementation 'io.github.tehnewb:Valthorne:1.3.1.0'
 }
 
 java {
@@ -143,7 +143,7 @@ sections. Maven Central is Maven's default repository:
     <dependency>
         <groupId>io.github.tehnewb</groupId>
         <artifactId>Valthorne</artifactId>
-        <version>1.2.4.4</version>
+        <version>1.3.1.0</version>
     </dependency>
 </dependencies>
 ```

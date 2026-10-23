@@ -9,8 +9,6 @@ key or publication account is needed. See [README.md](README.md) for build comma
 
 Please search existing issues and pull requests before opening a new one. If you are not sure whether an idea belongs in an issue yet, start a discussion first.
 
-If you want a place to jump in, look for labels such as `good first issue` and `help wanted`.
-
 ## Reporting Issues
 
 Bug reports and feature requests are both welcome. Helpful reports usually include:
@@ -30,26 +28,9 @@ Pull requests are the fastest way to get improvements merged. A good PR usually:
 * References related issues when applicable
 * Includes tests or verification notes for behavior changes
 
-Before opening a pull request, please run:
-
-```bash
-./gradlew -Pprototype3d=false -PeditorPrototype=false build
-./gradlew -Pprototype3d=false -PeditorPrototype=false verifyRelease verifySlugTextureBatch
-```
-
-Use `./gradlew.bat` in Windows PowerShell. `build` compiles the library, sources,
-and Javadoc; `verifyRelease` additionally checks publication artifacts and metadata.
-The native Slug check verifies rendering in a hidden graphics context. Record
-manual runtime verification separately; packaging checks alone do not establish
-rendering or interaction correctness.
-
 ## Repository ownership
 
-Keep engine code and runtime resources under `src/main`. Release packaging checks live in `gradle/release.gradle`;
-optional local benchmark configuration lives in `gradle/benchmarks.gradle`.
-
-Keep benchmark outputs produced during development under `build/`. Record the
-measured revision and environment alongside each result.
+Keep engine code and runtime resources under `src/main`
 
 ## Reviews
 

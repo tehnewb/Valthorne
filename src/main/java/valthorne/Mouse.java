@@ -1,5 +1,7 @@
 package valthorne;
 
+import java.util.Objects;
+
 import org.lwjgl.glfw.*;
 import valthorne.event.EventTypes;
 import valthorne.event.events.*;
@@ -335,6 +337,9 @@ public final class Mouse {
      * </p>
      */
     static void init() {
+        /*
+         * Keep lifecycle initialization on the calling engine thread so native handles and callbacks share one owner.
+         */
         dispose();
         resetState();
 
@@ -411,6 +416,9 @@ public final class Mouse {
      * @param shape one of the supported {@code CURSOR_*} shape constants
      */
     public static void setCursor(int shape) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         long win = Window.getAddress();
         if (win == 0) return;
 
@@ -430,7 +438,10 @@ public final class Mouse {
      * @param shape standard cursor shape such as CURSOR_HRESIZE or CURSOR_RESIZE_NWSE
      */
     public static void overrideCursor(Object owner, int shape) {
-        java.util.Objects.requireNonNull(owner);
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
+        Objects.requireNonNull(owner);
         long win = Window.getAddress();
         if (win == 0) return;
         if (overrideCursor != 0 && overrideCursorShape == shape) {
@@ -453,6 +464,9 @@ public final class Mouse {
      * @param owner identity token supplied to overrideCursor
      */
     public static void clearCursorOverride(Object owner) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (cursorOwner != owner || overrideCursor == 0) return;
         long win = Window.getAddress();
         if (win != 0) glfwSetCursor(win, currentCursor);
@@ -468,6 +482,9 @@ public final class Mouse {
      * @return standard CURSOR_* shape, or zero for an application custom image cursor
      */
     public static int getCursorShape() {
+        /*
+         * Read retained configuration or native state directly without constructing a temporary settings object.
+         */
         return overrideCursor != 0 ? overrideCursorShape : currentCursorShape;
     }
 
@@ -496,6 +513,9 @@ public final class Mouse {
      * @throws RuntimeException      if GLFW fails to create the cursor from the provided image
      */
     public static void setCursor(TextureData data, int hotX, int hotY) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         long win = Window.getAddress();
         if (win == 0) return;
         if (data == null) throw new NullPointerException("data");
@@ -551,6 +571,9 @@ public final class Mouse {
      * @throws IllegalArgumentException if the provided mode is not a valid GLFW cursor mode
      */
     public static void setCursorMode(int mode) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         long win = Window.getAddress();
         if (win == 0) return;
 
@@ -570,6 +593,9 @@ public final class Mouse {
      * @param enabled whether raw desktop motion should be enabled
      */
     public static void setRawMouseMotion(boolean enabled) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         long win = Window.getAddress();
         if (win != 0 && glfwRawMouseMotionSupported())
             glfwSetInputMode(win, GLFW_RAW_MOUSE_MOTION, enabled ? GLFW_TRUE : GLFW_FALSE);
@@ -590,6 +616,9 @@ public final class Mouse {
      * @param y the Y position in GLFW window coordinates
      */
     public static void setCursorPosition(double x, double y) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         long win = Window.getAddress();
         if (win == 0) return;
         glfwSetCursorPos(win, x, y);
@@ -610,6 +639,9 @@ public final class Mouse {
      * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void addMouseListener(MouseListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null MouseListener cannot be added");
         JGL.subscribe(EventTypes.MOUSE_MOVE, listener);
         JGL.subscribe(EventTypes.MOUSE_DRAG, listener);
@@ -630,6 +662,9 @@ public final class Mouse {
      * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void removeMouseListener(MouseListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null MouseListener cannot be removed");
         JGL.unsubscribe(EventTypes.MOUSE_MOVE, listener);
         JGL.unsubscribe(EventTypes.MOUSE_DRAG, listener);
@@ -650,6 +685,9 @@ public final class Mouse {
      * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void addScrollListener(MouseScrollListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be added");
         JGL.subscribe(EventTypes.MOUSE_SCROLL, listener);
     }
@@ -663,6 +701,9 @@ public final class Mouse {
      * @throws NullPointerException if {@code listener} is {@code null}
      */
     public static void removeScrollListener(MouseScrollListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null MouseScrollListener cannot be removed");
         JGL.unsubscribe(EventTypes.MOUSE_SCROLL, listener);
     }
@@ -679,6 +720,9 @@ public final class Mouse {
      * </p>
      */
     static void dispose() {
+        /*
+         * Release retained native state in lifecycle order; cleanup failures must not hide later release attempts.
+         */
         if (overrideCursor != 0) {
             glfwDestroyCursor(overrideCursor);
             overrideCursor = 0;
@@ -715,6 +759,9 @@ public final class Mouse {
      * Cancel held input while preserving cursor position across window activation changes.
      */
     static void cancelButtons() {
+        /*
+         * Release logical held-button state without synthesizing native mouse activity.
+         */
         buttonState = 0;
         modifierState = 0;
         scrollX = scrollY = 0;
@@ -726,6 +773,9 @@ public final class Mouse {
      * managed separately by disposal.
      */
     static void resetState() {
+        /*
+         * Restore reusable singleton state without retaining callbacks or stale native handles from a prior lifecycle.
+         */
         x = 0;
         y = 0;
         buttonState = 0;
@@ -746,7 +796,11 @@ public final class Mouse {
      * @return the current cursor X position
      */
     public static short getX() {
-        return x;
+        /*
+         * Return cached coordinates directly instead of polling native state during each caller query.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? x : (short) context.mouseX();
     }
 
     /**
@@ -763,7 +817,11 @@ public final class Mouse {
      * @return the converted cursor Y position
      */
     public static short getY() {
-        return (short) (Window.getHeight() - y);
+        /*
+         * Return cached coordinates directly instead of polling native state during each caller query.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? (short) (Window.getHeight() - y) : (short) context.mouseY();
     }
 
     /**
@@ -774,7 +832,11 @@ public final class Mouse {
      * @return signed horizontal offsets, retaining native double precision
      */
     public static double getScrollX() {
-        return scrollX;
+        /*
+         * Read the accumulated wheel cache; frame-boundary reset controls consumption rather than each individual query.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? scrollX : context.scrollX();
     }
 
     /**
@@ -785,7 +847,11 @@ public final class Mouse {
      * @return signed vertical offsets, retaining native double precision
      */
     public static double getScrollY() {
-        return scrollY;
+        /*
+         * Read the accumulated wheel cache; frame-boundary reset controls consumption rather than each individual query.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? scrollY : context.scrollY();
     }
 
     /**
@@ -799,6 +865,9 @@ public final class Mouse {
      * </p>
      */
     static void resetScroll() {
+        /*
+         * Clear consumed wheel movement at the frame boundary while retaining the reusable input state.
+         */
         scrollX = 0;
         scrollY = 0;
     }
@@ -822,7 +891,8 @@ public final class Mouse {
          */
         if (button < 0 || button > GLFW_MOUSE_BUTTON_LAST)
             return false;
-        return (buttonState & (1 << button)) != 0;
+        WindowContext context = WindowContext.current();
+        return context == null ? (buttonState & (1 << button)) != 0 : context.buttonDown(button);
     }
 
     /**

@@ -1,5 +1,6 @@
 package valthorne.event;
 
+import valthorne.WindowContext;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Objects;
@@ -82,11 +83,13 @@ public final class EventPublisher {
     /**
      * Cold-path sort order: highest priority first, then earliest registration first.
      */
-    private static final Comparator<Registration> REGISTRATION_ORDER = Comparator.comparingInt((Registration registration) -> registration.priority).reversed().thenComparingLong(registration -> registration.sequence);
+    private static final Comparator<EventRegistration> REGISTRATION_ORDER = Comparator.comparingInt((EventRegistration registration) -> registration.priority)
+            .reversed()
+            .thenComparingLong(registration -> registration.sequence);
 
     private final Object mutationLock = new Object(); // Serializes registration changes; event publication does not acquire this lock.
 
-    private final ArrayList<Registration>[] registrations; // Mutable registration metadata grouped by numeric event type.
+    private final ArrayList<EventRegistration>[] registrations; // Mutable registration metadata grouped by numeric event type.
 
     private volatile EventHandler<Event>[][] routes; // Published immutable routing snapshot; outer and inner arrays are never changed in place.
 
@@ -131,15 +134,16 @@ public final class EventPublisher {
      *
      * <p>
      * Registration identity uses {@code ==}, not {@link Object#equals(Object)}. The exact same
-     * handler object cannot be inserted twice on one route, while unrelated handler objects remain
-     * independent even if they implement unusual equality semantics.
+     * handler object cannot be inserted twice on one route in the same {@link WindowContext}.
+     * Other contexts may register it independently; null identifies the primary window scope.
+     * Unrelated handler objects remain independent even if they implement unusual equality semantics.
      * </p>
      *
      * @param type     event route to receive
      * @param priority execution priority; larger values execute first
      * @param handler  handler instance
      * @param <E>      concrete event type
-     * @return {@code true} if added, {@code false} if the same instance was already registered
+     * @return {@code true} if added, {@code false} if the same instance was already registered in the current context
      * @throws NullPointerException     if {@code type} or {@code handler} is null
      * @throws IllegalArgumentException if the type ID is outside this publisher's route table
      */
@@ -149,9 +153,10 @@ public final class EventPublisher {
 
         int typeId = type.id();
         validateTypeId(typeId);
+        WindowContext context = WindowContext.current();
 
         synchronized (mutationLock) {
-            ArrayList<Registration> list = registrations[typeId];
+            ArrayList<EventRegistration> list = registrations[typeId];
 
             if (list == null) {
                 list = new ArrayList<>(4);
@@ -159,14 +164,17 @@ public final class EventPublisher {
             }
 
             for (int i = 0, size = list.size(); i < size; i++) {
-                if (list.get(i).handler == handler) {
+                if (list.get(i).handler == handler && list.get(i).context == context) {
                     return false;
                 }
             }
 
             EventHandler<Event> rawHandler = (EventHandler<Event>) (EventHandler<?>) handler;
 
-            list.add(new Registration(rawHandler, priority, registrationSequence++));
+            boolean input = typeId <= EventTypes.WINDOW_RESIZE.id() || typeId == EventTypes.TEXT_INPUT.id()
+                    || typeId == EventTypes.WINDOW_FOCUS.id() || typeId == EventTypes.FILE_DROP.id() || typeId == EventTypes.FRAMEBUFFER_RESIZE.id();
+            EventHandler<Event> invoker = input ? new ContextEventHandler(rawHandler, context) : rawHandler;
+            list.add(new EventRegistration(rawHandler, invoker, context, priority, registrationSequence++));
             rebuildRoute(typeId, list);
             return true;
         }
@@ -185,7 +193,9 @@ public final class EventPublisher {
     }
 
     /**
-     * Removes one exact handler instance from one event route.
+     * Removes one exact handler instance from one event route in the current window context.
+     * Registrations made in other contexts remain intact. A null current context identifies
+     * the primary window scope, matching registration identity.
      *
      * <p>
      * An in-flight publication that already captured the previous immutable route may still invoke
@@ -195,7 +205,7 @@ public final class EventPublisher {
      * @param type    event route
      * @param handler exact handler instance to remove
      * @param <E>     concrete event type
-     * @return {@code true} if a registration was removed
+     * @return {@code true} if a registration in the current context was removed
      */
     public <E extends Event> boolean unregister(EventType<E> type, EventHandler<? super E> handler) {
         Objects.requireNonNull(type, "Event type cannot be null.");
@@ -203,16 +213,17 @@ public final class EventPublisher {
 
         int typeId = type.id();
         validateTypeId(typeId);
+        WindowContext context = WindowContext.current();
 
         synchronized (mutationLock) {
-            ArrayList<Registration> list = registrations[typeId];
+            ArrayList<EventRegistration> list = registrations[typeId];
 
             if (list == null) {
                 return false;
             }
 
             for (int i = 0, size = list.size(); i < size; i++) {
-                if (list.get(i).handler == handler) {
+                if (list.get(i).handler == handler && list.get(i).context == context) {
                     list.remove(i);
 
                     if (list.isEmpty()) {
@@ -343,13 +354,13 @@ public final class EventPublisher {
     /**
      * Sorts cold-path metadata and builds the dense immutable handler array consumed by publish.
      */
-    private void rebuildRoute(int typeId, ArrayList<Registration> list) {
+    private void rebuildRoute(int typeId, ArrayList<EventRegistration> list) {
         list.sort(REGISTRATION_ORDER);
 
         EventHandler<Event>[] handlers = (EventHandler<Event>[]) new EventHandler[list.size()];
 
         for (int i = 0, size = list.size(); i < size; i++) {
-            handlers[i] = list.get(i).handler;
+            handlers[i] = list.get(i).invoker;
         }
 
         publishRoute(typeId, handlers);
@@ -375,14 +386,31 @@ public final class EventPublisher {
     }
 
     /**
-     * Cold-path registration metadata. These objects are never traversed by {@link #publish(Event)}.
+     * Removes every subscription owned by a disposed logical presentation.
+     * Existing in-flight snapshots retain their documented completion semantics.
      *
-     * <p>Priority and sequence determine the order used when rebuilding immutable routes.
-     * The handler is a borrowed reference; this record does not invoke it or manage its lifetime.</p>
-     *
-     * @author Albert Beaupre
+     * @param context nonnull presentation identity
+     * @return removed subscription count
      */
-    private record Registration(EventHandler<Event> handler, int priority, long sequence) {
-
+    public int unregisterContext(WindowContext context) {
+        Objects.requireNonNull(context, "context");
+        int removed = 0;
+        synchronized (mutationLock) {
+            for (int route = 0; route < registrations.length; route++) {
+                ArrayList<EventRegistration> list = registrations[route];
+                if (list == null) continue;
+                int before = list.size();
+                for (int i = list.size() - 1; i >= 0; i--) if (list.get(i).context == context) list.remove(i);
+                if (before == list.size()) continue;
+                removed += before - list.size();
+                if (list.isEmpty()) {
+                    registrations[route] = null;
+                    publishRoute(route, EMPTY_HANDLERS);
+                }
+                else rebuildRoute(route, list);
+            }
+        }
+        return removed;
     }
+
 }

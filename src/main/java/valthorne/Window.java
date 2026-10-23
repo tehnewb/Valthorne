@@ -63,7 +63,6 @@ public final class Window {
      * Optional render-thread clear-color policy, borrowed until restored or window shutdown.
      */
     private static UnaryOperator<Color> clearColorFilter;
-
     /**
      * Engine-managed projection matrix used by shader rendering paths.
      */
@@ -72,21 +71,30 @@ public final class Window {
      * Reusable column-major projection values refreshed whenever the engine matrix changes.
      */
     private static final float[] projectionValues = projectionMatrix.get(new float[16]);
-
     /**
      * Reused resize event; listeners must copy values instead of retaining it as a historical snapshot.
      */
     private static final WindowResizeEvent resizeEvent = new WindowResizeEvent(0, 0, 0, 0);
-
     /**
      * Native focus callback reference; focus loss clears keyboard and pointer state.
      */
     private static GLFWWindowFocusCallback focusCallback;
     /**
-     * Native close callback reference that requests window closure.
+     * Native close callback reference that accepts or defers primary-window closure.
      */
     private static GLFWWindowCloseCallback closeCallback;
-
+    /**
+     * Optional primary-window close policy, borrowed until replaced or shutdown.
+     */
+    private static Runnable closeRequestHandler;
+    /**
+     * Coalesced native close intent awaiting dispatch outside GLFW callbacks.
+     */
+    private static boolean nativeCloseRequested;
+    /**
+     * Accepted primary closure; visibility across threads preserves explicit requests.
+     */
+    private static volatile boolean closeConfirmed;
     /**
      * Owned native path-drop callback, released with the window.
      */
@@ -115,7 +123,6 @@ public final class Window {
      * Reused pixel-size notification; listeners must copy its values during delivery.
      */
     private static final FramebufferResizeEvent framebufferResizeEvent = new FramebufferResizeEvent();
-
     /**
      * Cached swap-interval preference, initially disabled.
      */
@@ -125,23 +132,29 @@ public final class Window {
      */
     private static long address;
     /**
+     * Thread owning the primary native window and scoped render presentations.
+     */
+    private static volatile Thread renderThread;
+    /**
      * Shared graphics capabilities state retained by Window.
      */
     private static GraphicsCapabilities graphicsCapabilities;
-
-    /** @return actual capabilities of the initialized window, not the requested version */
-    public static GraphicsCapabilities getGraphicsCapabilities() {
-        if (graphicsCapabilities == null) throw new IllegalStateException("Window is not initialized");
-        return graphicsCapabilities;
-    }
     /**
      * Cached desktop X and Y coordinates in GLFW screen-coordinate units.
      */
-    private static int x, y;
+    private static int x;
+    /**
+     * Cached vertical window position in desktop screen coordinates.
+     */
+    private static int y;
     /**
      * Cached logical content width and height, rather than a separate framebuffer pixel size.
      */
-    private static int width, height;
+    private static int width;
+    /**
+     * Cached logical window content height in screen-coordinate units.
+     */
+    private static int height;
     /**
      * Shared content-rectangle adapter; position setters move the window while origin getters return zero.
      */
@@ -268,6 +281,17 @@ public final class Window {
     private static boolean resizable = true;
 
     /**
+     * @return actual capabilities of the initialized window, not the requested version
+     */
+    public static GraphicsCapabilities getGraphicsCapabilities() {
+        /*
+         * Expose the validated capabilities captured at initialization rather than repeating native feature queries.
+         */
+        if (graphicsCapabilities == null) throw new IllegalStateException("Window is not initialized");
+        return graphicsCapabilities;
+    }
+
+    /**
      * Prevents construction of the process-wide GLFW window utility.
      */
     private Window() {
@@ -286,6 +310,9 @@ public final class Window {
      *               If null, a {@link NullPointerException} will be thrown.
      */
     public static void init(JGLConfiguration config) {
+        /*
+         * Keep lifecycle initialization on the calling engine thread so native handles and callbacks share one owner.
+         */
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
         if (address != NULL) throw new IllegalStateException("Window is already initialized");
         if (config.getClientApi() != GLFW_OPENGL_API)
@@ -298,7 +325,10 @@ public final class Window {
         Window.resizable = config.isResizable();
         Window.swapInterval = config.getSwapInterval();
 
+        renderThread = Thread.currentThread();
         config.applyWindowHints();
+        // Keep windowed creation invisible until positioning and graphics setup finish.
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
         int[][] versions = config.isAutomaticContext() ? new int[][]{{4, 3}, {4, 1}, {3, 3}}
@@ -318,8 +348,15 @@ public final class Window {
                 int error = glfwGetError(description);
                 String detail = description.get(0) == NULL ? "No native description"
                         : MemoryUtil.memUTF8(description.get(0));
-                failures.append("GL ").append(version[0]).append('.').append(version[1])
-                        .append(" (error ").append(error).append("): ").append(detail).append('\n');
+                failures.append("GL ")
+                        .append(version[0])
+                        .append('.')
+                        .append(version[1])
+                        .append(" (error ")
+                        .append(error)
+                        .append("): ")
+                        .append(detail)
+                        .append('\n');
             }
         }
         if (address == NULL) throw new IllegalStateException("Failed to create the GLFW window:\n" + failures);
@@ -387,7 +424,12 @@ public final class Window {
         });
         glfwSetWindowFocusCallback(address, focusCallback);
 
-        closeCallback = GLFWWindowCloseCallback.create(win -> glfwSetWindowShouldClose(win, true));
+        closeCallback = GLFWWindowCloseCallback.create(win -> {
+            if (closeRequestHandler == null || closeConfirmed) return;
+            // GLFW sets this flag before invoking the callback; clear it before returning.
+            glfwSetWindowShouldClose(win, false);
+            nativeCloseRequested = true;
+        });
         glfwSetWindowCloseCallback(address, closeCallback);
         dropCallback = GLFWDropCallback.create((win, count, names) -> {
             ArrayList<Path> paths = new ArrayList<>(count);
@@ -412,8 +454,6 @@ public final class Window {
             }
         }
 
-        if (config.isVisible()) glfwShowWindow(address);
-
         if (config.isMaximized()) glfwMaximizeWindow(address);
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -433,6 +473,13 @@ public final class Window {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         updateDefaultProjectionMatrix();
+
+        if (config.isVisible()) {
+            // Initial presentation honors both focus preferences; subsequent shows retain their own policy.
+            glfwSetWindowAttrib(address, GLFW_FOCUS_ON_SHOW, config.isFocused() && config.isFocusOnShow() ? GLFW_TRUE : GLFW_FALSE);
+            glfwShowWindow(address);
+            glfwSetWindowAttrib(address, GLFW_FOCUS_ON_SHOW, config.isFocusOnShow() ? GLFW_TRUE : GLFW_FALSE);
+        }
     }
 
     /**
@@ -441,7 +488,11 @@ public final class Window {
      * column-major upload array. Does not modify a fixed-function GL matrix stack.
      */
     private static void updateDefaultProjectionMatrix() {
-        projectionMatrix.setOrtho(0f, Window.width, 0f, Window.height, -1f, 1f).get(projectionValues);
+        /*
+         * Update the retained matrix and shader array together so resize does not allocate projection objects.
+         */
+        projectionMatrix.setOrtho(0f, Window.width, 0f, Window.height, -1f, 1f)
+                .get(projectionValues);
     }
 
     /**
@@ -488,6 +539,9 @@ public final class Window {
      * @throws NullPointerException if {@code listener} is null
      */
     public static void addWindowResizeListener(WindowResizeListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         addWindowResizeListener(listener, 0);
     }
 
@@ -499,6 +553,9 @@ public final class Window {
      * @throws NullPointerException if {@code listener} is null
      */
     public static void addWindowResizeListener(WindowResizeListener listener, int priority) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null WindowResizeListener cannot be added");
         JGL.subscribe(EventTypes.WINDOW_RESIZE, priority, listener);
     }
@@ -512,6 +569,9 @@ public final class Window {
      * @throws NullPointerException if {@code listener} is null
      */
     public static void removeWindowResizeListener(WindowResizeListener listener) {
+        /*
+         * Forward listener identity through the shared event registry so subscription lifetime remains explicit.
+         */
         if (listener == null) throw new NullPointerException("A null WindowResizeListener cannot be removed");
         JGL.unsubscribe(EventTypes.WINDOW_RESIZE, listener);
     }
@@ -522,7 +582,35 @@ public final class Window {
      * @return true if the window should close
      */
     static boolean shouldClose() {
-        return address == NULL || glfwWindowShouldClose(address);
+        /*
+         * An explicit accepted close wins even if another native request arrives
+         * before the loop observes it and clears GLFW's provisional flag.
+         */
+        return address == NULL || closeConfirmed || glfwWindowShouldClose(address);
+    }
+
+    /**
+     * Dispatches one pending primary close request after native event polling.
+     * Application work therefore executes outside GLFW callbacks and follows the
+     * normal runtime failure and cleanup path. Temporarily enters the primary
+     * logical scope even if the event originated during a scoped presentation.
+     */
+    static void dispatchCloseRequest() {
+        /*
+         * Consume intent before invoking user code so reentrant polling cannot
+         * replay this request. No task is captured in an embedded game context.
+         */
+        if (!nativeCloseRequested) return;
+        nativeCloseRequested = false;
+        if (closeConfirmed) return;
+        WindowContext previous = WindowContext.use(null);
+        try {
+            Runnable handler = closeRequestHandler;
+            if (handler == null) requestClose();
+            else handler.run();
+        } finally {
+            WindowContext.use(previous);
+        }
     }
 
     /**
@@ -533,7 +621,11 @@ public final class Window {
      * @param newTitle new window title
      */
     public static void setTitle(String newTitle) {
-        glfwSetWindowTitle(address, newTitle);
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
+        long handle = getAddress();
+        if (handle != NULL) glfwSetWindowTitle(handle, newTitle);
     }
 
     /**
@@ -546,6 +638,14 @@ public final class Window {
      * @param height new window height (pixels)
      */
     public static void setSize(int width, int height) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
+        WindowContext context = WindowContext.current();
+        if (context != null) {
+            if (context.nativeWindow() != NULL) glfwSetWindowSize(context.nativeWindow(), width, height);
+            return;
+        }
         glfwSetWindowSize(address, width, height);
     }
 
@@ -555,7 +655,11 @@ public final class Window {
      * @return window width in pixels
      */
     public static int getWidth() {
-        return width;
+        /*
+         * Use the active logical presentation dimensions before falling back to primary-window state.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? width : context.width();
     }
 
     /**
@@ -564,7 +668,11 @@ public final class Window {
      * @return window height in pixels
      */
     public static int getHeight() {
-        return height;
+        /*
+         * Use the active logical presentation dimensions before falling back to primary-window state.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? height : context.height();
     }
 
     /**
@@ -573,6 +681,9 @@ public final class Window {
      * @return window X in screen coordinates
      */
     public static int getX() {
+        /*
+         * Return cached coordinates directly instead of polling native state during each caller query.
+         */
         return x;
     }
 
@@ -582,6 +693,9 @@ public final class Window {
      * @return window Y in screen coordinates
      */
     public static int getY() {
+        /*
+         * Return cached coordinates directly instead of polling native state during each caller query.
+         */
         return y;
     }
 
@@ -593,6 +707,9 @@ public final class Window {
      * @return array {framebufferWidth, framebufferHeight}
      */
     public static int[] getFramebufferSize() {
+        /*
+         * Use stack buffers for the native query; only the returned dimension pair escapes this call.
+         */
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer w = stack.mallocInt(1);
             IntBuffer h = stack.mallocInt(1);
@@ -631,6 +748,9 @@ public final class Window {
      * @return swap interval enum
      */
     public static SwapInterval getSwapInterval() {
+        /*
+         * Read retained configuration or native state directly without constructing a temporary settings object.
+         */
         return swapInterval;
     }
 
@@ -642,6 +762,9 @@ public final class Window {
      * @param type swap interval enum (null is ignored)
      */
     public static void setSwapInterval(SwapInterval type) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (type == null) return;
         swapInterval = type;
         glfwSwapInterval(type.getValue());
@@ -657,6 +780,9 @@ public final class Window {
      * @param y new window Y
      */
     public static void setPosition(int x, int y) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwSetWindowPos(address, x, y);
         Window.x = x;
@@ -669,6 +795,9 @@ public final class Window {
      * @return true if fullscreen
      */
     public static boolean isFullscreen() {
+        /*
+         * Read retained configuration or native state directly without constructing a temporary settings object.
+         */
         return fullscreen;
     }
 
@@ -684,6 +813,9 @@ public final class Window {
      * @throws RuntimeException if the primary monitor video mode cannot be queried
      */
     public static void setFullscreen(boolean fullscreen) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
 
         GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
@@ -704,6 +836,9 @@ public final class Window {
      * @return true if borderless
      */
     public static boolean isBorderless() {
+        /*
+         * Read retained configuration or native state directly without constructing a temporary settings object.
+         */
         return borderless;
     }
 
@@ -715,6 +850,9 @@ public final class Window {
      * @param borderless true for borderless, false for normal window decorations
      */
     public static void setBorderless(boolean borderless) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         Window.borderless = borderless;
         glfwSetWindowAttrib(address, GLFW_DECORATED, borderless ? GLFW_FALSE : GLFW_TRUE);
@@ -726,6 +864,9 @@ public final class Window {
      * @return true if resizable
      */
     public static boolean isResizable() {
+        /*
+         * Read retained configuration or native state directly without constructing a temporary settings object.
+         */
         return resizable;
     }
 
@@ -737,6 +878,9 @@ public final class Window {
      * @param resizable true to allow resizing, false to lock the window size
      */
     public static void setResizable(boolean resizable) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         Window.resizable = resizable;
         glfwSetWindowAttrib(address, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
@@ -749,6 +893,9 @@ public final class Window {
      * already updates {@link #fullscreen}.</p>
      */
     public static void toggleFullscreen() {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         setFullscreen(!fullscreen);
     }
 
@@ -758,6 +905,9 @@ public final class Window {
      * <p>No-op if the window has not been created.</p>
      */
     public static void minimize() {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwIconifyWindow(address);
     }
@@ -768,6 +918,9 @@ public final class Window {
      * <p>No-op if the window has not been created.</p>
      */
     public static void maximize() {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwMaximizeWindow(address);
     }
@@ -778,6 +931,9 @@ public final class Window {
      * <p>No-op if the window has not been created.</p>
      */
     public static void restore() {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwRestoreWindow(address);
     }
@@ -788,17 +944,61 @@ public final class Window {
      * <p>No-op if the window has not been created.</p>
      */
     public static void focus() {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwFocusWindow(address);
     }
 
     /**
-     * Requests the window to close.
+     * Replaces the primary operating-system close policy.
      *
-     * <p>This sets the GLFW should-close flag. Your engine loop should check it and exit cleanly.</p>
+     * <p>A nonnull handler receives coalesced title-bar and Alt+F4 requests on the
+     * render thread after native event polling. The window stays open until the
+     * handler eventually calls {@link #requestClose()}, allowing asynchronous
+     * save decisions. Returning without closing keeps the application running.
+     * Exceptions propagate through the normal JGL lifecycle. A null handler
+     * restores immediate native closure. Explicit close requests bypass this policy.</p>
+     *
+     * <p>Call only on the initialized primary window's render thread, outside a
+     * {@link WindowContext}. The handler is borrowed and released on shutdown.</p>
+     *
+     * @param handler close policy, or null for default behavior
+     * @return previous borrowed handler, or null
+     * @throws IllegalStateException if called outside the primary render scope
+     */
+    public static Runnable setCloseRequestHandler(Runnable handler) {
+        /*
+         * Presentation-scoped scripts must not replace the host's close policy.
+         * Retain one callback rather than allocating a task for each native event.
+         */
+        if (!isRenderThread() || WindowContext.current() != null)
+            throw new IllegalStateException("Close policy requires the primary window render thread.");
+        Runnable previous = closeRequestHandler;
+        closeRequestHandler = handler;
+        return previous;
+    }
+
+    /**
+     * Accepts closure of the active presentation, bypassing any native close policy.
+     *
+     * <p>For the primary window this sets the GLFW should-close flag and allows the
+     * engine loop to exit cleanly. Inside a {@link WindowContext}, only that logical
+     * presentation closes. Does nothing when no primary window exists.</p>
      */
     public static void requestClose() {
+        /*
+         * A completed save workflow must not prompt again. Keep scoped game exits
+         * independent of the host editor's accepted primary close state.
+         */
+        WindowContext context = WindowContext.current();
+        if (context != null) {
+            context.requestClose();
+            return;
+        }
         if (address == NULL) return;
+        closeConfirmed = true;
         glfwSetWindowShouldClose(address, true);
     }
 
@@ -810,6 +1010,9 @@ public final class Window {
      * @param value true to keep on top, false to allow normal z-ordering
      */
     public static void setAlwaysOnTop(boolean value) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwSetWindowAttrib(address, GLFW_FLOATING, value ? GLFW_TRUE : GLFW_FALSE);
     }
@@ -822,6 +1025,9 @@ public final class Window {
      * @param opacity opacity in [0..1]
      */
     public static void setOpacity(float opacity) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         opacity = Math.max(0f, Math.min(1f, opacity));
         glfwSetWindowOpacity(address, opacity);
@@ -836,6 +1042,9 @@ public final class Window {
      * @throws NullPointerException if the texture parameter is null.
      */
     public static void setIcon(TextureData texture) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         if (texture == null) throw new NullPointerException("TextureData cannot be null");
 
@@ -855,6 +1064,9 @@ public final class Window {
      * <p>This uses the current cached window size to compute the center position.</p>
      */
     public static void center() {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
 
         GLFWVidMode vid = glfwGetVideoMode(glfwGetPrimaryMonitor());
@@ -878,6 +1090,9 @@ public final class Window {
      * @param maxH maximum height
      */
     public static void setSizeLimits(int minW, int minH, int maxW, int maxH) {
+        /*
+         * Apply the requested native or cached state change directly, retaining lifecycle ownership in the engine.
+         */
         if (address == NULL) return;
         glfwSetWindowSizeLimits(address, minW, minH, maxW, maxH);
     }
@@ -888,6 +1103,9 @@ public final class Window {
      * <p>This frees all registered GLFW callbacks and destroys the GLFW window handle.</p>
      */
     static void dispose() {
+        /*
+         * Release retained native state in lifecycle order; cleanup failures must not hide later release attempts.
+         */
         Throwable failure = null;
 
         failure = appendSuppressed(failure, runSafe(ImmediateTextureRenderer::dispose));
@@ -961,6 +1179,9 @@ public final class Window {
         clearColorFilter = null;
         focusCallback = null;
         closeCallback = null;
+        closeRequestHandler = null;
+        nativeCloseRequested = false;
+        closeConfirmed = false;
         posCallback = null;
         sizeCallback = null;
         address = NULL;
@@ -975,7 +1196,8 @@ public final class Window {
         borderless = false;
         resizable = true;
         swapInterval = SwapInterval.OFF;
-        projectionMatrix.identity().get(projectionValues);
+        projectionMatrix.identity()
+                .get(projectionValues);
     }
 
     /**
@@ -984,7 +1206,11 @@ public final class Window {
      * @return GLFW window handle (0/NULL if not created)
      */
     public static long getAddress() {
-        return address;
+        /*
+         * Resolve the current presentation handle while preserving the primary handle for unscoped callers.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? address : context.nativeWindow();
     }
 
     /**
@@ -996,7 +1222,11 @@ public final class Window {
      * @return the current projection matrix values in column-major order
      */
     public static float[] getProjectionMatrix() {
-        return projectionValues;
+        /*
+         * Borrow the retained projection array for the current presentation without copying it.
+         */
+        WindowContext context = WindowContext.current();
+        return context == null ? projectionValues : context.projection();
     }
 
     /**
@@ -1011,9 +1241,18 @@ public final class Window {
      * @throws IllegalArgumentException if {@code matrixData.length < 16}
      */
     public static void setProjectionMatrix(float[] matrixData) {
+        /*
+         * Keep the retained matrix and packed shader values synchronized for the selected presentation.
+         */
         if (matrixData == null) throw new NullPointerException("matrixData");
         if (matrixData.length < 16) throw new IllegalArgumentException("matrixData must contain at least 16 floats");
-        projectionMatrix.set(matrixData).get(projectionValues);
+        WindowContext context = WindowContext.current();
+        if (context != null) {
+            context.projection(matrixData);
+            return;
+        }
+        projectionMatrix.set(matrixData)
+                .get(projectionValues);
     }
 
     /**
@@ -1024,9 +1263,12 @@ public final class Window {
      * @throws IllegalArgumentException if {@code destination.length < 16}
      */
     public static void copyProjectionMatrix(float[] destination) {
+        /*
+         * Copy into caller-owned storage so rendering can retain its own projection without exposing mutable engine state.
+         */
         if (destination == null) throw new NullPointerException("destination");
         if (destination.length < 16) throw new IllegalArgumentException("destination must contain at least 16 floats");
-        projectionMatrix.get(destination);
+        System.arraycopy(getProjectionMatrix(), 0, destination, 0, 16);
     }
 
     /**
@@ -1037,6 +1279,9 @@ public final class Window {
      * @return live shared dimensional adapter
      */
     public static Dimensional getDimensional() {
+        /*
+         * Reuse the shared dimensional adapter rather than allocating a wrapper for each query.
+         */
         return dimensional;
     }
 
@@ -1048,6 +1293,9 @@ public final class Window {
      * @return thrown failure, or null on success
      */
     private static Throwable runSafe(Runnable action) {
+        /*
+         * Retain the original cleanup failure instead of interrupting the remaining release sequence.
+         */
         try {
             action.run();
             return null;
@@ -1065,6 +1313,9 @@ public final class Window {
      * @return first available failure
      */
     private static Throwable appendSuppressed(Throwable primary, Throwable next) {
+        /*
+         * Preserve the first failure as the primary cause and attach later cleanup failures in encounter order.
+         */
         if (next == null) {
             return primary;
         }
@@ -1082,6 +1333,9 @@ public final class Window {
      * @param throwable nonnull failure to propagate
      */
     private static void rethrowUnchecked(Throwable throwable) {
+        /*
+         * Preserve runtime and error identities; wrap only checked cleanup failures that cannot escape this API directly.
+         */
         if (throwable instanceof RuntimeException runtimeException) {
             throw runtimeException;
         }
@@ -1090,4 +1344,17 @@ public final class Window {
         }
         throw new RuntimeException(throwable);
     }
+
+    /**
+     * Checks ownership of native rendering and presentation scope changes.
+     *
+     * @return whether the calling thread owns the primary window
+     */
+    public static boolean isRenderThread() {
+        /*
+         * The volatile owner is read only at context boundaries, not by hot input polling.
+         */
+        return address != NULL && renderThread == Thread.currentThread();
+    }
+
 }
