@@ -1,1 +1,1 @@
-{"name":"valthorne-browser-runtime","private":true,"type":"module","dependencies":{"@wasm-audio-decoders/ogg-vorbis":"0.1.20","mpg123-decoder":"1.0.3","yoga-layout":"3.2.1"}}
+{"name":"valthorne-browser-runtime","private":true,"type":"module","dependencies":{"@wasm-audio-decoders/ogg-vorbis":"0.1.20","jolt-physics":"1.1.1","mpg123-decoder":"1.0.3","yoga-layout":"3.2.1"}}

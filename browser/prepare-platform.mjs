@@ -404,3 +404,5 @@ for (const name of [
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, source);
 }
+
+await import("./prepare-physics.mjs");

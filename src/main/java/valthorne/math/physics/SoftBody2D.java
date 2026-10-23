@@ -21,7 +21,7 @@ import java.util.Objects;
  * World-owned deformable XY mesh solved by Jolt's native soft-body solver.
  * Construction triangulates a supported convex shape as a perimeter/center fan
  * with edge constraints; there is no enclosed 3D volume or pressure simulation.
- * Eight constraint iterations and compliance 0.00001 are used initially.
+ * Eight constraint iterations and compliance 0.001 are used initially.
  * Smaller compliance is stiffer; zero requests inextensible edges.
  *
  * <p>The original shape's live perimeter vectors receive interpolated pixels.
@@ -62,9 +62,9 @@ import java.util.Objects;
  */
 public final class SoftBody2D implements AutoCloseable {
     /**
-     * Initial inverse edge stiffness, allowing small elastic stretch under load.
+     * Initial inverse edge stiffness, keeping dense perimeter fans stable at ordinary masses.
      */
-    private static final float DEFAULT_COMPLIANCE = 0.00001f;
+    private static final float DEFAULT_COMPLIANCE = 0.001f;
     /**
      * Initial native XPBD constraint iterations per soft update.
      */
@@ -284,6 +284,8 @@ public final class SoftBody2D implements AutoCloseable {
 
     /**
      * Sets edge compliance; zero is stiffest and larger values permit stretching.
+     * Dense fans with very low compliance require mass and timestep tuning;
+     * greater stiffness can amplify numerical energy instead of settling.
      * @param compliance finite nonnegative native compliance in inverse stiffness units
      * @return this body
      */

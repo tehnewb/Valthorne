@@ -1,3 +1,4 @@
+import { BrowserPhysics } from "./physics.mjs";
 import createBgfx from "./native/bgfx.mjs";
 import { BrowserYoga } from "./yoga.mjs";
 import { BrowserAudio } from "./audio-backend.mjs";
@@ -70,6 +71,7 @@ export class BrowserHost {
         if (typeof FinalizationRegistry !== "function")
             throw new Error("This browser runtime requires native-allocation finalization support");
         this.yoga = new BrowserYoga();
+        this.physics = new BrowserPhysics();
         this.audioBackend = new BrowserAudio(this);
         this.assets = new Map();
         this.fontOwners = new FinalizationRegistry((pointer) => native._valthorne_font_free(pointer));
@@ -529,7 +531,11 @@ export class BrowserHost {
             await this.audioBackend.close();
         } finally {
             try {
-                this.yoga.close();
+                try {
+                    this.physics.close();
+                } finally {
+                    this.yoga.close();
+                }
             } finally {
                 if (this.upload) this.native._free(this.upload);
                 if (this.words) this.native._free(this.words);

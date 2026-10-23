@@ -21,7 +21,14 @@ def replacements = [
     'valthorne/graphics/bgfx/BgfxDesktopWindow', 'valthorne/graphics/bgfx/BgfxCallbacks',
     'valthorne/graphics/bgfx/BgfxPlatform', 'valthorne/graphics/bgfx/BgfxWindowsSurface',
     'valthorne/graphics/bgfx/BgfxGraphics', 'valthorne/graphics/bgfx/BgfxBatchRenderer', 'valthorne/graphics/bgfx/BgfxMeshRenderer',
-    'valthorne/graphics/bgfx/BgfxMesh', 'valthorne/graphics/bgfx/BgfxVertexBuffer'
+    'valthorne/graphics/bgfx/BgfxMesh', 'valthorne/graphics/bgfx/BgfxVertexBuffer',
+    'valthorne/math/physics/JoltRuntime', 'valthorne/math/physics/CollisionShape2D',
+    'valthorne/math/physics/PhysicsWorld2D', 'valthorne/math/physics/PhysicsWorldSettings2D', 'valthorne/math/physics/RigidBody2D',
+    'valthorne/math/physics/SoftBody2D', 'valthorne/math/physics/PhysicsSoftContacts2D',
+    'valthorne/math/physics/PhysicsContacts2D', 'valthorne/math/physics/PhysicsContactBridge2D',
+    'valthorne/math/physics/PhysicsQueries2D', 'valthorne/math/physics/PhysicsQueryCollector2D',
+    'valthorne/math/physics/PhysicsRigidBodyFilter2D', 'valthorne/math/physics/PhysicsPoses2D',
+    'valthorne/math/physics/PhysicsJoints2D', 'valthorne/math/physics/PhysicsJoint2D'
 ]
 
 def browserEngineApi = tasks.register('browserEngineApi', Jar) {
@@ -85,7 +92,7 @@ tasks.register('webExport', Sync) {
 
 // Generate platform variants from current engine sources rather than stale copies.
 def preparePlatform = tasks.register('preparePlatform', Exec) {
-    inputs.file('prepare-platform.mjs')
+    inputs.files('prepare-platform.mjs', 'prepare-physics.mjs')
     inputs.dir(rootProject.file('src/main/java'))
     outputs.dir(layout.buildDirectory.dir('generated/platform'))
     commandLine 'node', 'prepare-platform.mjs'
@@ -189,12 +196,14 @@ tasks.named('processApplicationResources') {
 // The official Yoga browser distribution contains its own WebAssembly module.
 def browserDependencies = tasks.register('browserDependencies', Exec) {
     inputs.files('package.json', 'package-lock.json')
-    outputs.files('node_modules/yoga-layout/package.json', 'node_modules/mpg123-decoder/package.json', 'node_modules/@wasm-audio-decoders/ogg-vorbis/package.json')
+    outputs.files('node_modules/yoga-layout/package.json', 'node_modules/mpg123-decoder/package.json', 'node_modules/@wasm-audio-decoders/ogg-vorbis/package.json', 'node_modules/jolt-physics/package.json')
     commandLine System.getProperty('os.name').startsWith('Windows') ? 'npm.cmd' : 'npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'
 }
 tasks.named('webExport', Sync) {
     dependsOn browserDependencies
     from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
+    from('node_modules/jolt-physics/dist') { include 'jolt-physics.wasm.js', 'jolt-physics.wasm.wasm'; into 'vendor/physics' }
+    from('node_modules/jolt-physics/LICENSE') { rename { 'jolt.txt' }; into 'META-INF/licenses' }
     from('node_modules/yoga-layout/LICENSE') { into 'vendor/yoga' }
     from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }
     from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include '*.min.js'; into 'vendor/audio' }
@@ -219,6 +228,8 @@ tasks.named('jar', Jar) {
     from { zipTree(browserJoml.get().archiveFile) }
     from(browserCompatibility.map { it.destinationDirectory })
     from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
+    from('node_modules/jolt-physics/dist') { include 'jolt-physics.wasm.js', 'jolt-physics.wasm.wasm'; into 'vendor/physics' }
+    from('node_modules/jolt-physics/LICENSE') { rename { 'jolt.txt' }; into 'META-INF/licenses' }
     from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }
     from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include '*.min.js'; into 'vendor/audio' }
     exclude 'module-info.class', 'META-INF/versions/**/module-info.class'
