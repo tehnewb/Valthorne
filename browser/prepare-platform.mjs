@@ -87,11 +87,34 @@ for (const name of [
         source = source.replaceAll("Files.readAllBytes(Path.of(path))", "BrowserAssets.read(path)");
     }
     if (name === "graphics/texture/TextureData") {
+        source = source.replaceAll("\r\n", "\n");
         source = source.replace(/^import java\.util\.(?:Collections|IdentityHashMap|Set);\s*$/gm, "");
-        const field = source.indexOf("    private static final Set<ByteBuffer> disposedBuffers");
+        source = source.replace(/^import static org\.lwjgl\.system\.MemoryUtil\.memAddress0;\s*$/gm, "");
+        const field = source.indexOf("    private static final Set<TextureData> nativeImages");
         if (field < 0) throw new Error("Review browser pixel-buffer ownership");
         const fieldEnd = source.indexOf("\n", field);
         source = source.slice(0, source.lastIndexOf("    /**", field)) + source.slice(fieldEnd + 1);
+        source = replace(source,
+            `        TextureData decoded = new TextureData(image, width, height);
+        synchronized (STB_LOCK) {
+            nativeImages.add(decoded);
+        }
+        return decoded;`,
+            "        return new TextureData(image, width, height);");
+        source = replace(source,
+            `         * Track the owning record by identity so borrowed views of the same
+         * buffer cannot release an allocation owned by a factory result.`,
+            `         * The browser decoder copies pixels into Java-managed storage and
+         * releases its native image allocation before returning.`);
+        source = replace(source,
+            ` * order. The loading factories own their native pixel allocations until
+ * {@link #dispose()}. Explicitly supplied buffers are borrowed: their original
+ * allocator or garbage collector controls their lifetime. Disposing such a view
+ * never frees caller-owned storage.</p>`,
+            ` * order. Browser decoders copy native pixels into Java-managed storage and release
+ * their native image allocation before returning. Returned buffers follow JavaScript
+ * garbage collection. Explicitly supplied buffers remain borrowed, and
+ * {@link #dispose()} never frees caller-owned storage.</p>`);
         const start = source.indexOf("    public void dispose() {"),
             begin = source.indexOf("{", start),
             end = closing(source, begin, "{", "}");
