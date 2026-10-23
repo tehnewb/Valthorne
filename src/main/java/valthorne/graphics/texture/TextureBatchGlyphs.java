@@ -100,6 +100,8 @@ final class TextureBatchGlyphs {
     private float clipH; // Logical clip height in final world coordinates.
     private Shader shader; // Lazily initialized curve-coverage shader owned by this component.
     private Shader mixedShader; // Dual-source composition preserves distinct sprite and glyph alpha rules.
+    private boolean mixedTargetKnown; // Whether the current segment has checked framebuffer draw targets.
+    private boolean mixedTargetSupported; // Dual-source blending requires exactly one active color output.
     private boolean mixedSprites; // Current segment includes compatible ordinary sprites.
     private int spriteTexture; // Borrowed sprite texture sampled by the mixed segment.
     private int oldTexture3; // Texture binding restored after mixed composition.
@@ -240,6 +242,7 @@ final class TextureBatchGlyphs {
     boolean appendSprite(int texture, float x, float y, float width, float height, float u0, float v0, float u1, float v1, Color tint, float opacity, boolean clipped, float cx, float cy, float cw, float ch) {
         if (texture == 0 || !drawing || !cachedCoverage || activeFont == null || srgbTarget || oldDepth || oldCull || cosine != 1f || sine != 0f || transformX != 0f || transformY != 0f) return false;
         if (oldSrcRgb != GL_SRC_ALPHA || oldDstRgb != GL_ONE_MINUS_SRC_ALPHA || oldSrcAlpha != GL_SRC_ALPHA || oldDstAlpha != GL_ONE_MINUS_SRC_ALPHA || oldEquationRgb != GL_FUNC_ADD || oldEquationAlpha != GL_FUNC_ADD) return false;
+        if (!supportsMixedTarget()) return false;
         if (mixedShader == null) {
             String vertex = ValthorneFiles.readString("valthorne/shaders/font/slug.vert");
             String fragment = ValthorneFiles.readString("valthorne/shaders/font/slug.frag");
@@ -264,6 +267,28 @@ final class TextureBatchGlyphs {
         instances.putFloat(cx).putFloat(cy).putFloat(cw).putFloat(ch).putFloat(clipped ? 1f : 0f);
         instanceCount++;
         return true;
+    }
+
+    /**
+     * Checks the destination only when sprites first try to join a text segment.
+     * Additional active color targets retain independent blending, including
+     * sparse configurations with an unused target between active attachments.
+     * Pure text submissions incur no extra framebuffer queries.
+     *
+     * @return true when dual-source blending can target the current framebuffer
+     */
+    private boolean supportsMixedTarget() {
+        if (mixedTargetKnown) return mixedTargetSupported;
+        mixedTargetKnown = true;
+        mixedTargetSupported = true;
+        int targets = readInteger(GL_MAX_DRAW_BUFFERS);
+        for (int target = 1; target < targets; target++) {
+            if (readInteger(GL_DRAW_BUFFER0 + target) != GL_NONE) {
+                mixedTargetSupported = false;
+                break;
+            }
+        }
+        return mixedTargetSupported;
     }
 
     /**
@@ -551,6 +576,7 @@ final class TextureBatchGlyphs {
             glBindVertexArray(vao);
             instances.clear();
             activeFont = null;
+            mixedTargetKnown = false;
             drawing = true;
         }
     }
