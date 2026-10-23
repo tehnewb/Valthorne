@@ -1,19 +1,25 @@
 package valthorne.graphics.bgfx;
 
-import org.lwjgl.bgfx.BGFXVertexLayout;
-
 import java.nio.ByteBuffer;
+import org.lwjgl.bgfx.BGFXVertexLayout;
+import valthorne.graphics.GraphicsResource;
 
 import static org.lwjgl.bgfx.BGFX.*;
 import static org.lwjgl.system.MemoryUtil.memAddress;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * Owns one immutable GPU triangle mesh. Repeated shapes share its vertices and
- * supply only transforms and tints. No source model or temporary staging storage
- * is retained, and close queues deletion on the owning bgfx runtime.
+ * supply only transforms and tints. Packed source bytes and a vertex declaration
+ * are retained for device restoration; drawing needs no staging allocations.
+ * Close queues native deletion and releases the retained CPU allocation.
  */
-public final class BgfxMesh implements AutoCloseable {
-    private short handle; // Owned immutable vertex buffer, invalid after close.
+public final class BgfxMesh implements AutoCloseable, GraphicsResource {
+    private ByteBuffer source; // Owned immutable mesh recovery bytes.
+    private final BGFXVertexLayout layout; // Owned packed vertex declaration retained across devices.
+
+    private short handle = BGFX_INVALID_HANDLE; // Owned immutable vertex buffer, invalid after close.
     private final int vertices; // Number of triangle-list vertices stored on the GPU.
     private final boolean transparent; // Whether any vertex color requires blending without depth writes.
 
@@ -34,10 +40,23 @@ public final class BgfxMesh implements AutoCloseable {
             }
         }
         transparent = translucent;
-        long memory = nbgfx_copy(memAddress(data) - size, size);
-        if (memory == 0) throw new IllegalStateException("Could not allocate bgfx mesh upload memory");
-        handle = nbgfx_create_vertex_buffer(memory, layout.address(), (short) BGFX_BUFFER_NONE);
-        if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not allocate bgfx mesh buffer");
+        this.layout = BGFXVertexLayout.calloc()
+                .set(layout);
+        try {
+            source = memAlloc(size);
+            source.put(data.duplicate().position(0).limit(size)).flip();
+            long memory = nbgfx_copy(memAddress(data) - size, size);
+            if (memory == 0) throw new IllegalStateException("Could not allocate bgfx mesh upload memory");
+            handle = nbgfx_create_vertex_buffer(memory, layout.address(), (short) BGFX_BUFFER_NONE);
+            if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not allocate bgfx mesh buffer");
+            BgfxResources.register(this);
+        } catch (RuntimeException | Error failure) {
+            releaseGraphicsResources();
+            if (source != null) memFree(source);
+            source = null;
+            this.layout.free();
+            throw failure;
+        }
     }
 
     /**
@@ -69,8 +88,26 @@ public final class BgfxMesh implements AutoCloseable {
 
     @Override
     public void close() {
+        if (source == null) return;
+        BgfxResources.unregister(this);
+        releaseGraphicsResources();
+        memFree(source);
+        source = null;
+        layout.free();
+    }
+
+    @Override
+    public void releaseGraphicsResources() {
         if (handle == BGFX_INVALID_HANDLE) return;
         bgfx_destroy_vertex_buffer(handle);
         handle = BGFX_INVALID_HANDLE;
     }
+
+    @Override
+    public void restoreGraphicsResources() {
+        BgfxLayouts.restore(layout);
+        handle = bgfx_create_vertex_buffer(bgfx_copy(source), layout, BGFX_BUFFER_NONE);
+        if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not restore cached mesh");
+    }
+
 }

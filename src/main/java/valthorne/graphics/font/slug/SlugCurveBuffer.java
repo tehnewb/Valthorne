@@ -44,7 +44,7 @@ final class SlugCurveBuffer {
         int y = texel >> 12;
         write(curve.p1x(), curve.p1y(), curve.p2x(), curve.p2y());
         write(curve.p3x(), curve.p3y(), 0f, 0f);
-        return SlugFont.packLocation(x, y);
+        return SlugOutlines.packLocation(x, y);
     }
 
     /**

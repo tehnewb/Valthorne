@@ -1,32 +1,26 @@
 package valthorne.graphics.texture;
 
-import org.lwjgl.BufferUtils;
-import valthorne.Window;
-import valthorne.graphics.Color;
-import valthorne.graphics.Sprite;
-import valthorne.graphics.shader.Shader;
-
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
 import java.util.Objects;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL14.*;
-import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
-import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
+import org.lwjgl.BufferUtils;
+import valthorne.Window;
+import valthorne.graphics.Color;
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsResource;
+import valthorne.graphics.Sprite;
+import valthorne.graphics.bgfx.BgfxBatchRenderer;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxResources;
+import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.slug.SlugTextRun;
+import valthorne.graphics.shader.Shader;
 
 /**
  * <p>
  * {@code TextureBatch} is Valthorne's instanced textured-quad renderer. It is designed
- * to batch many sprite draw operations into as few OpenGL draw calls as possible while
+ * to batch many sprite draw operations into as few GPU draw calls as possible while
  * still supporting several advanced rendering features such as color tinting, sprite
  * scaling, sprite rotation, nine-patch rendering, nested clipping, translation stacks,
  * shader overrides, and rendering into a {@link FrameBuffer}.
@@ -39,8 +33,8 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * An internal component owns glyph implementation state and is allocated only
  * when text is used; callers keep one batch and the same drawing lifecycle.
  * Text inherits translation, clipping, tint and opacity. Its dedicated curve shader
- * uses the current window projection and physical GL viewport; custom sprite shaders
- * do not affect glyphs. Flush before changing projection, viewport or external GL
+ * uses the current window projection and physical viewport; custom sprite shaders
+ * do not affect glyphs. Flush before changing projection, viewport or external rendering
  * state. Fonts are borrowed and must remain alive until queued text is flushed.
  * No raster atlas or per-draw scratch allocation is used by the text path.
  * </p>
@@ -49,7 +43,7 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * Instead of immediately sending every individual sprite to the GPU, this class stores
  * per-instance data inside an internal {@link FloatBuffer}. Once the batch is full or
  * the caller explicitly ends the batch, that instance data is uploaded to the GPU and
- * rendered with {@code glDrawArraysInstanced}. This greatly reduces driver overhead and
+ * rendered with {@code an instanced GPU submission}. This greatly reduces driver overhead and
  * improves rendering performance when drawing large numbers of textured objects.
  * </p>
  *
@@ -106,7 +100,10 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * @author Albert Beaupre
  * @since February 8th, 2026
  */
-public final class TextureBatch {
+public final class TextureBatch implements GraphicsResource {
+    private BgfxBatchRenderer bgfxRenderer; // Owned compact GPU instance path.
+    private int previousTargetWidth; // Saved parent target width for cropped viewport restoration.
+    private int previousTargetHeight; // Saved target orientation for a scoped bgfx framebuffer.
 
     private final ByteBuffer instanceBytes; // Shared native staging storage for sprite and glyph segments.
     private final FloatBuffer instanceBuffer; // Float view of shared staging storage used for sprite instances.
@@ -116,11 +113,7 @@ public final class TextureBatch {
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
-    private final int quadVBO; // VBO containing the shared quad geometry used by all instances
-    private final int instanceVBO; // VBO containing uploaded instance data for the current flush
-    private final int vao; // Owned vertex-array name for quad and instance attributes.
     private final int[] vp = new int[4]; // Temporary viewport storage used when switching framebuffer targets
-    private final int[] previousScissorBox = new int[4]; // Previous OpenGL scissor rectangle restored after batching
     private final float[] clipStack = new float[256]; // Stack storing nested clip rectangles as x, y, width, height groups
     private final float[] translationStack = new float[256]; // Stack storing nested translation states as x and y pairs
     private Shader customShader; // Optional user-supplied shader override
@@ -152,11 +145,10 @@ public final class TextureBatch {
     private float clipW; // Active clip rectangle width
     private float clipH; // Active clip rectangle height
 
-    private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
     private long totalDrawCalls; // Cumulative nonempty sprite draw count, combined with glyph counts by the getter.
     private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
-    private long totalSubmittedSprites; // Cumulative submitted and viewport-culled sprite counts.
-    private long totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalSubmittedSprites; // Cumulative submitted sprite count.
+    private long totalCulledSprites; // Cumulative viewport-culled sprite count.
 
     /**
      * <p>
@@ -186,7 +178,7 @@ public final class TextureBatch {
      * <p>
      * This constructor allocates the CPU-side instance buffer, creates the default
      * shader, binds its expected attributes and samplers, builds the base quad vertex
-     * data, and creates the OpenGL buffer objects required for batched instanced
+     * data, and creates the GPU buffer objects required for batched instanced
      * rendering.
      * </p>
      *
@@ -219,53 +211,15 @@ public final class TextureBatch {
         this.instanceBytes = BufferUtils.createByteBuffer(Math.multiplyExact(this.maxSprites, TextureBatchContract.INST_STRIDE_BYTES));
         this.instanceBuffer = instanceBytes.asFloatBuffer();
 
-        this.defaultShader = new Shader(TextureBatchContract.defaultVertexShader(), TextureBatchContract.buildDefaultFragmentShader(this.maxTextureUnits), TextureBatchContract::bindAttributes);
-        TextureBatchContract.bindSamplers(this.defaultShader, this.maxTextureUnits);
-
-        this.activeShader = this.defaultShader;
-
-        FloatBuffer quad = BufferUtils.createFloatBuffer(TextureBatchContract.QUAD_VERTS * TextureBatchContract.QUAD_FLOATS_PER_VERT);
-
-        quad.put(0f)
-                .put(0f)
-                .put(0f)
-                .put(0f);
-        quad.put(1f)
-                .put(0f)
-                .put(1f)
-                .put(0f);
-        quad.put(1f)
-                .put(1f)
-                .put(1f)
-                .put(1f);
-
-        quad.put(1f)
-                .put(1f)
-                .put(1f)
-                .put(1f);
-        quad.put(0f)
-                .put(1f)
-                .put(0f)
-                .put(1f);
-        quad.put(0f)
-                .put(0f)
-                .put(0f)
-                .put(0f);
-
-        quad.flip();
-
-        quadVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, quad, GL_STATIC_DRAW);
-
-        instanceVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, (long) this.maxSprites * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
-
-        vao = glGenVertexArrays();
-        configureVertexArray();
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        bgfxRenderer = new BgfxBatchRenderer(maxSprites);
+        try {
+            defaultShader = new TextureBatchShader(this.maxTextureUnits);
+        } catch (RuntimeException | Error failure) {
+            bgfxRenderer.close();
+            throw failure;
+        }
+        activeShader = defaultShader;
+        BgfxResources.register(this);
     }
 
     /**
@@ -316,69 +270,9 @@ public final class TextureBatch {
      */
     private static int detectTextureUnitsClamped(int clampTo) {
         /*
-         * Clamp native texture capacity to the supported batch contract before allocating indexed storage.
+         * Every packaged batch contract exposes sixteen sampled texture slots.
          */
-        int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
-        if (units <= 0) {
-            units = 8;
-        }
-        return Math.min(units, clampTo);
-    }
-
-    /**
-     * Associates static quad and streamed instance buffers with the batch vertex
-     * array, configuring the shared attribute layout and instance divisors. Requires
-     * the GL context and leaves array bindings at zero.
-     */
-    private void configureVertexArray() {
-        glBindVertexArray(vao);
-
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-
-        int quadStride = TextureBatchContract.QUAD_FLOATS_PER_VERT * TextureBatchContract.BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_LOCAL);
-        glVertexAttribPointer(TextureBatchContract.ATTR_LOCAL, 2, GL_FLOAT, false, quadStride, 0L);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_UV);
-        glVertexAttribPointer(TextureBatchContract.ATTR_UV, 2, GL_FLOAT, false, quadStride, 2L * TextureBatchContract.BYTES_PER_FLOAT);
-
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_XYWH);
-        glVertexAttribPointer(TextureBatchContract.ATTR_XYWH, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 0L);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_XYWH, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_COL);
-        glVertexAttribPointer(TextureBatchContract.ATTR_COL, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 4L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_COL, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_TEX);
-        glVertexAttribPointer(TextureBatchContract.ATTR_TEX, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 8L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_TEX, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_UVRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_UVRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 9L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
-        glVertexAttribPointer(TextureBatchContract.ATTR_ORIGIN, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 13L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_ROT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_ROT, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 15L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 17L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPENABLED, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 21L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 1);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
+        return Math.min(16, clampTo);
     }
 
     /**
@@ -657,19 +551,8 @@ public final class TextureBatch {
      * stacks, tint, shader choice, and framebuffer ownership.
      */
     public void resumeAfterExternalDraw() {
-        if (!drawing) throw new IllegalStateException("The batch is not drawing.");
-        if (instanceCount != 0 || glyphs != null && glyphs.isDrawing()) throw new IllegalStateException("Flush before switching renderers.");
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_SCISSOR_TEST);
-        activeTextureCount = 0;
-        lastTextureID = -1;
-        lastTextureUnit = -1;
-        Arrays.fill(textureIDs, 0, textureUnitCapacity, -1);
-        bindActiveShaderState();
+        if (!drawing) throw new IllegalStateException("The batch is not drawing");
+        BgfxGraphics.configureView();
     }
 
     /**
@@ -803,7 +686,7 @@ public final class TextureBatch {
      *
      * <p>
      * This method initializes batch state, resets clip and translation stacks, saves
-     * and temporarily modifies relevant OpenGL state, clears instance bookkeeping, and
+     * and temporarily modifies relevant engine render state, clears instance bookkeeping, and
      * binds the currently active shader and vertex attributes. If an FBO is provided,
      * the current framebuffer and viewport are captured and restored later in
      * {@link #end()}.
@@ -821,63 +704,7 @@ public final class TextureBatch {
      *                               into a framebuffer
      */
     public void begin(FrameBuffer fbo) {
-        if (drawing) throw new IllegalStateException("Already drawing.");
-        translationDepth = 0;
-        translationX = 0f;
-        translationY = 0f;
-        if (glyphs != null) glyphs.resetTransform();
-        drawing = true;
-
-        usingFBO = fbo != null;
-
-        if (usingFBO) {
-            previousFBO = glGetInteger(GL_FRAMEBUFFER_BINDING);
-
-            glGetIntegerv(GL_VIEWPORT, vp);
-            prevViewportX = vp[0];
-            prevViewportY = vp[1];
-            prevViewportW = vp[2];
-            prevViewportH = vp[3];
-
-            if (prevViewportW <= 0 || prevViewportH <= 0) {
-                throw new IllegalStateException("GL_VIEWPORT returned invalid size: " + prevViewportW + "x" + prevViewportH);
-            }
-
-            if (fbo.getWidth() != prevViewportW || fbo.getHeight() != prevViewportH) {
-                fbo.resize(prevViewportW, prevViewportH);
-            }
-
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo.getFrameBufferId());
-            glViewport(0, 0, fbo.getWidth(), fbo.getHeight());
-        }
-
-        clipDepth = 0;
-        clipEnabled = false;
-        clipX = 0f;
-        clipY = 0f;
-        clipW = 0f;
-        clipH = 0f;
-
-        scissorEnabledBeforeBegin = glIsEnabled(GL_SCISSOR_TEST);
-        if (scissorEnabledBeforeBegin) {
-            glGetIntegerv(GL_SCISSOR_BOX, previousScissorBox);
-            glDisable(GL_SCISSOR_TEST);
-        }
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        instanceCount = 0;
-        instanceBuffer.clear();
-
-        activeTextureCount = 0;
-        lastTextureID = -1;
-        lastTextureUnit = -1;
-
-        Arrays.fill(textureIDs, 0, textureUnitCapacity, -1);
-
-        activeShader = customShader != null ? customShader : defaultShader;
-        bindActiveShaderState();
+        beginBgfx(fbo);
     }
 
     /**
@@ -1770,7 +1597,7 @@ public final class TextureBatch {
      * @return this batch's reusable glyph component
      */
     public TextureBatchGlyphs getGlyphs() {
-        if (glyphs == null) glyphs = new TextureBatchGlyphs(this, instanceBytes, quadVBO, instanceVBO, maxSprites);
+        if (glyphs == null) glyphs = new TextureBatchGlyphs(this, instanceBytes, maxSprites, bgfxRenderer);
         return glyphs;
     }
 
@@ -1822,45 +1649,69 @@ public final class TextureBatch {
      * @throws IllegalStateException if the batch is not currently active
      */
     public void end() {
-        if (!drawing) throw new IllegalStateException("Call begin() before end().");
+        endBgfx();
+    }
 
-        flush();
-
-        activeShader.unbind();
-        glBindVertexArray(0);
-        drawing = false;
-
-        for (int i = 0; i < maxTextureUnits; i++) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, 0);
-        }
-        glActiveTexture(GL_TEXTURE0);
-
-        activeTextureCount = 0;
-        lastTextureID = -1;
-        lastTextureUnit = -1;
-
-        if (scissorEnabledBeforeBegin) {
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3]);
-        } else {
-            glDisable(GL_SCISSOR_TEST);
-        }
-
+    /**
+     * Establishes public batch scopes without reading implicit engine render state.
+     *
+     * @param fbo optional offscreen output
+     */
+    private void beginBgfx(FrameBuffer fbo) {
+        BgfxGraphics.device();
+        if (drawing) throw new IllegalStateException("Already drawing");
+        translationDepth = 0;
+        translationX = translationY = 0;
         clipDepth = 0;
         clipEnabled = false;
-        clipX = 0f;
-        clipY = 0f;
-        clipW = 0f;
-        clipH = 0f;
-        translationDepth = 0;
-        translationX = 0f;
-        translationY = 0f;
-
+        clipX = clipY = clipW = clipH = 0;
+        if (glyphs != null) glyphs.resetTransform();
+        usingFBO = fbo != null;
         if (usingFBO) {
-            glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
-            glViewport(prevViewportX, prevViewportY, prevViewportW, prevViewportH);
-            usingFBO = false;
+            previousFBO = BgfxGraphics.target();
+            previousTargetHeight = BgfxGraphics.targetHeight();
+            previousTargetWidth = BgfxGraphics.targetWidth();
+            BgfxGraphics.getViewport(vp);
+            prevViewportX = vp[0];
+            prevViewportY = vp[1];
+            prevViewportW = vp[2];
+            prevViewportH = vp[3];
+            if (fbo.getWidth() != prevViewportW || fbo.getHeight() != prevViewportH)
+                fbo.resize(prevViewportW, prevViewportH);
+            BgfxGraphics.setTarget(fbo.getFrameBufferId(), fbo.getWidth(), fbo.getHeight());
+            BgfxGraphics.setViewport(0, 0, fbo.getWidth(), fbo.getHeight());
+        }
+        drawing = true;
+        instanceCount = 0;
+        instanceBuffer.clear();
+        instanceBytes.clear();
+        activeTextureCount = 0;
+        lastTextureID = lastTextureUnit = -1;
+        Arrays.fill(textureIDs, -1);
+        activeShader = customShader != null ? customShader : defaultShader;
+        activeShader.bind();
+    }
+
+    /**
+     * Flushes the public batch and restores its optional framebuffer scope.
+     */
+    private void endBgfx() {
+        if (!drawing) throw new IllegalStateException("Call begin before end");
+        try {
+            flush();
+        } finally {
+            drawing = false;
+            activeShader.unbind();
+            activeTextureCount = 0;
+            lastTextureID = lastTextureUnit = -1;
+            clipDepth = translationDepth = 0;
+            clipEnabled = false;
+            translationX = translationY = 0;
+            if (usingFBO) {
+                BgfxGraphics.setTarget(previousFBO, previousTargetWidth, previousTargetHeight);
+                BgfxGraphics.setViewport(prevViewportX, prevViewportY, prevViewportW, prevViewportH);
+                usingFBO = false;
+            }
         }
     }
 
@@ -1915,7 +1766,7 @@ public final class TextureBatch {
      * uploads queued sprite instances after applying the active projection, orphans the
      * stream buffer, and issues one instanced draw. Clears CPU instance/texture-slot
      * bookkeeping afterward while retaining the drawing scope. Empty queues return
-     * immediately. Call within an active batch scope with its GL state intact;
+     * immediately. Call within an active batch scope with its engine render state intact;
      * this method does not establish or restore the full scope itself.
      */
     public void flush() {
@@ -1927,12 +1778,7 @@ public final class TextureBatch {
         applyActiveProjection();
         instanceBuffer.flip();
 
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, (long) maxSprites * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, instanceBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
+        bgfxRenderer.submit(instanceBytes, instanceCount, TextureBatchContract.INST_STRIDE_BYTES, activeShader, textureIDs, activeTextureCount, false);
         totalDrawCalls++;
 
         instanceBuffer.clear();
@@ -1946,7 +1792,7 @@ public final class TextureBatch {
 
     /**
      * <p>
-     * Releases native and OpenGL resources owned by this batch.
+     * Releases native resources owned by this batch.
      * </p>
      *
      * <p>
@@ -1956,11 +1802,10 @@ public final class TextureBatch {
      * </p>
      */
     public void dispose() {
+        BgfxResources.unregister(this);
         if (glyphs != null) glyphs.dispose();
         defaultShader.dispose();
-        glDeleteVertexArrays(vao);
-        glDeleteBuffers(quadVBO);
-        glDeleteBuffers(instanceVBO);
+        bgfxRenderer.close();
     }
 
     /**
@@ -1978,7 +1823,7 @@ public final class TextureBatch {
     private void bindActiveShaderState() {
         activeShader.bind();
         applyActiveProjection();
-        glBindVertexArray(vao);
+
     }
 
     /**
@@ -2006,7 +1851,7 @@ public final class TextureBatch {
      * can flush and retry.
      * </p>
      *
-     * @param textureID the OpenGL texture ID to resolve
+     * @param textureID the GPU texture ID to resolve
      * @return the texture unit index, or {@code -1} if the batch must flush first
      */
     private int getOrBindTextureUnit(int textureID) {
@@ -2032,10 +1877,6 @@ public final class TextureBatch {
         int unit = activeTextureCount++;
         textureIDs[unit] = textureID;
 
-        glActiveTexture(GL_TEXTURE0 + unit);
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glActiveTexture(GL_TEXTURE0);
-
         lastTextureID = textureID;
         lastTextureUnit = unit;
         return unit;
@@ -2058,4 +1899,10 @@ public final class TextureBatch {
         Arrays.fill(textureIDs, oldCapacity, newCapacity, -1);
         textureUnitCapacity = newCapacity;
     }
+
+    @Override
+    public void validateGraphicsReset(GraphicsBackend backend) {
+        if (drawing) throw new IllegalStateException("End texture batches before switching graphics backends");
+    }
+
 }

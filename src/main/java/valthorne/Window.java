@@ -1,32 +1,33 @@
 package valthorne;
 
+import java.nio.DoubleBuffer;
+import java.nio.IntBuffer;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.UnaryOperator;
+import org.joml.Matrix4f;
 import org.lwjgl.glfw.*;
-import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import valthorne.event.EventTypes;
+import valthorne.event.events.FileDropEvent;
+import valthorne.event.events.WindowFocusEvent;
 import valthorne.event.events.WindowResizeEvent;
 import valthorne.event.events.FramebufferResizeEvent;
 import valthorne.event.listeners.WindowResizeListener;
 import valthorne.graphics.Color;
-import java.util.function.UnaryOperator;
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsCapabilities;
+import valthorne.graphics.GraphicsRecoveryException;
 import valthorne.graphics.ImmediateTextureRenderer;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxResources;
 import valthorne.graphics.texture.TextureData;
-import org.joml.Matrix4f;
 import valthorne.math.geometry.Dimensional;
 
-import java.nio.IntBuffer;
-import java.nio.DoubleBuffer;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import valthorne.event.events.FileDropEvent;
-
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import static org.lwjgl.system.MemoryUtil.NULL;
-import org.lwjgl.system.MemoryUtil;
-import valthorne.event.events.WindowFocusEvent;
-import valthorne.graphics.GraphicsCapabilities;
 
 /**
  * GLFW window wrapper for Valthorne.
@@ -139,6 +140,7 @@ public final class Window {
      * Shared graphics capabilities state retained by Window.
      */
     private static GraphicsCapabilities graphicsCapabilities;
+
     /**
      * Cached desktop X and Y coordinates in GLFW screen-coordinate units.
      */
@@ -279,17 +281,14 @@ public final class Window {
      * Cached resizability preference/state.
      */
     private static boolean resizable = true;
-
     /**
-     * @return actual capabilities of the initialized window, not the requested version
+     * Pending render-thread requests cancelled if the application closes first.
      */
-    public static GraphicsCapabilities getGraphicsCapabilities() {
-        /*
-         * Expose the validated capabilities captured at initialization rather than repeating native feature queries.
-         */
-        if (graphicsCapabilities == null) throw new IllegalStateException("Window is not initialized");
-        return graphicsCapabilities;
-    }
+    private static final ArrayList<CompletableFuture<GraphicsBackend>> backendChanges = new ArrayList<>();
+    /**
+     * Prevents completion callbacks from queuing changes during window disposal.
+     */
+    private static boolean acceptsBackendChanges;
 
     /**
      * Prevents construction of the process-wide GLFW window utility.
@@ -298,16 +297,95 @@ public final class Window {
     }
 
     /**
-     * Initializes the application window with the given configuration parameters.
-     * Configures the OpenGL context and GLFW window hints and creates the application window.
-     * It sets up various callbacks for handling resize, position, focus, and other window events.
-     * The method also ensures proper rendering capabilities, including enabling multisampling and
-     * blending if required, based on the configuration.
+     * Returns capabilities of the current device, refreshed after backend changes.
      *
-     * @param config the {@link JGLConfiguration} object containing all the configuration parameters
-     *               required for setting up the application window, such as dimensions, fullscreen
-     *               mode, OpenGL settings, and additional hints. This parameter must not be null.
-     *               If null, a {@link NullPointerException} will be thrown.
+     * @return actual capabilities of the initialized renderer
+     */
+    public static GraphicsCapabilities getGraphicsCapabilities() {
+        /*
+         * Reuse the current device snapshot without querying native caps per call.
+         */
+        if (graphicsCapabilities == null) throw new IllegalStateException("Window is not initialized");
+        return graphicsCapabilities;
+    }
+
+    /**
+     * Requests a desktop renderer change at the next main-loop frame boundary.
+     * Call on the rendering thread and finish ordinary drawing scopes normally.
+     * The window, application, input, audio and CPU scene state remain alive.
+     * Engine assets restore automatically; render targets and compute outputs
+     * must be repainted. Borrowed native handles must be fetched again afterward.
+     *
+     * <p>The future completes on the rendering thread after restoration. Do not
+     * block that thread waiting for it. Unsupported targets and recoverable
+     * failures complete exceptionally while retaining/restoring the old backend.</p>
+     * <p>If both replacement and recovery fail, the future receives a
+     * {@link GraphicsRecoveryException} and JGL closes through normal disposal.</p>
+     *
+     * <pre>{@code
+     * Window.switchGraphicsBackend(GraphicsBackend.VULKAN)
+     *         .thenRun(this::regenerateComputeOutput);
+     * }</pre>
+     *
+     * @param backend requested desktop rendering API
+     * @return completion of the frame-boundary transition
+     */
+    public static CompletableFuture<GraphicsBackend> switchGraphicsBackend(GraphicsBackend backend) {
+        /*
+         * Queue work through the existing loop rather than destroying a device
+         * while input callbacks or an active scene draw are still using it.
+         */
+        BgfxGraphics.device();
+        if (!acceptsBackendChanges) throw new IllegalStateException("The window is shutting down");
+        if (backend == null) throw new NullPointerException("backend");
+        CompletableFuture<GraphicsBackend> completion = new CompletableFuture<>();
+        backendChanges.add(completion);
+        JGL.runTask(() -> {
+            if (!acceptsBackendChanges || shouldClose()) return;
+            if (completion.isDone()) {
+                backendChanges.remove(completion);
+                return;
+            }
+            try {
+                BgfxResources.switchBackend(backend);
+                graphicsCapabilities = GraphicsCapabilities.current();
+                backendChanges.remove(completion);
+                completion.complete(backend);
+            } catch (RuntimeException | Error failure) {
+                if (failure instanceof GraphicsRecoveryException) {
+                    acceptsBackendChanges = false;
+                    requestClose();
+                } else {
+                    try {
+                        graphicsCapabilities = GraphicsCapabilities.current();
+                    } catch (RuntimeException | Error capabilityFailure) {
+                        failure.addSuppressed(capabilityFailure);
+                    }
+                }
+                backendChanges.remove(completion);
+                completion.completeExceptionally(failure);
+            }
+        });
+        return completion;
+    }
+
+    /**
+     * Returns the active renderer rather than the startup configuration value.
+     *
+     * @return current graphics API
+     */
+    public static GraphicsBackend getGraphicsBackend() {
+        /*
+         * Runtime selection belongs to the live device, not its initial config.
+         */
+        return BgfxGraphics.device().backend();
+    }
+
+    /**
+     * Creates a native window and initializes the configured bgfx device, projection
+     * and engine event callbacks. Graphics initialization failure destroys the window.
+     *
+     * @param config nonnull application window and graphics configuration
      */
     public static void init(JGLConfiguration config) {
         /*
@@ -315,70 +393,35 @@ public final class Window {
          */
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
         if (address != NULL) throw new IllegalStateException("Window is already initialized");
-        if (config.getClientApi() != GLFW_OPENGL_API)
-            throw new UnsupportedOperationException("Valthorne currently uses desktop OpenGL bindings; OpenGL ES and no-API windows require a separate backend.");
-
+        /*
+         * Every renderer owns its graphics device. GLFW supplies only the native
+         * window, so context hints cannot alter the selected rendering backend.
+         */
         Window.width = config.getWidth();
         Window.height = config.getHeight();
         Window.fullscreen = config.isFullscreen();
         Window.borderless = !config.isDecorated();
         Window.resizable = config.isResizable();
         Window.swapInterval = config.getSwapInterval();
-
         renderThread = Thread.currentThread();
         config.applyWindowHints();
-        // Keep windowed creation invisible until positioning and graphics setup finish.
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         long monitor = config.isFullscreen() ? glfwGetPrimaryMonitor() : NULL;
-        int[][] versions = config.isAutomaticContext() ? new int[][]{{4, 3}, {4, 1}, {3, 3}}
-                : new int[][]{{config.getContextVersionMajor(), config.getContextVersionMinor()}};
-        StringBuilder failures = new StringBuilder();
-        for (int[] version : versions) {
-            if (config.isAutomaticContext()) {
-                glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, version[0]);
-                glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, version[1]);
-                glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-                glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-            }
-            address = glfwCreateWindow(config.getWidth(), config.getHeight(), config.getTitle(), monitor, NULL);
-            if (address != NULL) break;
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                var description = stack.mallocPointer(1);
-                int error = glfwGetError(description);
-                String detail = description.get(0) == NULL ? "No native description"
-                        : MemoryUtil.memUTF8(description.get(0));
-                failures.append("GL ")
-                        .append(version[0])
-                        .append('.')
-                        .append(version[1])
-                        .append(" (error ")
-                        .append(error)
-                        .append("): ")
-                        .append(detail)
-                        .append('\n');
-            }
-        }
-        if (address == NULL) throw new IllegalStateException("Failed to create the GLFW window:\n" + failures);
-
-        glfwMakeContextCurrent(address);
+        address = glfwCreateWindow(width, height, config.getTitle(), monitor, NULL);
+        if (address == NULL) throw new IllegalStateException("Failed to create the GLFW window");
         try {
-            if (glfwGetWindowAttrib(address, GLFW_CLIENT_API) != GLFW_OPENGL_API)
-                throw new UnsupportedOperationException("Extra window hints selected an unsupported client API; desktop OpenGL is required.");
-            GL.createCapabilities();
+            BgfxGraphics.initialize(address, swapInterval.getValue() != 0, config.getSamples(), config.getGraphicsBackend());
             graphicsCapabilities = GraphicsCapabilities.current();
             graphicsCapabilities.requireRaster();
+            acceptsBackendChanges = true;
         } catch (RuntimeException | Error failure) {
-            graphicsCapabilities = null;
-            glfwMakeContextCurrent(NULL);
-            GL.setCapabilities(null);
+            BgfxGraphics.dispose();
             glfwDestroyWindow(address);
             address = NULL;
+            graphicsCapabilities = null;
             throw failure;
         }
-        glfwSwapInterval(config.getSwapInterval().getValue());
-
-        if (config.getSamples() > 0) glEnable(GL_MULTISAMPLE);
 
         sizeCallback = GLFWWindowSizeCallback.create((win, newW, newH) -> {
             if (newW <= 0 || newH <= 0) return;
@@ -388,6 +431,8 @@ public final class Window {
 
             Window.width = newW;
             Window.height = newH;
+
+            BgfxGraphics.setViewport(0, 0, newW, newH);
 
             updateDefaultProjectionMatrix();
 
@@ -403,7 +448,7 @@ public final class Window {
             int oldHeight = framebufferHeight;
             framebufferWidth = newWidth;
             framebufferHeight = newHeight;
-            glViewport(0, 0, newWidth, newHeight);
+            BgfxGraphics.setViewport(0, 0, newWidth, newHeight);
             framebufferResizeEvent.set(oldWidth, oldHeight, newWidth, newHeight);
             JGL.publish(framebufferResizeEvent);
         });
@@ -467,10 +512,7 @@ public final class Window {
             framebufferHeight = h.get(0);
         }
 
-        glViewport(0, 0, framebufferWidth, framebufferHeight);
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        BgfxGraphics.setViewport(0, 0, framebufferWidth, framebufferHeight);
 
         updateDefaultProjectionMatrix();
 
@@ -485,7 +527,7 @@ public final class Window {
     /**
      * Rebuilds the engine's bottom-left-origin orthographic projection from cached
      * window dimensions, with depth limits -1 and 1, and refreshes the reusable
-     * column-major upload array. Does not modify a fixed-function GL matrix stack.
+     * column-major upload array. Does not submit any drawing.
      */
     private static void updateDefaultProjectionMatrix() {
         /*
@@ -496,7 +538,7 @@ public final class Window {
     }
 
     /**
-     * Clears the current OpenGL framebuffer using the specified color.
+     * Clears the current render target using the specified color.
      * <p>
      * This sets the clear color to the RGBA values of the provided {@code Color} object
      * and clears the color buffer bit, effectively resetting the frame for new drawing.
@@ -508,8 +550,7 @@ public final class Window {
          * Resolve an optional scoped policy before clearing without allocating colors.
          */
         Color effective = clearColorFilter == null ? color : clearColorFilter.apply(color);
-        glClearColor(effective.r(), effective.g(), effective.b(), effective.a());
-        glClear(GL_COLOR_BUFFER_BIT);
+        BgfxGraphics.clear(effective);
     }
 
     /**
@@ -632,7 +673,7 @@ public final class Window {
      * Sets the window size.
      *
      * <p>This requests a size change; GLFW will typically call your size callback, which updates cached
-     * {@link #width} and {@link #height} and updates the OpenGL projection.</p>
+     * {@link #width} and {@link #height} and updates the engine projection.</p>
      *
      * @param width  new window width (pixels)
      * @param height new window height (pixels)
@@ -757,7 +798,7 @@ public final class Window {
     /**
      * Sets the swap interval (VSync).
      *
-     * <p>This updates the cached {@link #swapInterval} and immediately calls {@link GLFW#glfwSwapInterval(int)}.</p>
+     * <p>This updates the cached {@link #swapInterval} and updates the graphics device presentation policy.</p>
      *
      * @param type swap interval enum (null is ignored)
      */
@@ -767,7 +808,7 @@ public final class Window {
          */
         if (type == null) return;
         swapInterval = type;
-        glfwSwapInterval(type.getValue());
+        if (BgfxGraphics.isActive()) BgfxGraphics.device().setVsync(type.getValue() != 0);
     }
 
     /**
@@ -1104,9 +1145,15 @@ public final class Window {
      */
     static void dispose() {
         /*
-         * Release retained native state in lifecycle order; cleanup failures must not hide later release attempts.
+         * Finish pending requests while callbacks can still inspect the live window,
+         * and reject new transitions before releasing native resources.
          */
         Throwable failure = null;
+        acceptsBackendChanges = false;
+        while (!backendChanges.isEmpty()) {
+            CompletableFuture<GraphicsBackend> completion = backendChanges.remove(backendChanges.size() - 1);
+            completion.completeExceptionally(new CancellationException("The application closed before the backend change"));
+        }
 
         failure = appendSuppressed(failure, runSafe(ImmediateTextureRenderer::dispose));
         long handle = address;
@@ -1149,12 +1196,11 @@ public final class Window {
         dropCallback = null;
         if (windowDropCallback != null) failure = appendSuppressed(failure, runSafe(windowDropCallback::free));
 
+        failure = appendSuppressed(failure, runSafe(BgfxGraphics::dispose));
         address = NULL;
         graphicsCapabilities = null;
         if (handle != NULL) {
             failure = appendSuppressed(failure, runSafe(() -> {
-                glfwMakeContextCurrent(NULL);
-                GL.setCapabilities(null);
                 glfwDestroyWindow(handle);
             }));
         }
@@ -1230,15 +1276,12 @@ public final class Window {
     }
 
     /**
-     * Replaces the engine-managed projection matrix with the supplied column-major matrix values.
+     * Replaces the engine's column-major projection. Renderers copy this value at
+     * submission, so subsequent camera changes cannot alter already queued draws.
      *
-     * <p>This does not update OpenGL's fixed-function matrix stack directly. It exists so
-     * shader-driven renderers can follow the same logical viewport/camera state as legacy
-     * code while the engine transitions away from implicit OpenGL matrices.</p>
-     *
-     * @param matrixData projection values in column-major order
-     * @throws NullPointerException     if {@code matrixData} is null
-     * @throws IllegalArgumentException if {@code matrixData.length < 16}
+     * @param matrixData at least sixteen column-major values
+     * @throws NullPointerException if the matrix is null
+     * @throws IllegalArgumentException if fewer than sixteen values are provided
      */
     public static void setProjectionMatrix(float[] matrixData) {
         /*

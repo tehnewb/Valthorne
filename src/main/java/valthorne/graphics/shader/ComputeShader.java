@@ -1,319 +1,237 @@
 package valthorne.graphics.shader;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL31.glBindBufferBase;
-import static org.lwjgl.opengl.GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42.GL_TEXTURE_FETCH_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42.glBindImageTexture;
-import static org.lwjgl.opengl.GL42.glMemoryBarrier;
-import static org.lwjgl.opengl.GL43.GL_COMPUTE_SHADER;
-import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
-import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
-import static org.lwjgl.opengl.GL43.glDispatchCompute;
-import java.nio.ByteBuffer;
-import org.lwjgl.opengl.GL;
 import valthorne.graphics.GraphicsCapabilities;
+import valthorne.graphics.ImageAccess;
+import valthorne.graphics.TextureFormat;
+import valthorne.graphics.bgfx.BgfxComputeImage;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxShader;
+
+import static org.lwjgl.bgfx.BGFX.*;
 
 /**
- * Minimal wrapper for an OpenGL compute shader program (GL 4.3+).
+ * Owns a packaged compute program on the active device. Compute is optional;
+ * check {@link #isComputeSupported()} before construction. Stage identifiers
+ * resolve to binaries for the selected backend. Dispatch creates an ordered pass
+ * so subsequent draws see completed writes without waiting on the CPU.
  *
- * <p>Features:
- * - Compile/link a single GL_COMPUTE_SHADER stage
- * - Scalar and vector uniform setters
- * - Image and SSBO binding helpers
- * - Dispatch and memory barrier helpers
- * <p>
- * Notes:
- * - Call {@link #dispose()} to delete GL resources when finished.
- * - Check availability via {@link #isComputeSupported()} before constructing.
+ * <p>Storage buffers contain uint32 elements with four-byte-aligned byte offsets.
+ * Image formats must match shader declarations. Buffers and images remain
+ * caller-owned and must be released before device shutdown. All operations are
+ * confined to the rendering thread; disposal is idempotent.</p>
  *
  * <pre>{@code
- * ComputeShader shader = new ComputeShader(source);
- * shader.bind();
- * shader.setUniform1i("u_count", count);
- * shader.dispatch(groups, 1, 1);
- * ComputeShader.memoryBarrierAll();
- * shader.unbind();
- * shader.dispose();
+ * ComputeShader shader = new ComputeShader("app/update.comp");
+ * int image = ComputeShader.createImage2D(128, 128, TextureFormat.RGBA8);
+ * ComputeBuffer parameters = new ComputeBuffer(16, ImageAccess.READ);
+ * parameters.update(0, initialValues);
+ * parameters.bind(1, ImageAccess.READ);
+ * ComputeShader.bindImage2D(image, 0, ImageAccess.WRITE, TextureFormat.RGBA8);
+ * shader.dispatch(16, 16, 1);
  * }</pre>
- *
- * <p>All OpenGL operations require the appropriate current context. Uniform setters
- * use glUniform and require this program to be bound; dispatch also uses the currently
- * bound program. Binding helpers change global state and do not restore previous
- * bindings. Created storage buffers belong to the caller and are not deleted when
- * this shader is disposed.</p>
- *
- * @author Albert Beaupre
  */
-public class ComputeShader {
-
-    private final Map<String, Integer> uniformCache = new HashMap<>(); // Cached uniform locations, including absent locations (-1).
-    private int programID; // Owned linked program name, or zero after disposal.
-    private int computeID; // Owned compiled compute-stage name, or zero after disposal.
+public final class ComputeShader {
+    private final BgfxShader program; // Owned program and retained uniform storage.
 
     /**
-     * Checks compute support and compiles a single compute stage into a linked program.
-     * Compilation and linking failures clean up resources allocated by those failed steps.
-     * The new program is not automatically bound.
+     * Loads a compiled stage for the active backend.
      *
-     * @param computeSource GLSL compute-stage source
-     * @throws NullPointerException if source is null after the support check
-     * @throws IllegalStateException if support is absent or compilation/linking fails
+     * @param stage packaged stage identifier without the binary suffix
      */
-    public ComputeShader(String computeSource) {
-        if (!isComputeSupported()) {
-            String version = glGetString(GL_VERSION);
-            throw new IllegalStateException("Compute shaders require OpenGL 4.3 or compute, shader-storage and image-load/store extensions. Current GL context: " + (version != null ? version : "unknown"));
-        }
-        if (computeSource == null) throw new NullPointerException("computeSource");
-        buildProgram(computeSource);
+    public ComputeShader(String stage) {
+        if (!isComputeSupported()) throw new UnsupportedOperationException("The selected device does not support compute");
+        if (stage == null) throw new NullPointerException("stage");
+        if (stage.startsWith("bgfx:")) stage = stage.substring(5);
+        if (stage.isBlank() || stage.contains("..") || stage.indexOf('\n') >= 0 || stage.indexOf('\r') >= 0)
+            throw new IllegalArgumentException("A packaged compute stage identifier is required");
+        program = new BgfxShader(stage);
     }
 
     /**
-     * Uses LWJGL's current-context capabilities, including storage and image operations.
-     * Does not query the legacy extension string, which is invalid in core contexts.
+     * Reports compute support on the initialized device.
      *
-     * @return whether the version or extension probe reports support
+     * @return whether compute dispatch is available
      */
     public static boolean isComputeSupported() {
-        return GraphicsCapabilities.supportsCompute(GL.getCapabilities());
+        /*
+         * Driver capabilities establish support more precisely than renderer names.
+         */
+        BgfxGraphics.device();
+        return (bgfx_get_caps().supported() & BGFX_CAPS_COMPUTE) != 0;
     }
 
     /**
-     * Issues image-access, shader-storage, and texture-fetch barrier bits for dependent
-     * GPU operations. Despite the name, this is not GL_ALL_BARRIER_BITS and does not
-     * wait for completion on the CPU.
+     * Starts an ordered pass for subsequent dependent work without a CPU wait.
      */
     public static void memoryBarrierAll() {
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+        /*
+         * bgfx performs resource transitions at ordered submission boundaries.
+         */
+        BgfxGraphics.invalidateView();
     }
 
     /**
-     * Issues only the shader-image-access barrier bit. Choose additional barrier types
-     * when later operations consume the output through other access paths.
+     * Starts an ordered pass for subsequent image consumers without a CPU wait.
      */
     public static void memoryBarrierImage() {
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        /*
+         * Images follow the same ordered submission boundary as other resources.
+         */
+        BgfxGraphics.invalidateView();
     }
 
-    // Image/SSBO binding helpers
     /**
-     * Binds mip level zero of a two-dimensional texture as a nonlayered image. Changes
-     * the indexed image binding and leaves validation of format/access compatibility to OpenGL.
+     * Binds mip level zero for the next dispatch without transferring ownership.
      *
-     * @param texId texture name, or zero to unbind
-     * @param unit image binding index
-     * @param access OpenGL read/write access constant
-     * @param internalFormat image format compatible with the texture
+     * @param image image handle
+     * @param unit shader binding index
+     * @param access shader access mode
+     * @param format allocated image format
      */
-    public static void bindImage2D(int texId, int unit, int access, int internalFormat) {
-        glBindImageTexture(unit, texId, 0, false, 0, access, internalFormat);
+    public static void bindImage2D(int image, int unit, ImageAccess access, TextureFormat format) {
+        /*
+         * Image bindings are independent of sampled texture bindings.
+         */
+        BgfxGraphics.device();
+        if (unit < 0 || unit >= bgfx_get_caps().limits().maxComputeBindings())
+            throw new IllegalArgumentException("Image binding exceeds device limits");
+        bgfx_set_image(unit, (short) BgfxGraphics.textureHandle(image), 0, access.nativeAccess(), format.nativeFormat());
     }
 
     /**
-     * Allocates uninitialized shader-storage buffer bytes and unbinds the generic target
-     * to zero afterward. The caller owns the returned buffer and must delete it.
+     * Allocates an uninitialized sampled image with compute write access.
      *
-     * @param size storage size in bytes
-     * @param usage OpenGL buffer usage hint
-     * @return newly allocated buffer name
+     * @param width positive width in pixels
+     * @param height positive height in pixels
+     * @param format shader-compatible storage format
+     * @return caller-owned texture handle
      */
-    public static int createSSBO(long size, int usage) {
-        int id = glGenBuffers();
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, id);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, size, usage);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-        return id;
+    public static int createImage2D(int width, int height, TextureFormat format) {
+        /*
+         * Write access is an allocation property; validate it before allocating.
+         */
+        if (!isComputeSupported()) throw new UnsupportedOperationException("Compute images are unavailable");
+        int maximum = GraphicsCapabilities.maximumTextureSize();
+        if (width < 1 || height < 1 || width > maximum || height > maximum)
+            throw new IllegalArgumentException("Compute image dimensions exceed device limits");
+        if (!bgfx_is_texture_valid(0, false, 1, format.nativeFormat(), BGFX_TEXTURE_COMPUTE_WRITE))
+            throw new UnsupportedOperationException("Compute image format is unavailable on this device");
+        return new BgfxComputeImage(width, height, format).id();
     }
 
     /**
-     * Binds a whole storage buffer at an indexed shader-storage binding point. Does not
-     * allocate storage or transfer ownership.
+     * Releases a caller-owned image and clears its managed sampler bindings.
      *
-     * @param ssboId buffer name, or zero to clear the binding
-     * @param binding shader-storage binding index
+     * @param image live texture handle
      */
-    public static void bindSSBO(int ssboId, int binding) {
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssboId);
-    }
-
-    /** Releases caller-owned storage without requiring a platform-specific GL import. */
-    public static void deleteSSBO(int ssboId) {
-        glDeleteBuffers(ssboId);
+    public static void deleteImage2D(int image) {
+        /*
+         * The engine identifier owns its image and follows native handle replacement.
+         */
+        BgfxComputeImage.dispose(image);
     }
 
     /**
-     * Uploads the buffer's remaining bytes into existing storage at a byte offset, then
-     * unbinds the generic storage target to zero. This does not resize the destination
-     * or issue a memory barrier; the caller supplies suitable buffer bounds.
+     * Validates lifetime; dispatch selects the program explicitly.
+     */
+    public void bind() {
+        program.handle();
+    }
+
+    /**
+     * Ends the caller's binding scope without changing raster program selection.
+     */
+    public void unbind() {
+        program.handle();
+    }
+
+    /**
+     * Submits workgroups in a dedicated ordered view.
      *
-     * @param ssboId existing storage buffer name
-     * @param offset destination byte offset
-     * @param data source bytes from position through limit
-     */
-    public static void updateSSBO(int ssboId, long offset, ByteBuffer data) {
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboId);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, data);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    }
-
-    /**
-     * Compiles and links one compute stage, retaining both names on success and clearing
-     * uniform locations. Compiler or linker failures include the driver's diagnostic log
-     * and delete the resources created for that failed stage.
-     *
-     * @param src compute-stage GLSL source
-     * @throws IllegalStateException if compilation or linking fails
-     */
-    private void buildProgram(String src) {
-        int cs = glCreateShader(GL_COMPUTE_SHADER);
-        glShaderSource(cs, src);
-        glCompileShader(cs);
-        if (glGetShaderi(cs, GL_COMPILE_STATUS) == GL_FALSE) {
-            String log = glGetShaderInfoLog(cs);
-            glDeleteShader(cs);
-            throw new IllegalStateException("Compute shader compile failed:\n" + log);
-        }
-        int prog = glCreateProgram();
-        glAttachShader(prog, cs);
-        glLinkProgram(prog);
-        if (glGetProgrami(prog, GL_LINK_STATUS) == GL_FALSE) {
-            String log = glGetProgramInfoLog(prog);
-            glDetachShader(prog, cs);
-            glDeleteProgram(prog);
-            glDeleteShader(cs);
-            throw new IllegalStateException("Compute shader link failed:\n" + log);
-        }
-        this.programID = prog;
-        this.computeID = cs;
-        uniformCache.clear();
-    }
-
-    /**
-     * Selects this program as the current OpenGL program. Does not save the previously
-     * bound program; after disposal the stored zero name unbinds instead.
-     */
-    public void bind() {glUseProgram(programID);}
-
-    /**
-     * Binds program zero, regardless of which program is currently active. This does
-     * not restore a program that was active before bind.
-     */
-    public void unbind() {glUseProgram(0);}
-
-    /**
-     * Dispatches workgroups using the currently bound compute program. Counts are groups,
-     * not individual shader invocations. Does not bind this instance or insert a barrier.
-     *
-     * @param groupsX workgroup count along X
-     * @param groupsY workgroup count along Y
-     * @param groupsZ workgroup count along Z
+     * @param groupsX X workgroup count from one through 65535
+     * @param groupsY Y workgroup count from one through 65535
+     * @param groupsZ Z workgroup count from one through 65535
      */
     public void dispatch(int groupsX, int groupsY, int groupsZ) {
-        glDispatchCompute(groupsX, groupsY, groupsZ);
+        if (groupsX < 1 || groupsY < 1 || groupsZ < 1 || groupsX > 65535 || groupsY > 65535 || groupsZ > 65535)
+            throw new IllegalArgumentException("Workgroup counts must be between one and 65535");
+        program.apply(BgfxGraphics.textures(), 16);
+        BgfxGraphics.invalidateView();
+        bgfx_dispatch(BgfxGraphics.view(), program.handle(), groupsX, groupsY, groupsZ, BGFX_DISCARD_ALL);
+        BgfxGraphics.invalidateView();
     }
 
     /**
-     * Deletes the owned program and compute stage, first unbinding if this program is
-     * active. Clears uniform locations and zeros names, making repeated disposal a no-op.
-     * Buffers and textures used by the shader remain caller-owned.
+     * Releases the program; images and buffers remain caller-owned.
      */
     public void dispose() {
-        if (programID != 0) {
-            if (glGetInteger(GL_CURRENT_PROGRAM) == programID) {
-                glUseProgram(0);
-            }
-            glDetachShader(programID, computeID);
-            glDeleteProgram(programID);
-            glDeleteShader(computeID);
-            programID = 0;
-            computeID = 0;
-        }
-        uniformCache.clear();
+        program.close();
     }
 
     /**
-     * Looks up and caches a uniform location in this program, including -1 for inactive
-     * or missing uniforms. Does not bind the program; disposal clears the cache.
+     * Retains an integer scalar uniform for subsequent dispatches.
      *
-     * @param name GLSL uniform name
-     * @return cached or queried location
+     * @param name uniform name
+     * @param value scalar value
      */
-    private int uniformLocation(String name) {
-        Integer cached = uniformCache.get(name);
-        if (cached != null) return cached;
-        int loc = glGetUniformLocation(programID, name);
-        uniformCache.put(name, loc);
-        return loc;
+    public void setUniform1i(String name, int value) {
+        program.integer(name, value);
     }
 
     /**
-     * Writes a 1-component int uniform using a cached location from this program.
-     * Bind this shader first: glUniform writes the active program. Inactive or missing
-     * uniforms have location -1 and are ignored by OpenGL.
+     * Retains a scalar uniform for subsequent dispatches.
      *
-     * @param name GLSL uniform name
-     * @param v0 scalar value
+     * @param name uniform name
+     * @param value scalar value
      */
-    public void setUniform1i(String name, int v0) {glUniform1i(uniformLocation(name), v0);}
+    public void setUniform1f(String name, float value) {
+        program.vector(name, value, 0, 0, 0);
+    }
 
     /**
-     * Writes a 1-component float uniform using a cached location from this program.
-     * Bind this shader first: glUniform writes the active program. Inactive or missing
-     * uniforms have location -1 and are ignored by OpenGL.
+     * Retains two uniform components for subsequent dispatches.
      *
-     * @param name GLSL uniform name
-     * @param v0 scalar value
+     * @param name uniform name
+     * @param x first component
+     * @param y second component
      */
-    public void setUniform1f(String name, float v0) {glUniform1f(uniformLocation(name), v0);}
+    public void setUniform2f(String name, float x, float y) {
+        program.vector(name, x, y, 0, 0);
+    }
 
     /**
-     * Writes a 2-component float uniform using a cached location from this program.
-     * Bind this shader first: glUniform writes the active program. Inactive or missing
-     * uniforms have location -1 and are ignored by OpenGL.
+     * Retains three uniform components for subsequent dispatches.
      *
-     * @param name GLSL uniform name
-     * @param x X component
-     * @param y Y component
+     * @param name uniform name
+     * @param x first component
+     * @param y second component
+     * @param z third component
      */
-    public void setUniform2f(String name, float x, float y) {glUniform2f(uniformLocation(name), x, y);}
+    public void setUniform3f(String name, float x, float y, float z) {
+        program.vector(name, x, y, z, 0);
+    }
 
     /**
-     * Writes a 3-component float uniform using a cached location from this program.
-     * Bind this shader first: glUniform writes the active program. Inactive or missing
-     * uniforms have location -1 and are ignored by OpenGL.
+     * Retains four uniform components for subsequent dispatches.
      *
-     * @param name GLSL uniform name
-     * @param x X component
-     * @param y Y component
-     * @param z Z component
+     * @param name uniform name
+     * @param x first component
+     * @param y second component
+     * @param z third component
+     * @param w fourth component
      */
-    public void setUniform3f(String name, float x, float y, float z) {glUniform3f(uniformLocation(name), x, y, z);}
+    public void setUniform4f(String name, float x, float y, float z, float w) {
+        program.vector(name, x, y, z, w);
+    }
 
     /**
-     * Writes a 4-component float uniform using a cached location from this program.
-     * Bind this shader first: glUniform writes the active program. Inactive or missing
-     * uniforms have location -1 and are ignored by OpenGL.
+     * Retains integer-valued components in native vector storage.
      *
-     * @param name GLSL uniform name
-     * @param x X component
-     * @param y Y component
-     * @param z Z component
-     * @param w W component
+     * @param name uniform name
+     * @param x first component
+     * @param y second component
      */
-    public void setUniform4f(String name, float x, float y, float z, float w) {glUniform4f(uniformLocation(name), x, y, z, w);}
-
-    /**
-     * Writes a 2-component int uniform using a cached location from this program.
-     * Bind this shader first: glUniform writes the active program. Inactive or missing
-     * uniforms have location -1 and are ignored by OpenGL.
-     *
-     * @param name GLSL uniform name
-     * @param x X component
-     * @param y Y component
-     */
-    public void setUniform2i(String name, int x, int y) {glUniform2i(uniformLocation(name), x, y);}
+    public void setUniform2i(String name, int x, int y) {
+        program.vector(name, x, y, 0, 0);
+    }
 }

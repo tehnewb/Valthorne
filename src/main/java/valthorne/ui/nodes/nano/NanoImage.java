@@ -1,6 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import org.lwjgl.nanovg.NVGPaint;
+import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.ui.UINode;
@@ -28,6 +29,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @author Albert Beaupre
  */
 public class NanoImage extends UINode implements NanoNode {
+    private long imageGeneration = -1; // Device generation owning the cached NanoVG image.
 
     private TextureData texture; // Borrowed source pixels retained for lazy upload and context recreation.
     private int imageHandle = -1; // Owned NanoVG image name, positive only after successful creation.
@@ -165,6 +167,11 @@ public class NanoImage extends UINode implements NanoNode {
      * @param vg the valid nonzero destination NanoVG context
      */
     private void ensureImage(long vg) {
+        if (imageGeneration != BgfxGraphics.generation()) {
+            imageHandle = -1;
+            imageContext = 0;
+            imageGeneration = BgfxGraphics.generation();
+        }
         if (imageHandle > 0 && imageContext == vg)
             return;
 
@@ -181,7 +188,7 @@ public class NanoImage extends UINode implements NanoNode {
      * do nothing beyond resetting bookkeeping. Source TextureData is untouched.
      */
     private void deleteImage() {
-        if (imageHandle > 0 && imageContext != 0L)
+        if (imageGeneration == BgfxGraphics.generation() && imageHandle > 0 && imageContext != 0L)
             nvgDeleteImage(imageContext, imageHandle);
 
         imageHandle = -1;

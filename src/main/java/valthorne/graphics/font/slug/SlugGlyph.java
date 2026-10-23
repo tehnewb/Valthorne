@@ -140,6 +140,40 @@ public final class SlugGlyph {
     public float maxY() { return y1; }
 
     /**
+     * Appends one 56-byte expanded outline vertex: XYZ, RGBA bytes, outline XY,
+     * four float-decoded glyph indices, and the four-component band transform.
+     * This portable layout avoids integer vertex attributes and keeps identical
+     * metadata on every vertex of a glyph triangle. Caller storage must be native
+     * order with at least 56 remaining bytes; this method allocates nothing.
+     *
+     * @param target caller-owned native staging buffer
+     * @param x horizontal screen position
+     * @param y vertical screen position
+     * @param outlineX horizontal outline coordinate in em units
+     * @param outlineY vertical outline coordinate in em units
+     * @param rgba color packed with red in the high byte and alpha in the low byte
+     */
+    public void writeOutlineVertex(ByteBuffer target, float x, float y, float outlineX, float outlineY, int rgba) {
+        target.putFloat(x)
+                .putFloat(y)
+                .putFloat(0f);
+        target.put((byte) (rgba >>> 24))
+                .put((byte) (rgba >>> 16))
+                .put((byte) (rgba >>> 8))
+                .put((byte) rgba);
+        target.putFloat(outlineX)
+                .putFloat(outlineY);
+        target.putFloat(glyphPack & 0xFFFF)
+                .putFloat(glyphPack >>> 16);
+        target.putFloat(glyphInfoPack & 0xFFFF)
+                .putFloat(glyphInfoPack >>> 16);
+        target.putFloat(bandScaleX)
+                .putFloat(bandScaleY)
+                .putFloat(bandOffsetX)
+                .putFloat(bandOffsetY);
+    }
+
+    /**
      * Appends this glyph's 64-byte GPU instance to caller-owned native storage.
      * TextureBatch supplies the clipped rectangle and coverage scale; immutable
      * glyph metadata supplies the packed outline and band references. No temporary

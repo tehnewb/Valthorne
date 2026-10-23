@@ -1,21 +1,20 @@
 package valthorne;
 
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 import org.lwjgl.glfw.GLFW;
 import valthorne.event.Event;
 import valthorne.event.EventHandler;
 import valthorne.event.EventPublisher;
 import valthorne.event.EventType;
-
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
+import valthorne.graphics.bgfx.BgfxGraphics;
 
 import static org.lwjgl.glfw.GLFW.glfwGetTime;
-import static org.lwjgl.glfw.GLFW.glfwInit;
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
-import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
 import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
-import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
+import static org.lwjgl.glfw.GLFW.glfwInit;
+import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
 /**
  * The {@code JGL} class forms the core of the Valthorne 2D game engine framework.
@@ -151,7 +150,10 @@ public class JGL {
             double lastTime = glfwGetTime();
 
             while (!Window.shouldClose()) {
+                long graphicsGeneration = BgfxGraphics.generation();
                 drainTasks();
+                if (Window.shouldClose()) break;
+                if (graphicsGeneration != BgfxGraphics.generation()) lastTime = glfwGetTime();
 
                 double now = glfwGetTime();
                 deltaTime = (float) (now - lastTime);
@@ -161,6 +163,7 @@ public class JGL {
                 Window.dispatchCloseRequest();
                 if (Window.shouldClose()) break;
 
+                BgfxGraphics.beginFrame();
                 frameApplication.update(deltaTime);
                 frameApplication.render();
 
@@ -173,7 +176,7 @@ public class JGL {
                     frames = 0;
                 }
 
-                glfwSwapBuffers(Window.getAddress());
+                BgfxGraphics.present();
                 Mouse.resetScroll();
             }
         } catch (Throwable throwable) {

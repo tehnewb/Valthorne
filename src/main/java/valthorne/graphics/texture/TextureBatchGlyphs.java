@@ -3,18 +3,16 @@ package valthorne.graphics.texture;
 import org.joml.Matrix4f;
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxBatchRenderer;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugGlyph;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.shader.Shader;
-import valthorne.io.file.ValthorneFiles;
 
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.Objects;
-
-import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Owns live-outline submission and GPU state for one {@link TextureBatch}.
@@ -23,8 +21,8 @@ import static org.lwjgl.opengl.GL33.*;
  * records, font bindings and restoration of the sprite pipeline.
  *
  * <p>Created lazily on the first text operation. It borrows the parent's native
- * staging buffer, quad VBO and instance VBO, with exclusive access while a glyph
- * segment is active. No second staging buffer or stream VBO is allocated. Shader
+ * staging buffer and instance uploader, with exclusive access while a glyph
+ * segment is active. No second staging buffer or instance stream is allocated. Shader
  * resources are initialized on the first segment and released by the parent.
  * Fonts and text runs are borrowed and must outlive queued submission.</p>
  *
@@ -45,10 +43,10 @@ import static org.lwjgl.opengl.GL33.*;
  * }</pre>
  */
 public final class TextureBatchGlyphs {
-    private final TextureBatch parent; // Owning batch supplying live scope, translation, and painter-order coordination.
+    private final TextureBatch parent; // Parent batch providing drawing scopes and submission state.
+    private final BgfxBatchRenderer bgfxRenderer; // Borrowed compact instance uploader owned by the parent.
+
     private final ByteBuffer instances; // Borrowed native staging storage, shared exclusively with sprites.
-    private final int quadVBO; // Borrowed static quad VBO owned by the parent batch.
-    private final int instanceVBO; // Borrowed streaming VBO owned by the parent batch.
     private final int capacity; // Maximum glyph count fitting the shared staging and stream storage.
     private final int[] viewport = new int[4]; // Reused viewport query storage for coverage and rejection bounds.
     private int instanceCount; // Glyph records queued in the shared storage during the active segment.
@@ -59,8 +57,6 @@ public final class TextureBatchGlyphs {
     private float clipW; // Logical clip width in final world coordinates.
     private float clipH; // Logical clip height in final world coordinates.
     private Shader shader; // Lazily initialized curve-coverage shader owned by this component.
-    private int vao; // Glyph interpretation of the shared quad and instance VBOs.
-    private int indexBuffer; // Four indices preserving the curve shader's original triangle-strip interpolation.
     private Matrix4f projection; // Reused combined camera/text transform for coverage and culling.
     private float[] matrix; // Reusable upload storage for the composed glyph projection.
     private Matrix4f transform; // Reused rigid text transform composed with the current projection.
@@ -77,40 +73,21 @@ public final class TextureBatchGlyphs {
     private float viewMaxX; // Local-world viewport maximum X for compatible axis-aligned projections.
     private float viewMaxY; // Local-world viewport maximum Y for compatible axis-aligned projections.
     private boolean drawing; // Whether consecutive text submissions currently own the GPU state.
-    private int oldProgram; // Program binding restored after a glyph segment.
-    private int oldVao; // Vertex-array binding restored after a glyph segment.
-    private int oldBuffer; // Array-buffer binding restored after a glyph segment.
-    private int oldActiveTexture; // Active texture unit restored after a glyph segment.
     private int oldTexture0; // Texture binding on unit zero before glyph drawing.
     private int oldTexture1; // Texture binding on unit one before glyph drawing.
-    private int oldSampler0; // Sampler binding on unit zero before glyph drawing.
-    private int oldSampler1; // Sampler binding on unit one before glyph drawing.
-    private int oldSrcRgb; // Original RGB source blend factor.
-    private int oldDstRgb; // Original RGB destination blend factor.
-    private int oldSrcAlpha; // Original alpha source blend factor.
-    private int oldDstAlpha; // Original alpha destination blend factor.
-    private int oldEquationRgb; // Original RGB blend equation.
-    private int oldEquationAlpha; // Original alpha blend equation.
-    private boolean oldBlend; // Original blend enablement.
-    private boolean oldDepth; // Original depth-test enablement.
-    private boolean oldCull; // Original face-cull enablement.
-    private boolean oldDepthMask; // Original depth-write enablement.
-    private boolean oldSrgb; // Framebuffer conversion policy restored after glyph drawing.
 
     /**
-     * Borrows shared storage without creating GPU resources or reading GL state.
+     * Borrows shared storage without creating GPU resources or reading engine render state.
      *
      * @param parent owning batch; never null
      * @param instances shared native staging buffer
-     * @param quadVBO shared static geometry VBO
-     * @param instanceVBO shared streaming VBO
      * @param capacity number of instances supported by shared storage
+     * @param bgfxRenderer shared compact instance uploader
      */
-    TextureBatchGlyphs(TextureBatch parent, ByteBuffer instances, int quadVBO, int instanceVBO, int capacity) {
+    TextureBatchGlyphs(TextureBatch parent, ByteBuffer instances, int capacity, BgfxBatchRenderer bgfxRenderer) {
         this.parent = parent;
+        this.bgfxRenderer = bgfxRenderer;
         this.instances = instances;
-        this.quadVBO = quadVBO;
-        this.instanceVBO = instanceVBO;
         this.capacity = capacity;
     }
 
@@ -356,7 +333,7 @@ public final class TextureBatchGlyphs {
     private void beginGlyphSegment() {
         if (!drawing) {
             if (shader == null) initializeGlyphState();
-            glGetIntegerv(GL_VIEWPORT, viewport);
+            BgfxGraphics.getViewport(viewport);
             projection.set(Window.getProjectionMatrix());
             transform.identity()
                     .m00(cosine)
@@ -369,45 +346,15 @@ public final class TextureBatchGlyphs {
             if (!projection.isFinite() || viewport[2] <= 0 || viewport[3] <= 0)
                 throw new IllegalStateException("Text requires a finite projection and a nonempty viewport.");
             updateGlyphBounds();
-            oldProgram = glGetInteger(GL_CURRENT_PROGRAM);
-            oldVao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
-            oldBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
-            oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
-            glActiveTexture(GL_TEXTURE0);
-            oldTexture0 = glGetInteger(GL_TEXTURE_BINDING_2D);
-            oldSampler0 = glGetInteger(GL_SAMPLER_BINDING);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            oldTexture1 = glGetInteger(GL_TEXTURE_BINDING_2D);
-            oldSampler1 = glGetInteger(GL_SAMPLER_BINDING);
-            oldBlend = glIsEnabled(GL_BLEND);
-            oldDepth = glIsEnabled(GL_DEPTH_TEST);
-            oldCull = glIsEnabled(GL_CULL_FACE);
-            oldDepthMask = glGetInteger(GL_DEPTH_WRITEMASK) != 0;
-            oldSrgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
-            oldSrcRgb = glGetInteger(GL_BLEND_SRC);
-            oldDstRgb = glGetInteger(GL_BLEND_DST);
-            oldSrcAlpha = glGetInteger(GL_BLEND_SRC_ALPHA);
-            oldDstAlpha = glGetInteger(GL_BLEND_DST_ALPHA);
-            oldEquationRgb = glGetInteger(GL_BLEND_EQUATION_RGB);
-            oldEquationAlpha = glGetInteger(GL_BLEND_EQUATION_ALPHA);
-            boolean srgb = isSrgbFramebuffer();
-            shader.bind();
+            oldTexture0 = BgfxGraphics.textures()[0];
+            oldTexture1 = BgfxGraphics.textures()[1];
             shader.setUniformMatrix4("u_mvp", projection.get(matrix));
             shader.setUniform4f("u_textTransform", cosine, sine, transformX, transformY);
-            shader.setUniform1i("u_linearColor", srgb ? 1 : 0);
-            glBindSampler(0, 0);
-            glBindSampler(1, 0);
-            if (srgb) glEnable(GL_FRAMEBUFFER_SRGB);
-            glEnable(GL_BLEND);
-            glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-            glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-            glDisable(GL_DEPTH_TEST);
-            glDisable(GL_CULL_FACE);
-            glDepthMask(false);
-            glBindVertexArray(vao);
-            instances.clear();
-            activeFont = null;
             drawing = true;
+            instanceCount = 0;
+            activeFont = null;
+            instances.clear();
+            return;
         }
     }
 
@@ -417,51 +364,12 @@ public final class TextureBatchGlyphs {
      * restores bindings before the first glyph segment captures caller state.
      */
     private void initializeGlyphState() {
-        int previousProgram = glGetInteger(GL_CURRENT_PROGRAM);
-        int previousVao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
-        int previousBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
-        try {
-            projection = new Matrix4f();
-            matrix = new float[16];
-            transform = new Matrix4f();
-            shader = new Shader(ValthorneFiles.readString("valthorne/shaders/font/slug.vert"), ValthorneFiles.readString("valthorne/shaders/font/slug.frag"));
-            shader.bind();
-            shader.setUniform1i("u_curveTexture", 0);
-            shader.setUniform1i("u_bandTexture", 1);
-            vao = glGenVertexArrays();
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 2, GL_FLOAT, false, TextureBatchContract.QUAD_FLOATS_PER_VERT * Float.BYTES, 0L);
-            indexBuffer = glGenBuffers();
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-            IntBuffer indices = BufferUtils.createIntBuffer(4);
-            indices.put(0)
-                    .put(1)
-                    .put(4)
-                    .put(2)
-                    .flip();
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-            int stride = TextureBatchContract.GLYPH_STRIDE_BYTES;
-            // Locations and offsets match the packed glyph record and slug.vert.
-            glVertexAttribPointer(1, 4, GL_FLOAT, false, stride, 0L);
-            glVertexAttribPointer(2, 4, GL_FLOAT, false, stride, 16L);
-            glVertexAttribIPointer(3, 2, GL_UNSIGNED_INT, stride, 32L);
-            glVertexAttribPointer(4, 4, GL_FLOAT, false, stride, 40L);
-            glVertexAttribPointer(5, 4, GL_UNSIGNED_BYTE, true, stride, 60L);
-            glVertexAttribPointer(6, 1, GL_FLOAT, false, stride, 56L);
-            glVertexAttribPointer(7, 4, GL_FLOAT, false, stride, 64L);
-            glVertexAttribPointer(8, 1, GL_FLOAT, false, stride, 80L);
-            for (int attribute = 1; attribute <= 8; attribute++) {
-                glEnableVertexAttribArray(attribute);
-                glVertexAttribDivisor(attribute, 1);
-            }
-        } finally {
-            glBindVertexArray(previousVao);
-            glBindBuffer(GL_ARRAY_BUFFER, previousBuffer);
-            glUseProgram(previousProgram);
-        }
+        projection = new Matrix4f();
+        transform = new Matrix4f();
+        matrix = new float[16];
+        shader = new Shader("bgfx:engine/slug.vert", "bgfx:engine/slug.frag");
+        shader.bgfx().sampler("u_curves", 0);
+        shader.bgfx().sampler("u_bands", 1);
     }
 
     /**
@@ -490,25 +398,6 @@ public final class TextureBatchGlyphs {
         float sy = Math.abs(mvp.m11()) * viewport[3] / (2f * mvp.m33());
         if (Math.abs(sx - sy) < Math.min(sx, sy) * .0001f) projectionScale = sx;
         padding = Math.max(.5f, .5f / Math.min(sx, sy));
-    }
-
-    /**
-     * Reads the current draw attachment's color encoding without changing targets.
-     *
-     * @return true when glyphs should be blended in linear light
-     */
-    private static boolean isSrgbFramebuffer() {
-        /*
-         * Default framebuffer attachment names differ from FBO color attachments.
-         * Query the active draw buffer so both offscreen and window text agree.
-         */
-        int attachment = glGetInteger(GL_DRAW_BUFFER0);
-        if (attachment == GL_NONE) return false;
-        if (glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0) {
-            if (attachment == GL_BACK) attachment = GL_BACK_LEFT;
-            else if (attachment == GL_FRONT) attachment = GL_FRONT_LEFT;
-        }
-        return glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, attachment, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING) == GL_SRGB;
     }
 
     /**
@@ -563,10 +452,7 @@ public final class TextureBatchGlyphs {
         if (instanceCount == 0) return;
         activeFont.bindTextures();
         instances.flip();
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, (long) capacity * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0L, instances);
-        glDrawElementsInstanced(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_INT, 0L, instanceCount);
+        bgfxRenderer.submit(instances, instanceCount, TextureBatchContract.GLYPH_STRIDE_BYTES, shader, BgfxGraphics.textures(), 16, true);
         totalDrawCalls++;
         instances.clear();
         instanceCount = 0;
@@ -591,27 +477,8 @@ public final class TextureBatchGlyphs {
      * disposed font causes flushing to fail. The sprite view then owns staging.
      */
     private void restoreState() {
-        if (oldSrgb) glEnable(GL_FRAMEBUFFER_SRGB);
-        else glDisable(GL_FRAMEBUFFER_SRGB);
-        glBindBuffer(GL_ARRAY_BUFFER, oldBuffer);
-        glBindVertexArray(oldVao);
-        glUseProgram(oldProgram);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, oldTexture0);
-        glBindSampler(0, oldSampler0);
-        glActiveTexture(GL_TEXTURE0 + 1);
-        glBindTexture(GL_TEXTURE_2D, oldTexture1);
-        glBindSampler(1, oldSampler1);
-        glActiveTexture(oldActiveTexture);
-        if (oldDepth) glEnable(GL_DEPTH_TEST);
-        else glDisable(GL_DEPTH_TEST);
-        if (oldCull) glEnable(GL_CULL_FACE);
-        else glDisable(GL_CULL_FACE);
-        glDepthMask(oldDepthMask);
-        if (oldBlend) glEnable(GL_BLEND);
-        else glDisable(GL_BLEND);
-        glBlendFuncSeparate(oldSrcRgb, oldDstRgb, oldSrcAlpha, oldDstAlpha);
-        glBlendEquationSeparate(oldEquationRgb, oldEquationAlpha);
+        BgfxGraphics.bindTexture(0, oldTexture0);
+        BgfxGraphics.bindTexture(1, oldTexture1);
         drawing = false;
         activeFont = null;
         instanceCount = 0;
@@ -626,7 +493,5 @@ public final class TextureBatchGlyphs {
         if (drawing) restoreState();
         if (shader == null) return;
         shader.dispose();
-        glDeleteVertexArrays(vao);
-        glDeleteBuffers(indexBuffer);
     }
 }

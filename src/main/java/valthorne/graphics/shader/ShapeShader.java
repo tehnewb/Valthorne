@@ -1,6 +1,9 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxMeshRenderer;
+
+import static org.lwjgl.bgfx.BGFX.*;
 
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
@@ -10,15 +13,6 @@ import valthorne.math.geometry.Shape;
 
 import java.nio.FloatBuffer;
 import java.util.Collection;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30.glGenVertexArrays;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL30;
 
 /**
  * A simple, general-purpose shader for drawing {@link Shape} polygons with explicit
@@ -33,20 +27,6 @@ import org.lwjgl.opengl.GL30;
 public class ShapeShader extends Shader {
 
     /**
-     * Bundled polygon vertex source loaded once at class initialization.
-     */
-    private static final String VERT_SRC = ValthorneFiles.readString("valthorne/shaders/core/shape.vert");
-
-    /**
-     * Bundled solid-color fragment source loaded once at class initialization.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/core/shape.frag");
-
-    /**
-     * Attribute location for two-float polygon positions.
-     */
-    private static final int ATTR_POSITION = 0;
-    /**
      * Uniform name for RGBA fill or border tint.
      */
     private static final String UNIFORM_COLOR = "u_color";
@@ -55,29 +35,19 @@ public class ShapeShader extends Shader {
      */
     private static final String UNIFORM_MVP = "u_mvp";
 
-    private final int vao; // Owned polygon vertex-array name.
-    private final int vbo; // Owned streaming position-buffer name.
+    private final BgfxMeshRenderer bgfxRenderer; // Owned procedural-mesh path, owned by this renderer.
+    private final int[] viewport = new int[4]; // Reused physical viewport for pixel-width polygon borders.
     private FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(32); // Reusable direct CPU position staging buffer.
     private int floatCapacity = 32; // Current CPU/GPU staging capacity in floats.
 
     /**
      * Compiles the bundled polygon shader and allocates an owned VAO/VBO with
-     * two-float position attributes. Requires a current GL context and leaves array
+     * two-float position attributes. Requires a current graphics device and leaves array
      * bindings at zero.
      */
     public ShapeShader() {
-        super(VERT_SRC, FRAG_SRC);
-
-        vao = glGenVertexArrays();
-        vbo = glGenBuffers();
-
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, (long) floatCapacity * Float.BYTES, GL_STREAM_DRAW);
-        glEnableVertexAttribArray(ATTR_POSITION);
-        glVertexAttribPointer(ATTR_POSITION, 2, GL_FLOAT, false, (int) (2L * Float.BYTES), 0L);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
+        super("engine/shape.vert", "engine/shape.frag");
+        bgfxRenderer = new BgfxMeshRenderer(2);
     }
 
     /**
@@ -97,7 +67,6 @@ public class ShapeShader extends Shader {
 
         bind();
         setUniformMatrix4(UNIFORM_MVP, Window.getProjectionMatrix());
-        glBindVertexArray(vao);
 
         try {
             drawShape(points, shape.getColor());
@@ -110,7 +79,7 @@ public class ShapeShader extends Shader {
                 }
             }
         } finally {
-            glBindVertexArray(0);
+
             unbind();
         }
     }
@@ -127,7 +96,6 @@ public class ShapeShader extends Shader {
 
         bind();
         setUniformMatrix4(UNIFORM_MVP, Window.getProjectionMatrix());
-        glBindVertexArray(vao);
 
         try {
             for (Shape shape : shapes) {
@@ -147,21 +115,20 @@ public class ShapeShader extends Shader {
                 }
             }
         } finally {
-            glBindVertexArray(0);
+
             unbind();
         }
     }
 
     /**
      * Disposes the shader program and owned vertex-array/buffer names. Requires
-     * the GL context. This override does not clear its numeric object names, so
+     * the graphics device. This override does not clear its numeric object names, so
      * callers should dispose the instance once.
      */
     @Override
     public void dispose() {
         super.dispose();
-        if (vao != 0) GL30.glDeleteVertexArrays(vao);
-        if (vbo != 0) GL15.glDeleteBuffers(vbo);
+        bgfxRenderer.close();
     }
 
     /**
@@ -184,20 +151,15 @@ public class ShapeShader extends Shader {
 
         setColorUniform(color != null ? color : Color.WHITE);
 
-        int vertexCount = points.length + 2;
-        ensureCapacity(vertexCount * 2);
+        ensureCapacity(points.length * 6);
         vertexBuffer.clear();
-        vertexBuffer.put(cx).put(cy);
-        for (Vector2f point : points) {
-            vertexBuffer.put(point.x()).put(point.y());
+        for (int i = 0; i < points.length; i++) {
+            Vector2f a = points[i];
+            Vector2f b = points[(i + 1) % points.length];
+            vertexBuffer.put(cx).put(cy).put(a.x).put(a.y).put(b.x).put(b.y);
         }
-        vertexBuffer.put(points[0].x()).put(points[0].y());
         vertexBuffer.flip();
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, vertexBuffer);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, vertexCount);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        submitBgfx();
     }
 
     /**
@@ -210,20 +172,30 @@ public class ShapeShader extends Shader {
      */
     private void drawBorder(Vector2f[] points, Color color, float thickness) {
         setColorUniform(color);
-        glLineWidth(thickness);
-
-        int vertexCount = points.length;
-        ensureCapacity(vertexCount * 2);
+        ensureCapacity(points.length * 12);
         vertexBuffer.clear();
-        for (Vector2f point : points) {
-            vertexBuffer.put(point.x()).put(point.y());
+        float[] matrix = Window.getProjectionMatrix();
+        BgfxGraphics.getViewport(viewport);
+        for (int i = 0; i < points.length; i++) {
+            Vector2f a = points[i];
+            Vector2f b = points[(i + 1) % points.length];
+            float dx = b.x - a.x;
+            float dy = b.y - a.y;
+            float px = (matrix[0] * dx + matrix[4] * dy) * viewport[2] * .5f;
+            float py = (matrix[1] * dx + matrix[5] * dy) * viewport[3] * .5f;
+            float length = (float) Math.hypot(px, py);
+            if (length == 0) continue;
+            float determinant = matrix[0] * matrix[5] - matrix[4] * matrix[1];
+            if (determinant == 0) continue;
+            float nx = -py / length * thickness / viewport[2];
+            float ny = px / length * thickness / viewport[3];
+            float ox = (matrix[5] * nx - matrix[4] * ny) / determinant;
+            float oy = (-matrix[1] * nx + matrix[0] * ny) / determinant;
+            vertexBuffer.put(a.x + ox).put(a.y + oy).put(a.x - ox).put(a.y - oy).put(b.x - ox).put(b.y - oy);
+            vertexBuffer.put(b.x - ox).put(b.y - oy).put(b.x + ox).put(b.y + oy).put(a.x + ox).put(a.y + oy);
         }
         vertexBuffer.flip();
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, vertexBuffer);
-        glDrawArrays(GL_LINE_LOOP, 0, vertexCount);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        submitBgfx();
     }
 
     /**
@@ -248,8 +220,12 @@ public class ShapeShader extends Shader {
         floatCapacity = Math.max(requiredFloats, floatCapacity * 2);
         vertexBuffer = BufferUtils.createFloatBuffer(floatCapacity);
 
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, (long) floatCapacity * Float.BYTES, GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
+    /**
+     * Submits the staged triangles using straight-alpha source-over blending.
+     */
+    private void submitBgfx() {
+        bgfxRenderer.submit(vertexBuffer, this, BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
     }
 }

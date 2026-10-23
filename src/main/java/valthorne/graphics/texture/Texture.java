@@ -1,17 +1,21 @@
 package valthorne.graphics.texture;
 
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsResource;
 import valthorne.graphics.Sprite;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxResources;
+import valthorne.graphics.bgfx.BgfxTexture2D;
 import valthorne.io.pool.Poolable;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
-import static org.lwjgl.opengl.GL30.glGenerateMipmap;
+import static org.lwjgl.bgfx.BGFX.BGFX_TEXTURE_FORMAT_RGBA8;
+import static org.lwjgl.bgfx.BGFX.bgfx_destroy_texture;
 
 /**
  * <p>
- * {@code Texture} represents a GPU-backed 2D OpenGL texture in Valthorne.
+ * {@code Texture} represents a GPU-backed 2D texture for the selected backend in Valthorne.
  * It acts as the primary wrapper around a texture object ID and its associated
- * {@link TextureData}. This class is responsible for creating the OpenGL texture,
+ * {@link TextureData}. This class is responsible for creating the GPU texture,
  * uploading pixel data, configuring filtering behavior, exposing width and height,
  * and cleaning up the GPU resource when it is no longer needed.
  * </p>
@@ -81,9 +85,10 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
  * @author Albert Beaupre
  * @since March 13th, 2026
  */
-public class Texture implements Poolable {
+public class Texture implements Poolable, GraphicsResource {
 
-    protected final int textureID; // OpenGL texture object ID created for this texture
+    private BgfxTexture2D bgfxTexture; // Owned native bgfx upload, absent for wrapped handles.
+    protected int textureID; // Engine binding ID, stable across device changes; mip replacement may change it.
     protected final boolean ownsData; // Whether this texture should dispose the decoded TextureData when the GPU texture is released
     protected TextureData data; // CPU-side texture metadata and pixel buffer associated with this texture
     protected TextureFilter filter = TextureFilter.NEAREST; // Current filtering mode applied to the texture
@@ -129,10 +134,9 @@ public class Texture implements Poolable {
      * </p>
      *
      * <p>
-     * This constructor creates a new OpenGL texture object, binds it,
+     * This constructor creates a new GPU texture object, binds it,
      * applies the default filtering mode, applies clamp-to-edge wrapping,
-     * and uploads the RGBA pixel buffer to the GPU using
-     * {@code glTexImage2D}.
+     * and uploads a copied RGBA pixel buffer to the graphics device.
      * </p>
      *
      * <p>
@@ -148,10 +152,10 @@ public class Texture implements Poolable {
     }
 
     /**
-     * Creates and uploads an RGBA8 OpenGL texture, retaining the supplied pixel data.
+     * Creates and uploads an RGBA8 GPU texture, retaining the supplied pixel data.
      * Configures the default filters and clamp-to-edge wrapping and leaves the texture
      * bound on the active texture unit. Disposal always releases the GPU object and
-     * also releases pixel data when ownsData is true. Requires a current OpenGL context.
+     * also releases pixel data when ownsData is true. Requires a current graphics device.
      *
      * @param data decoded RGBA pixels and dimensions
      * @param ownsData whether disposal also releases the decoded pixel buffer
@@ -160,32 +164,27 @@ public class Texture implements Poolable {
     protected Texture(TextureData data, boolean ownsData) {
         if (data == null) throw new NullPointerException("TextureData cannot be null");
 
-        this.textureID = glGenTextures();
+        bgfxTexture = new BgfxTexture2D(BgfxGraphics.device(), data.width(), data.height(), BGFX_TEXTURE_FORMAT_RGBA8, data.buffer());
+        textureID = bgfxTexture.id();
         this.data = data;
         this.ownsData = ownsData;
-
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.magFilter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, data.width(), data.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, data.buffer());
+        BgfxResources.register(this);
     }
 
     /**
      * <p>
-     * Creates a texture wrapper around an existing OpenGL texture ID and
+     * Creates a texture wrapper around an existing GPU texture ID and
      * texture data.
      * </p>
      *
      * <p>
-     * This constructor does not generate a new OpenGL texture object or upload
+     * This constructor does not generate a new GPU texture object or upload
      * data. It simply wraps an already existing texture ID with the supplied
      * metadata. This is useful for subclasses or advanced cases where the
      * texture object has already been created elsewhere.
      * </p>
      *
-     * @param textureID the existing OpenGL texture ID
+     * @param textureID the existing GPU texture ID
      * @param data      the associated texture data
      * @throws NullPointerException if {@code data} is {@code null}
      */
@@ -194,11 +193,11 @@ public class Texture implements Poolable {
     }
 
     /**
-     * Wraps an existing texture handle without uploading pixels or changing GL state.
+     * Wraps an existing texture handle without uploading pixels or changing engine render state.
      * The wrapper takes responsibility for deleting the handle on disposal; ownsData
      * separately controls release of the associated CPU pixel buffer.
      *
-     * @param textureID existing OpenGL texture handle
+     * @param textureID existing GPU texture handle
      * @param data retained pixel data and dimensions
      * @param ownsData whether disposal also releases the pixel buffer
      * @throws NullPointerException if data is null
@@ -209,20 +208,21 @@ public class Texture implements Poolable {
         this.textureID = textureID;
         this.data = data;
         this.ownsData = ownsData;
+        BgfxResources.register(this);
     }
 
     /**
      * <p>
-     * Binds this texture to {@code GL_TEXTURE_2D}.
+     * Selects this texture on the engine's active sampled texture slot.
      * </p>
      *
      * <p>
      * This makes the texture the current active 2D texture for subsequent
-     * OpenGL operations in the currently active texture unit.
+     * engine draws in the currently active texture unit.
      * </p>
      */
     public void bind() {
-        glBindTexture(GL_TEXTURE_2D, textureID);
+        BgfxGraphics.bindTexture(BgfxGraphics.textureUnit(), textureID);
     }
 
     /**
@@ -253,12 +253,17 @@ public class Texture implements Poolable {
     public void setFilter(TextureFilter filter) {
         if (filter == null) throw new NullPointerException("TextureFilter cannot be null");
 
+        if (disposed) throw new IllegalStateException("Texture is disposed");
+        if (this.filter.usesMipmaps() != filter.usesMipmaps()) {
+            if (bgfxTexture == null) throw new UnsupportedOperationException("Wrapped textures cannot replace their mip storage");
+            BgfxTexture2D replacement = new BgfxTexture2D(BgfxGraphics.device(), data.width(), data.height(), BGFX_TEXTURE_FORMAT_RGBA8, data.buffer(), filter.usesMipmaps());
+            bgfxTexture.close();
+            bgfxTexture = replacement;
+            textureID = replacement.id();
+        }
+        if (bgfxTexture != null) bgfxTexture.setFilter(filter);
+        else BgfxGraphics.setTextureFilter(textureID, filter);
         this.filter = filter;
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter.minFilter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter.magFilter);
-
-        if (filter.usesMipmaps()) glGenerateMipmap(GL_TEXTURE_2D);
     }
 
     /**
@@ -279,10 +284,13 @@ public class Texture implements Poolable {
 
     /**
      * <p>
-     * Returns the OpenGL texture object ID.
+     * Returns the engine texture ID used by engine drawing APIs. Owned asset IDs
+     * survive backend changes. Changing mip storage can replace the ID, so fetch
+     * it after filter configuration. Native integrations must resolve the current
+     * device handle through {@link BgfxGraphics#textureHandle(int)}.
      * </p>
      *
-     * @return the OpenGL texture ID
+     * @return engine texture identifier, or a wrapped native handle
      */
     public int getTextureID() {
         return textureID;
@@ -332,7 +340,7 @@ public class Texture implements Poolable {
      * </p>
      *
      * <p>
-     * This deletes the OpenGL texture object using {@code glDeleteTextures}.
+     * This releases the owned GPU texture after queued commands finish.
      * After disposal, the texture data and filter references are set to
      * {@code null}. The instance should not be used again after this call.
      * </p>
@@ -342,7 +350,12 @@ public class Texture implements Poolable {
             return;
         }
 
-        glDeleteTextures(textureID);
+        BgfxResources.unregister(this);
+        if (bgfxTexture != null) bgfxTexture.close();
+        else {
+            BgfxGraphics.resetTextureState(textureID);
+            bgfx_destroy_texture((short) textureID);
+        }
         if (ownsData && data != null) {
             data.dispose();
         }
@@ -365,4 +378,10 @@ public class Texture implements Poolable {
     public void reset() {
         setFilter(TextureFilter.NEAREST);
     }
+
+    @Override
+    public void validateGraphicsReset(GraphicsBackend backend) {
+        if (bgfxTexture == null) throw new IllegalStateException("Wrapped native textures require explicit ownership and cannot be restored automatically");
+    }
+
 }

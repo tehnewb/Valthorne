@@ -8,6 +8,8 @@ package valthorne.graphics.lighting2d;
  * @author Albert Beaupre
  */
 final class Lighting2DEntry {
+    long graphicsGeneration = -1; // Device generation containing the uploaded shadow row.
+
     final PointLight2D light; // Borrowed registered light.
     final int slot; // Reserved atlas row.
     final PolarShadow2D shadow; // Owned reusable polar-shadow cache.

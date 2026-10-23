@@ -2,15 +2,16 @@ package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
-import valthorne.graphics.OpenGLStateSnapshot;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxMeshRenderer;
+import valthorne.graphics.bgfx.BgfxRenderState;
+
+import static org.lwjgl.bgfx.BGFX.*;
 import valthorne.graphics.shader.Shader;
-import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.TextureBatch;
 
 import java.nio.FloatBuffer;
 import java.util.List;
-
-import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Finite alpha-textured ground shadows for a dominant elevated light.
@@ -19,38 +20,25 @@ import static org.lwjgl.opengl.GL33.*;
  * Multiple lights need a separate receiver/visibility pipeline; do not stack one overlay
  * per light. TextureBatch translation/custom clipping is not applied: pass world sprites
  * and the active Window projection, with normal framebuffer viewport/scissor settings.
- * Resources and draw calls belong to the creating GL thread.
+ * Resources and draw calls belong to the creating rendering thread.
  */
 public final class GroundShadowRenderer2D implements AutoCloseable {
+    private final BgfxMeshRenderer bgfx; // Owned native mesh path.
+    private final BgfxRenderState bgfxState = new BgfxRenderState(); // Reused external drawing scope.
     private final Shader shader; // Owned shader for this rendering pass.
-    private final int vao; // Owned vertex array describing pass geometry.
-    private final int vbo; // Owned streaming vertex buffer.
     private final FloatBuffer vertices = BufferUtils.createFloatBuffer(20); // Reusable projected-shadow quad staging.
     private boolean closed; // Whether the owned GL resources were released.
     private int drawCalls; // Draw count in the latest shadow pass.
     private final PointLight2D blended = new PointLight2D(); // Reusable virtual source blended from nearby lights.
 
     /**
-     * Creates the shader and streaming quad resources on the current GL context,
+     * Creates the shader and streaming quad resources on the current graphics device,
      * restoring the caller's selected bindings afterward. Close on the same
      * graphics thread after the final pass.
      */
     public GroundShadowRenderer2D() {
-        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
-        try {
-            shader = new Shader(ValthorneFiles.readString("valthorne/shaders/lighting2d/ground-shadow.vert"), ValthorneFiles.readString("valthorne/shaders/lighting2d/ground-shadow.frag"));
-            vao = glGenVertexArrays();
-            vbo = glGenBuffers();
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferData(GL_ARRAY_BUFFER, 80, GL_STREAM_DRAW);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, false, 20, 0);
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 2, GL_FLOAT, false, 20, 12);
-        } finally {
-            state.restore();
-        }
+        shader = new Shader("bgfx:engine/lighting/ground-shadow.vert", "bgfx:engine/lighting/ground-shadow.frag");
+        bgfx = new BgfxMeshRenderer(3, 2);
     }
 
     /**
@@ -89,23 +77,16 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (!light.enabled || !light.shadows || light.elevation <= 0 || light.intensity <= 0 || light.r + light.g + light.b <= 0)
             return;
         sceneBatch.flush();
-        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+
+        bgfxState.store();
         try {
-            glDisable(GL_DEPTH_TEST);
-            glDepthMask(false);
-            glDisable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
-            glActiveTexture(GL_TEXTURE2);
-            glBindSampler(2, 0);
+
             shader.bind();
             shader.setUniform1i("u_texture", 2);
             shader.setUniform1i("u_volume", fills == null ? 0 : 1);
             shader.setUniformMatrix4("u_projection", Window.getProjectionMatrix());
             shader.setUniform1f("u_softness", Math.min(2, light.sourceRadius * .15f));
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
             for (int n = 0; n < casters.size(); n++) {
                 SpriteGroundShadow2D caster = casters.get(n);
                 if (!caster.enabled || caster.height <= 0 || caster.opacity <= 0 || caster.sprite.getColor().a() <= 0)
@@ -147,13 +128,13 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                     vertices.put(uv.get(0) + u * (uv.get(4) - uv.get(0))).put(uv.get(1) + v * (uv.get(5) - uv.get(1)));
                 }
                 vertices.flip();
-                glBufferSubData(GL_ARRAY_BUFFER, 0, vertices);
-                glBindTexture(GL_TEXTURE_2D, caster.sprite.getTexture().getTextureID());
+
+                BgfxGraphics.bindTexture(2, caster.sprite.getTexture().getTextureID());
                 float halfU = .5f / caster.sprite.getTexture().getWidth(), halfV = .5f / caster.sprite.getTexture().getHeight();
                 shader.setUniform4f("u_uvBounds", Math.min(uv.get(0), uv.get(4)) + halfU, Math.min(uv.get(1), uv.get(5)) + halfV, Math.max(uv.get(0), uv.get(4)) - halfU, Math.max(uv.get(1), uv.get(5)) - halfV);
                 shader.setUniform1f("u_opacity", caster.opacity * caster.sprite.getColor().a());
                 shader.setUniform1i("u_contact", 0);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
                 drawCalls++;
                 if (fills == null) continue;
                 // Compact receiver-space contact shadow stays beneath the trunk/feet.
@@ -164,13 +145,12 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                     vertices.put(baseX + (u * 2 - 1) * radius).put(baseY + (v * 2 - 1) * radius * .4f).put(1).put(u).put(v);
                 }
                 vertices.flip();
-                glBufferSubData(GL_ARRAY_BUFFER, 0, vertices);
                 shader.setUniform1i("u_contact", 1);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
                 drawCalls++;
             }
         } finally {
-            state.restore();
+            bgfxState.restore();
         }
     }
 
@@ -198,7 +178,6 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (closed) return;
         closed = true;
         shader.dispose();
-        glDeleteBuffers(vbo);
-        glDeleteVertexArrays(vao);
+        bgfx.close();
     }
 }

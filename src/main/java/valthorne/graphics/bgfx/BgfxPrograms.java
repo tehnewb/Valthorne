@@ -9,7 +9,7 @@ import java.io.UncheckedIOException;
 import static org.lwjgl.bgfx.BGFX.*;
 
 /**
- * Loads build-packaged OpenGL shader containers and transfers their storage to
+ * Loads the selected backend's packaged shader containers and transfers their storage to
  * bgfx. Programs use predefined matrix uniforms, so no per-shape uniform handles
  * or color updates are needed. Shader objects are owned by their linked program.
  */
@@ -73,7 +73,7 @@ final class BgfxPrograms {
          * bgfx_alloc supplies memory with the exact native lifetime required by
          * deferred shader creation; Java resource arrays live only during setup.
          */
-        String path = "/valthorne/bgfx/" + name + ".bin";
+        String path = "/valthorne/bgfx/" + BgfxShaderResources.directory() + "/shapes/" + name + ".bin";
         try (InputStream stream = BgfxPrograms.class.getResourceAsStream(path)) {
             if (stream == null) throw new IllegalStateException("Missing bgfx shader: " + path);
             byte[] bytes = stream.readAllBytes();
