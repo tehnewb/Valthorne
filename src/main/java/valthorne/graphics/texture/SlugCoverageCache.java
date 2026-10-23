@@ -147,7 +147,14 @@ final class SlugCoverageCache {
         if (texture == 0) {
             texture = glGenTextures();
             glBindTexture(GL_TEXTURE_2D, texture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, EXTENT, EXTENT, 0, GL_RED, GL_FLOAT, 0L);
+            int unpackBuffer = glGetInteger(GL_PIXEL_UNPACK_BUFFER_BINDING);
+            try {
+                // Allocate empty storage even when the caller uses pixel-buffer uploads.
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, EXTENT, EXTENT, 0, GL_RED, GL_FLOAT, 0L);
+            } finally {
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, unpackBuffer);
+            }
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             framebuffer = glGenFramebuffers();
