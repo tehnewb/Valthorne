@@ -403,8 +403,21 @@ export class BrowserHost {
             }
             this.emit(2, 0, 0, 0, 0, this.cursorX, this.cursorY);
         };
+        const pointerButtons = (event) => {
+            // Chorded presses and releases arrive as pointermove events. The buttons
+            // bit order already matches GLFW: left, right, middle, then extra buttons.
+            for (let button = 0; button < 8; button++) {
+                const pressed = (event.buttons & (1 << button)) !== 0;
+                if (pressed === this.buttons.has(button)) continue;
+                if (pressed) this.buttons.add(button);
+                else this.buttons.delete(button);
+                this.emit(3, button, pressed ? 1 : 0, mods(event));
+            }
+        };
         on(this.canvas, "pointermove", (event) => {
-            if (event.isPrimary) position(event);
+            if (!event.isPrimary) return;
+            position(event);
+            pointerButtons(event);
         });
         on(this.canvas, "pointerdown", (event) => {
             if (!event.isPrimary) return;
@@ -412,19 +425,16 @@ export class BrowserHost {
             this.canvas.focus();
             this.canvas.setPointerCapture(event.pointerId);
             position(event);
-            const button = [0, 2, 1][event.button] ?? event.button;
-            this.buttons.add(button);
-            this.emit(3, button, 1, mods(event));
+            pointerButtons(event);
             event.preventDefault();
         });
         on(this.canvas, "pointerup", (event) => {
             if (!event.isPrimary) return;
             position(event);
-            const button = [0, 2, 1][event.button] ?? event.button;
-            this.buttons.delete(button);
-            this.emit(3, button, 0, mods(event));
+            pointerButtons(event);
         });
-        on(this.canvas, "pointercancel", () => {
+        on(this.canvas, "pointercancel", (event) => {
+            if (!event.isPrimary) return;
             for (const button of this.buttons) this.emit(3, button, 0, 0);
             this.buttons.clear();
         });

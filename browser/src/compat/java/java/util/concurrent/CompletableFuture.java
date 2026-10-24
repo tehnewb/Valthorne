@@ -836,14 +836,16 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 executor);
     }
 
-    @SuppressWarnings("unchecked")
     /**
      * Maps the first observed input outcome; exceptional completion propagates without mapping.
+     *
      * @param other independent input stage
      * @param fn nonnull completion mapping
-     * @param executor nonnull cooperative execution target
+     * @param executor cooperative execution target, or null for inline completion
+     * @param <U> mapped result type
      * @return independently owned completion stage
      */
+    @SuppressWarnings("unchecked")
     private <U> CompletableFuture<U> either(CompletionStage<? extends T> other, Function<? super T, U> fn, Executor executor) {
         Objects.requireNonNull(fn);
         return anyOf(this, Objects.requireNonNull(other).toCompletableFuture())
