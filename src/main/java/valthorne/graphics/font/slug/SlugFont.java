@@ -737,8 +737,7 @@ public final class SlugFont implements Dimensional {
                 SlugCurves.line(curves, currentX, currentY, startX, startY);
             }
         } finally {
-            // CFF fonts can allocate a non-null shape with zero vertices (for example, space).
-            // Free its native allocation without the buffer overload's minimum-length check.
+            // CFF glyphs can allocate zero vertices; the checked wrapper rejects empty buffers.
             nstbtt_FreeShape(info.address(), vertices.address());
         }
 

@@ -155,9 +155,9 @@ final class NanoTreeRow<T> extends NanoContainer {
     @Override
     public void draw(long vg) {
         ResolvedStyle typography = owner.rowTypography();
-        setSkinStyle(NanoText.SLUG_FONT, typography.get(NanoText.SLUG_FONT));
-        setSkinStyle(NanoText.SLUG_CODE_FONT, typography.get(NanoText.SLUG_CODE_FONT));
-        setSkinStyle(NanoText.SLUG_HEADING_FONT, typography.get(NanoText.SLUG_HEADING_FONT));
+        setSkinStyle(NanoText.FONT, typography.get(NanoText.FONT));
+        setSkinStyle(NanoText.CODE_FONT, typography.get(NanoText.CODE_FONT));
+        setSkinStyle(NanoText.HEADING_FONT, typography.get(NanoText.HEADING_FONT));
         if (owner.isDisabled()) nvgGlobalAlpha(vg, 0.5f);
         float x = getAbsoluteX(), y = getAbsoluteY(), cy = y + getHeight() / 2;
         float branch = x + 6 + item.depth() * owner.ivdevt + owner.ivdevt / 2;

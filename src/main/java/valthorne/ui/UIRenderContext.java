@@ -171,7 +171,7 @@ public final class UIRenderContext {
      * @param size logical em size
      * @param color borrowed tint
      */
-    public void drawNanoSlug(UINode node, SlugFont font, String text, float x, float baseline, float size, Color color) {
+    public void drawNanoText(UINode node, SlugFont font, String text, float x, float baseline, float size, Color color) {
         selectBackend(false);
         float tx = batch.getTranslationX();
         float ty = batch.getTranslationY();
