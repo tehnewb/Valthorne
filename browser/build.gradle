@@ -179,6 +179,36 @@ sourceSets.main.java.srcDir(prepareBrowserJoml)
 tasks.named('compileJava') { dependsOn prepareBrowserJoml }
 dependencies { implementation files(browserJoml) }
 
+// Use fastjson2's maintained parser with browser-safe memory access and tree binding.
+configurations { fastjsonBrowserSources; fastjsonBrowserBinary }
+dependencies {
+    fastjsonBrowserSources("com.alibaba.fastjson2:fastjson2:${rootProject.fastjson2Version}.android5:sources") { transitive = false }
+    fastjsonBrowserBinary("com.alibaba.fastjson2:fastjson2:${rootProject.fastjson2Version}.android5") { transitive = false }
+}
+def fastjsonReplacements = ['JSONReader', 'JSONReaderUTF16', 'util/JDKUtils']
+def extractBrowserFastjson = tasks.register('extractBrowserFastjson', Sync) {
+    from { zipTree(configurations.fastjsonBrowserSources.singleFile) }
+    fastjsonReplacements.each { type -> include "com/alibaba/fastjson2/${type}.java" }
+    into(layout.buildDirectory.dir('generated/fastjson2-upstream'))
+}
+def prepareBrowserFastjson = tasks.register('prepareBrowserFastjson', Exec) {
+    dependsOn extractBrowserFastjson
+    inputs.file('prepare-fastjson2.mjs')
+    inputs.dir(layout.buildDirectory.dir('generated/fastjson2-upstream'))
+    outputs.dir(layout.buildDirectory.dir('generated/fastjson2'))
+    commandLine 'node', 'prepare-fastjson2.mjs', layout.buildDirectory.dir('generated/fastjson2-upstream').get().asFile.absolutePath, layout.buildDirectory.dir('generated/fastjson2').get().asFile.absolutePath
+}
+def browserFastjson = tasks.register('browserFastjson', Jar) {
+    archiveFileName = 'fastjson2-browser.jar'
+    inputs.property('replacedTypes', fastjsonReplacements)
+    from { zipTree(configurations.fastjsonBrowserBinary.singleFile) }
+    fastjsonReplacements.each { type -> exclude "com/alibaba/fastjson2/${type}.class", "com/alibaba/fastjson2/${type}\$*.class" }
+    exclude 'META-INF/MANIFEST.MF', 'META-INF/maven/**'
+}
+sourceSets.main.java.srcDir(prepareBrowserFastjson)
+tasks.named('compileJava') { dependsOn prepareBrowserFastjson }
+dependencies { implementation files(browserFastjson) }
+
 // Embed the same classpath assets used by unchanged engine and application code.
 def browserResourceManifest = tasks.register('browserResourceManifest') {
     inputs.dir(rootProject.file('src/main/resources'))
@@ -249,9 +279,10 @@ dependencies { implementation files(browserCompatibility.map { it.destinationDir
 // The browser artifact carries adapted engine classes and native runtime assets;
 // applications compile in their own source set and never enter a library release.
 tasks.named('jar', Jar) {
-    dependsOn browserEngineApi, browserJoml, browserCompatibility, browserDependencies
+    dependsOn browserEngineApi, browserJoml, browserFastjson, browserCompatibility, browserDependencies
     from { zipTree(browserEngineApi.get().archiveFile) }
     from { zipTree(browserJoml.get().archiveFile) }
+    from { zipTree(browserFastjson.get().archiveFile) }
     from(browserCompatibility.map { it.destinationDirectory })
     from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
     from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }

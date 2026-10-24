@@ -1,7 +1,8 @@
 package valthorne.graphics.map.ldtk;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSONException;
+import com.alibaba.fastjson2.JSONReader;
+import com.alibaba.fastjson2.JSONValidator;
 import valthorne.graphics.texture.TextureData;
 
 import java.nio.file.Files;
@@ -29,12 +30,14 @@ import java.util.*;
  * {@link #dispose()} after no map construction or CPU image access remains.</p>
  */
 public final class LdtkProject {
-    /**
-     * Shared stateless JSON parser used for project and external-level documents.
-     */
-    private static final ObjectMapper JSON = new ObjectMapper();
-    private final String iid, jsonVersion, appBuildId, worldLayout, backgroundColor; // Project metadata.
-    private final int defaultGridSize, defaultLevelWidth, defaultLevelHeight; // Project defaults.
+    private final String iid; // Project instance identifier.
+    private final String jsonVersion; // LDtk JSON format version.
+    private final String appBuildId; // LDtk application build identifier.
+    private final String worldLayout; // Optional configured world layout.
+    private final String backgroundColor; // Project background color.
+    private final int defaultGridSize; // Default cell size in pixels.
+    private final int defaultLevelWidth; // Default level width in pixels.
+    private final int defaultLevelHeight; // Default level height in pixels.
     private final List<LdtkLevel> levels; // Immutable decoded levels in project order.
     private final Map<Integer, LdtkTileset> tilesets; // Immutable tilesets keyed by UID.
     private final List<LdtkDefinition.Layer> layerDefinitions; // Immutable layer definitions.
@@ -82,6 +85,9 @@ public final class LdtkProject {
      * @throws RuntimeException if the project or any dependency cannot be read or parsed
      */
     public static LdtkProject load(String path) {
+        /*
+         * Read the parent once so dependency resolution sees the same project bytes.
+         */
         try {
             byte[] bytes = Files.readAllBytes(Path.of(path));
             return load(bytes, path, LdtkResolvers.from(new LdtkDependencySource.FileSystemSource()));
@@ -104,15 +110,18 @@ public final class LdtkProject {
      * @throws RuntimeException if JSON parsing, dependency resolution, or image decoding fails
      */
     public static LdtkProject load(byte[] bytes, String path, LdtkDependencyResolver resolver) {
+        /*
+         * Track decoded images until the complete immutable project takes ownership.
+         */
         Objects.requireNonNull(bytes, "bytes");
         Objects.requireNonNull(path, "path");
         Objects.requireNonNull(resolver, "resolver");
         List<TextureData> decoded = new ArrayList<>();
         try {
-            JsonNode root = JSON.readTree(bytes);
-            JsonNode defs = root.path("defs");
+            Object root = document(bytes);
+            Object defs = property(root, "defs");
             Map<Integer, LdtkTileset> tilesets = new LinkedHashMap<>();
-            for (JsonNode node : defs.path("tilesets")) {
+            for (Object node : array(property(defs, "tilesets"))) {
                 int uid = integer(node, "uid");
                 String rel = text(node, "relPath", null);
                 TextureData image = null;
@@ -127,27 +136,27 @@ public final class LdtkProject {
                         decoded.add(image);
                     }
                 }
-                tilesets.put(uid, new LdtkTileset(uid, text(node, "identifier", ""), rel, integer(node, "tileGridSize"), integer(node, "spacing"), integer(node, "padding"), integer(node, "pxWid"), integer(node, "pxHei"), strings(node.path("tags")), image));
+                tilesets.put(uid, new LdtkTileset(uid, text(node, "identifier", ""), rel, integer(node, "tileGridSize"), integer(node, "spacing"), integer(node, "padding"), integer(node, "pxWid"), integer(node, "pxHei"), strings(property(node, "tags")), image));
             }
             List<LdtkDefinition.Layer> layerDefs = new ArrayList<>();
-            for (JsonNode node : defs.path("layers")) {
+            for (Object node : array(property(defs, "layers"))) {
                 List<LdtkDefinition.IntGridValue> values = new ArrayList<>();
-                for (JsonNode value : node.path("intGridValues"))
+                for (Object value : array(property(node, "intGridValues")))
                     values.add(new LdtkDefinition.IntGridValue(integer(value, "value"), text(value, "identifier", ""), text(value, "color", "")));
                 layerDefs.add(new LdtkDefinition.Layer(integer(node, "uid"), text(node, "identifier", ""), text(node, "type", ""), integer(node, "gridSize"), nullableInt(node, "tilesetDefUid", -1), values));
             }
             List<LdtkDefinition.Entity> entityDefs = new ArrayList<>();
-            for (JsonNode node : defs.path("entities"))
-                entityDefs.add(new LdtkDefinition.Entity(integer(node, "uid"), text(node, "identifier", ""), integer(node, "width"), integer(node, "height"), text(node, "color", ""), strings(node.path("tags"))));
+            for (Object node : array(property(defs, "entities")))
+                entityDefs.add(new LdtkDefinition.Entity(integer(node, "uid"), text(node, "identifier", ""), integer(node, "width"), integer(node, "height"), text(node, "color", ""), strings(property(node, "tags"))));
             List<LdtkDefinition.Enum> enumDefs = new ArrayList<>();
-            parseEnums(defs.path("enums"), enumDefs);
-            parseEnums(defs.path("externalEnums"), enumDefs);
+            parseEnums(property(defs, "enums"), enumDefs);
+            parseEnums(property(defs, "externalEnums"), enumDefs);
 
             List<LdtkLevel> levels = new ArrayList<>();
-            JsonNode sourceLevels = root.has("worlds") && root.path("worlds").isArray() && !root.path("worlds").isEmpty() ? null : root.path("levels");
+            Object sourceLevels = !array(property(root, "worlds")).isEmpty() ? null : property(root, "levels");
             if (sourceLevels != null) parseLevels(sourceLevels, bytes, path, resolver, levels, decoded);
-            else for (JsonNode world : root.path("worlds"))
-                parseLevels(world.path("levels"), bytes, path, resolver, levels, decoded);
+            else for (Object world : array(property(root, "worlds")))
+                parseLevels(property(world, "levels"), bytes, path, resolver, levels, decoded);
 
             return new LdtkProject(text(root, "iid", ""), text(root, "jsonVersion", ""), text(root, "appBuildId", ""), text(root, "worldLayout", null), text(root, "bgColor", "#000000"), integer(root, "defaultGridSize"), integer(root, "defaultLevelWidth"), integer(root, "defaultLevelHeight"), levels, tilesets, layerDefs, entityDefs, enumDefs);
         } catch (Exception e) {
@@ -167,31 +176,34 @@ public final class LdtkProject {
      * @param decoded ownership list used to clean up partially decoded images
      * @throws Exception if a dependency cannot be resolved or decoded
      */
-    private static void parseLevels(JsonNode nodes, byte[] parentBytes, String parentPath, LdtkDependencyResolver resolver, List<LdtkLevel> out, List<TextureData> decoded) throws Exception {
-        for (JsonNode stub : nodes) {
+    private static void parseLevels(Object nodes, byte[] parentBytes, String parentPath, LdtkDependencyResolver resolver, List<LdtkLevel> out, List<TextureData> decoded) throws Exception {
+        /*
+         * Resolve each external level relative to its own document before loading images.
+         */
+        for (Object stub : array(nodes)) {
             String external = text(stub, "externalRelPath", null);
-            JsonNode node = stub;
+            Object node = stub;
             String levelPath = parentPath;
             byte[] levelBytes = parentBytes;
             if (external != null && !external.isBlank()) {
                 levelBytes = resolver.resolve(parentBytes, parentPath, external);
-                node = JSON.readTree(levelBytes);
+                node = document(levelBytes);
                 levelPath = LdtkResolvers.resolve(parentPath, external).toString();
             }
             List<LdtkLayer> layers = new ArrayList<>();
-            for (JsonNode layer : node.path("layerInstances")) layers.add(parseLayer(layer));
+            for (Object layer : array(property(node, "layerInstances"))) layers.add(parseLayer(layer));
             LdtkBackground background = null;
             String bgPath = text(node, "bgRelPath", null);
             if (bgPath != null && !bgPath.isBlank()) {
                 TextureData image = TextureData.load(resolver.resolve(levelBytes, levelPath, bgPath), true);
                 decoded.add(image);
-                JsonNode pos = node.path("__bgPos");
-                JsonNode crop = pos.path("cropRect");
-                JsonNode scale = pos.path("scale");
-                JsonNode topLeft = pos.path("topLeftPx");
-                background = new LdtkBackground(bgPath, arrayFloat(topLeft, 0), arrayFloat(topLeft, 1), scale.isNumber() ? (float) scale.asDouble() : arrayFloat(scale, 0), scale.isNumber() ? (float) scale.asDouble() : arrayFloat(scale, 1), arrayInt(crop, 0), arrayInt(crop, 1), arrayInt(crop, 2), arrayInt(crop, 3), image);
+                Object pos = property(node, "__bgPos");
+                Object crop = property(pos, "cropRect");
+                Object scale = property(pos, "scale");
+                Object topLeft = property(pos, "topLeftPx");
+                background = new LdtkBackground(bgPath, arrayFloat(topLeft, 0), arrayFloat(topLeft, 1), scale instanceof Number size ? size.floatValue() : arrayFloat(scale, 0), scale instanceof Number size ? size.floatValue() : arrayFloat(scale, 1), arrayInt(crop, 0), arrayInt(crop, 1), arrayInt(crop, 2), arrayInt(crop, 3), image);
             }
-            out.add(new LdtkLevel(text(node, "identifier", text(stub, "identifier", "")), text(node, "iid", text(stub, "iid", "")), integer(node, "uid", integer(stub, "uid")), integer(node, "worldX", integer(stub, "worldX")), integer(node, "worldY", integer(stub, "worldY")), integer(node, "pxWid", integer(stub, "pxWid")), integer(node, "pxHei", integer(stub, "pxHei")), text(node, "bgColor", text(stub, "bgColor", "")), background, layers, fields(node.path("fieldInstances")), external));
+            out.add(new LdtkLevel(text(node, "identifier", text(stub, "identifier", "")), text(node, "iid", text(stub, "iid", "")), integer(node, "uid", integer(stub, "uid")), integer(node, "worldX", integer(stub, "worldX")), integer(node, "worldY", integer(stub, "worldY")), integer(node, "pxWid", integer(stub, "pxWid")), integer(node, "pxHei", integer(stub, "pxHei")), text(node, "bgColor", text(stub, "bgColor", "")), background, layers, fields(property(node, "fieldInstances")), external));
         }
     }
 
@@ -201,12 +213,15 @@ public final class LdtkProject {
      * @param node layer-instance JSON object
      * @return immutable decoded layer
      */
-    private static LdtkLayer parseLayer(JsonNode node) {
-        List<LdtkTile> grid = tiles(node.path("gridTiles")), auto = tiles(node.path("autoLayerTiles"));
+    private static LdtkLayer parseLayer(Object node) {
+        /*
+         * Decode each placement array once before constructing the immutable layer.
+         */
+        List<LdtkTile> grid = tiles(property(node, "gridTiles")), auto = tiles(property(node, "autoLayerTiles"));
         List<LdtkEntity> entities = new ArrayList<>();
-        for (JsonNode entity : node.path("entityInstances"))
-            entities.add(new LdtkEntity(text(entity, "__identifier", ""), text(entity, "iid", ""), arrayInt(entity.path("px"), 0), arrayInt(entity.path("px"), 1), integer(entity, "width"), integer(entity, "height"), arrayFloat(entity.path("__pivot"), 0), arrayFloat(entity.path("__pivot"), 1), integer(entity, "defUid"), strings(entity.path("__tags")), fields(entity.path("fieldInstances"))));
-        return new LdtkLayer(text(node, "__identifier", ""), text(node, "iid", ""), text(node, "__type", ""), integer(node, "layerDefUid"), integer(node, "__gridSize"), integer(node, "__cWid"), integer(node, "__cHei"), integer(node, "__pxTotalOffsetX", integer(node, "pxOffsetX")), integer(node, "__pxTotalOffsetY", integer(node, "pxOffsetY")), nullableInt(node, "__tilesetDefUid", -1), text(node, "__tilesetRelPath", null), (float) number(node, "__opacity", 1), node.path("visible").asBoolean(true), ints(node.path("intGridCsv")), grid, auto, entities, fields(node.path("fieldInstances")));
+        for (Object entity : array(property(node, "entityInstances")))
+            entities.add(new LdtkEntity(text(entity, "__identifier", ""), text(entity, "iid", ""), arrayInt(property(entity, "px"), 0), arrayInt(property(entity, "px"), 1), integer(entity, "width"), integer(entity, "height"), arrayFloat(property(entity, "__pivot"), 0), arrayFloat(property(entity, "__pivot"), 1), integer(entity, "defUid"), strings(property(entity, "__tags")), fields(property(entity, "fieldInstances"))));
+        return new LdtkLayer(text(node, "__identifier", ""), text(node, "iid", ""), text(node, "__type", ""), integer(node, "layerDefUid"), integer(node, "__gridSize"), integer(node, "__cWid"), integer(node, "__cHei"), integer(node, "__pxTotalOffsetX", integer(node, "pxOffsetX")), integer(node, "__pxTotalOffsetY", integer(node, "pxOffsetY")), nullableInt(node, "__tilesetDefUid", -1), text(node, "__tilesetRelPath", null), (float) number(node, "__opacity", 1), flag(property(node, "visible"), true), ints(property(node, "intGridCsv")), grid, auto, entities, fields(property(node, "fieldInstances")));
     }
 
     /**
@@ -215,10 +230,13 @@ public final class LdtkProject {
      * @param nodes tile JSON array or missing node
      * @return mutable parse-time list later snapshotted by its owning layer
      */
-    private static List<LdtkTile> tiles(JsonNode nodes) {
+    private static List<LdtkTile> tiles(Object nodes) {
+        /*
+         * Preserve source order because overlapping tile placements depend on it.
+         */
         List<LdtkTile> result = new ArrayList<>();
-        for (JsonNode tile : nodes)
-            result.add(new LdtkTile(arrayInt(tile.path("px"), 0), arrayInt(tile.path("px"), 1), arrayInt(tile.path("src"), 0), arrayInt(tile.path("src"), 1), integer(tile, "t"), integer(tile, "f"), (float) number(tile, "a", 1)));
+        for (Object tile : array(nodes))
+            result.add(new LdtkTile(arrayInt(property(tile, "px"), 0), arrayInt(property(tile, "px"), 1), arrayInt(property(tile, "src"), 0), arrayInt(property(tile, "src"), 1), integer(tile, "t"), integer(tile, "f"), (float) number(tile, "a", 1)));
         return result;
     }
 
@@ -228,39 +246,46 @@ public final class LdtkProject {
      * @param nodes field-instance JSON array or missing node
      * @return mutable parse-time map later snapshotted by its owner
      */
-    private static Map<String, LdtkField> fields(JsonNode nodes) {
+    private static Map<String, LdtkField> fields(Object nodes) {
+        /*
+         * Preserve nullable and nested field values while snapshotting their containers.
+         */
         Map<String, LdtkField> fields = new LinkedHashMap<>();
-        for (JsonNode node : nodes) {
+        for (Object node : array(nodes)) {
             String id = text(node, "__identifier", "");
-            fields.put(id, new LdtkField(id, text(node, "__type", ""), value(node.get("__value"))));
+            fields.put(id, new LdtkField(id, text(node, "__type", ""), value(property(node, "__value"))));
         }
         return fields;
     }
 
     /**
-     * Converts a JSON value recursively into scalars and immutable lists or maps.
-     * Unknown node kinds fall back to their JSON text representation.
+     * Snapshots fastjson2 values into the immutable scalar and collection API.
+     * Integral field values remain longs; decimal field values become doubles.
      *
-     * @param node value node, possibly null or JSON null
-     * @return decoded value, or {@code null}
+     * @param node decoded field value, possibly null
+     * @return scalar value or immutable collection retaining null elements
      */
-    private static Object value(JsonNode node) {
-        if (node == null || node.isNull()) return null;
-        if (node.isTextual()) return node.textValue();
-        if (node.isBoolean()) return node.booleanValue();
-        if (node.isIntegralNumber()) return node.longValue();
-        if (node.isFloatingPointNumber()) return node.doubleValue();
-        if (node.isArray()) {
-            List<Object> values = new ArrayList<>();
-            node.forEach(it -> values.add(value(it)));
-            return Collections.unmodifiableList(values);
-        }
-        if (node.isObject()) {
-            Map<String, Object> values = new LinkedHashMap<>();
-            node.fields().forEachRemaining(it -> values.put(it.getKey(), value(it.getValue())));
+    private static Object value(Object node) {
+        /*
+         * Copy only containers; scalar values are immutable. Preserve explicit
+         * nulls because LDtk nullable fields and array entries depend on them.
+         */
+        if (node instanceof Map<?, ?> object) {
+            Map<String, Object> values = new LinkedHashMap<>(object.size());
+            for (Map.Entry<?, ?> entry : object.entrySet())
+                values.put((String) entry.getKey(), value(entry.getValue()));
             return Collections.unmodifiableMap(values);
         }
-        return node.toString();
+        if (node instanceof List<?> array) {
+            List<Object> values = new ArrayList<>(array.size());
+            for (Object element : array) values.add(value(element));
+            return Collections.unmodifiableList(values);
+        }
+        if (node instanceof Number number) {
+            if (number instanceof Long || number instanceof Integer) return number.longValue();
+            return number.doubleValue();
+        }
+        return node;
     }
 
     /**
@@ -269,10 +294,13 @@ public final class LdtkProject {
      * @param nodes enum-definition array
      * @param out destination shared by internal and external definitions
      */
-    private static void parseEnums(JsonNode nodes, List<LdtkDefinition.Enum> out) {
-        for (JsonNode node : nodes) {
+    private static void parseEnums(Object nodes, List<LdtkDefinition.Enum> out) {
+        /*
+         * Keep enum declaration order stable across internal and external definitions.
+         */
+        for (Object node : array(nodes)) {
             Map<String, String> values = new LinkedHashMap<>();
-            for (JsonNode value : node.path("values")) values.put(text(value, "id", ""), text(value, "color", ""));
+            for (Object value : array(property(node, "values"))) values.put(text(value, "id", ""), text(value, "color", ""));
             out.add(new LdtkDefinition.Enum(integer(node, "uid"), text(node, "identifier", ""), values));
         }
     }
@@ -285,106 +313,269 @@ public final class LdtkProject {
      * @param fallback value used for absent or JSON-null properties
      * @return decoded text or fallback
      */
-    private static String text(JsonNode n, String key, String fallback) {
-        JsonNode v = n.get(key);
-        return v == null || v.isNull() ? fallback : v.asText();
+    private static String text(Object n, String key, String fallback) {
+        /*
+         * Containers are not text values. Do not invoke JSON container toString,
+         * which would serialize an unexpected schema value unnecessarily.
+         */
+        Object value = property(n, key);
+        return value == null ? fallback : scalarText(value);
     }
 
     /**
-     * Reads an integer property, defaulting absent or null data to zero.
+     * Reads an integer property with zero for missing or incompatible values.
      *
-     * @param n containing JSON object
+     * @param n containing object
      * @param key property name
      * @return decoded integer or zero
      */
-    private static int integer(JsonNode n, String key) {
+    private static int integer(Object n, String key) {
+        /*
+         * Share the fallback conversion used by nullable LDtk references.
+         */
         return integer(n, key, 0);
     }
 
     /**
      * Reads an integer property with a caller-selected fallback.
      *
-     * @param n containing JSON object
+     * @param n containing object
      * @param key property name
-     * @param fallback value used for absent, null, or incompatible data
+     * @param fallback absent, null, or incompatible value fallback
      * @return decoded integer or fallback
      */
-    private static int integer(JsonNode n, String key, int fallback) {
-        JsonNode v = n.get(key);
-        return v == null || v.isNull() ? fallback : v.asInt(fallback);
+    private static int integer(Object n, String key, int fallback) {
+        /*
+         * Convert directly from numeric storage without decimal text allocation.
+         */
+        return integerValue(property(n, key), fallback);
     }
 
     /**
-     * Reads a nullable integer-valued LDtk reference using its sentinel fallback.
+     * Reads a nullable integer reference with its sentinel fallback.
      *
-     * @param n containing JSON object
+     * @param n containing object
      * @param key property name
-     * @param fallback sentinel used for absent or null data
-     * @return decoded integer or fallback
+     * @param fallback sentinel for absent or null references
+     * @return decoded reference or sentinel
      */
-    private static int nullableInt(JsonNode n, String key, int fallback) {
+    private static int nullableInt(Object n, String key, int fallback) {
+        /*
+         * Nullable references use the same scalar rules as ordinary integers.
+         */
         return integer(n, key, fallback);
     }
 
     /**
      * Reads a numeric property as a double.
      *
-     * @param n containing JSON object
+     * @param n containing object
      * @param key property name
-     * @param fallback value used for absent, null, or incompatible data
+     * @param fallback absent, null, or incompatible value fallback
      * @return decoded number or fallback
      */
-    private static double number(JsonNode n, String key, double fallback) {
-        JsonNode v = n.get(key);
-        return v == null || v.isNull() ? fallback : v.asDouble(fallback);
+    private static double number(Object n, String key, double fallback) {
+        /*
+         * Keep schema conversion separate from the JSON reader's token handling.
+         */
+        return numeric(property(n, key), fallback);
     }
 
     /**
-     * Reads an integer array element with a safe zero fallback.
+     * Reads an integer array element with zero for unsuitable input.
      *
-     * @param n expected JSON array
+     * @param n expected array
      * @param i zero-based element index
-     * @return decoded integer, or zero when the node or index is unsuitable
+     * @return decoded integer or zero
      */
-    private static int arrayInt(JsonNode n, int i) {
-        return n.isArray() && n.size() > i ? n.get(i).asInt() : 0;
+    private static int arrayInt(Object n, int i) {
+        /*
+         * Bounds checking also handles omitted optional coordinate arrays.
+         */
+        List<?> values = array(n);
+        return i >= 0 && i < values.size() ? integerValue(values.get(i), 0) : 0;
     }
 
     /**
-     * Reads a floating-point array element with a safe zero fallback.
+     * Reads a floating-point array element with zero for unsuitable input.
      *
-     * @param n expected JSON array
+     * @param n expected array
      * @param i zero-based element index
-     * @return decoded float, or zero when the node or index is unsuitable
+     * @return decoded coordinate or zero
      */
-    private static float arrayFloat(JsonNode n, int i) {
-        return n.isArray() && n.size() > i ? (float) n.get(i).asDouble() : 0;
+    private static float arrayFloat(Object n, int i) {
+        /*
+         * Convert only the requested coordinate without copying its array.
+         */
+        List<?> values = array(n);
+        return i >= 0 && i < values.size() ? (float) numeric(values.get(i), 0) : 0;
     }
 
     /**
-     * Copies a JSON integer array into primitive row-major storage.
+     * Copies an integer array into primitive row-major storage.
      *
-     * @param n expected JSON array
-     * @return decoded values, or an empty array for non-array input
+     * @param n expected array
+     * @return decoded values or an empty array
      */
-    private static int[] ints(JsonNode n) {
-        if (!n.isArray()) return new int[0];
-        int[] v = new int[n.size()];
-        for (int i = 0; i < v.length; i++) v[i] = n.get(i).asInt();
-        return v;
+    private static int[] ints(Object n) {
+        /*
+         * Allocate exactly the final primitive storage required by IntGrid.
+         */
+        List<?> values = array(n);
+        int[] result = new int[values.size()];
+        for (int i = 0; i < result.length; i++) result[i] = integerValue(values.get(i), 0);
+        return result;
     }
 
     /**
-     * Copies a JSON array into a list of text values.
+     * Copies a schema array into text values, preserving order.
      *
-     * @param n expected JSON array
-     * @return decoded strings, or an immutable empty list for non-array input
+     * @param n expected array
+     * @return decoded strings or an empty list
      */
-    private static List<String> strings(JsonNode n) {
-        if (!n.isArray()) return List.of();
-        List<String> v = new ArrayList<>();
-        n.forEach(it -> v.add(it.asText()));
-        return v;
+    private static List<String> strings(Object n) {
+        /*
+         * Avoid serializing containers passed in place of scalar tag values.
+         */
+        List<?> values = array(n);
+        List<String> result = new ArrayList<>(values.size());
+        for (Object element : values) result.add(scalarText(element));
+        return result;
+    }
+
+    /**
+     * Parses one object document using fastjson2 without bean binding or AutoType.
+     *
+     * @param bytes UTF-8 project or external-level document
+     * @return mutable parse-time object tree owned by this loading operation
+     * @throws JSONException if the input is not one complete object document
+     */
+    private static Map<String, Object> document(byte[] bytes) {
+        /*
+         * A fresh context confines nesting limits and suppliers to this load.
+         * Native containers keep the tree independent of serialization APIs.
+         */
+        JSONReader.Context context = new JSONReader.Context(null, JSONReader.Feature.DisableReferenceDetect.mask | JSONReader.Feature.DisableSingleQuote.mask | JSONReader.Feature.UseLongForInts.mask | JSONReader.Feature.UseDoubleForDecimals.mask);
+        context.setMaxLevel(256);
+        context.setObjectSupplier(LinkedHashMap::new);
+        context.setArraySupplier(ArrayList::new);
+        try (JSONReader reader = JSONReader.of(bytes, context)) {
+            if (reader.current() != '{') throw new JSONException("Expected an LDtk object document");
+            Map<String, Object> root = reader.readObject();
+            if (!reader.isEnd() || reader.hasComma()) throw new JSONException("Unexpected data after LDtk document");
+            /*
+             * The tree reader accepts some incomplete numeric tokens. Validate
+             * with fastjson2's separate token checker before loading images.
+             * Parsing first enforces the nesting bound on the validation pass.
+             */
+            try (JSONReader validation = JSONReader.of(bytes, context)) {
+                if (!JSONValidator.from(validation).validate()) throw new JSONException("Invalid LDtk document");
+            }
+            return root;
+        }
+    }
+
+    /**
+     * Looks up a schema property without allocating a missing-node wrapper.
+     *
+     * @param object expected object
+     * @param key property name
+     * @return property value or null for absent or unsuitable input
+     */
+    private static Object property(Object object, String key) {
+        /*
+         * Missing and JSON-null schema properties share the documented fallback.
+         */
+        return object instanceof Map<?, ?> map ? map.get(key) : null;
+    }
+
+    /**
+     * Views a schema array without copying its elements.
+     *
+     * @param value expected array
+     * @return array view or an immutable empty list
+     */
+    private static List<?> array(Object value) {
+        /*
+         * Optional missing arrays need no allocated placeholder object.
+         */
+        return value instanceof List<?> list ? list : List.of();
+    }
+
+    /**
+     * Converts a scalar to its text spelling with empty text for containers.
+     *
+     * @param value decoded value, possibly null
+     * @return scalar spelling or empty text for containers
+     */
+    private static String scalarText(Object value) {
+        /*
+         * Explicit scalar cases avoid invoking arbitrary object serialization.
+         */
+        if (value == null) return "null";
+        if (value instanceof String text) return text;
+        if (value instanceof Number number) return number.toString();
+        if (value instanceof Boolean flag) return flag ? "true" : "false";
+        return "";
+    }
+
+    /**
+     * Coerces a schema numeric scalar while retaining previous fallback behavior.
+     *
+     * @param value decoded numeric, Boolean, or numeric-text scalar
+     * @param fallback value for null or incompatible input
+     * @return numeric value or fallback
+     */
+    private static double numeric(Object value, double fallback) {
+        /*
+         * Most schema values are already numbers. Text coercion is a cold path
+         * for older documents that encoded numeric metadata as strings.
+         */
+        if (value instanceof Number number) return number.doubleValue();
+        if (value instanceof Boolean flag) return flag ? 1 : 0;
+        if (value instanceof String text) {
+            try {
+                return Double.parseDouble(text.trim());
+            } catch (NumberFormatException failure) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * Converts integer metadata without routing exact longs through double.
+     *
+     * @param value decoded scalar
+     * @param fallback value for missing or incompatible input
+     * @return narrowed integer or fallback
+     */
+    private static int integerValue(Object value, int fallback) {
+        /*
+         * Preserve Java's numeric narrowing behavior for integral JSON values.
+         */
+        return value instanceof Number number ? number.intValue() : (int) numeric(value, fallback);
+    }
+
+    /**
+     * Reads an optional schema Boolean with a caller-selected fallback.
+     *
+     * @param value decoded Boolean, number, or Boolean text
+     * @param fallback value for null or incompatible input
+     * @return decoded flag or fallback
+     */
+    private static boolean flag(Object value, boolean fallback) {
+        /*
+         * Retain the scalar flag coercions accepted by existing LDtk loading.
+         */
+        if (value instanceof Boolean flag) return flag;
+        if (value instanceof Number number) return number.doubleValue() != 0;
+        if (value instanceof String text) {
+            text = text.trim();
+            if ("true".equals(text)) return true;
+            if ("false".equals(text)) return false;
+        }
+        return fallback;
     }
 
     /**

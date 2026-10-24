@@ -18,7 +18,6 @@ export async function prepareBrowserLoaders(root, output) {
     for (const type of types) {
         let source = (await readFile(path.join(root, "src/main/java/valthorne", type + ".java"), "utf8")).replaceAll("\r\n", "\n");
         source = source.replaceAll("javax.xml.stream.", "valthorne.browser.xml.");
-        source = source.replaceAll("com.fasterxml.jackson.databind.", "valthorne.browser.json.");
         if (type.startsWith("graphics/map/")) {
             source = source.replace("import java.nio.file.Files;", "import java.nio.file.Files;\nimport valthorne.browser.BrowserAssets;");
             source = source.replaceAll("Files.readAllBytes(", "BrowserAssets.read(");
@@ -34,8 +33,12 @@ export async function prepareBrowserLoaders(root, output) {
         }
         if (type === "graphics/map/ldtk/LdtkResolvers")
             source = source.replace("BrowserAssets.read(resolve(parentPath, dependencyPath))", "BrowserAssets.read(BrowserAssets.resolve(parentPath, dependencyPath))");
-        if (type === "graphics/map/ldtk/LdtkProject")
+        if (type === "graphics/map/ldtk/LdtkProject") {
             source = source.replace("LdtkResolvers.resolve(parentPath, external).toString()", "BrowserAssets.resolve(parentPath, external)");
+            source = source.replace("import java.nio.file.Files;", "import java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;");
+            source = source.replace("JSONReader.Context context =", "String json = new String(bytes, StandardCharsets.UTF_8);\n        JSONReader.Context context =");
+            source = source.replaceAll("JSONReader.of(bytes, context)", "JSONReader.of(json, context)");
+        }
         if (type === "graphics/map/tiled/TiledResolvers") {
             source = source.replace("import java.nio.file.Path;", "import java.nio.file.Path;\nimport valthorne.browser.BrowserAssets;");
             const start = source.indexOf("            Path dep = Paths.get(dependencyPath);");
