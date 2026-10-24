@@ -135,6 +135,8 @@ final class AdaptiveNativeFace implements AutoCloseable {
     /**
      * Rasterizes grayscale coverage using the selected outline hinting policy
      * while retaining natural layout. NONE changes grid fitting, not antialiasing.
+     * A transparent one-pixel image border preserves filtered edge coverage at
+     * fractional glyph positions; bearings include that border in layout units.
      * @param glyph shaped glyph index
      * @param size physical pixels per em
      * @param hinting trusted non-null small-text hinting policy
@@ -149,19 +151,19 @@ final class AdaptiveNativeFace implements AutoCloseable {
         int width = bitmap.width();
         int height = bitmap.rows();
         if (width == 0 || height == 0) return new FontRaster(null, 0, 0, 0, 0, size);
-        if (width > FontAtlasPage.MAX_SIDE - 2 || height > FontAtlasPage.MAX_SIDE - 2) throw new IllegalArgumentException("Glyph exceeds atlas dimensions");
+        if (width > FontAtlasPage.MAX_SIDE - 4 || height > FontAtlasPage.MAX_SIDE - 4) throw new IllegalArgumentException("Glyph exceeds atlas dimensions");
         if (bitmap.pixel_mode() != FT_PIXEL_MODE_GRAY) throw new IllegalStateException("Expected grayscale FreeType glyph");
-        ByteBuffer pixels = memAlloc(width * height);
+        int paddedWidth = width + 2;
+        int paddedHeight = height + 2;
+        ByteBuffer pixels = memCalloc(paddedWidth * paddedHeight);
         int pitch = bitmap.pitch();
         long origin = memGetAddress(bitmap.address() + FT_Bitmap.BUFFER);
+        long destination = memAddress(pixels) + paddedWidth + 1;
         for (int y = 0; y < height; y++) {
             long row = origin + (long) (height - 1 - y) * pitch;
-            for (int x = 0; x < width; x++) {
-                pixels.put(memGetByte(row + x));
-            }
+            memCopy(row, destination + (long) y * paddedWidth, width);
         }
-        pixels.flip();
-        return new FontRaster(pixels, width, height, slot.bitmap_left() / (float) size, (slot.bitmap_top() - height) / (float) size, size);
+        return new FontRaster(pixels, paddedWidth, paddedHeight, (slot.bitmap_left() - 1) / (float) size, (slot.bitmap_top() - height - 1) / (float) size, size);
     }
 
     /**

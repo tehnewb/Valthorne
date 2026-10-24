@@ -20,6 +20,7 @@ import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL20.glGetUniformLocation;
 import static org.lwjgl.opengl.GL20.glUniform2f;
+import static org.lwjgl.opengl.GL20.glUniform1f;
 import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
@@ -116,6 +117,8 @@ public final class TextureBatch {
     private final int[] textViewport = new int[4]; // Lazily sampled viewport shared by all adaptive labels in a batch scope.
     private final float[] distanceRanges; // Last uploaded per-unit MSDF ranges; zero preserves ordinary texture sampling.
     private int distanceRangeUniform; // First location in the built-in shader's contiguous vec2 range array.
+    private int textContrastUniform; // Coverage correction control in the active participating shader.
+    private boolean linearTextBlending; // Whether a linear target or hardware sRGB blending handles edge luminance.
     private int distanceRangeProgram; // Program supplying cached range locations and values; detects shader reloads.
     private boolean distanceFields; // Whether the active shader accepts shared distance-range uniforms.
     private boolean textViewportValid; // Whether the viewport snapshot matches the current drawing scope.
@@ -222,6 +225,7 @@ public final class TextureBatch {
         this.defaultShader = new Shader(TextureBatchContract.defaultVertexShader(), TextureBatchContract.buildDefaultFragmentShader(this.maxTextureUnits), TextureBatchContract::bindAttributes);
         TextureBatchContract.bindSamplers(this.defaultShader, this.maxTextureUnits);
         this.distanceRangeUniform = glGetUniformLocation(this.defaultShader.getProgramID(), "u_distanceRange[0]");
+        this.textContrastUniform = glGetUniformLocation(this.defaultShader.getProgramID(), "u_textContrast");
         this.distanceRangeProgram = this.defaultShader.getProgramID();
 
         this.activeShader = this.defaultShader;
@@ -693,6 +697,8 @@ public final class TextureBatch {
 
     /**
      * Samples the active viewport once per drawing scope for adaptive text.
+     * Detects linear and sRGB targets in the same cold snapshot so font coverage
+     * correction never adds framebuffer queries to individual glyph draws.
      * Resume after external rendering to invalidate this snapshot when another
      * renderer changes the viewport. Projection values remain live independently.
      */
@@ -700,6 +706,13 @@ public final class TextureBatch {
         if (!drawing) throw new IllegalStateException("Call begin() before reading the text viewport.");
         if (textViewportValid) return;
         glGetIntegerv(GL_VIEWPORT, textViewport);
+        linearTextBlending = glIsEnabled(GL_FRAMEBUFFER_SRGB);
+        int framebuffer = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        if (framebuffer != 0) {
+            int component = glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE);
+            linearTextBlending = component == GL_FLOAT || linearTextBlending && glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING) == GL_SRGB;
+        }
+        if (distanceFields && textContrastUniform >= 0) glUniform1f(textContrastUniform, linearTextBlending ? 0 : 1);
         textViewportValid = true;
     }
 
@@ -2021,12 +2034,14 @@ public final class TextureBatch {
         if (distanceFields && distanceRangeProgram != activeShader.getProgramID()) {
             distanceRangeProgram = activeShader.getProgramID();
             distanceRangeUniform = glGetUniformLocation(distanceRangeProgram, "u_distanceRange[0]");
+            textContrastUniform = glGetUniformLocation(distanceRangeProgram, "u_textContrast");
             int units = activeShader instanceof TextureBatchShader shader ? shader.getMaxTextureUnits() : maxTextureUnits;
             TextureBatchContract.bindSamplers(activeShader, units);
         }
         // A borrowed shader may have been used by another batch since our last bind.
         if (distanceFields) Arrays.fill(distanceRanges, Float.NaN);
         activeShader.bind();
+        if (distanceFields && textContrastUniform >= 0) glUniform1f(textContrastUniform, linearTextBlending ? 0 : 1);
         applyActiveProjection();
         glBindVertexArray(vao);
     }
