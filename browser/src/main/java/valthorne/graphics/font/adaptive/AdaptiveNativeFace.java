@@ -36,7 +36,8 @@ final class AdaptiveNativeFace implements AutoCloseable {
     AdaptiveNativeFace(byte[] source) {
         ByteBuffer encoded = memAlloc(source.length);
         try {
-            encoded.put(source).flip();
+            encoded.put(source)
+                    .flip();
             handle = BrowserNative.call(ADAPTIVE_FONT_CREATE, encoded);
             if (handle == 0) throw new IllegalArgumentException("Unable to open scalable browser font; use SFNT or WOFF outlines");
             BrowserNative.word(0, handle);
@@ -87,7 +88,9 @@ final class AdaptiveNativeFace implements AutoCloseable {
         int length = Math.multiplyExact(source.length(), 2);
         if (textBytes == null) textBytes = memAlloc(Math.max(256, length));
         else if (textBytes.capacity() < length) textBytes = memRealloc(textBytes, Math.max(length, textBytes.capacity() * 2));
-        textBytes.order(ByteOrder.LITTLE_ENDIAN).clear().limit(length);
+        textBytes.order(ByteOrder.LITTLE_ENDIAN)
+                .clear()
+                .limit(length);
         for (int i = 0; i < source.length(); i++) textBytes.putShort(i * 2, (short) source.charAt(i));
     }
     /**

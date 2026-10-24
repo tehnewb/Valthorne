@@ -33,7 +33,9 @@ final class FontShape implements AutoCloseable {
         int bytes = Math.multiplyExact(count, STRIDE);
         if (pixels == null) pixels = memAlloc(Math.max(320, bytes));
         else if (pixels.capacity() < bytes) pixels = memRealloc(pixels, Math.max(bytes, pixels.capacity() * 2));
-        pixels.order(ByteOrder.nativeOrder()).clear().limit(bytes);
+        pixels.order(ByteOrder.nativeOrder())
+                .clear()
+                .limit(bytes);
         this.count = count;
         return pixels;
     }

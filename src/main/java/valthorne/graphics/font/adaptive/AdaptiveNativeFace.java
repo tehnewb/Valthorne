@@ -60,7 +60,8 @@ final class AdaptiveNativeFace implements AutoCloseable {
      */
     AdaptiveNativeFace(byte[] source) {
         bytes = memAlloc(source.length);
-        bytes.put(source).flip();
+        bytes.put(source)
+                .flip();
         long blob = 0;
         long hbFace = 0;
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -207,9 +208,11 @@ final class AdaptiveNativeFace implements AutoCloseable {
         for (int i = 0; i < length; i++) {
             long info = infos + (long) i * hb_glyph_info_t.SIZEOF;
             long position = positions + (long) i * hb_glyph_position_t.SIZEOF;
-            output.putInt(hb_glyph_info_t.ncodepoint(info)).putInt(hb_glyph_info_t.ncluster(info));
+            output.putInt(hb_glyph_info_t.ncodepoint(info))
+                    .putInt(hb_glyph_info_t.ncluster(info));
             output.putFloat(hb_glyph_position_t.nx_advance(position) * scale);
-            output.putFloat(hb_glyph_position_t.nx_offset(position) * scale).putFloat(hb_glyph_position_t.ny_offset(position) * scale);
+            output.putFloat(hb_glyph_position_t.nx_offset(position) * scale)
+                    .putFloat(hb_glyph_position_t.ny_offset(position) * scale);
         }
         return shapeOutput;
     }

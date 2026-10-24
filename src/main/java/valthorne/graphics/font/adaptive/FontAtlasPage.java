@@ -114,7 +114,10 @@ final class FontAtlasPage extends Texture {
         try {
             ByteBuffer source = raster.pixels();
             for (int i = source.position(); i < source.limit(); i += 3)
-                expanded.put(source.get(i)).put(source.get(i + 1)).put(source.get(i + 2)).put((byte) 255);
+                expanded.put(source.get(i))
+                        .put(source.get(i + 1))
+                        .put(source.get(i + 2))
+                        .put((byte) 255);
             expanded.flip();
             updatePixels(imageX, imageY, raster.width(), raster.height(), expanded);
         } finally {

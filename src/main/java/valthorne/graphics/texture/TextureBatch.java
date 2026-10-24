@@ -1860,7 +1860,7 @@ public final class TextureBatch implements GraphicsResource {
     }
 
     /**
-     * Reports whether the selected shader supports ordinary and MSDF sampling.
+     * Reports whether the selected shader decodes R8 coverage and MSDF atlases.
      * @return whether adaptive text can stay in the current shader and queue
      */
     public boolean supportsDistanceFields() {

@@ -38,11 +38,12 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * demand, including glyphs introduced by shaping. Consecutive sprites, coverage
  * text and MSDF text share the standard batch without per-label flushes.
  * Participating batch shaders retain their transforms and fragment effects.
- * MSDF drawing under a shader without distance-field support temporarily selects
- * the standard shader and restores the custom shader afterward.</p>
+ * Coverage and MSDF drawing under a shader without atlas decoding temporarily
+ * select the standard shader and restore the custom shader afterward.</p>
  *
  * <pre>{@code
- * AdaptiveFont font = AdaptiveFontData.load("Cinzel-Regular.otf", 20).asFont();
+ * AdaptiveFont font = AdaptiveFontData.load("Cinzel-Regular.otf", 20)
+ *         .asFont();
  * AdaptiveTextRun title = font.createRun("Valthorne", 96);
  * batch.begin();
  * font.draw(batch, "Inventory", 24, 100, 20, Color.WHITE);
@@ -319,7 +320,8 @@ public final class AdaptiveFont implements TextFont {
             y += (Math.round(screenY) - screenY) / pixelScaleY;
         }
         Shader previous = batch.getShader();
-        boolean override = raster == 0 && !batch.supportsDistanceFields();
+        // R8 coverage requires atlas decoding just as RGB distance fields do.
+        boolean override = !batch.supportsDistanceFields();
         try {
             if (override) batch.setShader(batch.getDefaultShader());
             if (!warmed) {
