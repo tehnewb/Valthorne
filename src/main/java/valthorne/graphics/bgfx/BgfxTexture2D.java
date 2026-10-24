@@ -44,9 +44,9 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     }
 
     /**
-     * Uploads an image with optional CPU-generated RGBA8 box-filtered mip levels.
-     * Generation writes directly into the retained upload buffer during resource
-     * configuration; drawing never allocates intermediate images or filters pixels.
+     * Uploads an image with optional STB-filtered RGBA8 mip levels. Generation
+     * fills the retained upload during resource configuration; drawing never
+     * allocates intermediate images or filters pixels.
      *
      * @param window initialized runtime owner
      * @param width positive image width
@@ -124,7 +124,7 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         ByteBuffer upload = memAlloc((int) total);
         try {
             upload.put(pixels.duplicate());
-            if (mipmaps) generateMipmaps(upload, width, height);
+            if (mipmaps) BgfxMipmaps.generate(upload, width, height);
             return upload.clear();
         } catch (RuntimeException | Error failure) {
             memFree(upload);
@@ -145,46 +145,6 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         short texture = bgfx_create_texture_2d(width, height, mipmaps, 1, format, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, memory, 0);
         if (texture == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not create bgfx texture");
         return texture;
-    }
-
-    /**
-     * Appends tightly packed mip levels, including every texel of odd source rows.
-     *
-     * @param upload native upload containing the complete base level
-     * @param width base width
-     * @param height base height
-     */
-    private static void generateMipmaps(ByteBuffer upload, int width, int height) {
-        /*
-         * Integer area partitions account for odd dimensions without an extra
-         * scratch image; previous levels already reside in the upload allocation.
-         */
-        int sourceOffset = 0;
-        int destinationOffset = width * height * 4;
-        while (width > 1 || height > 1) {
-            int nextWidth = Math.max(1, width / 2);
-            int nextHeight = Math.max(1, height / 2);
-            for (int y = 0; y < nextHeight; y++) {
-                int startY = y * height / nextHeight;
-                int endY = (y + 1) * height / nextHeight;
-                for (int x = 0; x < nextWidth; x++) {
-                    int startX = x * width / nextWidth;
-                    int endX = (x + 1) * width / nextWidth;
-                    int samples = (endX - startX) * (endY - startY);
-                    for (int channel = 0; channel < 4; channel++) {
-                        int sum = 0;
-                        for (int sy = startY; sy < endY; sy++)
-                            for (int sx = startX; sx < endX; sx++)
-                                sum += upload.get(sourceOffset + (sy * width + sx) * 4 + channel) & 255;
-                        upload.put(destinationOffset + (y * nextWidth + x) * 4 + channel, (byte) ((sum + samples / 2) / samples));
-                    }
-                }
-            }
-            sourceOffset = destinationOffset;
-            destinationOffset += nextWidth * nextHeight * 4;
-            width = nextWidth;
-            height = nextHeight;
-        }
     }
 
     /**

@@ -62,6 +62,7 @@ writeLicense("emscripten", readFileSync(path.join(sdk, "upstream/emscripten/LICE
 for (const [name, file] of [
     ["stb-image", "bimg/3rdparty/stb/stb_image.h"],
     ["stb-truetype", "bgfx/3rdparty/stb/stb_truetype.h"],
+    ["stb-image-resize", "bimg/3rdparty/stb/stb_image_resize2.h"],
 ]) {
     const source = readFileSync(path.join(sourceRoot, file), "utf8");
     const start = source.lastIndexOf("ALTERNATIVE A - MIT License");

@@ -521,6 +521,11 @@ public final class BrowserOperation {
     public static final int FONT_BAKE = 113;
 
     /**
+     * Generates a complete independent-channel RGBA8 mip chain using native STB.
+     */
+    public static final int MIPMAP_GENERATE = 114;
+
+    /**
      * Prevents constructing protocol constant holders.
      */
     private BrowserOperation() {
