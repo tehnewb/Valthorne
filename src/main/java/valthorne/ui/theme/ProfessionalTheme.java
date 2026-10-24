@@ -3,8 +3,8 @@ package valthorne.ui.theme;
 import org.lwjgl.BufferUtils;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugData;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.adaptive.AdaptiveFontData;
 import valthorne.graphics.texture.NinePatchTexture;
 import valthorne.graphics.texture.TextureData;
 import valthorne.ui.NanoText;
@@ -20,7 +20,7 @@ import valthorne.graphics.texture.NinePatchDrawable;
  * Builds a compact desktop-editor skin for texture and NanoVG UI controls.
  * The default dark palette uses neutral charcoal surfaces, recessed inputs,
  * muted foregrounds, and restrained blue focus and selection feedback.
- * Both rendering backends share fourteen-unit live Slug typography and
+ * Both rendering backends share fourteen-unit adaptive typography and
  * twenty-six-unit controls at unit density. The optional light palette retains
  * the same layout.
  * Directory hierarchies use twenty-four-unit rows, sixteen-unit indentation,
@@ -61,7 +61,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
     public final Color selection; // Muted blue row-selection surface, separate from focus ink.
     public final Color chrome; // Dark title bars, tab strips, and surrounding editor chrome.
     public final Color error = new Color(0xFFF87171); // Shared validation-error accent color.
-    private final SlugFont font; // Owned font shared by all generated texture-control styles.
+    private final TextFont font; // Owned font shared by all generated texture-control styles.
     private final List<NinePatchTexture> skins = new ArrayList<>(); // Owned skins accumulated across create calls.
     private final float density; // Scale applied to logical control, spacing, and font dimensions.
     private final boolean lightPalette; // Original palette choice for derived window chrome colors.
@@ -95,7 +95,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         field = new Color(light ? 0xFFFFFFFF : 0xFF111111);
         selection = new Color(light ? 0xFFB8D1E4 : 0xFF40576D);
         chrome = new Color(light ? 0xFFD6D6D6 : 0xFF181818);
-        font = SlugData.load(SystemFonts.find(false).toString(), 32, 224)
+        font = AdaptiveFontData.load(SystemFonts.find(false).toString(), 20)
                 .asFont();
     }
 
@@ -143,7 +143,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      *
      * @return the shared font reference
      */
-    public SlugFont getFont() {
+    public TextFont getFont() {
         return font;
     }
 

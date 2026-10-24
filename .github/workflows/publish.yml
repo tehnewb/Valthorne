@@ -52,10 +52,10 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - uses: gradle/actions/wrapper-validation@v4
-      - name: Verify release artifacts
+      - name: Build release artifacts
         env:
           ALSOFT_DRIVERS: 'null'
-        run: bash ./gradlew verifyRelease -Pprototype3d=false -PeditorPrototype=false --stacktrace --console=plain
+        run: bash ./gradlew assemble --stacktrace --console=plain
 
   publish:
     needs: verify

@@ -38,9 +38,9 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 - **Animation and particles:** Frame-based animation with playback modes and
   listeners, plus particle emitters with box, circle, cone, and line spawning.
 - **2D lighting:** Batched lights and ground-shadow rendering.
-- **Fonts and vector drawing:** Bitmap fonts, live Slug curve fonts, and NanoVG
-  drawing. Regular UI uses Slug; Nano controls use NanoVG. Default fonts are
-  loaded from installed system fonts.
+- **Fonts and vector drawing:** Adaptive FreeType/MSDF fonts with shared HarfBuzz
+  layout, optional bitmap fonts, and NanoVG drawing. UI text uses
+  adaptive fonts by default, loaded from installed system fonts.
 - **UI layout and styling:** Retained UI trees, Yoga layout, themes, gradients,
   borders, scrolling, and a UI inspector.
 - **UI controls:** Buttons, checkboxes, radio groups, sliders, number spinners,

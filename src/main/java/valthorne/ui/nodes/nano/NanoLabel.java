@@ -15,6 +15,7 @@ import valthorne.Keyboard;
 import valthorne.Mouse;
 import valthorne.event.events.*;
 import valthorne.ui.behavior.TextSelection;
+import valthorne.graphics.font.TextRun;
 import valthorne.ui.behavior.TextEditing;
 
 import static org.lwjgl.nanovg.NanoVG.*;
@@ -24,10 +25,12 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * horizontal and vertical alignment. Each line is aligned within the resolved
  * label width; the complete text block is aligned within its height. In NanoVG's
  * top-left coordinates, vertical START means top and END means bottom. Selection
- * and projected previews use the same offsets. Fonts are selected by
- * an already registered NanoVG name; this node
- * does not load or own font resources. Width and height are measured from the
- * root's context when available, otherwise estimated from character count.
+ * and projected previews use the same offsets. Default typography uses the
+ * root's adaptive font through {@link NanoText}; explicit custom NanoVG names
+ * retain their registered face. This node does not load or own font resources.
+ * Adaptive selection and pointer hits use complete shaped lines, preserving
+ * grapheme boundaries and disjoint bidirectional highlight spans. Width and
+ * height use the selected font when attached, otherwise character estimates.
  *
  * <p>Automatic dimensions use fresh text measurements without replacing the
  * application's automatic layout specifications. Explicit application sizes
@@ -84,6 +87,7 @@ public class NanoLabel extends UINode implements NanoNode {
     private Alignment verticalAlignment = Alignment.START; // Vertical placement of the complete text block; START is top.
     private boolean fontLoaded; // Reserved font state; current implementation does not read or update it.
     private TextSelection selection; // Optional read-only text selection model; null disables selection.
+    private float[] selectionRanges; // Reused visual spans, allocated only when an adaptive selection is painted.
     private boolean selecting; // Whether a pointer gesture is extending the label selection.
     private boolean documentSelection; // Whether the root currently owns this label range across a document.
     private long lastPressTime; // Monotonic time of the last accepted primary press, in nanoseconds.
@@ -235,6 +239,8 @@ public class NanoLabel extends UINode implements NanoNode {
         float target = point.x() - getAbsoluteX() - lineOffset(vg, lines[line], fontSize, getWidth());
         float previous = 0;
         String value = lines[line];
+        TextRun layout = NanoText.layout(this, fontName, fontSize, value);
+        if (layout != null) return offset + layout.hitTest(target);
         for (int i = 0; i < value.length();) {
             int next = value.offsetByCodePoints(i, 1);
             float edge = measure(vg, value.substring(0, next));
@@ -670,10 +676,26 @@ public class NanoLabel extends UINode implements NanoNode {
                 int start = Math.max(0, selection.start() - offset);
                 int end = Math.min(lines[i].length(), selection.end() - offset);
                 if (end > start) {
-                    float left = measure(vg, lines[i].substring(0, start));
-                    float right = measure(vg, lines[i].substring(0, end));
                     nvgBeginPath(vg);
-                    nvgRect(vg, lineX + left, y + i * (lineHeight + lineSpacing), right - left, lineHeight);
+                    TextRun layout = NanoText.layout(this, fontName, fontSize, lines[i]);
+                    float selectionY = y + i * (lineHeight + lineSpacing);
+                    if (layout == null) {
+                        float left = measure(vg, lines[i].substring(0, start));
+                        float right = measure(vg, lines[i].substring(0, end));
+                        nvgRect(vg, lineX + left, selectionY, right - left, lineHeight);
+                    } else {
+                        if (selectionRanges == null) selectionRanges = new float[8];
+                        int ranges = layout.selectionRanges(start, end, selectionRanges);
+                        if (ranges * 2 > selectionRanges.length) {
+                            selectionRanges = new float[ranges * 2];
+                            layout.selectionRanges(start, end, selectionRanges);
+                        }
+                        for (int range = 0; range < ranges; range++) {
+                            float left = selectionRanges[range * 2];
+                            float right = selectionRanges[range * 2 + 1];
+                            nvgRect(vg, lineX + left, selectionY, right - left, lineHeight);
+                        }
+                    }
                     Color selectionColor = getStyle() == null ? SELECTION_COLOR_KEY.getDefaultValue() : getStyle().get(SELECTION_COLOR_KEY);
                     nvgFillColor(vg, NanoUtility.color1(selectionColor));
                     nvgFill(vg);

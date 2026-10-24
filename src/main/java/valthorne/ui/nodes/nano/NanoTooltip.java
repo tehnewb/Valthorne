@@ -15,7 +15,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
 /**
  * NanoVG tooltip with themed surface, border, text, padding, and typography.
  * Font and padding setters are local style overrides; clearing them restores the current
- * theme or key defaults. Text measurement uses the same Nano/Slug font bridge as drawing.
+ * theme or key defaults. Text measurement uses the same shared adaptive font bridge as drawing.
  * Attach through a root or assign with UINode.setTooltip; the root owns graphics resources.
  */
 public class NanoTooltip extends Tooltip implements NanoNode {

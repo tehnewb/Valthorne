@@ -869,7 +869,8 @@ public final class JGLConfiguration {
     /**
      * <p>
      * Sets whether an sRGB-capable framebuffer should be requested. The default
-     * is true, allowing Slug to blend text edges in linear light. Disabling the
+     * is true, permitting linear-light blending in render paths that enable
+     * framebuffer conversion. Disabling the
      * capability retains legacy text blending on linear default surfaces.
      * </p>
      *

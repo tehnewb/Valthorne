@@ -73,6 +73,7 @@ import valthorne.graphics.shader.Shader;
 public class TextureBatchShader extends Shader {
 
     private final int maxTextureUnits; // The number of texture samplers this shader is built to support.
+    private final boolean distanceFields; // Whether generated fragments supply the shared MSDF sampling contract.
 
     /**
      * Creates a batch-compatible shader using the default batch vertex shader and default batch
@@ -155,6 +156,7 @@ public class TextureBatchShader extends Shader {
         }
 
         this.maxTextureUnits = maxTextureUnits;
+        this.distanceFields = !fullFragmentSource || fragmentSource == null || fragmentSource.isBlank();
 
         TextureBatchContract.bindAttributes(this);
 
@@ -222,4 +224,19 @@ public class TextureBatchShader extends Shader {
     public int getMaxTextureUnits() {
         return maxTextureUnits;
     }
+
+    /**
+     * Reports whether generated fragment code supports per-texture MSDF ranges.
+     * Partial custom fragments sample through sampleBatchTexture to obtain text
+     * coverage before applying their own color effects.
+     * @return whether this shader participates in the shared MSDF contract
+     */
+    public final boolean supportsDistanceFields() { return distanceFields; }
+
+    /**
+     * Indicates vertex transformations requiring scalable text rather than bitmap
+     * grid fitting. Custom rotating or deforming vertex shaders may override this.
+     * @return whether geometry is transformed beyond the window projection
+     */
+    public boolean transformsText() { return false; }
 }

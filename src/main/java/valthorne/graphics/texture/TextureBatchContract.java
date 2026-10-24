@@ -65,11 +65,6 @@ import java.util.regex.Matcher;
 public final class TextureBatchContract {
 
     /**
-     * Byte stride of packed glyph metadata followed by a world clip rectangle and flag.
-     */
-    public static final int GLYPH_STRIDE_BYTES = 84;
-
-    /**
      * Uniform name used for the batch projection matrix.
      */
     public static final String UNIFORM_MVP = "u_mvp";
@@ -238,7 +233,9 @@ public final class TextureBatchContract {
      * The generated shader declares one sampler uniform per supported texture
      * unit, applies shader-side clipping when a clip rectangle is active, selects
      * the correct sampler based on the per-instance texture index, samples the
-     * texture, and multiplies the sampled color by the instance tint color.
+     * texture, and multiplies ordinary sampled color by the instance tint.
+     * Per-unit distance-range uniforms optionally evaluate an MSDF texture's
+     * median distance instead; zero range preserves ordinary RGBA sampling.
      * </p>
      *
      * <p>
@@ -357,7 +354,8 @@ public final class TextureBatchContract {
             samplers.append(replaceToken(sampler, "INDEX", index));
             if (i > 0) branches.append(replaceToken(next, "INDEX", index));
         }
-        return replaceToken(replaceToken(ValthorneFiles.readString("valthorne/shaders/" + resource), "SAMPLERS", samplers.toString()), "SELECTION", branches.toString());
+        String source = replaceToken(replaceToken(ValthorneFiles.readString("valthorne/shaders/" + resource), "SAMPLERS", samplers.toString()), "SELECTION", branches.toString());
+        return replaceToken(source, "TEXTURE_UNITS", Integer.toString(maxTextureUnits));
     }
     /**
      * Substitutes a template token while tolerating whitespace inserted by GLSL
