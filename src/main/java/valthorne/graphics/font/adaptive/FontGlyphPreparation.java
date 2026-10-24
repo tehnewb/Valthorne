@@ -18,6 +18,8 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * operation releases its own face and pixels when it returns, without joining
  * a worker on the render thread. Failures propagate through the owner's poll.
  * Synchronization only occurs during preparation; completed warm draws skip it.
+ * Visible glyphs and their completed pixels precede speculative default-size
+ * prewarming. Tasks yield after four glyphs so other fonts share the CPU pool.
  */
 final class FontGlyphPreparation implements AutoCloseable {
     /**
@@ -28,6 +30,10 @@ final class FontGlyphPreparation implements AutoCloseable {
      * Completed-image budget, excluding the single in-progress native image.
      */
     private static final int MAX_READY_BYTES = 4 * 1024 * 1024;
+    /**
+     * Native jobs per pool turn, preventing one font from monopolizing a worker.
+     */
+    private static final int TASK_SLICE = 4;
     /**
      * Small shared CPU pool; daemon workers do not keep applications alive.
      */
@@ -57,9 +63,10 @@ final class FontGlyphPreparation implements AutoCloseable {
      * @param glyph shaped OpenType index
      * @param raster coverage size or zero for MSDF
      * @param hinting coverage policy
+     * @param priority true for visible glyphs, false for speculative prewarming
      * @return whether the key is pending after this call
      */
-    synchronized boolean request(long key, int glyph, int raster, FontHinting hinting) {
+    synchronized boolean request(long key, int glyph, int raster, FontHinting hinting, boolean priority) {
         if (closed || failure != null) return false;
         int vacant = -1;
         for (int i = 0; i < pending.length; i++) {
@@ -69,7 +76,9 @@ final class FontGlyphPreparation implements AutoCloseable {
         if (vacant < 0) return false;
         pending[vacant] = key;
         pendingCount++;
-        requests.addLast(new FontGlyphRequest(key, glyph, raster, hinting));
+        FontGlyphRequest request = new FontGlyphRequest(key, glyph, raster, hinting, priority);
+        if (priority) requests.addFirst(request);
+        else requests.addLast(request);
         schedule();
         return true;
     }
@@ -91,7 +100,8 @@ final class FontGlyphPreparation implements AutoCloseable {
             break;
         }
         if (paused != null && readyBytes + pixelBytes(paused) <= MAX_READY_BYTES) {
-            ready.addLast(paused);
+            if (paused.priority()) ready.addFirst(paused);
+            else ready.addLast(paused);
             readyBytes += pixelBytes(paused);
             paused = null;
         }
@@ -119,6 +129,7 @@ final class FontGlyphPreparation implements AutoCloseable {
      * The running flag prevents another task or idle cleanup from using the face.
      */
     private void prepare() {
+        int processed = 0;
         while (true) {
             FontGlyphRequest request;
             synchronized (this) {
@@ -153,14 +164,20 @@ final class FontGlyphPreparation implements AutoCloseable {
                     stop();
                     return;
                 }
-                FontGlyphResult result = new FontGlyphResult(request.key(), image);
+                FontGlyphResult result = new FontGlyphResult(request.key(), image, request.priority());
                 if (readyBytes + pixelBytes(result) > MAX_READY_BYTES) {
                     paused = result;
                     running = false;
                     return;
                 }
-                ready.addLast(result);
+                if (result.priority()) ready.addFirst(result);
+                else ready.addLast(result);
                 readyBytes += pixelBytes(result);
+                if (++processed == TASK_SLICE) {
+                    running = false;
+                    schedule();
+                    return;
+                }
             }
         }
     }

@@ -248,7 +248,7 @@ public final class TextureBatchContract {
      * @return the default fragment shader source code
      */
     public static String buildDefaultFragmentShader(int maxTextureUnits) {
-        return buildFragment("texture/batch.frag", "color", maxTextureUnits);
+        return buildFragment("texture/batch.frag", "sample", maxTextureUnits);
     }
 
     /**
@@ -344,6 +344,10 @@ public final class TextureBatchContract {
      * @return fragment source with SAMPLERS and SELECTION tokens expanded
      */
     private static String buildFragment(String resource, String selection, int maxTextureUnits) {
+        /*
+         * Share edge integration between the default shader and custom fragment
+         * preambles so UI effects cannot silently restore lower-quality sampling.
+         */
         String sampler = ValthorneFiles.readString("valthorne/shaders/texture/templates/sampler.glsl");
         String first = ValthorneFiles.readString("valthorne/shaders/texture/templates/select-" + selection + "-first.glsl");
         String next = ValthorneFiles.readString("valthorne/shaders/texture/templates/select-" + selection + "-next.glsl");
@@ -355,6 +359,7 @@ public final class TextureBatchContract {
             if (i > 0) branches.append(replaceToken(next, "INDEX", index));
         }
         String source = replaceToken(replaceToken(ValthorneFiles.readString("valthorne/shaders/" + resource), "SAMPLERS", samplers.toString()), "SELECTION", branches.toString());
+        source = replaceToken(source, "DISTANCE_SAMPLING", ValthorneFiles.readString("valthorne/shaders/texture/batch-distance.glsl"));
         return replaceToken(source, "TEXTURE_UNITS", Integer.toString(maxTextureUnits));
     }
     /**

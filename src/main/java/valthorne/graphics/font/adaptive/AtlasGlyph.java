@@ -12,9 +12,7 @@ package valthorne.graphics.font.adaptive;
  * @param v0 bottom texture coordinate
  * @param u1 right texture coordinate
  * @param v1 top texture coordinate
- * @param insetU three-texel horizontal inset for conservative large-MSDF quad trimming
- * @param insetV three-texel vertical inset for conservative large-MSDF quad trimming
  * @param provisional whether this scalable coverage image awaits prepared final-quality pixels
  */
-record AtlasGlyph(FontAtlasPage page, float width, float height, float left, float bottom, float u0, float v0, float u1, float v1, float insetU, float insetV, boolean provisional) {
+record AtlasGlyph(FontAtlasPage page, float width, float height, float left, float bottom, float u0, float v0, float u1, float v1, boolean provisional) {
 }

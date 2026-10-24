@@ -6,6 +6,7 @@ package valthorne.graphics.font.adaptive;
  * @param glyph shaped OpenType glyph index
  * @param raster physical coverage size, or zero for MSDF
  * @param hinting coverage policy; ignored for MSDF
+ * @param priority whether visible text should precede speculative prewarming
  */
-record FontGlyphRequest(long key, int glyph, int raster, FontHinting hinting) {
+record FontGlyphRequest(long key, int glyph, int raster, FontHinting hinting, boolean priority) {
 }

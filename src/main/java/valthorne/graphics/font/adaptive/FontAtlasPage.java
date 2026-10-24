@@ -59,7 +59,7 @@ final class FontAtlasPage extends Texture {
     }
 
     @Override
-    public float getDistanceFieldRange() { return distanceField ? AdaptiveNativeFace.MSDF_RANGE : 0; }
+    public float getDistanceFieldRange() { return distanceField ? AdaptiveNativeFace.MSDF_RANGE : -1; }
 
     /**
      * Returns exact allocated texel storage, excluding driver bookkeeping.

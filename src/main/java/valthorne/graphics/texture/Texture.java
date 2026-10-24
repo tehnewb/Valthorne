@@ -302,8 +302,10 @@ public class Texture implements Poolable {
     /**
      * Describes signed-distance sampling to the standard batch shader. Ordinary
      * textures return zero; MSDF atlas textures return their full distance range
-     * in texels. This immutable metadata is read only when binding a new texture.
-     * @return full MSDF distance range, or zero for ordinary RGBA sampling
+     * in texels. Negative values identify coverage-font textures, enabling the
+     * same text-edge contrast handling without changing ordinary sprite colors.
+     * This immutable metadata is read only when binding a new texture.
+     * @return positive MSDF distance range, negative coverage marker, or zero for ordinary RGBA
      */
     public float getDistanceFieldRange() { return 0f; }
 

@@ -34,7 +34,8 @@ import static org.lwjgl.nanovg.NanoVG.*;
  *
  * <p>Automatic dimensions use fresh text measurements without replacing the
  * application's automatic layout specifications. Explicit application sizes
- * retain their alignment and clipping bounds. Text is normalized for measurement
+ * retain their alignment. Glyph ink may overhang advance-based label bounds;
+ * ancestor containers and the root supply clipping. Text is normalized for measurement
  * and drawing without modifying getText().</p>
  *
  * @author Albert Beaupre

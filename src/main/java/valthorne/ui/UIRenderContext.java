@@ -5,6 +5,7 @@ import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.shader.Shader;
 import valthorne.ui.nodes.nano.NanoNode;
+import valthorne.ui.nodes.nano.NanoLabel;
 
 import static org.lwjgl.nanovg.NanoVG.*;
 import valthorne.graphics.Color;
@@ -160,7 +161,8 @@ public final class UIRenderContext {
     /**
      * Paints adaptive glyphs within a Nano control while retaining backend order.
      * Coordinates use the same top-left logical space as the Nano callback;
-     * clipping intersects the control and its current ancestor clip.
+     * input and button text intersect the control and its current ancestor clip.
+     * Labels inherit ancestor clipping so ink overhangs are not cut at advances.
      * Axis-aligned line origins and baselines align to physical pixels without
      * changing fractional glyph advances or kerning.
      *
@@ -208,6 +210,16 @@ public final class UIRenderContext {
      */
     private void drawNanoLayout(UINode node, TextRun layout, float x, float baseline, Color color, int[] ends, Color[] colors, int count) {
         selectBackend(false);
+        if (node instanceof NanoLabel) {
+            try {
+                // Label advances are layout widths, not ink bounds; inherit ancestor clipping.
+                if (ends == null) layout.draw(batch, x, height - baseline, color);
+                else layout.drawStyled(batch, x, height - baseline, ends, colors, count);
+            } finally {
+                selectBackend(true);
+            }
+            return;
+        }
         float tx = batch.getTranslationX();
         float ty = batch.getTranslationY();
         float left = node.getAbsoluteX() + tx;

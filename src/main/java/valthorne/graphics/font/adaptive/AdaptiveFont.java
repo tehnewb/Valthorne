@@ -27,12 +27,14 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * all subsequent draws, including previously created retained layouts. Cached
  * coverage variants coexist within the existing bounded atlas; MSDF images and
  * shaping metrics are shared across hinting modes.
- * Common glyphs prepare automatically on shared background workers. Missing
- * variants temporarily reuse scalable cached coverage or an available MSDF;
- * changing size never waits for native MSDF or hinted-coverage generation.
- * The first appearance of an uncached character may generate quick 24-pixel
- * fallback coverage. Subsequent prepared images replace it without changing
- * shaping metrics. GPU uploads are admitted in small, spaced groups.
+ * Initial and stable small text rasterizes at its requested physical resolution,
+ * so visible text never waits behind speculative background work to become sharp.
+ * Small-size cache misses generate inexpensive coverage immediately rather than
+ * displaying enlarged lower-resolution glyphs. Larger text can reuse cached MSDF.
+ * MSDF preparation runs off-thread for visible glyphs; speculative prewarming
+ * only prepares inexpensive default-size coverage. Large-text fallback coverage
+ * uses the displayed physical resolution up to 128 pixels per em. GPU uploads
+ * are admitted in small, spaced groups without changing shaping metrics.
  *
  * <p>Create from CPU-only {@link AdaptiveFontData} on the graphics thread. Native
  * shaping and provisional-coverage faces are created immediately; workers own
@@ -94,6 +96,10 @@ public final class AdaptiveFont implements TextFont {
      */
     private static final int FALLBACK_SIZE = 24;
     /**
+     * Highest provisional coverage resolution before background MSDF is ready.
+     */
+    private static final int MAX_FALLBACK_SIZE = 128;
+    /**
      * Maximum ready glyph uploads admitted by one preparation drain.
      */
     private static final int MAX_UPLOADS = 4;
@@ -125,11 +131,6 @@ public final class AdaptiveFont implements TextFont {
      * Small fixed probe group balancing label reuse against lookup work.
      */
     private static final int LAYOUT_CACHE_WAYS = 8;
-    /**
-     * Unused MSDF border cropped only at one or more physical pixels per atlas texel.
-     * At least two physical pixels of transparent antialiasing guard remain.
-     */
-    private static final int MSDF_QUAD_INSET = 3;
     private final Thread owner = Thread.currentThread(); // Native and OpenGL owner thread.
     private final AdaptiveNativeFace face; // Owner-thread shaper and quick provisional coverage rasterizer.
     private final FontGlyphPreparation preparation; // Bounded background preparation with an independent native face.
@@ -154,7 +155,7 @@ public final class AdaptiveFont implements TextFont {
     private float pixelScaleY; // Vertical physical pixels per logical unit for the current hinted draw.
     private float pixelOriginX; // Viewport/projection horizontal physical origin.
     private float pixelOriginY; // Viewport/projection vertical physical origin.
-    private float physicalEmSize; // Current uniform axis-aligned physical em size; zero disables border trimming.
+    private float physicalEmSize; // Current uniform physical em size used for provisional raster resolution.
     private boolean preparing; // Whether completed CPU images may need owner-thread upload.
     private long nextUpload = System.nanoTime(); // Earliest monotonic time for another bounded upload group.
     private boolean disposed; // Prevents native access after release.
@@ -196,8 +197,8 @@ public final class AdaptiveFont implements TextFont {
             spaceAdvance = hb_font_get_glyph_h_advance(face.font(), out.get(0)) * inverseEm;
             for (int i = 0; i < prewarmCount; i++) {
                 if (!hb_font_get_nominal_glyph(face.font(), firstCharacter + i, out)) continue;
-                requestGlyph(out.get(0), (int) DEFAULT_SIZE);
-                requestGlyph(out.get(0), 0);
+                int glyph = out.get(0);
+                preparing |= preparation.request(glyphKey(glyph, (int) DEFAULT_SIZE), glyph, (int) DEFAULT_SIZE, hinting, false);
             }
         }
     }
@@ -233,8 +234,8 @@ public final class AdaptiveFont implements TextFont {
      * runs and UI controls borrowing this font. Layout metrics and MSDF images
      * remain unchanged. Coverage images are cached per policy within the same
      * bounded atlas, so changing modes neither flushes nor invalidates queued
-     * text. Uncached modes prepare asynchronously; scalable images remain
-     * visible until their hinted replacements are ready.
+     * text. Missing small-size coverage generates immediately on first use;
+     * expensive MSDF preparation remains asynchronous.
      * @param hinting non-null coverage hinting mode
      * @return this font for fluent configuration
      * @throws NullPointerException if hinting is null
@@ -403,11 +404,19 @@ public final class AdaptiveFont implements TextFont {
     private int rasterSize(TextureBatch batch, float size, float radians) {
         physicalEmSize = 0;
         float[] matrix = Window.getProjectionMatrix();
-        if (radians != 0 || batch.transformsText() || matrix[1] != 0 || matrix[4] != 0 || matrix[3] != 0 || matrix[7] != 0 || matrix[15] != 1 || matrix[0] <= 0 || matrix[5] <= 0) return 0;
         int width = batch.getViewportWidth();
         int height = batch.getViewportHeight();
         float sx = Math.abs(matrix[0]) * width * 0.5f;
         float sy = Math.abs(matrix[5]) * height * 0.5f;
+        physicalEmSize = size * Math.max(sx, sy);
+        if (radians != 0 || batch.transformsText() || matrix[1] != 0 || matrix[4] != 0 || matrix[3] != 0 || matrix[7] != 0 || matrix[15] != 1 || matrix[0] <= 0 || matrix[5] <= 0) {
+            if (matrix[1] != 0 || matrix[4] != 0) {
+                double horizontal = Math.hypot(matrix[0] * width, matrix[1] * height);
+                double vertical = Math.hypot(matrix[4] * width, matrix[5] * height);
+                physicalEmSize = (float) (size * Math.max(horizontal, vertical) * 0.5);
+            }
+            return 0;
+        }
         if (Math.abs(sx - sy) > Math.max(sx, sy) * 0.0001f) return 0;
         pixelScaleX = sx;
         pixelScaleY = sy;
@@ -439,12 +448,10 @@ public final class AdaptiveFont implements TextFont {
         if (count == 0 || size == 0) return;
         if (preparing) uploadPrepared(batch);
         int raster = rasterSize(batch, size, radians);
-        if (raster != 0) {
-            float screenX = (x + batch.getTranslationX()) * pixelScaleX + pixelOriginX;
-            float screenY = (y + batch.getTranslationY()) * pixelScaleY + pixelOriginY;
-            x += (Math.round(screenX) - screenX) / pixelScaleX;
-            y += (Math.round(screenY) - screenY) / pixelScaleY;
-        }
+        float pixelOffsetX = batch.getTranslationX() * pixelScaleX + pixelOriginX;
+        float pixelOffsetY = batch.getTranslationY() * pixelScaleY + pixelOriginY;
+        float inversePixelScaleX = raster == 0 ? 0 : 1 / pixelScaleX;
+        float inversePixelScaleY = raster == 0 ? 0 : 1 / pixelScaleY;
         Shader previous = batch.getShader();
         boolean override = !batch.supportsDistanceFields();
         try {
@@ -457,8 +464,6 @@ public final class AdaptiveFont implements TextFont {
             float[] xs = run.xs;
             float[] ys = run.ys;
             Color drawTint = tint == null ? Color.WHITE : tint;
-            boolean trim = raster == 0 && physicalEmSize >= AdaptiveNativeFace.MSDF_EM;
-            float inset = trim ? size * (MSDF_QUAD_INSET / (float) AdaptiveNativeFace.MSDF_EM) : 0;
             long version = cacheVersion;
             for (int i = 0; i < count; i++) {
                 AtlasGlyph glyph = cached ? images[i] : glyph(batch, run.glyphs[i], raster);
@@ -466,7 +471,7 @@ public final class AdaptiveFont implements TextFont {
                 if (glyph.page() == null) continue;
                 if (override) {
                     // Provisional images can use a different atlas format than the requested raster.
-                    Shader selected = glyph.page().getDistanceFieldRange() == 0 ? previous : batch.getDefaultShader();
+                    Shader selected = glyph.page().getDistanceFieldRange() <= 0 ? previous : batch.getDefaultShader();
                     if (batch.getShader() != selected) batch.setShader(selected);
                 }
                 if (ends != null) {
@@ -482,12 +487,15 @@ public final class AdaptiveFont implements TextFont {
                 }
                 float localX = (xs[i] + glyph.left()) * size;
                 float localY = (ys[i] + glyph.bottom()) * size;
-                if (trim && glyph.page().getDistanceFieldRange() != 0) {
-                    // Skip provably transparent border fragments without reducing the stored distance range.
-                    localX += inset;
-                    localY += inset;
-                    batch.drawUV(glyph.page(), x + localX, y + localY, glyph.width() * size - 2 * inset, glyph.height() * size - 2 * inset, glyph.u0() + glyph.insetU(), glyph.v0() + glyph.insetV(), glyph.u1() - glyph.insetU(), glyph.v1() - glyph.insetV(), -localX, -localY, sin, cos, drawTint);
-                } else batch.drawUV(glyph.page(), x + localX, y + localY, glyph.width() * size, glyph.height() * size, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), -localX, -localY, sin, cos, drawTint);
+                float drawX = x + localX;
+                float drawY = y + localY;
+                if (raster != 0) {
+                    // Hinted images already contain pixel coverage. Fractional glyph origins
+                    // filter that coverage a second time and blur even fully covered stems.
+                    drawX = (Math.round(drawX * pixelScaleX + pixelOffsetX) - pixelOffsetX) * inversePixelScaleX;
+                    drawY = (Math.round(drawY * pixelScaleY + pixelOffsetY) - pixelOffsetY) * inversePixelScaleY;
+                }
+                batch.drawUV(glyph.page(), drawX, drawY, glyph.width() * size, glyph.height() * size, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), -localX, -localY, sin, cos, drawTint);
             }
             run.imageRaster = imageKey;
             run.imageVersion = version == cacheVersion ? version : -1;
@@ -507,25 +515,34 @@ public final class AdaptiveFont implements TextFont {
     private AtlasGlyph glyph(TextureBatch batch, int id, int raster) {
         long key = glyphKey(id, raster);
         AtlasGlyph cached = findGlyph(key);
+        if ((cached == null || cached.provisional()) && raster != 0) {
+            ensureCacheSpace(batch, 1);
+            FontRaster image = face.bitmap(id, raster, hinting);
+            try {
+                AtlasGlyph glyph = uploadGlyph(batch, image, false, false);
+                putGlyph(key, glyph);
+                if (cached != null) cacheVersion++;
+                if (glyph.page() != null) requestGlyph(id, 0);
+                return glyph;
+            } finally {
+                if (image.pixels() != null) memFree(image.pixels());
+            }
+        }
         if (cached != null) {
             if (cached.provisional()) requestGlyph(id, raster);
             return cached;
         }
         ensureCacheSpace(batch, 2);
-        AtlasGlyph fallback = raster == 0 ? null : findGlyph(glyphKey(id, 0));
-        if (fallback == null || fallback.provisional()) fallback = fallbackGlyph(batch, id);
-        else if (fallback.page() != null) fallback = new AtlasGlyph(fallback.page(), fallback.width(), fallback.height(), fallback.left(), fallback.bottom(), fallback.u0(), fallback.v0(), fallback.u1(), fallback.v1(), fallback.insetU(), fallback.insetV(), true);
+        AtlasGlyph fallback = fallbackGlyph(batch, id);
         putGlyph(key, fallback);
-        if (fallback.page() != null) {
-            requestGlyph(id, raster);
-            if (raster != 0) requestGlyph(id, 0);
-        }
+        if (fallback.page() != null) requestGlyph(id, 0);
         return fallback;
     }
 
     /**
-     * Returns quick size-independent coverage while the worker prepares final
-     * glyphs. Its reserved key is shared by every requested size and policy.
+     * Returns coverage at a useful displayed resolution while MSDF prepares.
+     * Its reserved key is shared across resizing; native work is bounded by
+     * MAX_FALLBACK_SIZE rather than enlarging a fixed low-resolution image.
      * @param batch active destination
      * @param id shaped glyph index
      * @return cached provisional coverage or empty-outline entry
@@ -534,7 +551,8 @@ public final class AdaptiveFont implements TextFont {
         long key = (((long) id << 32) | FALLBACK_RASTER) + 1;
         AtlasGlyph cached = findGlyph(key);
         if (cached != null) return cached;
-        FontRaster image = face.bitmap(id, FALLBACK_SIZE, FontHinting.NONE);
+        int pixels = physicalEmSize > 0 ? Math.max(FALLBACK_SIZE, Math.min(MAX_FALLBACK_SIZE, Math.round(physicalEmSize))) : FALLBACK_SIZE;
+        FontRaster image = face.bitmap(id, pixels, hinting);
         try {
             AtlasGlyph glyph = uploadGlyph(batch, image, false, image.pixels() != null);
             putGlyph(key, glyph);
@@ -579,7 +597,7 @@ public final class AdaptiveFont implements TextFont {
         long key = glyphKey(id, raster);
         AtlasGlyph cached = findGlyph(key);
         if (cached != null && !cached.provisional()) return;
-        preparing |= preparation.request(key, id, raster, hinting);
+        preparing |= preparation.request(key, id, raster, hinting, true);
     }
 
     /**
@@ -646,7 +664,7 @@ public final class AdaptiveFont implements TextFont {
         FontAtlasPage page = null;
         if (image.pixels() != null) {
             for (int i = 0; i < pageCount; i++) {
-                if ((pages[i].getDistanceFieldRange() != 0) != distance) continue;
+                if ((pages[i].getDistanceFieldRange() > 0) != distance) continue;
                 if (!pages[i].reserve(image.width(), image.height())) continue;
                 page = pages[i];
                 break;
@@ -668,7 +686,7 @@ public final class AdaptiveFont implements TextFont {
         }
         float u = page == null ? 0 : page.imageX() / (float) page.getWidth();
         float v = page == null ? 0 : page.imageY() / (float) page.getHeight();
-        return new AtlasGlyph(page, image.width() / image.scale(), image.height() / image.scale(), image.left(), image.bottom(), u, v, page == null ? 0 : u + image.width() / (float) page.getWidth(), page == null ? 0 : v + image.height() / (float) page.getHeight(), page == null ? 0 : MSDF_QUAD_INSET / (float) page.getWidth(), page == null ? 0 : MSDF_QUAD_INSET / (float) page.getHeight(), provisional);
+        return new AtlasGlyph(page, image.width() / image.scale(), image.height() / image.scale(), image.left(), image.bottom(), u, v, page == null ? 0 : u + image.width() / (float) page.getWidth(), page == null ? 0 : v + image.height() / (float) page.getHeight(), provisional);
     }
     /**
      * Mixes glyph/raster keys or source hashes before masking a cache table.
