@@ -156,8 +156,8 @@ public class UIRoot extends UIContainer {
     private final List<UIFocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
-    private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
-    private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
+    private SlugFont nanoFont; // Default proportional face for smooth Nano text.
+    private SlugFont nanoCodeFont; // Default monospace face for smooth code text.
     private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
@@ -986,13 +986,13 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigFree(yogaConfig);
         if (batch != null) batch.dispose();
         if (rotationShader != null) rotationShader.dispose();
-        if (nanoSlugFont != null) {
-            nanoSlugFont.dispose();
-            nanoSlugFont = null;
+        if (nanoFont != null) {
+            nanoFont.dispose();
+            nanoFont = null;
         }
-        if (nanoSlugCodeFont != null) {
-            nanoSlugCodeFont.dispose();
-            nanoSlugCodeFont = null;
+        if (nanoCodeFont != null) {
+            nanoCodeFont.dispose();
+            nanoCodeFont = null;
         }
         if (defaultTheme != null) {
             defaultTheme.close();
@@ -1023,11 +1023,11 @@ public class UIRoot extends UIContainer {
         if (disposed) return null;
         if (!code && defaultTheme != null) return defaultTheme.getFont();
         if (nanoVGHandle == 0) return null;
-        SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
+        SlugFont current = code ? nanoCodeFont : nanoFont;
         if (current != null) return current;
         current = new SlugFont(SlugData.load(SystemFonts.find(code).toString(), 32, 224), true);
-        if (code) nanoSlugCodeFont = current;
-        else nanoSlugFont = current;
+        if (code) nanoCodeFont = current;
+        else nanoFont = current;
         return current;
     }
 

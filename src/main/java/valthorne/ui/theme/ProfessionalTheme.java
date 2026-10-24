@@ -187,7 +187,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         data.setToken(UITokens.ERROR, error);
         data.setToken(Label.FONT_KEY, font);
         data.setToken(Label.COLOR_KEY, text);
-        data.setToken(NanoText.SLUG_FONT, font);
+        data.setToken(NanoText.FONT, font);
         Drawable normal = skin(raised, border), over = skin(hover, border), focus = skin(raised, accent);
         Drawable selected = skin(selection, selection), pressed = skin(selection, accent), inactive = skin(disabled, border);
         Drawable track = skin(field, border), fill = skin(accent, accent);
