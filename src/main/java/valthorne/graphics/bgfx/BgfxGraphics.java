@@ -319,6 +319,43 @@ public final class BgfxGraphics {
     }
 
     /**
+     * Makes room for upload passes without presenting or changing the caller's scope.
+     *
+     * @param count required pass slots, including the caller's resumed pass
+     */
+    static void reserveUploadViews(int count) {
+        /*
+         * Large asset loads can generate more mip chains than bgfx has view IDs.
+         * Complete queued uploads at a non-presenting frame boundary; unsent Java
+         * batch records remain intact and acquire fresh native storage on flush.
+         */
+        device();
+        if (count < 1 || count > 256) throw new IllegalArgumentException("Invalid upload pass count");
+        if (nextView <= 256 - count) return;
+        flushUploads();
+    }
+
+    /**
+     * Completes queued uploads and deferred resource releases without presentation.
+     */
+    static void flushUploads() {
+        /*
+         * Deferred framebuffer destruction may exhaust native handles during a
+         * large asset load before the view-ID budget is reached. A flush releases
+         * those handles while preserving the application's logical drawing scope.
+         */
+        BgfxRenderState saved = new BgfxRenderState();
+        saved.store();
+        try {
+            device.flush();
+            frameActive = false;
+            beginFrame();
+        } finally {
+            saved.restore();
+        }
+    }
+
+    /**
      * Returns a sequential view configured for the active target and viewport.
      *
      * @return pass identifier shared by compatible ordered renderers
@@ -383,11 +420,25 @@ public final class BgfxGraphics {
     }
 
     /**
-     * Starts a new ordered color/depth/stencil clear on the current target.
+     * Starts an ordered color-only clear, preserving existing depth and stencil.
      *
      * @param color borrowed RGBA clear color
      */
     public static void clear(Color color) {
+        /*
+         * Window.clear historically changes only color; masks and depth contents
+         * remain available to later draws in the same target.
+         */
+        clear(color, false);
+    }
+
+    /**
+     * Clears color and optionally initializes depth/stencil for an internal capture.
+     *
+     * @param color borrowed RGBA clear color
+     * @param depthStencil whether to reset depth to one and stencil to zero
+     */
+    public static void clear(Color color, boolean depthStencil) {
         /*
          * A fresh view preserves immediate clear ordering in the deferred renderer.
          */
@@ -406,7 +457,8 @@ public final class BgfxGraphics {
         bgfx_set_view_rect(view, left, targetHeight - top, right - left, top - bottom);
         bgfx_set_view_scissor(view, 0, 0, 0, 0);
         bgfx_set_palette_color_rgba32f(palette, color.r(), color.g(), color.b(), color.a());
-        bgfx_set_view_clear_mrt(view, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH | BGFX_CLEAR_STENCIL, 1f, 0, (byte) palette, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255);
+        int flags = BGFX_CLEAR_COLOR | (depthStencil ? BGFX_CLEAR_DEPTH | BGFX_CLEAR_STENCIL : 0);
+        bgfx_set_view_clear_mrt(view, flags, 1f, 0, (byte) palette, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255);
         bgfx_touch(view);
         currentView = -1;
     }

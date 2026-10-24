@@ -75,8 +75,9 @@ final class BgfxCallbacks implements AutoCloseable {
     }
 
     /**
-     * Writes one pitched RGBA/BGRA backbuffer image or completes a synchronization
-     * request whose name is empty. Pixel orientation follows the native flip flag.
+     * Writes an opaque PNG from pitched RGBA/BGRA pixels, matching legacy captures,
+     * or completes a synchronization request whose name is empty. Pixel orientation
+     * follows the native flip flag.
      * The final row needs only its pixel bytes, without trailing alignment padding.
      *
      * @param file native UTF-8 output path
@@ -100,7 +101,7 @@ final class BgfxCallbacks implements AutoCloseable {
                 if (width < 1 || height < 1 || data == NULL || pitch < rowBytes || (long) pitch * (height - 1) + rowBytes > size)
                     throw new IllegalArgumentException("Invalid native screenshot bounds: " + width + "x" + height + ", pitch=" + pitch + ", size=" + size);
                 ByteBuffer pixels = memByteBuffer(data, size);
-                BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+                BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
                 int[] output = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
                 for (int y = 0; y < height; y++) {
                     int row = (flip ? height - y - 1 : y) * pitch;
@@ -109,10 +110,9 @@ final class BgfxCallbacks implements AutoCloseable {
                         int first = pixels.get(offset) & 255;
                         int green = pixels.get(offset + 1) & 255;
                         int third = pixels.get(offset + 2) & 255;
-                        int alpha = pixels.get(offset + 3) & 255;
                         int red = format == BGFX_TEXTURE_FORMAT_BGRA8 ? third : first;
                         int blue = format == BGFX_TEXTURE_FORMAT_BGRA8 ? first : third;
-                        output[y * width + x] = alpha << 24 | red << 16 | green << 8 | blue;
+                        output[y * width + x] = red << 16 | green << 8 | blue;
                     }
                 }
                 Path path = Path.of(name);

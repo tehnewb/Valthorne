@@ -10,10 +10,11 @@ import valthorne.graphics.bgfx.BgfxRenderTarget;
 import valthorne.graphics.bgfx.BgfxResources;
 
 import static org.lwjgl.bgfx.BGFX.bgfx_get_caps;
+import static org.lwjgl.bgfx.BGFX.BGFX_TEXTURE_FORMAT_RGBA8;
 
 /**
- * Owns an RGBA8 render target with optional depth/stencil storage. Rendering uses
- * the same scene, batch and shader APIs as the window. Begin/end save and restore
+ * Owns a nearest-sampled RGBA8 render target with optional depth/stencil storage.
+ * Rendering uses the same scene, batch and shader APIs as the window. Begin/end save and restore
  * the parent target and viewport; different targets may nest in reverse order.
  * Finish active batches before changing targets. Projection and scissor state
  * remain under caller control.
@@ -57,7 +58,7 @@ public final class FrameBuffer implements GraphicsResource {
      */
     public FrameBuffer(int width, int height, boolean hasDepth) {
         this.hasDepth = hasDepth;
-        target = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth);
+        target = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth, BGFX_TEXTURE_FORMAT_RGBA8, TextureFilter.NEAREST);
         this.width = width;
         this.height = height;
         BgfxResources.register(this);
@@ -117,7 +118,7 @@ public final class FrameBuffer implements GraphicsResource {
         requireOpen();
         if (drawing) throw new IllegalStateException("End capture before resizing the framebuffer");
         if (this.width == width && this.height == height) return;
-        BgfxRenderTarget replacement = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth);
+        BgfxRenderTarget replacement = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth, BGFX_TEXTURE_FORMAT_RGBA8, TextureFilter.NEAREST);
         target.close();
         target = replacement;
         this.width = width;

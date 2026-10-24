@@ -85,7 +85,7 @@ final class BgfxLighting2D implements AutoCloseable, GraphicsResource {
         BgfxGraphics.setTarget(Short.toUnsignedInt(scene.framebuffer()), scene.width(), scene.height());
         BgfxGraphics.setViewport(0, 0, scene.width(), scene.height());
         BgfxGraphics.setScissor(0, 0, 0, 0, false);
-        BgfxGraphics.clear(Color.TRANSPARENT);
+        BgfxGraphics.clear(Color.TRANSPARENT, true);
     }
 
     /**

@@ -10,9 +10,6 @@
 #include <stb_image.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
-#define STB_IMAGE_RESIZE_STATIC
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include <stb_image_resize2.h>
 #include "font_resource.h"
 #include <nanovg.h>
 #include <nanovg_bgfx.h>
@@ -87,6 +84,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t valthorne_command(uint32_t operation, uint32_t* w,
         return active ? 1 : 0;
     }
     case SHUTDOWN: if (active) { bgfx::shutdown(); active = false; std::free(canvasSelector); canvasSelector = nullptr; } return 0;
+    case MIPMAP_FRAMEBUFFER: {
+        bgfx::Attachment attachment;
+        attachment.init(handle<bgfx::TextureHandle>(w[0]), bgfx::Access::Write, 0, 1, 0, BGFX_RESOLVE_AUTO_GEN_MIPS);
+        return bgfx::createFrameBuffer(1, &attachment, false).idx;
+    }
     case FRAME: return bgfx::frame(w[0]);
     case RESET: bgfx::reset(w[0], w[1], w[2]); return 0;
     case CAPABILITIES: {
@@ -284,35 +286,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t valthorne_command(uint32_t operation, uint32_t* w,
     case NVG_VIEW: nvgSetViewId(context(w[0]), bgfx::ViewId(w[1])); return 0;
     case NVG_MOVE_TO: nvgMoveTo(context(w[0]), f[0], f[1]); return 0;
     case NVG_LINE_TO: nvgLineTo(context(w[0]), f[0], f[1]); return 0;
-    case MIPMAP_GENERATE: {
-        int width = int(w[0]);
-        int height = int(w[1]);
-        if (width < 1 || height < 1 || width > 65535 || height > 65535 || uint64_t(width) * height * 4 != length) return 0;
-        uint64_t outputSize = 0;
-        for (int x = width, y = height; x > 1 || y > 1; ) {
-            x = x > 1 ? x / 2 : 1;
-            y = y > 1 ? y / 2 : 1;
-            outputSize += uint64_t(x) * y * 4;
-        }
-        if (!outputSize || outputSize > INT32_MAX || outputSize != w[2]) return 0;
-        auto* output = static_cast<uint8_t*>(std::malloc(size_t(outputSize)));
-        if (!output) return 0;
-        const uint8_t* source = bytes;
-        uint8_t* destination = output;
-        while (width > 1 || height > 1) {
-            int nextWidth = width > 1 ? width / 2 : 1;
-            int nextHeight = height > 1 ? height / 2 : 1;
-            STBIR_RESIZE settings;
-            stbir_resize_init(&settings, source, width, height, width * 4, destination, nextWidth, nextHeight, nextWidth * 4, STBIR_4CHANNEL, STBIR_TYPE_UINT8);
-            stbir_set_filters(&settings, STBIR_FILTER_BOX, STBIR_FILTER_BOX);
-            if (!stbir_resize_extended(&settings)) { std::free(output); return 0; }
-            source = destination;
-            destination += size_t(nextWidth) * nextHeight * 4;
-            width = nextWidth;
-            height = nextHeight;
-        }
-        return reinterpret_cast<uintptr_t>(output);
-    }
     default: std::abort();
     }
 }

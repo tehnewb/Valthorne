@@ -1,6 +1,7 @@
 package valthorne.graphics.bgfx;
 
 import valthorne.graphics.GraphicsResource;
+import valthorne.graphics.texture.TextureFilter;
 
 import static org.lwjgl.bgfx.BGFX.*;
 
@@ -12,6 +13,7 @@ import static org.lwjgl.bgfx.BGFX.*;
 public final class BgfxRenderTarget implements AutoCloseable, GraphicsResource {
     private final boolean depthStencil; // Whether a depth/stencil attachment is required.
     private final int format; // Retained attachment format for recreation.
+    private final long samplerFlags; // Immutable attachment sampling restored with each allocation.
 
     private final BgfxDesktopWindow window; // Borrowed runtime owner that must outlive this target.
     private short framebuffer = BGFX_INVALID_HANDLE; // Owned framebuffer and color attachment.
@@ -52,7 +54,24 @@ public final class BgfxRenderTarget implements AutoCloseable, GraphicsResource {
      * @param format native color format, including RGBA16F for HDR lighting
      */
     public BgfxRenderTarget(BgfxDesktopWindow window, int width, int height, boolean depthStencil, int format) {
+        this(window, width, height, depthStencil, format, TextureFilter.LINEAR);
+    }
+
+    /**
+     * Allocates a target with an explicit non-mipmapped attachment sampling policy.
+     *
+     * @param window initialized runtime owner
+     * @param width positive pixel width
+     * @param height positive pixel height
+     * @param depthStencil whether D24S8 storage is required
+     * @param format native color format
+     * @param filter nearest or linear sampling, retained across device changes
+     */
+    public BgfxRenderTarget(BgfxDesktopWindow window, int width, int height, boolean depthStencil, int format, TextureFilter filter) {
         window.checkOwner();
+        if (filter != TextureFilter.NEAREST && filter != TextureFilter.LINEAR)
+            throw new IllegalArgumentException("Render targets require nearest or linear filtering");
+        samplerFlags = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | (filter == TextureFilter.NEAREST ? BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT : 0);
         if (width < 1 || height < 1 || width > 65535 || height > 65535)
             throw new IllegalArgumentException("Render-target dimensions must be between 1 and 65535");
         int maximum = bgfx_get_caps()
@@ -140,7 +159,7 @@ public final class BgfxRenderTarget implements AutoCloseable, GraphicsResource {
             short color = BGFX_INVALID_HANDLE;
             short depth = BGFX_INVALID_HANDLE;
             try {
-                color = bgfx_create_texture_2d(width, height, false, 1, format, BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, null, 0);
+                color = bgfx_create_texture_2d(width, height, false, 1, format, BGFX_TEXTURE_RT | samplerFlags, null, 0);
                 depth = bgfx_create_texture_2d(width, height, false, 1, BGFX_TEXTURE_FORMAT_D24S8, BGFX_TEXTURE_RT_WRITE_ONLY, null, 0);
                 if (color == BGFX_INVALID_HANDLE || depth == BGFX_INVALID_HANDLE)
                     throw new IllegalStateException("Could not allocate render-target attachments");
@@ -152,7 +171,7 @@ public final class BgfxRenderTarget implements AutoCloseable, GraphicsResource {
                 }
             }
         } else {
-            framebuffer = bgfx_create_frame_buffer(width, height, format, BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP);
+            framebuffer = bgfx_create_frame_buffer(width, height, format, BGFX_TEXTURE_RT | samplerFlags);
         }
         if (framebuffer == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not allocate render target");
         texture = bgfx_get_texture(framebuffer, 0);

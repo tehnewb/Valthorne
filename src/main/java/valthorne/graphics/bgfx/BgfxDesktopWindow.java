@@ -1,7 +1,10 @@
 package valthorne.graphics.bgfx;
 
+import java.util.concurrent.locks.LockSupport;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.bgfx.BGFXCaps;
 import org.lwjgl.bgfx.BGFXInit;
+import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.Platform;
 import valthorne.graphics.GraphicsBackend;
@@ -34,6 +37,11 @@ public final class BgfxDesktopWindow implements AutoCloseable {
     private boolean closed; // Whether this renderer wrapper has released its native resources.
     private int width; // Current positive backbuffer width in framebuffer pixels.
     private int height; // Current positive backbuffer height in framebuffer pixels.
+    private int swapInterval; // Zero is uncapped, positive counts refreshes, and minus one is adaptive.
+    private long refreshNanos = 16_666_667L; // Last known monitor refresh period for portable presentation pacing.
+    private long refreshChecked; // Last monitor timing refresh in the monotonic clock.
+    private long previousPresent; // End of the previous paced presentation, or zero before the first frame.
+    private long nextPresentDeadline; // Drift-free refresh-divisor deadline, or zero before pacing starts.
     private BgfxCallbacks callbacks; // Owned native diagnostic/capture callbacks, retained through shutdown.
     private BgfxWindowsSurface surface; // Replaceable Windows presentation child; null on other platforms.
 
@@ -77,6 +85,7 @@ public final class BgfxDesktopWindow implements AutoCloseable {
         BgfxRuntime.claim(this);
         this.handle = handle;
         resetFlags = vsync ? BGFX_RESET_VSYNC : BGFX_RESET_NONE;
+        swapInterval = vsync ? 1 : 0;
         resetFlags |= samples <= 1 ? BGFX_RESET_NONE : samples <= 2 ? BGFX_RESET_MSAA_X2 : samples <= 4 ? BGFX_RESET_MSAA_X4 : samples <= 8 ? BGFX_RESET_MSAA_X8 : BGFX_RESET_MSAA_X16;
         try {
             initializeRenderer();
@@ -120,6 +129,9 @@ public final class BgfxDesktopWindow implements AutoCloseable {
             throw new IllegalStateException("bgfx did not select the requested renderer " + backend + "");
         if (glfwGetWindowAttrib(handle, GLFW_CLIENT_API) != GLFW_NO_API || glfwGetCurrentContext() != 0)
             throw new IllegalStateException("The bgfx desktop path must use a GLFW no-client-API window");
+        previousPresent = 0;
+        nextPresentDeadline = 0;
+        refreshChecked = 0;
     }
 
     /**
@@ -203,9 +215,91 @@ public final class BgfxDesktopWindow implements AutoCloseable {
      * @param enabled whether to wait for presentation synchronization
      */
     public void setVsync(boolean enabled) {
+        setSwapInterval(enabled ? 1 : 0);
+    }
+
+    /**
+     * Restores refresh divisors and adaptive synchronization above bgfx's boolean
+     * VSync switch. Divisors pace the graphics thread after submission; adaptive
+     * mode disables synchronization when rendering misses a refresh deadline.
+     *
+     * @param interval zero, one through three, or minus one for adaptive VSync
+     */
+    public void setSwapInterval(int interval) {
         checkOwner();
-        resetFlags = (resetFlags & ~BGFX_RESET_VSYNC) | (enabled ? BGFX_RESET_VSYNC : BGFX_RESET_NONE);
+        if (interval < -1 || interval > 3) throw new IllegalArgumentException("Unsupported swap interval: " + interval);
+        swapInterval = interval;
+        previousPresent = 0;
+        nextPresentDeadline = 0;
+        refreshChecked = 0;
+        synchronize(interval != 0);
+    }
+
+    /**
+     * Changes native presentation only when its synchronization policy changes.
+     *
+     * @param enabled whether to wait for vertical blank
+     */
+    private void synchronize(boolean enabled) {
+        int flags = (resetFlags & ~BGFX_RESET_VSYNC) | (enabled ? BGFX_RESET_VSYNC : 0);
+        if (flags == resetFlags) return;
+        resetFlags = flags;
         bgfx_reset(width, height, resetFlags, BGFX_TEXTURE_FORMAT_COUNT);
+    }
+
+    /**
+     * Refreshes the monitor period at most once per second while pacing is needed.
+     *
+     * @param now current monotonic nanoseconds
+     */
+    private void updateRefreshPeriod(long now) {
+        if (refreshChecked != 0 && now - refreshChecked < 1_000_000_000L) return;
+        long monitor = glfwGetWindowMonitor(handle);
+        if (monitor == 0) monitor = windowMonitor();
+        GLFWVidMode mode = monitor == 0 ? null : glfwGetVideoMode(monitor);
+        if (mode != null && mode.refreshRate() > 0) {
+            long period = 1_000_000_000L / mode.refreshRate();
+            if (period != refreshNanos) nextPresentDeadline = 0;
+            refreshNanos = period;
+        }
+        refreshChecked = now;
+    }
+
+    /**
+     * Selects the monitor containing the largest part of a windowed presentation.
+     * Wayland does not expose global window coordinates and uses the primary output.
+     *
+     * @return monitor handle, or zero when no output is available
+     */
+    private long windowMonitor() {
+        long selected = glfwGetPrimaryMonitor();
+        if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) return selected;
+        PointerBuffer monitors = glfwGetMonitors();
+        if (monitors == null) return selected;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            var windowX = stack.mallocInt(1);
+            var windowY = stack.mallocInt(1);
+            var windowWidth = stack.mallocInt(1);
+            var windowHeight = stack.mallocInt(1);
+            var monitorX = stack.mallocInt(1);
+            var monitorY = stack.mallocInt(1);
+            glfwGetWindowPos(handle, windowX, windowY);
+            glfwGetWindowSize(handle, windowWidth, windowHeight);
+            long largest = 0;
+            for (int i = monitors.position(); i < monitors.limit(); i++) {
+                long candidate = monitors.get(i);
+                GLFWVidMode mode = glfwGetVideoMode(candidate);
+                if (mode == null) continue;
+                glfwGetMonitorPos(candidate, monitorX, monitorY);
+                long overlapWidth = Math.max(0L, Math.min((long) windowX.get(0) + windowWidth.get(0), (long) monitorX.get(0) + mode.width()) - Math.max(windowX.get(0), monitorX.get(0)));
+                long overlapHeight = Math.max(0L, Math.min((long) windowY.get(0) + windowHeight.get(0), (long) monitorY.get(0) + mode.height()) - Math.max(windowY.get(0), monitorY.get(0)));
+                long area = overlapWidth * overlapHeight;
+                if (area <= largest) continue;
+                largest = area;
+                selected = candidate;
+            }
+        }
+        return selected;
     }
 
     /**
@@ -215,8 +309,22 @@ public final class BgfxDesktopWindow implements AutoCloseable {
      */
     public int present() {
         checkOwner();
+        long now = System.nanoTime();
+        if (swapInterval > 1 || swapInterval == -1) updateRefreshPeriod(now);
+        if (swapInterval == -1)
+            synchronize(previousPresent == 0 || now - previousPresent < refreshNanos);
         int frame = bgfx_frame(BGFX_FRAME_NONE);
         callbacks.checkFailure();
+        if (swapInterval > 1) {
+            long period = refreshNanos * swapInterval;
+            long deadline = nextPresentDeadline;
+            long remaining;
+            while (deadline != 0 && (remaining = deadline - System.nanoTime()) > 0 && !Thread.currentThread().isInterrupted())
+                LockSupport.parkNanos(remaining);
+            now = System.nanoTime();
+            nextPresentDeadline = deadline == 0 || now - deadline >= period ? now + period : deadline + period;
+        }
+        previousPresent = System.nanoTime();
         return frame;
     }
 

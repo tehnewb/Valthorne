@@ -521,9 +521,9 @@ public final class BrowserOperation {
     public static final int FONT_BAKE = 113;
 
     /**
-     * Generates a complete independent-channel RGBA8 mip chain using native STB.
+     * Creates a borrowed-texture framebuffer with automatic GPU mip generation.
      */
-    public static final int MIPMAP_GENERATE = 114;
+    public static final int MIPMAP_FRAMEBUFFER = 115;
 
     /**
      * Prevents constructing protocol constant holders.

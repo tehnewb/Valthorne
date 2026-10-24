@@ -439,6 +439,7 @@ public final class Window {
         if (address == NULL) throw new IllegalStateException("Failed to create the GLFW window");
         try {
             BgfxGraphics.initialize(address, swapInterval.getValue() != 0, config.getSamples(), config.getGraphicsBackend());
+            BgfxGraphics.device().setSwapInterval(swapInterval.getValue());
             graphicsCapabilities = GraphicsCapabilities.current();
             graphicsCapabilities.requireRaster();
             acceptsBackendChanges = true;
@@ -835,7 +836,7 @@ public final class Window {
          */
         if (type == null) return;
         swapInterval = type;
-        if (BgfxGraphics.isActive()) BgfxGraphics.device().setVsync(type.getValue() != 0);
+        if (BgfxGraphics.isActive()) BgfxGraphics.device().setSwapInterval(type.getValue());
     }
 
     /**

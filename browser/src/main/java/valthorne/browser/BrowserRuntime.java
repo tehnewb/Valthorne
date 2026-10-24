@@ -32,6 +32,10 @@ public final class BrowserRuntime {
      */
     private static AsyncCallback<Void> pendingFrame;
     /**
+     * Whether divisor pacing has already waited for the next application frame.
+     */
+    private static boolean presentationWaited;
+    /**
      * Registered windowFocus callback, or null when detached.
      */
     private static GLFWWindowFocusCallbackI windowFocusCallback;
@@ -120,7 +124,8 @@ public final class BrowserRuntime {
         /*
          * Retain browser state on the single application coroutine.
          */
-        if (input.isEmpty() || contextLost()) awaitFrame();
+        if (contextLost() || !presentationWaited && input.isEmpty()) awaitFrame();
+        presentationWaited = false;
         BrowserInputEvent event;
         while ((event = input.poll()) != null) dispatch(event);
     }
@@ -143,6 +148,37 @@ public final class BrowserRuntime {
         if (!input.isEmpty() && !contextLost()) wake();
         else requestFrame(BrowserRuntime::wake);
     }
+
+    /**
+     * Suspends presentation for additional display refreshes without blocking input.
+     * @param refreshes positive number of additional animation-frame callbacks
+     */
+    @Async
+    public static native void waitRefreshes(int refreshes);
+
+    /**
+     * Schedules a presentation continuation independently of input-triggered wakeups.
+     * @param refreshes positive number of display callbacks to await
+     * @param callback suspended application continuation
+     */
+    private static void waitRefreshes(int refreshes, AsyncCallback<Void> callback) {
+        /*
+         * Input remains queued while a refresh divisor is active; it cannot resume
+         * this continuation early and accidentally remove HALF/TRIPLE pacing.
+         */
+        requestRefreshes(refreshes, () -> {
+            presentationWaited = true;
+            callback.complete(null);
+        });
+    }
+
+    /**
+     * Counts browser display callbacks for a portable refresh divisor.
+     * @param refreshes number of callbacks
+     * @param ready continuation invoked once after the final callback
+     */
+    @JSBody(params = {"refreshes", "ready"}, script = "globalThis.valthorneHost.requestFrame(function tick(){if(--refreshes>0)globalThis.valthorneHost.requestFrame(tick);else ready();});")
+    private static native void requestRefreshes(int refreshes, BrowserWake ready);
 
     /**
      * Resumes the pending application wait at most once.
@@ -238,6 +274,7 @@ public final class BrowserRuntime {
              */
             input.clear();
             pendingFrame = null;
+            presentationWaited = false;
             windowFocusCallback = null;
             windowCloseCallback = null;
             dropCallback = null;

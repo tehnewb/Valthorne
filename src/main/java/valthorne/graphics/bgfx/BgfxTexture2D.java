@@ -12,7 +12,7 @@ import static org.lwjgl.system.MemoryUtil.memFree;
 /**
  * Owns one sampled texture uploaded through bgfx-owned memory. This
  * initial desktop API accepts RGBA8, RGBA32F and RG32U data with tightly packed
- * rows. An owned CPU copy, including optional mip levels, restores the texture
+ * rows. An owned CPU copy of the base level restores the texture
  * after device replacement. Mip storage can be replaced without changing the
  * engine binding ID, preserving queued draws and bound texture slots. Caller
  * staging may be freed immediately; close frees the native texture and its
@@ -23,7 +23,7 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     private final int height; // Retained pixel height for device replacement.
     private final int format; // Immutable sampled texture format.
     private boolean mipmaps; // Whether the retained upload includes a mip chain.
-    private ByteBuffer retainedPixels; // Owned immutable recovery upload including mip levels.
+    private ByteBuffer retainedPixels; // Owned immutable base image used for recovery and mip regeneration.
     private int id = -1; // Stable engine binding ID, or negative for standalone allocations.
     private TextureFilter filter; // Optional sampler override restored with this allocation.
 
@@ -44,9 +44,9 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     }
 
     /**
-     * Uploads an image with optional STB-filtered RGBA8 mip levels. Generation
-     * fills the retained upload during resource configuration; drawing never
-     * allocates intermediate images or filters pixels.
+     * Uploads an image with optional GPU-generated RGBA8 mip levels. Generation
+     * uses the active backend's native filter; only the base pixels are retained
+     * for device replacement, and ordinary drawing performs no filtering work.
      *
      * @param window initialized runtime owner
      * @param width positive image width
@@ -81,7 +81,7 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         this.height = height;
         this.format = format;
         this.mipmaps = mipmaps;
-        retainedPixels = copyPixels(pixels, width, height, mipmaps);
+        retainedPixels = copyPixels(pixels);
         try {
             handle = createTexture(retainedPixels, mipmaps);
             if (BgfxGraphics.isActive()) {
@@ -99,32 +99,19 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     }
 
     /**
-     * Copies base pixels and optionally appends RGBA8 mip levels in one allocation.
+     * Retains base pixels; generated mip levels remain on the graphics device.
      *
      * @param pixels validated tightly packed base pixels
-     * @param width base pixel width
-     * @param height base pixel height
-     * @param mipmaps whether to generate the RGBA8 mip chain
      * @return owned upload buffer positioned at its beginning
      */
-    private static ByteBuffer copyPixels(ByteBuffer pixels, int width, int height, boolean mipmaps) {
+    private static ByteBuffer copyPixels(ByteBuffer pixels) {
         /*
-         * Size the complete upload before allocation; mip generation reads each
-         * preceding level in place and never needs a second scratch image.
+         * Generated levels can always be reconstructed from the immutable base,
+         * avoiding a second CPU mip chain and preserving the driver's filtering.
          */
-        long total = pixels.remaining();
-        if (mipmaps) {
-            for (int w = width, h = height; w > 1 || h > 1; ) {
-                w = Math.max(1, w / 2);
-                h = Math.max(1, h / 2);
-                total += (long) w * h * 4;
-            }
-        }
-        if (total > Integer.MAX_VALUE) throw new IllegalArgumentException("Mip chain exceeds upload limits");
-        ByteBuffer upload = memAlloc((int) total);
+        ByteBuffer upload = memAlloc(pixels.remaining());
         try {
             upload.put(pixels.duplicate());
-            if (mipmaps) BgfxMipmaps.generate(upload, width, height);
             return upload.clear();
         } catch (RuntimeException | Error failure) {
             memFree(upload);
@@ -135,11 +122,12 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     /**
      * Creates a native allocation from a retained upload using default sampling.
      *
-     * @param pixels complete base and optional mip bytes
+     * @param pixels retained base-level pixels
      * @param mipmaps whether the upload includes mip levels
      * @return owned valid native texture handle
      */
     private short createTexture(ByteBuffer pixels, boolean mipmaps) {
+        if (mipmaps) return BgfxMipmaps.create(window, pixels, width, height);
         BGFXMemory memory = bgfx_copy(pixels);
         if (memory == null) throw new IllegalStateException("Could not allocate texture upload memory");
         short texture = bgfx_create_texture_2d(width, height, mipmaps, 1, format, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, memory, 0);
@@ -206,7 +194,7 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         if (format != BGFX_TEXTURE_FORMAT_RGBA8) throw new IllegalArgumentException("Automatic mipmaps require RGBA8 pixels");
         ByteBuffer base = retainedPixels.duplicate()
                 .limit(width * height * 4);
-        ByteBuffer replacement = copyPixels(base, width, height, mipmaps);
+        ByteBuffer replacement = copyPixels(base);
         short replacementHandle = BGFX_INVALID_HANDLE;
         try {
             replacementHandle = createTexture(replacement, mipmaps);

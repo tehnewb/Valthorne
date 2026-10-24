@@ -20,6 +20,7 @@ public final class BgfxDesktopWindow implements AutoCloseable {
     private int width; // Current backbuffer width in physical pixels.
     private int height; // Current backbuffer height in physical pixels.
     private int flags; // Retained multisample and presentation policy.
+    private int swapInterval; // Requested display refresh divisor, or minus one for browser-adaptive timing.
     private boolean initialized; // Whether native shutdown is required.
     private boolean closed; // Whether this wrapper has released its resources.
     private long captures; // Monotonic synchronous canvas-capture completion count.
@@ -53,6 +54,7 @@ public final class BgfxDesktopWindow implements AutoCloseable {
         if (samples < 0 || samples > 16) throw new IllegalArgumentException("Samples must be between zero and sixteen");
         this.handle = handle;
         flags = vsync ? BGFX_RESET_VSYNC : BGFX_RESET_NONE;
+        swapInterval = vsync ? 1 : 0;
         flags |= samples <= 1 ? 0 : samples <= 2 ? BGFX_RESET_MSAA_X2 : samples <= 4 ? BGFX_RESET_MSAA_X4 : samples <= 8 ? BGFX_RESET_MSAA_X8 : BGFX_RESET_MSAA_X16;
         BgfxRuntime.claim(this);
         try {
@@ -125,8 +127,20 @@ public final class BgfxDesktopWindow implements AutoCloseable {
      * @param enabled requested vertical synchronization policy
      */
     public void setVsync(boolean enabled) {
+        setSwapInterval(enabled ? 1 : 0);
+    }
+
+    /**
+     * Selects a display refresh divisor; adaptive mode follows browser scheduling.
+     * @param interval zero, one through three, or minus one for adaptive presentation
+     */
+    public void setSwapInterval(int interval) {
         checkOwner();
-        flags = enabled ? flags | BGFX_RESET_VSYNC : flags & ~BGFX_RESET_VSYNC;
+        if (interval < -1 || interval > 3) throw new IllegalArgumentException("Unsupported swap interval: " + interval);
+        swapInterval = interval;
+        int next = interval != 0 ? flags | BGFX_RESET_VSYNC : flags & ~BGFX_RESET_VSYNC;
+        if (next == flags) return;
+        flags = next;
         bgfx_reset(width, height, flags, BGFX_TEXTURE_FORMAT_COUNT);
     }
 
@@ -136,7 +150,9 @@ public final class BgfxDesktopWindow implements AutoCloseable {
      */
     public int present() {
         checkOwner();
-        return bgfx_frame(BGFX_FRAME_NONE);
+        int frame = bgfx_frame(BGFX_FRAME_NONE);
+        if (swapInterval > 1) BrowserRuntime.waitRefreshes(swapInterval);
+        return frame;
     }
 
     /**

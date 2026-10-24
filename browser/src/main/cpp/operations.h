@@ -116,5 +116,5 @@ enum BrowserOperation {
     NVG_MOVE_TO = 111,
     NVG_LINE_TO = 112,
     FONT_BAKE = 113,
-    MIPMAP_GENERATE = 114
+    MIPMAP_FRAMEBUFFER = 115
 };

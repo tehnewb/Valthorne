@@ -29,9 +29,9 @@ public final class BgfxBatchRenderer implements AutoCloseable, GraphicsResource 
      */
     private static final int DEFAULT_INSTANCE_STRIDE = 96;
     /**
-     * RGB straight-alpha source-over blending preserving destination alpha.
+     * Legacy straight-alpha blending applied to both RGB and destination alpha.
      */
-    private static final long SPRITE_STATE = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA);
+    private static final long SPRITE_STATE = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA);
     /**
      * Slug fragment shaders produce premultiplied color coverage.
      */

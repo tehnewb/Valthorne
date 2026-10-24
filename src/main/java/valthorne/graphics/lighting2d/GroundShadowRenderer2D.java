@@ -134,7 +134,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                 shader.setUniform4f("u_uvBounds", Math.min(uv.get(0), uv.get(4)) + halfU, Math.min(uv.get(1), uv.get(5)) + halfV, Math.max(uv.get(0), uv.get(4)) - halfU, Math.max(uv.get(1), uv.get(5)) - halfV);
                 shader.setUniform1f("u_opacity", caster.opacity * caster.sprite.getColor().a());
                 shader.setUniform1i("u_contact", 0);
-                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_MSAA | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
                 drawCalls++;
                 if (fills == null) continue;
                 // Compact receiver-space contact shadow stays beneath the trunk/feet.
@@ -146,7 +146,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                 }
                 vertices.flip();
                 shader.setUniform1i("u_contact", 1);
-                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_MSAA | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
                 drawCalls++;
             }
         } finally {

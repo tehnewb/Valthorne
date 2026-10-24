@@ -221,9 +221,9 @@ public class ShapeShader extends Shader {
     }
 
     /**
-     * Submits the staged triangles using straight-alpha source-over blending.
+     * Submits multisampled triangles using the legacy straight-alpha blend factors.
      */
     private void submitBgfx() {
-        bgfxRenderer.submit(vertexBuffer, this, BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+        bgfxRenderer.submit(vertexBuffer, this, BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
     }
 }

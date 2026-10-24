@@ -88,7 +88,7 @@ import static org.lwjgl.bgfx.BGFX.bgfx_destroy_texture;
 public class Texture implements Poolable, GraphicsResource {
 
     private BgfxTexture2D bgfxTexture; // Owned native bgfx upload, absent for wrapped handles.
-    protected int textureID; // Engine binding ID, stable across device changes; mip replacement may change it.
+    protected int textureID; // Engine binding ID, stable across device and mip-storage changes.
     protected final boolean ownsData; // Whether this texture should dispose the decoded TextureData when the GPU texture is released
     protected TextureData data; // CPU-side texture metadata and pixel buffer associated with this texture
     protected TextureFilter filter = TextureFilter.NEAREST; // Current filtering mode applied to the texture
