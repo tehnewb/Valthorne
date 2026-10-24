@@ -74,11 +74,11 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 When a number increases, the numbers to its right reset to zero.
 
 Merged pull requests can update the development version automatically with
-`version:feature` (second number), `version:patch` (third number), or
+`version:major` (first number), `version:feature` (second number), `version:patch` (third number), or
 `version:hotfix` (fourth number). Unlabeled PRs
 leave it unchanged. See [automatic version setup](.github/VERSION_AUTOMATION.md)
 for the owner-controlled GitHub App configuration and release behavior.
-The `version:feature` label publishes automatically after release checks pass.
+The `version:major` and `version:feature` labels publish automatically after release checks pass.
 Adding `release:urgent` alongside a version label also requests automatic Maven
 Central publication. Increasing the first or second version number explicitly
 also requests publication; routine version bumps do not.

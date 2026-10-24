@@ -29,6 +29,22 @@ test('feature increments the second component, resets both trailing components, 
     }
 });
 
+test('major resets all trailing components, publishes once, and rejects every conflicting version label', () => {
+    assert.equal(bumpVersion('1.3.1.9', 'major'), '2.0.0.0');
+    const major = pull(1, 'version:major');
+    const plan = planUpdate('version=1.3.1.9\n', { ...state, version: '1.3.1.9' }, [major]);
+    assert.equal(plan.version, '2.0.0.0');
+    assert.equal(plan.release.reason, 'major-or-feature-version');
+    assert.deepEqual(plan.release.pullRequests, [1]);
+    assert.equal(planUpdate(plan.properties, plan.state, [major]).release, null);
+    for (const label of ['version:feature', 'version:patch', 'version:hotfix']) {
+        const conflict = { ...major, labels: [...major.labels, { name: label }] };
+        assert.throws(() => planUpdate('version=1.0.0.0\n', state, [conflict]), /conflicting/);
+    }
+    const urgent = { ...major, labels: [...major.labels, { name: 'release:urgent' }] };
+    assert.equal(planUpdate('version=1.0.0.0\n', state, [urgent]).release.version, '2.0.0.0');
+});
+
 test('reconciles out-of-order merges, preserves CRLF, and is idempotent', () => {
     const pulls = [pull(3, 'version:hotfix', '2026-10-04T00:00:03Z'), pull(1, 'version:hotfix'),
         pull(2, 'version:patch', '2026-10-04T00:00:02Z'), pull(4, null)];
