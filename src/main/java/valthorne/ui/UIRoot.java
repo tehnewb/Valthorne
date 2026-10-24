@@ -158,6 +158,13 @@ public class UIRoot extends UIContainer {
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
     private SlugFont nanoFont; // Default proportional face for smooth Nano text.
     private SlugFont nanoCodeFont; // Default monospace face for smooth code text.
+    private boolean slugHintingEnabled = true; // Physical-size hinting for eligible axis-aligned UI; world outlines remain scalable.
+    private SlugUIText slugText; // Lazily owned physical-size hinted outline views.
+    private UITextRenderingMode lastTextMode = UITextRenderingMode.NOT_DRAWN; // Renderer mode of the latest text submission.
+    private UITextFallbackReason lastTextFallback = UITextFallbackReason.NONE; // Why that submission bypassed hinted drawing or produced no pixels.
+    private float lastTextScaleX; // Physical framebuffer pixels per DIP of the latest hinted submission.
+    private float lastTextScaleY; // Vertical physical framebuffer pixels per DIP of the latest hinted submission.
+    private Map<String, SlugFont> namedTextFonts; // Optional borrowed exact-file faces for custom Nano text names.
     private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
@@ -986,6 +993,11 @@ public class UIRoot extends UIContainer {
         Yoga.YGConfigFree(yogaConfig);
         if (batch != null) batch.dispose();
         if (rotationShader != null) rotationShader.dispose();
+        if (slugText != null) {
+            slugText.close();
+            slugText = null;
+        }
+        if (namedTextFonts != null) namedTextFonts.clear();
         if (nanoFont != null) {
             nanoFont.dispose();
             nanoFont = null;
@@ -1817,8 +1829,112 @@ public class UIRoot extends UIContainer {
      *
      * @return borrowed proportional font, or null before graphics initialization
      */
-    public SlugFont getDefaultFont() {
-        return getNanoTextFont(false);
+    public SlugFont getDefaultFont() {return getNanoTextFont(false);}
+
+    /**
+     * Enables physical-size FreeType hinting for Slug's axis-aligned UI outlines.
+     * Enabled by default on every platform. Disabling retains HarfBuzz shaping but
+     * uses ordinary scalable outlines; direct world text is unaffected either way.
+     * Hinted UI uses the published Microsoft Terminal default grayscale response
+     * (gamma 1.8, grayscale contrast 1) consistently across platforms, independently
+     * of local Windows calibration. It does not simulate LCD subpixel ClearType.
+     *
+     * @param enabled whether eligible Slug UI uses hinted outlines
+     */
+    public void setSlugHintingEnabled(boolean enabled) {
+        if (batch != null) batch.flush();
+        slugHintingEnabled = enabled;
+        if (!enabled && slugText != null) {
+            slugText.close();
+            slugText = null;
+        }
+        invalidateTextLayout(this);
     }
+
+    /**
+     * Returns the root's Slug hinting policy before transform eligibility.
+     *
+     * @return whether axis-aligned Slug UI should use hinted outlines
+     */
+    public boolean isSlugHintingEnabled() { return slugHintingEnabled; }
+
+    /**
+     * Borrows the lazy owner of physical-size hinted Slug views.
+     *
+     * @return root-owned hinted outline cache
+     */
+    SlugUIText slugText() {
+        if (slugText == null) slugText = new SlugUIText(this);
+        return slugText;
+    }
+
+    /**
+     * Snapshots the most recent text submission through the shared UI typography
+     * facade. This reports hinted, scalable or NanoVG rendering for the last draw.
+     * It does not summarize every
+     * control or direct world-font draw. Read on this root's rendering thread after
+     * the control of interest draws; each explicit query allocates one snapshot.
+     *
+     * @return last renderer, fallback reason, physical scaling
+     */
+    public UITextDiagnostics getTextRenderingDiagnostics() {
+        return new UITextDiagnostics(lastTextMode, lastTextFallback, lastTextScaleX, lastTextScaleY);
+    }
+
+    /**
+     * Records the last text submission without allocating diagnostic objects.
+     *
+     * @param mode renderer mode
+     * @param reason fallback or skipped-drawing reason
+     * @param scaleX physical pixels per DIP, or zero for a fallback
+     * @param scaleY vertical pixels per DIP, or zero for a fallback
+     */
+    void recordTextRendering(UITextRenderingMode mode, UITextFallbackReason reason, float scaleX, float scaleY) {
+        lastTextMode = mode;
+        lastTextFallback = reason;
+        lastTextScaleX = scaleX;
+        lastTextScaleY = scaleY;
+    }
+
+    /**
+     * Associates a custom Nano font name with an exact encoded source for consistent
+     * portable UI typography. Fonts are borrowed and
+     * must outlive controls using the name. This avoids substituting a similarly
+     * named system face for custom NanoVG-only handles, which expose no font bytes.
+     *
+     * @param name nonblank name used by Nano label/button/editor fontName properties
+     * @param font borrowed source font, or null to remove the association
+     */
+    public void registerTextFont(String name, SlugFont font) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("A text font name is required");
+        if (font == null) {
+            if (namedTextFonts != null) namedTextFonts.remove(name);
+        } else {
+            if (namedTextFonts == null) namedTextFonts = new HashMap<>();
+            namedTextFonts.put(name, font);
+        }
+        invalidateTextLayout(this);
+    }
+
+    /**
+     * Resolves a borrowed explicitly registered exact-file font.
+     *
+     * @param name Nano control font name
+     * @return borrowed source face, or null when only a NanoVG handle is registered
+     */
+    SlugFont registeredTextFont(String name) { return namedTextFonts == null ? null : namedTextFonts.get(name); }
+
+    /**
+     * Invalidates intrinsic text measurements throughout a root after its backend
+     * policy changes, including descendants with independent themes.
+     *
+     * @param node subtree whose typography may have changed
+     */
+    private void invalidateTextLayout(UINode node) {
+        node.markLayoutDirty();
+        if (node instanceof UIContainer container)
+            for (int index = 0; index < container.size(); index++) invalidateTextLayout(container.get(index));
+    }
+
 
 }

@@ -28,6 +28,8 @@ def lwjglModules = [
         "lwjgl-opengl",
         "lwjgl-bgfx",
         "lwjgl-stb",
+        "lwjgl-freetype",
+        "lwjgl-harfbuzz",
         "lwjgl-openal",
         "lwjgl-yoga",
         "lwjgl-nanovg",

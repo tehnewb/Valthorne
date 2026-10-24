@@ -10,7 +10,9 @@ import java.util.Arrays;
  *
  * <p>Use this for fair live-rendering benchmarks and for text that is drawn repeatedly. The run
  * removes per-frame layout, newline handling, tab handling, and kerning lookups. It still renders
- * live Slug curves every frame; it does not cache text into a texture.</p>
+ * Slug coverage with its original outlines. TextureBatch may reuse exact glyph
+ * coverage and packed run geometry at unchanged sampling positions; this run
+ * itself owns no GPU textures or batch-specific cached state.</p>
  *
  * <pre>{@code
  * SlugTextRun run = font.createRun("The quick brown fox", 36f);
@@ -25,6 +27,11 @@ import java.util.Arrays;
  */
 public final class SlugTextRun {
 
+    /**
+     * Bounded consecutive rebuild history used to preserve shaped prefixes.
+     */
+    private static final int PREFIX_HISTORY = 8;
+    private final int[] prefixHistory = new int[PREFIX_HISTORY]; // Unchanged leading drawable count per recent rebuild.
     private final SlugFont font; // Font that owns the glyph data.
     private SlugGlyph[] glyphs; // Drawable glyphs in draw order.
     private float[] xOffsets; // Baseline x offsets in world units.
@@ -32,6 +39,10 @@ public final class SlugTextRun {
     private int count; // Number of drawable glyphs.
     private String text; // Source text.
     private float size; // World units per em.
+    private int previousCount; // Drawable count before the current full-context rebuild.
+    private boolean matchingSize; // Whether previous offsets use the current em size.
+    private int unchangedPrefix; // Drawable prefix preserved by the immediately preceding rebuild.
+    private long revision; // Increments whenever layout geometry is rebuilt.
     private float width; // Measured width.
     private float height; // Measured height.
     private float minX; // Minimum outline X relative to the run baseline.
@@ -67,11 +78,15 @@ public final class SlugTextRun {
             throw new IllegalArgumentException("Size must be finite and nonnegative");
         String normalized = text == null ? "" : text;
         if (glyphs != null && this.size == size && normalized.equals(this.text)) return;
+        matchingSize = this.size == size;
+        unchangedPrefix = 0;
+        revision++;
         this.text = text == null ? "" : text;
         this.size = size;
 
         int capacity = Math.max(8, this.text.length());
         int oldCount = count;
+        previousCount = count;
         if (glyphs == null) {
             glyphs = new SlugGlyph[capacity];
             xOffsets = new float[capacity];
@@ -81,71 +96,44 @@ public final class SlugTextRun {
         minX = minY = Float.POSITIVE_INFINITY;
         maxX = maxY = Float.NEGATIVE_INFINITY;
 
-        float penX = 0f;
-        float penY = 0f;
-        float lineWidth = 0f;
-        float maxWidth = 0f;
-        int previous = 0;
-        int lines = 1;
-
-        for (int i = 0; i < this.text.length(); i++) {
-            char c = this.text.charAt(i);
-
-            if (c == '\n') {
-                maxWidth = Math.max(maxWidth, lineWidth);
-                lineWidth = 0f;
-                penX = 0f;
-                penY -= font.lineHeight() * size;
-                previous = 0;
-                lines++;
-                continue;
-            }
-
-            if (c == '\t') {
-                SlugGlyph space = font.glyph(' ');
-                float tab = (space != null ? space.advance : 0.25f) * 4f * size;
-                penX += tab;
-                lineWidth += tab;
-                previous = 0;
-                continue;
-            }
-
-            SlugGlyph glyph = font.glyph(c);
-            if (glyph == null) {
-                float fallback = 0.25f * size;
-                penX += fallback;
-                lineWidth += fallback;
-                previous = 0;
-                continue;
-            }
-
-            if (previous != 0) {
-                float kern = font.kerning(previous, c) * size;
-                penX += kern;
-                lineWidth += kern;
-            }
-
-            if (glyph.drawable) {
-                ensureCapacity(count + 1);
-                glyphs[count] = glyph;
-                xOffsets[count] = penX;
-                yOffsets[count] = penY;
-                minX = Math.min(minX, penX + glyph.x0 * size);
-                minY = Math.min(minY, penY + glyph.y0 * size);
-                maxX = Math.max(maxX, penX + glyph.x1 * size);
-                maxY = Math.max(maxY, penY + glyph.y1 * size);
-                count++;
-            }
-
-            float advance = glyph.advance * size;
-            penX += advance;
-            lineWidth += advance;
-            previous = c;
+        SlugShape cached = this.text.isEmpty() ? null : font.cachedShape(this.text);
+        if (cached != null) {
+            for (int index = 0; index < cached.glyphCount(); index++)
+                appendShapedGlyph(cached.glyphIndex(index), cached.x(index), cached.y(index));
+            width = cached.width() * size;
+            height = cached.height() * size;
+        } else {
+            SlugShapeBuilder shape = this.text.isEmpty() ? null : font.layoutRun(this.text, this);
+            width = shape == null ? 0 : shape.width * size;
+            height = shape == null ? 0 : shape.lines * shape.lineHeight * size;
         }
-
-        width = Math.max(maxWidth, lineWidth);
-        height = this.text.isEmpty() ? 0 : lines * font.lineHeight() * size;
+        prefixHistory[(int) (revision & (PREFIX_HISTORY - 1))] = unchangedPrefix;
         if (count < oldCount) Arrays.fill(glyphs, count, oldCount, null);
+    }
+
+    /**
+     * Consumes one glyph from the full-context shaping stream without intermediate
+     * index/position arrays. Whitespace contributes advances but no draw record.
+     *
+     * @param index exact font glyph index selected by HarfBuzz
+     * @param x normalized horizontal baseline position
+     * @param y normalized vertical baseline position
+     */
+    void appendShapedGlyph(int index, float x, float y) {
+        SlugGlyph glyph = font.glyphByIndex(index);
+        if (!glyph.drawable) return;
+        ensureCapacity(count + 1);
+        float offsetX = x * size;
+        float offsetY = y * size;
+        if (matchingSize && count < previousCount && unchangedPrefix == count && glyphs[count] == glyph && xOffsets[count] == offsetX && yOffsets[count] == offsetY) unchangedPrefix++;
+        glyphs[count] = glyph;
+        xOffsets[count] = offsetX;
+        yOffsets[count] = offsetY;
+        minX = Math.min(minX, offsetX + glyph.x0 * size);
+        minY = Math.min(minY, offsetY + glyph.y0 * size);
+        maxX = Math.max(maxX, offsetX + glyph.x1 * size);
+        maxY = Math.max(maxY, offsetY + glyph.y1 * size);
+        count++;
     }
 
     /**
@@ -168,7 +156,7 @@ public final class SlugTextRun {
     /**
      * Queues this retained layout in an ordinary texture batch. Glyphs remain
      * resolution independent and inherit batch translation, clipping and opacity.
-     * Reuses layout arrays without allocating per-frame scratch or raster atlases.
+     * Warm submissions reuse layout arrays; the batch owns any coverage cache.
      *
      * @param batch active destination texture batch
      * @param x baseline X before batch translation
@@ -188,6 +176,45 @@ public final class SlugTextRun {
      */
     public String text() {
         return text;
+    }
+
+    /**
+     * Returns the layout generation used to invalidate retained drawing geometry.
+     * Rebuilding unchanged text at the same size leaves this value unchanged.
+     *
+     * @return generation incremented whenever glyph offsets are rebuilt
+     */
+    public long revision() {
+        return revision;
+    }
+
+    /**
+     * Returns the drawable prefix preserved across up to eight recent rebuilds.
+     * Glyph identity and fully shaped offsets must match at the same em size;
+     * contextual substitutions and kerning therefore invalidate affected glyphs.
+     * Older revisions conservatively require rebuilding all drawing geometry.
+     *
+     * @param previousRevision generation represented by the caller's geometry
+     * @return identical leading drawable glyph count, or zero for older revisions
+     */
+    public int unchangedGlyphPrefix(long previousRevision) {
+        long distance = revision - previousRevision;
+        if (distance <= 0 || distance > PREFIX_HISTORY) return 0;
+        int prefix = count;
+        for (int step = 1; step <= distance; step++)
+            prefix = Math.min(prefix, prefixHistory[(int) ((previousRevision + step) & (PREFIX_HISTORY - 1))]);
+        return prefix;
+    }
+
+    /**
+     * Checks whether reusing this immediate layout would retain reasonably sized
+     * staging arrays. Large-to-small replacements instead release excess capacity.
+     *
+     * @param characters replacement source length within the font's cache limit
+     * @return true when retained glyph capacity is at most twice the requested size
+     */
+    boolean canReuse(int characters) {
+        return glyphs.length <= Math.max(8, characters) * 2;
     }
 
     /**

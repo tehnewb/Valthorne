@@ -13,6 +13,7 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashMap;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
@@ -27,26 +28,35 @@ import static org.lwjgl.opengl.GL30.GL_RG_INTEGER;
 import static org.lwjgl.stb.STBTruetype.*;
 
 /**
- * Owns GPU outline data and font metrics for a contiguous character range,
- * using Slug-style banded curve evaluation. Loading compiles glyph outlines into
- * quadratic segments and horizontal/vertical curve lookup bands. Kerning pairs are
- * cached as requested. The default constructor uploads RGBA16F curve and RG32UI band
- * textures immediately; deferred construction uploads them on first binding instead.
+ * Owns exact-file HarfBuzz text layouts and live Slug GPU curve geometry. The
+ * configured character range is precompiled; OpenType substitution and additional
+ * Unicode glyph indices are compiled lazily into append-only curve/band storage.
+ * Cubic CFF contours use adaptive bounded-error quadratics. The default constructor
+ * uploads RGBA16F curves and RG32UI bands immediately; deferred construction and
+ * CPU shaping require no graphics context. New geometry replaces the texture pair
+ * together at a later binding while preserving existing glyph addresses.
  * Texture upload, drawing, and disposal of uploaded textures require a current
  * OpenGL context. Confine each font's mutable layout and resource operations to its
  * owning graphics thread.
  * <p>
- * Text drawing and measurement iterate UTF-16 characters, recognize newline and
- * tab, and use a quarter-em advance for characters outside the compiled range.
- * They do not perform script shaping or surrogate-pair composition. Cubic outlines
- * are approximated by short line sequences; small segments are omitted according
- * to the configured thresholds.
+ * Text is itemized by Unicode bidi direction and script, then shaped by HarfBuzz
+ * with a deterministic undetermined-language profile. Ligatures, combining marks,
+ * UTF-16 clusters, CR/LF lines, and four-space tabs share one layout for measurement
+ * and drawing. Missing characters use this exact face's missing glyph; no system
+ * font is substituted. At most 128 layouts and 65,536 source characters are cached.
+ * Immediate draw runs use a separately bounded cache; createRun provides an
+ * independent retained layout for caller-managed or oversized text.
  * </p>
  * <p>
- * The font retains backing bytes for STB fallback kerning queries and owns its two
- * GPU textures. Dispose them with the context current after all drawing completes.
- * Measurement data remains stored after disposal, but drawing then has no valid
- * texture resources. Optional retained text, baseline position, size, and color
+ * World text uses scalable unhinted geometry. createHinted creates a disposable UI
+ * view sharing the source's bytes and normalized logical layout, while FreeType
+ * supplies physical-size hinted outlines. UI roots retain these views and apply a
+ * fixed portable grayscale response; no bitmap atlas replaces Slug's curve shader.
+ * FreeType initializes only when hinting is requested. Dispose GPU resources with
+ * the context current after drawing completes; hinted views must not outlive their
+ * borrowed source. Native shaping/hinting resources are released on disposal.
+ * CPU-only measurement remains available, using a temporary native owner on a
+ * disposed font's layout cache miss. Optional retained position, size, and color
  * support Dimensional usage; explicit width/height setters only override measured
  * metadata and do not scale rendered glyphs.
  * </p>
@@ -86,17 +96,21 @@ public final class SlugFont implements Dimensional {
      */
     private static final float BANDS_PER_EM = Float.parseFloat(System.getProperty("valthorne.slug.bandsPerEm", "40"));
     /**
-     * Squared em-space endpoint threshold below which curve segments are omitted.
+     * Maximum retained shaped strings per source font.
      */
-    private static final float MIN_CURVE_LENGTH_SQUARED = Float.parseFloat(System.getProperty("valthorne.slug.minCurveLengthSquared", "0.00000025"));
+    private static final int MAX_SHAPES = 128;
     /**
-     * Squared em-space flatness threshold used to simplify quadratic and cubic outlines.
+     * Maximum UTF-16 characters retained across the source font's shape cache.
      */
-    private static final float QUADRATIC_FLATNESS_SQUARED = Float.parseFloat(System.getProperty("valthorne.slug.quadraticFlatnessSquared", "0.00000009"));
+    private static final int MAX_SHAPE_CHARACTERS = 65536;
     /**
      * Em-space expansion on each band edge to retain near-boundary curves.
      */
     private static final float BAND_EPSILON = 0.00005f;
+    /**
+     * Largest input retained by reusable draw-only HarfBuzz staging.
+     */
+    private static final int MAX_RUN_LAYOUT_CHARACTERS = 4096;
     private SlugTextRun retainedRun; // Reusable convenience-draw layout; separate runs are required for independent retained text.
 
     private final STBTTFontinfo info; // STB font info kept alive for fallback queries.
@@ -109,7 +123,18 @@ public final class SlugFont implements Dimensional {
     private final float ascent; // Font ascent in em units.
     private final float descent; // Font descent in em units.
     private final float lineHeight; // Line height in em units.
-    private final float fallbackAdvance; // Advance used when a glyph is not present.
+    private final SlugFont sourceFont; // Borrowed source for a hinted view, or null for an independently owned font.
+    private final float pixelsPerEm; // Physical hinted em size; zero keeps scalable unhinted world outlines.
+    private final SlugCurveBuffer curveWriter; // Append-only geometry staging preserves addresses of retained glyphs.
+    private final SlugBandBuffer bandWriter; // Append-only band staging shared by all compiled glyph indices.
+    private final SlugGlyph[][] indexedGlyphs; // Lazily allocated 256-glyph pages support substitutions without large sparse arrays.
+    private final LinkedHashMap<String, SlugShape> shapes = new LinkedHashMap<>(16, .75f, true); // Bounded retained normalized text layouts.
+    private final LinkedHashMap<String, SlugTextRun> cachedRuns = new LinkedHashMap<>(16, .75f, true); // Bounded prepared geometry/layouts for immediate drawing.
+    private SlugShapeBuilder runLayout; // Bounded source-owned draw-only HarfBuzz staging, never exposed as an immutable shape.
+    private SlugNativeFace nativeFace; // Lazily owned shaping/hinting face, shared by borrowed hinted views.
+    private int shapedCharacters; // UTF-16 character count retained in the shape cache.
+    private int runCharacters; // UTF-16 character count retained by prepared immediate runs.
+    private boolean geometryDirty; // Whether appended glyphs require a replacement GPU texture pair.
     private final Color color = new Color(1f, 1f, 1f, 1f); // Optional retained color for Font-like usage.
     private int curveTexture; // OpenGL texture id storing curve control points.
     private int bandTexture; // OpenGL texture id storing band lookup data.
@@ -135,6 +160,23 @@ public final class SlugFont implements Dimensional {
      */
     public SlugFont(SlugData data) {
         this(data, false);
+    }
+
+    /**
+     * Copies the exact encoded source for an independently owned native UI face.
+     * This cold-path operation performs no OpenGL calls and never exposes mutable
+     * STB backing storage. Existing outline drawing and ownership remain independent.
+     *
+     * @return independent TrueType/OpenType source bytes
+     * @throws IllegalStateException if the font has been disposed
+     */
+    public byte[] copyEncodedData() {
+        if (isDisposed()) throw new IllegalStateException("Font is disposed");
+        ByteBuffer source = fontBuffer.asReadOnlyBuffer();
+        source.position(0);
+        byte[] result = new byte[source.remaining()];
+        source.get(result);
+        return result;
     }
 
     /**
@@ -181,10 +223,15 @@ public final class SlugFont implements Dimensional {
         SlugCurveBuffer curveWriter = new SlugCurveBuffer(TEXTURE_WIDTH);
         SlugBandBuffer bandWriter = new SlugBandBuffer(TEXTURE_WIDTH);
         SlugGlyph[] glyphs = new SlugGlyph[characterCount];
+        SlugGlyph[][] indexedGlyphs = new SlugGlyph[256][];
 
         for (int i = 0; i < characterCount; i++) {
             int codepoint = firstCodepoint + i;
-            glyphs[i] = compileGlyph(info, codepoint, emScale, curveWriter, bandWriter);
+            int glyphIndex = stbtt_FindGlyphIndex(info, codepoint);
+            glyphs[i] = compileGlyph(info, glyphIndex, codepoint, emScale, loadCurves(info, glyphIndex, emScale), curveWriter, bandWriter);
+            int page = glyphIndex >>> 8;
+            if (indexedGlyphs[page] == null) indexedGlyphs[page] = new SlugGlyph[256];
+            indexedGlyphs[page][glyphIndex & 255] = glyphs[i];
         }
 
         float[] kerning = createKerningCache(characterCount);
@@ -202,11 +249,211 @@ public final class SlugFont implements Dimensional {
         this.ascent = ascent;
         this.descent = descent;
         this.lineHeight = ascent - descent + lineGap;
-        this.fallbackAdvance = 0.25f;
+        this.sourceFont = null;
+        this.pixelsPerEm = 0;
+        this.curveWriter = curveWriter;
+        this.bandWriter = bandWriter;
+        this.indexedGlyphs = indexedGlyphs;
         this.pendingCurves = curveWriter.toBuffer(curveHeight);
         this.pendingBands = bandWriter.toBuffer(bandHeight);
         if (!deferUpload) ensureTextures();
         recalcSize();
+    }
+
+    /**
+     * Creates a GPU-independent size-hinted view borrowing immutable source bytes,
+     * logical metrics, and shaping. Only this view's curve/band geometry is owned.
+     *
+     * @param source live source font that outlives this view
+     * @param pixelsPerEm quantized physical em size
+     */
+    private SlugFont(SlugFont source, float pixelsPerEm) {
+        sourceFont = source;
+        this.pixelsPerEm = pixelsPerEm;
+        info = source.info;
+        fontBuffer = source.fontBuffer;
+        firstCodepoint = source.firstCodepoint;
+        characterCount = source.characterCount;
+        emScale = source.emScale;
+        ascent = source.ascent;
+        descent = source.descent;
+        lineHeight = source.lineHeight;
+        kerning = source.kerning;
+        glyphs = new SlugGlyph[characterCount];
+        indexedGlyphs = new SlugGlyph[source.indexedGlyphs.length][];
+        curveWriter = new SlugCurveBuffer(TEXTURE_WIDTH);
+        bandWriter = new SlugBandBuffer(TEXTURE_WIDTH);
+        geometryDirty = true;
+    }
+
+    /**
+     * Creates an independently disposable hinted outline view for axis-aligned UI.
+     * The source must outlive the view. Run advances remain unhinted and share the
+     * source's shaped layout, so DPI changes do not alter logical text placement.
+     * Cache views by physical em size and release them with the UI resource owner.
+     *
+     * @param physicalSize finite physical pixels per em from 1 through 4096
+     * @return owned view whose geometry is generated lazily
+     */
+    public SlugFont createHinted(float physicalSize) {
+        if (isDisposed()) throw new IllegalStateException("Slug font is disposed");
+        if (!Float.isFinite(physicalSize) || physicalSize < 1 || physicalSize > 4096) throw new IllegalArgumentException("Invalid physical font size");
+        return new SlugFont(sourceFont == null ? this : sourceFont, Math.round(physicalSize * 64) / 64f);
+    }
+
+    /**
+     * Reports whether this view uses size-specific hinted geometry and display-space UI blending.
+     *
+     * @return true for a hinted UI view
+     */
+    public boolean isHinted() { return pixelsPerEm != 0; }
+
+    /**
+     * Estimates complete row-padded GPU curve/band storage without querying OpenGL.
+     * CPU staging and retained text metadata are additional owned storage. UI owners
+     * use this value to bound cached hinted views as new glyphs are appended.
+     *
+     * @return bytes required by the current RGBA16F and RG32UI texture pair
+     */
+    public long geometryBytes() { return (long) TEXTURE_WIDTH * (curveWriter.height() + bandWriter.height()) * 8; }
+
+    /**
+     * Borrows a retained HarfBuzz layout over the exact supplied font. Normalized
+     * positions are shared by logical measurement, raw world outlines, and hinted
+     * UI views. Cache misses after disposal use a temporary CPU-only native owner,
+     * preserving the existing ability to measure disposed fonts without retaining
+     * native shaping resources indefinitely. No OpenGL calls occur here.
+     *
+     * @param text nonnull complete UTF-16 text
+     * @return immutable em-space layout
+     */
+    public SlugShape shape(String text) {
+        if (text == null) throw new NullPointerException("text");
+        if (sourceFont != null) return sourceFont.shape(text);
+        SlugShape cached = shapes.get(text);
+        if (cached != null) return cached;
+        SlugShape result;
+        if (disposed) {
+            try (SlugNativeFace temporary = new SlugNativeFace(fontBuffer)) {
+                result = new SlugShapeBuilder(temporary, text, lineHeight).build();
+            }
+        } else {
+            result = new SlugShapeBuilder(text.isEmpty() ? null : nativeFace(), text, lineHeight).build();
+        }
+        if (text.length() <= MAX_SHAPE_CHARACTERS) {
+            shapes.put(text, result);
+            shapedCharacters += text.length();
+            while (shapes.size() > MAX_SHAPES || shapedCharacters > MAX_SHAPE_CHARACTERS)
+                shapedCharacters -= shapes.pollFirstEntry().getKey().length();
+        }
+        return result;
+    }
+
+    /**
+     * Borrows an immutable layout already retained by measurement or editing.
+     * Drawing may consume these positions directly without shaping the same
+     * changing label a second time. A miss does not allocate a public shape.
+     *
+     * @param text complete nonnull UTF-16 source
+     * @return previously computed source layout, or null when none is retained
+     */
+    SlugShape cachedShape(String text) {
+        return sourceFont != null ? sourceFont.cachedShape(text) : shapes.get(text);
+    }
+
+    /**
+     * Borrows a full-context draw layout until the next run rebuild on this source.
+     * Hinted views share the same source-owned staging. Inputs above 4096 UTF-16
+     * units use temporary staging so a large one-off label cannot grow the retained
+     * draw scratch indefinitely. Public immutable shapes retain separate storage.
+     *
+     * @param text nonempty UTF-16 source
+     * @param target borrowed run receiving full-context glyph positions
+     * @return completed borrowed line metrics; glyph positions are sent directly to target
+     */
+    SlugShapeBuilder layoutRun(String text, SlugTextRun target) {
+        if (sourceFont != null) return sourceFont.layoutRun(text, target);
+        if (text.length() > MAX_RUN_LAYOUT_CHARACTERS) {
+            SlugShapeBuilder temporary = new SlugShapeBuilder(nativeFace(), text, lineHeight, false);
+            temporary.rebuildRun(text, target);
+            return temporary;
+        }
+        if (runLayout == null) runLayout = new SlugShapeBuilder(nativeFace(), text, lineHeight, false);
+        runLayout.rebuildRun(text, target);
+        return runLayout;
+    }
+
+    /**
+     * Borrows a prepared immediate-draw run, avoiding repeated shaping, geometry
+     * lookup, and temporary glyph arrays on stable frames. The borrowed run may be
+     * rebuilt by a later size change or reused for another text after eviction;
+     * use createRun for independently
+     * retained or caller-modified layouts. Cache limits match the shaped text cache.
+     *
+     * @param text nonnull UTF-16 text
+     * @param size finite nonnegative world units per em
+     * @return borrowed prepared run for immediate serialized submission
+     */
+    public SlugTextRun cachedRun(String text, float size) {
+        if (isDisposed()) throw new IllegalStateException("Slug font is disposed");
+        if (text == null) throw new NullPointerException("text");
+        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Invalid font size");
+        SlugTextRun result = cachedRuns.get(text);
+        if (result != null) {
+            result.rebuild(text, size);
+            return result;
+        }
+        if (text.length() <= MAX_SHAPE_CHARACTERS && !cachedRuns.isEmpty() && (cachedRuns.size() >= MAX_SHAPES || runCharacters + text.length() > MAX_SHAPE_CHARACTERS)) {
+            var eldest = cachedRuns.pollFirstEntry();
+            runCharacters -= eldest.getKey().length();
+            if (eldest.getValue().canReuse(text.length())) {
+                result = eldest.getValue();
+                result.rebuild(text, size);
+            }
+        }
+        if (result == null) result = createRun(text, size);
+        if (text.length() <= MAX_SHAPE_CHARACTERS) {
+            cachedRuns.put(text, result);
+            runCharacters += text.length();
+            while (cachedRuns.size() > MAX_SHAPES || runCharacters > MAX_SHAPE_CHARACTERS)
+                runCharacters -= cachedRuns.pollFirstEntry().getKey().length();
+        }
+        return result;
+    }
+
+    /**
+     * Borrows the source's lazy native shaping and hinting owner.
+     *
+     * @return live exact-file native face
+     */
+    private SlugNativeFace nativeFace() {
+        if (sourceFont != null) return sourceFont.nativeFace();
+        if (disposed) throw new IllegalStateException("Slug font is disposed");
+        if (nativeFace == null) nativeFace = new SlugNativeFace(fontBuffer);
+        return nativeFace;
+    }
+
+    /**
+     * Resolves an actual shaped glyph index, compiling geometry only on a miss.
+     * Append-only texture addresses keep previously retained text runs valid.
+     *
+     * @param glyphIndex glyph index from this exact font's shaped layout
+     * @return immutable geometry metadata, including nondrawable whitespace
+     */
+    public SlugGlyph glyphByIndex(int glyphIndex) {
+        if (disposed || sourceFont != null && sourceFont.disposed) throw new IllegalStateException("Slug font is disposed");
+        if (glyphIndex < 0 || glyphIndex > 65535) throw new IllegalArgumentException("Invalid font glyph index");
+        int pageIndex = glyphIndex >>> 8;
+        SlugGlyph[] page = indexedGlyphs[pageIndex];
+        if (page == null) indexedGlyphs[pageIndex] = page = new SlugGlyph[256];
+        SlugGlyph result = page[glyphIndex & 255];
+        if (result != null) return result;
+        if (glyphIndex >= nativeFace().glyphCount()) throw new IllegalArgumentException("Glyph index exceeds this font's glyph count");
+        List<SlugCurve> curves = pixelsPerEm == 0 ? loadCurves(info, glyphIndex, emScale) : nativeFace().hintedCurves(glyphIndex, pixelsPerEm);
+        result = compileGlyph(info, glyphIndex, -1, emScale, curves, curveWriter, bandWriter);
+        page[glyphIndex & 255] = result;
+        geometryDirty = true;
+        return result;
     }
 
     /**
@@ -263,35 +510,39 @@ public final class SlugFont implements Dimensional {
      * metadata maps em-space coordinates into the selected bands.
      *
      * @param info        initialized STB font
-     * @param codepoint   character to compile
+     * @param glyphIndex actual shaped font glyph index
+     * @param codepoint representative source character, or -1 for glyph-index-only geometry
      * @param emScale     raw-unit to em multiplier
+     * @param curves normalized raw or hinted outline curves
      * @param curveWriter shared curve-data destination
      * @param bandWriter  shared band-data destination
      * @return compiled metrics and GPU lookup metadata
      */
-    private static SlugGlyph compileGlyph(STBTTFontinfo info, int codepoint, float emScale, SlugCurveBuffer curveWriter, SlugBandBuffer bandWriter) {
+    private static SlugGlyph compileGlyph(STBTTFontinfo info, int glyphIndex, int codepoint, float emScale, List<SlugCurve> curves, SlugCurveBuffer curveWriter, SlugBandBuffer bandWriter) {
         /*
          * Append each outline to shared texture staging and retain only immutable draw metadata.
          */
         IntBuffer advanceRaw = BufferUtils.createIntBuffer(1);
         IntBuffer lsbRaw = BufferUtils.createIntBuffer(1);
-        stbtt_GetCodepointHMetrics(info, codepoint, advanceRaw, lsbRaw);
+        stbtt_GetGlyphHMetrics(info, glyphIndex, advanceRaw, lsbRaw);
 
         float advance = advanceRaw.get(0) * emScale;
         float lsb = lsbRaw.get(0) * emScale;
 
-        IntBuffer ix0 = BufferUtils.createIntBuffer(1);
-        IntBuffer iy0 = BufferUtils.createIntBuffer(1);
-        IntBuffer ix1 = BufferUtils.createIntBuffer(1);
-        IntBuffer iy1 = BufferUtils.createIntBuffer(1);
-        boolean hasBox = stbtt_GetCodepointBox(info, codepoint, ix0, iy0, ix1, iy1);
-
-        float x0 = hasBox ? ix0.get(0) * emScale : 0f;
-        float y0 = hasBox ? iy0.get(0) * emScale : 0f;
-        float x1 = hasBox ? ix1.get(0) * emScale : 0f;
-        float y1 = hasBox ? iy1.get(0) * emScale : 0f;
-
-        List<SlugCurve> curves = loadCurves(info, codepoint, emScale);
+        float x0 = 0;
+        float y0 = 0;
+        float x1 = 0;
+        float y1 = 0;
+        if (!curves.isEmpty()) {
+            x0 = y0 = Float.POSITIVE_INFINITY;
+            x1 = y1 = Float.NEGATIVE_INFINITY;
+            for (SlugCurve curve : curves) {
+                x0 = Math.min(x0, curve.minX());
+                y0 = Math.min(y0, curve.minY());
+                x1 = Math.max(x1, curve.maxX());
+                y1 = Math.max(y1, curve.maxY());
+            }
+        }
         if (curves.isEmpty() || x1 <= x0 || y1 <= y0) {
             return new SlugGlyph(codepoint, advance, lsb, x0, y0, x1, y1, 0, 0, 0f, 0f, 0f, 0f, false);
         }
@@ -362,8 +613,9 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Assigns overlapping curves to each expanded axis band, then sorts each list
+     * Assigns crossing curves to each expanded axis band, then sorts each list
      * by descending maximum extent on the perpendicular axis for shader traversal.
+     * Constant ray-axis curves are omitted because their root code is always zero.
      *
      * @param curves         source quadratic segments
      * @param curveLocations matching packed curve texture addresses
@@ -387,6 +639,8 @@ public final class SlugFont implements Dimensional {
 
             for (int i = 0; i < curves.size(); i++) {
                 SlugCurve curve = curves.get(i);
+                // Constant ray-axis coordinates cannot contribute a crossing.
+                if (horizontal ? curve.p1y() == curve.p2y() && curve.p2y() == curve.p3y() : curve.p1x() == curve.p2x() && curve.p2x() == curve.p3x()) continue;
                 float cmin = horizontal ? curve.minY() : curve.minX();
                 float cmax = horizontal ? curve.maxY() : curve.maxX();
                 if (cmax >= bandMin && cmin <= bandMax) {
@@ -418,16 +672,16 @@ public final class SlugFont implements Dimensional {
      * Always frees the borrowed native outline buffer after processing.
      *
      * @param info      initialized font information
-     * @param codepoint character whose outline is requested
+     * @param glyphIndex actual font glyph index whose outline is requested
      * @param emScale   raw-unit to em multiplier
      * @return compiled segments, possibly empty
      */
-    private static List<SlugCurve> loadCurves(STBTTFontinfo info, int codepoint, float emScale) {
+    private static List<SlugCurve> loadCurves(STBTTFontinfo info, int glyphIndex, float emScale) {
         /*
          * Normalize outline commands to quadratic segments while retaining contour closure.
          */
         List<SlugCurve> curves = new ArrayList<>();
-        STBTTVertex.Buffer vertices = stbtt_GetCodepointShape(info, codepoint);
+        STBTTVertex.Buffer vertices = stbtt_GetGlyphShape(info, glyphIndex);
         if (vertices == null) {
             return curves;
         }
@@ -445,7 +699,7 @@ public final class SlugFont implements Dimensional {
 
                 if (type == STBTT_vmove) {
                     if (contourOpen) {
-                        addLine(curves, currentX, currentY, startX, startY);
+                        SlugCurves.line(curves, currentX, currentY, startX, startY);
                     }
                     startX = v.x() * emScale;
                     startY = v.y() * emScale;
@@ -455,7 +709,7 @@ public final class SlugFont implements Dimensional {
                 } else if (type == STBTT_vline) {
                     float x = v.x() * emScale;
                     float y = v.y() * emScale;
-                    addLine(curves, currentX, currentY, x, y);
+                    SlugCurves.line(curves, currentX, currentY, x, y);
                     currentX = x;
                     currentY = y;
                 } else if (type == STBTT_vcurve) {
@@ -463,7 +717,7 @@ public final class SlugFont implements Dimensional {
                     float cy = v.cy() * emScale;
                     float x = v.x() * emScale;
                     float y = v.y() * emScale;
-                    addQuadratic(curves, currentX, currentY, cx, cy, x, y);
+                    SlugCurves.quadratic(curves, currentX, currentY, cx, cy, x, y);
                     currentX = x;
                     currentY = y;
                 } else if (type == STBTT_vcubic) {
@@ -473,14 +727,14 @@ public final class SlugFont implements Dimensional {
                     float cy1 = v.cy1() * emScale;
                     float x = v.x() * emScale;
                     float y = v.y() * emScale;
-                    approximateCubic(curves, currentX, currentY, cx0, cy0, cx1, cy1, x, y);
+                    SlugCurves.cubic(curves, currentX, currentY, cx0, cy0, cx1, cy1, x, y);
                     currentX = x;
                     currentY = y;
                 }
             }
 
             if (contourOpen) {
-                addLine(curves, currentX, currentY, startX, startY);
+                SlugCurves.line(curves, currentX, currentY, startX, startY);
             }
         } finally {
             // CFF glyphs can allocate zero vertices; the checked wrapper rejects empty buffers.
@@ -488,138 +742,6 @@ public final class SlugFont implements Dimensional {
         }
 
         return curves;
-    }
-
-    /**
-     * Appends a line encoded as a quadratic with midpoint control, unless endpoint
-     * distance squared is below the configured minimum.
-     *
-     * @param curves destination segment list
-     * @param x0     start X in em units
-     * @param y0     start Y in em units
-     * @param x1     end X in em units
-     * @param y1     end Y in em units
-     */
-    private static void addLine(List<SlugCurve> curves, float x0, float y0, float x1, float y1) {
-        /*
-         * Represent a line as a midpoint quadratic compatible with the same GPU evaluator.
-         */
-        float dx = x1 - x0;
-        float dy = y1 - y0;
-        if (dx * dx + dy * dy < MIN_CURVE_LENGTH_SQUARED) {
-            return;
-        }
-        curves.add(new SlugCurve(x0, y0, (x0 + x1) * 0.5f, (y0 + y1) * 0.5f, x1, y1));
-    }
-
-    /**
-     * Appends a quadratic unless its endpoint separation is below the minimum.
-     * A control point sufficiently close to the endpoint midpoint is replaced by
-     * that midpoint, encoding a straight segment.
-     *
-     * @param curves destination segments
-     * @param x0     start X
-     * @param y0     start Y
-     * @param cx     control X
-     * @param cy     control Y
-     * @param x1     end X
-     * @param y1     end Y
-     */
-    private static void addQuadratic(List<SlugCurve> curves, float x0, float y0, float cx, float cy, float x1, float y1) {
-        /*
-         * Omit negligible segments and simplify flat control points before texture staging.
-         */
-        float dx = x1 - x0;
-        float dy = y1 - y0;
-        if (dx * dx + dy * dy < MIN_CURVE_LENGTH_SQUARED) {
-            return;
-        }
-
-        float mx = (x0 + x1) * 0.5f;
-        float my = (y0 + y1) * 0.5f;
-        float fx = cx - mx;
-        float fy = cy - my;
-        if (fx * fx + fy * fy < QUADRATIC_FLATNESS_SQUARED) {
-            curves.add(new SlugCurve(x0, y0, mx, my, x1, y1));
-            return;
-        }
-
-        curves.add(new SlugCurve(x0, y0, cx, cy, x1, y1));
-    }
-
-    /**
-     * Approximates a cubic in em space. Very short endpoint spans are omitted,
-     * nearly collinear controls become one line, and other curves become five or
-     * eight line segments according to control-point distance from the endpoint line.
-     *
-     * @param curves destination quadratic/line records
-     * @param x0     start X
-     * @param y0     start Y
-     * @param cx0    first control X
-     * @param cy0    first control Y
-     * @param cx1    second control X
-     * @param cy1    second control Y
-     * @param x1     end X
-     * @param y1     end Y
-     */
-    private static void approximateCubic(List<SlugCurve> curves, float x0, float y0, float cx0, float cy0, float cx1, float cy1, float x1, float y1) {
-        /*
-         * Sample unsupported cubic outlines into the existing quadratic line representation.
-         */
-        float dx = x1 - x0;
-        float dy = y1 - y0;
-        float lengthSquared = dx * dx + dy * dy;
-        if (lengthSquared < MIN_CURVE_LENGTH_SQUARED) {
-            return;
-        }
-
-        float flat0 = distanceToLineSquared(cx0, cy0, x0, y0, x1, y1);
-        float flat1 = distanceToLineSquared(cx1, cy1, x0, y0, x1, y1);
-        if (Math.max(flat0, flat1) < QUADRATIC_FLATNESS_SQUARED) {
-            addLine(curves, x0, y0, x1, y1);
-            return;
-        }
-
-        float px = x0;
-        float py = y0;
-        final int steps = Math.max(flat0, flat1) > 0.00001f ? 8 : 5;
-        for (int i = 1; i <= steps; i++) {
-            float t = i / (float) steps;
-            float u = 1f - t;
-            float x = u * u * u * x0 + 3f * u * u * t * cx0 + 3f * u * t * t * cx1 + t * t * t * x1;
-            float y = u * u * u * y0 + 3f * u * u * t * cy0 + 3f * u * t * t * cy1 + t * t * t * y1;
-            addLine(curves, px, py, x, y);
-            px = x;
-            py = y;
-        }
-    }
-
-    /**
-     * Measures squared perpendicular distance to the infinite endpoint line.
-     * For a near-zero line length, returns squared distance to its first endpoint.
-     *
-     * @param px point X
-     * @param py point Y
-     * @param x0 first line point X
-     * @param y0 first line point Y
-     * @param x1 second line point X
-     * @param y1 second line point Y
-     * @return squared distance in the input coordinate units
-     */
-    private static float distanceToLineSquared(float px, float py, float x0, float y0, float x1, float y1) {
-        /*
-         * Use squared distances to avoid a square root when checking outline flatness.
-         */
-        float dx = x1 - x0;
-        float dy = y1 - y0;
-        float len2 = dx * dx + dy * dy;
-        if (len2 < 1.0e-12f) {
-            float ox = px - x0;
-            float oy = py - y0;
-            return ox * ox + oy * oy;
-        }
-        float cross = (px - x0) * dy - (py - y0) * dx;
-        return (cross * cross) / len2;
     }
 
     /**
@@ -764,6 +886,7 @@ public final class SlugFont implements Dimensional {
         if (index < 0 || index >= characterCount) {
             return null;
         }
+        if (glyphs[index] == null) glyphs[index] = glyphByIndex(stbtt_FindGlyphIndex(info, codepoint));
         return glyphs[index];
     }
 
@@ -791,8 +914,9 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Creates a reusable layout tied to this font, avoiding repeated glyph and kerning
-     * layout during drawing. Keep the font's GPU resources alive while drawing the run.
+     * Creates an independent reusable shaped layout tied to this font. HarfBuzz
+     * positioning and glyph geometry are prepared on construction/rebuild and
+     * reused during drawing. Keep the font alive while drawing the run.
      *
      * @param text text to lay out
      * @param size world units per em
@@ -807,21 +931,24 @@ public final class SlugFont implements Dimensional {
      *
      * @return true after disposal; measurement remains available
      */
-    public boolean isDisposed() {
-        return disposed;
-    }
+    public boolean isDisposed() { return disposed || sourceFont != null && sourceFont.disposed; }
 
     /**
-     * Uploads staged outline data once with the owning context current. Both texture
-     * IDs become visible together; a failed second upload releases the first texture
-     * and retains staging buffers so a later call can retry.
+     * Uploads staged outline data with the owning context current. Geometry growth
+     * replaces the pair while keeping glyph addresses stable. Both texture IDs
+     * become visible together; a failed second upload releases the first new
+     * texture and retains staging buffers so a later call can retry.
      *
      * @throws IllegalStateException if the font has been disposed
      * @throws RuntimeException if texture creation fails
      */
     private void ensureTextures() {
-        if (disposed) throw new IllegalStateException("Slug font is disposed.");
-        if (curveTexture != 0) return;
+        if (isDisposed()) throw new IllegalStateException("Slug font is disposed.");
+        if (curveTexture != 0 && !geometryDirty) return;
+        if (geometryDirty) {
+            pendingCurves = curveWriter.toBuffer(Math.max(1, curveWriter.height()));
+            pendingBands = bandWriter.toBuffer(Math.max(1, bandWriter.height()));
+        }
         int curves = uploadTexture(pendingCurves, null);
         int bands;
         try {
@@ -830,8 +957,11 @@ public final class SlugFont implements Dimensional {
             glDeleteTextures(curves);
             throw failure;
         }
+        if (curveTexture != 0) glDeleteTextures(curveTexture);
+        if (bandTexture != 0) glDeleteTextures(bandTexture);
         curveTexture = curves;
         bandTexture = bands;
+        geometryDirty = false;
         pendingCurves = null;
         pendingBands = null;
     }
@@ -938,8 +1068,8 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Measures the maximum line advance using the same UTF-16 kerning, tab, and
-     * fallback rules as draw. This measures pen advances rather than tight ink bounds.
+     * Measures the maximum shaped line advance using the same OpenType glyph
+     * positions as drawing. This measures advances rather than tight ink bounds.
      * Does not change retained state; null or empty text returns zero.
      *
      * @param text text to measure
@@ -947,13 +1077,15 @@ public final class SlugFont implements Dimensional {
      * @return maximum line advance in world units
      */
     public float getWidth(String text, float size) {
-        return getWidth(text, 0, text == null ? 0 : text.length(), size);
+        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Invalid font size");
+        if (text == null || text.isEmpty() || size == 0) return 0;
+        return shape(text).width() * size;
     }
 
     /**
-     * Measures a UTF-16 range without allocating a substring. Range endpoints
-     * are clamped to the string, and kerning starts fresh at the first character.
-     * Newline, tab and unsupported-character advances match live rendering.
+     * Shapes a clamped UTF-16 substring as an independent run. Interior ranges may
+     * allocate a substring on cache lookup. For full-context caret positions or
+     * bidirectional selection, use shape(text) instead of measuring prefixes.
      *
      * @param text source text; null or empty yields zero
      * @param startInclusive inclusive start index, clamped to the source
@@ -963,49 +1095,17 @@ public final class SlugFont implements Dimensional {
      * @throws IllegalArgumentException if size is negative or nonfinite
      */
     public float getWidth(String text, int startInclusive, int endExclusive, float size) {
-        if (!Float.isFinite(size) || size < 0f) throw new IllegalArgumentException("Size must be finite and nonnegative.");
-        if (text == null || text.isEmpty() || size == 0f) return 0f;
-        int start = Math.max(0, startInclusive);
-        int end = Math.min(text.length(), endExclusive);
-        if (start >= end) return 0f;
-
-        float lineWidth = 0f;
-        float maxWidth = 0f;
-        int previous = 0;
-
-        for (int i = start; i < end; i++) {
-            char c = text.charAt(i);
-            if (c == '\n') {
-                maxWidth = Math.max(maxWidth, lineWidth);
-                lineWidth = 0f;
-                previous = 0;
-                continue;
-            }
-            if (c == '\t') {
-                SlugGlyph space = glyph(' ');
-                lineWidth += (space != null ? space.advance : fallbackAdvance) * 4f * size;
-                previous = 0;
-                continue;
-            }
-            SlugGlyph glyph = glyph(c);
-            if (glyph == null) {
-                lineWidth += fallbackAdvance * size;
-                previous = 0;
-                continue;
-            }
-            if (previous != 0) {
-                lineWidth += kerning(previous, c) * size;
-            }
-            lineWidth += glyph.advance * size;
-            previous = c;
-        }
-
-        return Math.max(maxWidth, lineWidth);
+        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Invalid font size");
+        if (text == null || text.isEmpty() || size == 0) return 0;
+        int start = Math.max(0, Math.min(text.length(), startInclusive));
+        int end = Math.max(start, Math.min(text.length(), endExclusive));
+        if (start == end) return 0;
+        return getWidth(start == 0 && end == text.length() ? text : text.substring(start, end), size);
     }
 
     /**
-     * Measures line-box height as newline count plus one times font line height and
-     * size. A trailing newline adds an empty line; null or empty text returns zero.
+     * Measures shaped line-box height using font line height and size. CR, LF,
+     * and CRLF delimit lines. A trailing break adds an empty line; null or empty text returns zero.
      * This is not a tight glyph-ink measurement.
      *
      * @param text text to measure
@@ -1013,16 +1113,9 @@ public final class SlugFont implements Dimensional {
      * @return total line-box height
      */
     public float getHeight(String text, float size) {
-        if (text == null || text.isEmpty()) {
-            return 0f;
-        }
-        int lines = 1;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '\n') {
-                lines++;
-            }
-        }
-        return lines * lineHeight * size;
+        if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Invalid font size");
+        if (text == null || text.isEmpty() || size == 0) return 0;
+        return shape(text).height() * size;
     }
 
     /**
@@ -1139,13 +1232,23 @@ public final class SlugFont implements Dimensional {
     }
 
     /**
-     * Deletes owned curve and band textures with the GL context current, replacing
-     * their IDs with zero. Repeated calls are harmless. Retains CPU glyph, kerning,
-     * and font-byte data, so measurement still works while drawing is no longer valid.
+     * Deletes owned geometry textures and native shaping/hinting resources. A hinted
+     * view releases only its geometry; the source owns shared native resources.
+     * Repeated calls are harmless. Retained bytes/cached layout metadata permit
+     * CPU-only measurement after disposal, while further drawing is invalid.
      * An unuploaded deferred font needs no current context for disposal.
      */
     public void dispose() {
+        if (disposed) return;
         disposed = true;
+        cachedRuns.clear();
+        retainedRun = null;
+        runLayout = null;
+        runCharacters = 0;
+        if (nativeFace != null) {
+            nativeFace.close();
+            nativeFace = null;
+        }
         pendingCurves = null;
         pendingBands = null;
         if (curveTexture != 0) {

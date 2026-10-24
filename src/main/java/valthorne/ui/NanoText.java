@@ -2,6 +2,7 @@ package valthorne.ui;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.TextSelection;
 import valthorne.ui.theme.StyleKey;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.nodes.nano.NanoCodeEditor;
@@ -9,11 +10,15 @@ import valthorne.ui.nodes.nano.NanoCodeEditor;
 import static org.lwjgl.nanovg.NanoVG.*;
 
 /**
- * Mixed-renderer text bridge for Nano controls. A theme can provide a Slug font
- * for smooth curve glyphs; roots supply smooth defaults when no face is configured.
+ * Shared text bridge for Nano controls. Slug uses full-context shaping and
+ * physical-size hinted outlines from the theme font's exact bytes. Roots supply defaults
+ * when no face is configured. Caret/selection measurements share the selected shaped layout.
  * Detached drawing without a root context retains the NanoVG renderer.
  * The active root coordinates backend transitions and painter order. Font
  * ownership stays with the theme, and controls retain their normal text input.
+ * Custom names registered with {@link UIRoot#registerTextFont(String, SlugFont)}
+ * participate in hinted and scalable rendering. NanoVG-only registered names retain
+ * that renderer because an opaque handle does not expose the encoded source file.
  * <pre>{@code
  * label.setStyle(NanoText.FONT, borrowedFont);
  * label.clearStyle(NanoText.FONT); // Restore current theme/root typography.
@@ -57,7 +62,7 @@ public final class NanoText {
          * with smooth text instead of borrowing the NanoVG raster metrics.
          */
         SlugFont font = font(node, name);
-        return font == null ? NanoUtility.measureTextWidth(vg, name, size, text) : font.getWidth(text, size);
+        return font == null ? NanoUtility.measureTextWidth(vg, name, size, text) : UIText.width(node, font, text, size);
     }
 
     /**
@@ -75,7 +80,7 @@ public final class NanoText {
          * when editor controls lay out before their first draw.
          */
         SlugFont font = font(node, name);
-        return font == null ? NanoUtility.measureTextHeight(vg, name, size) : font.lineHeight() * size;
+        return font == null ? NanoUtility.measureTextHeight(vg, name, size) : UIText.lineHeight(node, font, size);
     }
 
     /**
@@ -122,15 +127,18 @@ public final class NanoText {
          */
         SlugFont font = font(node, name);
         UIRoot root = node.getRoot();
-        if (font == null || root == null || root.getRenderContext() == null) return nvgText(vg, x, y, text);
-        float width = font.getWidth(text, size);
+        if (font == null || root == null || root.getRenderContext() == null) {
+            float end = nvgText(vg, x, y, text);
+            if (root != null) root.recordTextRendering(UITextRenderingMode.NANOVG, font == null ? UITextFallbackReason.NANOVG_ONLY_FONT : UITextFallbackReason.NO_RENDER_CONTEXT, 0, 0);
+            return end;
+        }
+        float width = UIText.width(node, font, text, size);
         float left = x - ((align & NVG_ALIGN_CENTER) != 0 ? width * .5f : (align & NVG_ALIGN_RIGHT) != 0 ? width : 0);
         float baseline = y;
-        if ((align & NVG_ALIGN_TOP) != 0) baseline += font.ascent() * size;
-        else if ((align & NVG_ALIGN_MIDDLE) != 0) baseline += (font.ascent() + font.descent()) * size * .5f;
-        else if ((align & NVG_ALIGN_BOTTOM) != 0) baseline += font.descent() * size;
-        root.getRenderContext()
-                .drawNanoText(node, font, text, left, baseline, size, color);
+        if ((align & NVG_ALIGN_TOP) != 0) baseline += UIText.ascent(node, font, size);
+        else if ((align & NVG_ALIGN_MIDDLE) != 0) baseline += (UIText.ascent(node, font, size) + UIText.descent(node, font, size)) * .5f;
+        else if ((align & NVG_ALIGN_BOTTOM) != 0) baseline += UIText.descent(node, font, size);
+        root.getRenderContext().drawNanoText(node, font, text, left, baseline, size, color);
         return left + width;
     }
 
@@ -148,11 +156,70 @@ public final class NanoText {
      */
     public static float measureTextWidth(UINode node, long vg, String name, float size, String text, int start, int end) {
         /*
-         * Range slicing occurs only for caret measurement, matching the existing
-         * editor's prefix measurement semantics.
+         * Registered Slug faces measure the complete shaped context at both carets;
+         * custom NanoVG names retain their own range measurement.
          */
-        if (font(node, name) == null) return NanoUtility.measureTextWidth(vg, name, size, text, start, end);
-        return measureTextWidth(node, vg, name, size, text.substring(start, end));
+        SlugFont selected = font(node, name);
+        if (selected == null) return NanoUtility.measureTextWidth(vg, name, size, text, start, end);
+        return Math.abs(UIText.caretX(node, selected, text, size, end) - UIText.caretX(node, selected, text, size, start));
+    }
+
+    /**
+     * Uses the selected shaped backend for registered Slug faces. Custom NanoVG
+     * names retain the editor's existing fallback.
+     *
+     * @param node owning editor
+     * @param name registered font name
+     * @param text complete displayed line
+     * @param size logical em size
+     * @param x logical horizontal position relative to text origin
+     * @return shaped UTF-16 insertion position, or -1 for a custom NanoVG face
+     */
+    public static int shapedHitTest(UINode node, String name, String text, float size, float x) {
+        /*
+         * Shaped cluster boundaries preserve ligatures and bidirectional shaping.
+         */
+        SlugFont selected = font(node, name);
+        return selected != null ? UIText.hitTest(node, selected, text, size, x) : -1;
+    }
+
+    /**
+     * Measures the actual leading-edge caret position in a fully shaped line.
+     *
+     * @param node owning editor
+     * @param vg fallback Nano context
+     * @param name registered font name
+     * @param text full displayed line
+     * @param size logical em size
+     * @param position UTF-16 insertion position
+     * @return logical caret X coordinate
+     */
+    public static float caretX(UINode node, long vg, String name, String text, float size, int position) {
+        /*
+         * RTL caret coordinates are positions, not absolute prefix distances.
+         */
+        SlugFont selected = font(node, name);
+        return selected != null ? UIText.caretX(node, selected, text, size, position)
+                : measureTextWidth(node, vg, name, size, text, 0, position);
+    }
+
+    /**
+     * Gets shaped selection rectangles without approximating bidi ranges.
+     *
+     * @param node owning editor
+     * @param name registered font name
+     * @param text full displayed line
+     * @param size logical em size
+     * @param start inclusive UTF-16 position
+     * @param end exclusive UTF-16 position
+     * @return shaped visual rectangles, or null for a custom NanoVG face
+     */
+    public static TextSelection selection(UINode node, String name, String text, float size, int start, int end) {
+        /*
+         * The same exact font and selected layout drive selection, carets, and drawing.
+         */
+        SlugFont selected = font(node, name);
+        return selected == null ? null : UIText.selection(node, selected, text, size, start, end);
     }
 
     /**
@@ -170,6 +237,8 @@ public final class NanoText {
          * Code controls use a matching monospace face while normal controls
          * share the proportional interface face.
          */
+        SlugFont registered = node.getRoot() == null ? null : node.getRoot().registeredTextFont(name);
+        if (registered != null) return registered;
         if (!"default".equals(name) && !"code".equals(name)) return null;
         ResolvedStyle style = node.getStyleOrDefaults();
         boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);

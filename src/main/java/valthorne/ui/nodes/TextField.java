@@ -6,9 +6,11 @@ import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
 import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.TextSelection;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
+import valthorne.ui.UIText;
 import valthorne.graphics.texture.TextureData;
 import valthorne.math.MathUtils;
 import org.joml.Vector2f;
@@ -729,8 +731,8 @@ public class TextField extends Panel {
             if (font != null) {
                 String measured = getDisplayText();
                 String fallback = placeholder == null ? "" : placeholder;
-                float measuredWidth = Math.max(font.getWidth(measured, fontSize), font.getWidth(fallback, fontSize)) + padding * 2f;
-                float measuredHeight = font.getHeight("Ay", fontSize) + padding * 2f;
+                float measuredWidth = Math.max(UIText.width(this, font, measured, fontSize), UIText.width(this, font, fallback, fontSize)) + padding * 2f;
+                float measuredHeight = UIText.height(this, font, "Ay", fontSize) + padding * 2f;
 
                 if (getLayout().getWidth().isAuto())
                     getLayout()
@@ -840,8 +842,8 @@ public class TextField extends Panel {
      * <p>
      * If the visible text is empty, placeholder text is rendered when available.
      * Otherwise the visible text is drawn at the horizontally scrolled text origin.
-     * Axis-aligned Slug line origins and baselines align to physical pixels to
-     * keep small text steady while preserving fractional advances and kerning.
+     * Text, selection and caret share the same fractional line origin. Slug
+     * evaluates hinted coverage at that position without rounding shaped advances.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -850,23 +852,20 @@ public class TextField extends Panel {
         String visibleText = getDisplayText();
         boolean empty = visibleText.isEmpty();
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
-        float baseline = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
-        float drawY = batch.getGlyphs()
-                .alignTextBaseline(baseline);
+        float drawX = getRenderX() + padding + textOffsetX;
+        float drawY = getRenderY() + (getHeight() - (UIText.ascent(this, font, fontSize) - UIText.descent(this, font, fontSize))) * .5f - UIText.descent(this, font, fontSize);
         if (empty) {
             if (!placeholder.isEmpty()) {
                 if (placeholderRun == null || placeholderRun.font() != font)
                     placeholderRun = font.createRun(placeholder, fontSize);
                 else placeholderRun.rebuild(placeholder, fontSize);
-                placeholderRun.draw(batch, batch.getGlyphs().alignTextOrigin(getRenderX() + padding + placeholderOffsetX), drawY, placeholderColor);
+                UIText.draw(this, batch, placeholderRun, font, placeholder, getRenderX() + padding + placeholderOffsetX, drawY, fontSize, placeholderColor);
             }
             return;
         }
         if (textRun == null || textRun.font() != font) textRun = font.createRun(visibleText, fontSize);
         else textRun.rebuild(visibleText, fontSize);
-        textRun.draw(batch, drawX, drawY, textColor);
+        UIText.draw(this, batch, textRun, font, visibleText, drawX, drawY, fontSize, textColor);
     }
 
     /**
@@ -878,7 +877,7 @@ public class TextField extends Panel {
      * The selection rectangle is computed from the measured width up to the selected
      * character indices. A solid color quad is drawn using the shared caret pixel
      * texture and the resolved or fallback selection color. Its origin uses the
-     * same physical pixel alignment as the text so their positions remain consistent.
+     * same fractional position as the text so their positions remain consistent.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -887,8 +886,7 @@ public class TextField extends Panel {
         int a = Math.min(selectionStart, selectionEnd);
         int b = Math.max(selectionStart, selectionEnd);
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float drawX = getRenderX() + padding + textOffsetX;
         float x1 = drawX + getTextWidthUpTo(a);
         float x2 = drawX + getTextWidthUpTo(b);
 
@@ -896,6 +894,12 @@ public class TextField extends Panel {
         float selectionY = getRenderY() + (getHeight() - selectionH) * 0.5f;
 
         Color drawSelectionColor = selectionColor != null ? selectionColor : defaultSelectionColor;
+        TextSelection shapedSelection = UIText.selection(this, font, getDisplayText(), fontSize, a, b);
+        if (shapedSelection != null) {
+            for (int index = 0; index < shapedSelection.size(); index++)
+                batch.draw(getCaretPixel(), drawX + shapedSelection.left(index), selectionY, shapedSelection.width(index), selectionH, drawSelectionColor);
+            return;
+        }
         batch.draw(getCaretPixel(), x1, selectionY, x2 - x1, selectionH, drawSelectionColor);
     }
 
@@ -906,8 +910,8 @@ public class TextField extends Panel {
      *
      * <p>
      * The caret X position is based on the measured width up to the current caret
-     * index plus the horizontal text offset. Its origin uses the same physical
-     * pixel alignment as the text, preserving the measured character offsets.
+     * index plus the horizontal text offset. Its origin uses the same fractional
+     * position as the text, preserving the measured character offsets.
      * </p>
      *
      * @param batch the texture batch used for rendering
@@ -915,8 +919,7 @@ public class TextField extends Panel {
     private void drawCaret(TextureBatch batch) {
         if (!isFocused() || !caretVisible) return;
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float drawX = getRenderX() + padding + textOffsetX;
         float caretX = drawX + getTextWidthUpTo(caretIndex);
         float caretH = Math.max(0f, getHeight() - caretPadY * 2f);
         float caretY = getRenderY() + (getHeight() - caretH) * 0.5f;
@@ -1197,10 +1200,10 @@ public class TextField extends Panel {
      * @return the rendered width up to the given index
      */
     private float getTextWidthUpTo(int index) {
-        if (font == null || index <= 0) return 0f;
+        if (font == null || index < 0) return 0f;
 
         String visibleText = getDisplayText();
-        return font.getWidth(visibleText, 0, Math.min(index, visibleText.length()), fontSize);
+        return UIText.caretX(this, font, visibleText, fontSize, Math.min(index, visibleText.length()));
     }
 
     /**
@@ -1221,16 +1224,8 @@ public class TextField extends Panel {
         if (font == null) return text.length();
 
         float local = mouseX - (getRenderX() + padding + textOffsetX);
-        if (local <= 0f) return 0;
-
         String visibleText = getDisplayText();
-        int length = visibleText.length();
-
-        for (int i = editor.next(0); i <= length && i > 0; i = i == length ? length + 1 : editor.next(i)) {
-            if (font.getWidth(visibleText, 0, i, fontSize) >= local) return i;
-        }
-
-        return length;
+        return UIText.hitTest(this, font, visibleText, fontSize, local);
     }
 
     /**
@@ -1286,8 +1281,8 @@ public class TextField extends Panel {
         }
 
         String visibleText = getDisplayText();
-        float textWidth = font.getWidth(visibleText, fontSize);
-        placeholderOffsetX = centered && visibleText.isEmpty() ? Math.max(0f, (available - font.getWidth(placeholder, fontSize)) * .5f) : 0f;
+        float textWidth = UIText.width(this, font, visibleText, fontSize);
+        placeholderOffsetX = centered && visibleText.isEmpty() ? Math.max(0f, (available - UIText.width(this, font, placeholder, fontSize)) * .5f) : 0f;
 
         if (textWidth <= available) {
             textOffsetX = centered ? (available - textWidth) * .5f : 0f;

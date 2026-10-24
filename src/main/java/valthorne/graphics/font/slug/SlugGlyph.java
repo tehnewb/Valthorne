@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
  */
 public final class SlugGlyph {
 
-    final int codepoint; // Unicode codepoint represented by this glyph.
+    final int codepoint; // Representative Unicode codepoint, or -1 for glyph-index-only substitution geometry.
     final float advance; // Horizontal advance in em units.
     final float leftSideBearing; // Left side bearing in em units.
     final float x0; // Minimum glyph bound x in em-space.
@@ -34,7 +34,7 @@ public final class SlugGlyph {
      * band data. Values are retained without validation; curve and band textures remain
      * owned by the enclosing font rather than this metadata object.
      *
-     * @param codepoint       represented Unicode codepoint
+     * @param codepoint       representative Unicode codepoint, or -1 for glyph-index-only geometry
      * @param advance         horizontal pen advance in em units
      * @param leftSideBearing left bearing in em units
      * @param x0              minimum horizontal outline bound in em units
@@ -67,9 +67,10 @@ public final class SlugGlyph {
     }
 
     /**
-     * Returns the Unicode codepoint represented by this glyph.
+     * Returns the representative precompiled codepoint, or -1 for geometry created
+     * from a substituted glyph index that need not map to one Unicode character.
      *
-     * @return glyph codepoint
+     * @return representative codepoint or -1
      */
     public int codepoint() {
         return codepoint;
@@ -144,16 +145,20 @@ public final class SlugGlyph {
      * TextureBatch supplies the clipped rectangle and coverage scale; immutable
      * glyph metadata supplies the packed outline and band references. No temporary
      * objects are created. The caller must provide enough remaining capacity.
+     * The four sample floats hold em-space bounds for derivative coverage, an
+     * integer physical baseline followed by its fractional phase for uniform
+     * live coverage, or atlas texel bounds for cached coverage. TextureBatch
+     * selects the corresponding shader mode and owns this packed-record contract.
      *
      * @param target native-order instance storage
      * @param x0 rectangle minimum world X
      * @param y0 rectangle minimum world Y
      * @param x1 rectangle maximum world X
      * @param y1 rectangle maximum world Y
-     * @param tx0 rectangle minimum outline X in em units
-     * @param ty0 rectangle minimum outline Y in em units
-     * @param tx1 rectangle maximum outline X in em units
-     * @param ty1 rectangle maximum outline Y in em units
+     * @param tx0 first horizontal sample value for the selected pipeline mode
+     * @param ty0 first vertical sample value for the selected pipeline mode
+     * @param tx1 second horizontal sample value for the selected pipeline mode
+     * @param ty1 second vertical sample value for the selected pipeline mode
      * @param pixelsPerEm positive uniform scale, or negative for derivative coverage
      * @param rgba packed normalized color bytes in RGBA order
      */

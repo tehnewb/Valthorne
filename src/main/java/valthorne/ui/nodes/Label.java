@@ -5,6 +5,7 @@ import valthorne.graphics.font.slug.SlugFont;
 import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
+import valthorne.ui.UIText;
 import valthorne.ui.enums.Alignment;
 import valthorne.ui.theme.ResolvedStyle;
 import valthorne.ui.theme.StyleKey;
@@ -38,14 +39,15 @@ import valthorne.ui.theme.UITokens;
  * <p>
  * During drawing, if a font is present, the label renders its text at its render
  * position. If a color is also present, that color is used; otherwise the batch
- * color is used. Live Slug curves follow camera zoom without raster caches.
+ * color is used. Axis-aligned UI uses hinted Slug outlines;
+ * rotated and camera-zoomed controls retain scalable Slug curves.
  * </p>
  *
  * <p>
  * Per-line layouts are retained so drawing does not split strings or repeat kerning.
- * Axis-aligned line origins and baselines align to physical pixels for consistent
- * small UI text while preserving fractional advances and kerning. Rotated or
- * nonuniform projections retain their original placement.
+ * Shaped layout and caret metrics share the source font, while the UI root owns
+ * physical-size hinted views. Logical sizes map to framebuffer pixels through
+ * its viewport.
  * The font is borrowed and must outlive pending draws.
  * The class does not perform its own interaction behavior and is typically used as
  * a child inside higher-level components such as buttons, tooltips, or form controls.
@@ -368,27 +370,27 @@ public class Label extends UINode {
             if (run == null || run.font() != font) run = font.createRun(line, fontSize);
             else run.rebuild(line, fontSize);
             lines[i] = run;
-            textWidth = Math.max(textWidth, run.width());
+            textWidth = Math.max(textWidth, UIText.width(this, font, line, fontSize));
             start = end + 1;
         }
-        textHeight = count * font.lineHeight() * fontSize;
+        textHeight = count * UIText.lineHeight(this, font, fontSize);
     }
 
     @Override
     public void draw(TextureBatch batch) {
         if (font == null || lines.length == 0 || fontSize == 0f) return;
         float x = getRenderX();
-        float baseline = getRenderY() + getHeight() - font.ascent() * fontSize;
-        float advance = font.lineHeight() * fontSize;
+        float baseline = getRenderY() + getHeight() - UIText.ascent(this, font, fontSize);
+        float advance = UIText.lineHeight(this, font, fontSize);
         float availableWidth = getWidth();
         for (int i = 0; i < lines.length; i++) {
             SlugTextRun line = lines[i];
             float lineX = switch (alignment) {
                 case START -> x;
-                case CENTER -> x + (availableWidth - line.width()) * .5f;
-                case END -> x + availableWidth - line.width();
+                case CENTER -> x + (availableWidth - UIText.width(this, font, line.text(), fontSize)) * .5f;
+                case END -> x + availableWidth - UIText.width(this, font, line.text(), fontSize);
             };
-            line.draw(batch, batch.getGlyphs().alignTextOrigin(lineX), batch.getGlyphs().alignTextBaseline(baseline - i * advance), color);
+            UIText.draw(this, batch, line, font, line.text(), lineX, baseline - i * advance, fontSize, color);
         }
     }
 }

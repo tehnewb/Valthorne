@@ -12,9 +12,11 @@ layout(location = 8) in float a_clipEnabled;
 
 uniform mat4 u_mvp;
 uniform vec4 u_textTransform;
+uniform bool u_linearColor;
 
-out vec4 v_color;
+flat out vec4 v_color;
 out vec2 v_texCoord;
+flat out vec4 v_sampleOrigin;
 flat out vec4 v_banding;
 flat out ivec4 v_glyph;
 flat out float v_pixelsPerEm;
@@ -27,6 +29,7 @@ void main() {
     vec2 world = vec2(u_textTransform.x * xy.x - u_textTransform.y * xy.y,
               u_textTransform.y * xy.x + u_textTransform.x * xy.y) + u_textTransform.zw;
     v_texCoord = mix(a_texRect.xy, a_texRect.zw, a_corner);
+    v_sampleOrigin = a_texRect;
     gl_Position = u_mvp * vec4(xy, 0.0, 1.0);
 
     v_glyph = ivec4(
@@ -37,7 +40,15 @@ void main() {
     );
     v_banding = a_band;
     v_pixelsPerEm = a_pixelsPerEm;
-    v_color = a_color;
+    vec4 instanceColor = a_color;
+#ifdef SLUG_MIXED_SPRITES
+    if (a_pixelsPerEm == -2.0) instanceColor = a_band;
+#endif
+    vec3 color = instanceColor.rgb;
+    if (u_linearColor) {
+        color = mix(color / 12.92, pow((color + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), color));
+    }
+    v_color = vec4(color, instanceColor.a);
     v_world = world;
     v_clipRect = a_clipRect;
     v_clipEnabled = a_clipEnabled;
