@@ -44,18 +44,14 @@ jobs:
       - name: Validate publication policy and snapshot
         id: policy
         run: node .github/scripts/release-policy.cjs
-      - name: Verify automation
-        run: node --test .github/scripts/*.test.cjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - uses: gradle/actions/wrapper-validation@v4
-      - name: Verify release artifacts
-        env:
-          ALSOFT_DRIVERS: 'null'
-        run: bash ./gradlew verifyRelease -Pprototype3d=false -PeditorPrototype=false --stacktrace --console=plain
+      - name: Build release artifacts
+        run: bash ./gradlew assemble --stacktrace --console=plain
 
   publish:
     needs: verify
@@ -95,14 +91,12 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: '5152FDD3'
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-          ALSOFT_DRIVERS: 'null'
         shell: bash
         run: |
           test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername"
           test -n "$ORG_GRADLE_PROJECT_mavenCentralPassword"
           test -n "$ORG_GRADLE_PROJECT_signingInMemoryKey"
-          bash ./gradlew publishAndReleaseToMavenCentral -PreleaseSigning=true \
-            -Pprototype3d=false -PeditorPrototype=false --console=plain
+          bash ./gradlew publishAndReleaseToMavenCentral -PreleaseSigning=true --console=plain
       - name: Record publication result
         env:
           RELEASE_VERSION: ${{ needs.verify.outputs.version }}

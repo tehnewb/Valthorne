@@ -84,8 +84,6 @@ dependencies {
 sourceSets {
     application {
         java.srcDir rootProject.file(providers.gradleProperty('applicationSources').orElse('src/game/java').get())
-        if (providers.gradleProperty('applicationIncludes').isPresent())
-            java.include providers.gradleProperty('applicationIncludes').get().split(',')
         if (providers.gradleProperty('applicationResources').isPresent())
             resources.srcDir rootProject.file(providers.gradleProperty('applicationResources').get())
         compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath

@@ -109,11 +109,3 @@ version's artifacts.
 
 Nothing is uploaded by local verification. This setup does not publish the
 current development version automatically; the next eligible merge requests publication.
-
-## Verification
-
-Run `node --test .github/scripts/*.test.cjs`. Tests cover component
-increments and resets, merge ordering, duplicate processing, unlabeled and
-ineligible PRs, invalid input, atomic commits, competing updates, automatic
-publication eligibility, exact release snapshot validation, and documentation
-synchronization that preserves unrelated Maven versions and IP addresses.

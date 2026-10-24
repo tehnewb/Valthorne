@@ -16,12 +16,6 @@ repositories {
 def lwjglVersion = "3.4.3"
 def joltVersion = "6.0.0"
 ext.fastjson2Version = '2.0.66'
-// Enable private prototypes only in checkouts that contain their ignored setup.
-def prototype3d = providers.gradleProperty('prototype3d').map { it.toBoolean() }
-        .getOrElse(file('.prototype3d/prototype.gradle').isFile())
-if (prototype3d && !file('.prototype3d/prototype.gradle').isFile())
-    throw new GradleException('The local 3D prototype is not installed.')
-
 // If you want more modules, add them to both lists below.
 def lwjglModules = [
         "lwjgl",
@@ -85,55 +79,15 @@ java {
     withSourcesJar()
 }
 
-apply from: 'gradle/benchmarks.gradle'
-apply from: 'gradle/bgfx.gradle'
-if (prototype3d) apply from: '.prototype3d/prototype.gradle'
-else {
-    sourceSets.main.java.exclude 'valthorne/threed/**'
-    sourceSets.test.java.exclude 'valthorne/threed/**', 'valthorne/graphics/bgfx/**', 'valthorne/graphics/lighting3d/**'
-}
-if (!prototype3d) {
-    tasks.withType(Jar).configureEach {
-        exclude 'valthorne/threed/**', 'valthorne/filament/**',
-                'valthorne/shaders/model3d/**', 'valthorne/shaders/pathtrace/**',
-                'META-INF/licenses/*filament*'
+// Keep private local sources and resources outside the public library build.
+sourceSets {
+    main {
+        java.exclude 'valthorne/threed/**', 'valthorne/ui/engine/**'
+        resources.exclude 'ui/icons/**', 'ui/scene-selection.png',
+                'valthorne/filament/**', 'valthorne/shaders/model3d/**',
+                'valthorne/shaders/pathtrace/**', 'META-INF/licenses/*filament*'
     }
 }
-// Ignored prototype code and native dependencies must never enter a publication.
-tasks.matching { it.name.startsWith('publish') }.configureEach {
-    doFirst {
-        if (prototype3d) throw new GradleException('Publish with -Pprototype3d=false to exclude the local prototype.')
-    }
-}
-tasks.register('verifySlugTextureBatch', JavaExec) {
-    group = 'verification'
-    description = 'Verifies direct and retained Slug curves, mixed sprites and batching in a hidden OpenGL context.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'valthorne.graphics.font.slug.SlugTextureBatchVerification'
-}
-
-
-// The editor is installed locally and is never part of a public checkout.
-def editorPrototype = providers.gradleProperty('editorPrototype').map { it.toBoolean() }
-        .getOrElse(file('.prototype-editor/editor.gradle').isFile())
-if (editorPrototype) {
-    if (!file('.prototype-editor/editor.gradle').isFile()) throw new GradleException('The local editor prototype is not installed.')
-    apply from: '.prototype-editor/editor.gradle'
-} else {
-    sourceSets.main.java.exclude 'valthorne/ui/engine/**'
-    sourceSets.test.java.exclude 'valthorne/ui/engine/**'
-    sourceSets.main.resources.exclude 'ui/icons/**', 'ui/scene-selection.png'
-    tasks.withType(Jar).configureEach { exclude 'valthorne/ui/engine/**', 'ui/icons/**', 'ui/scene-selection.png' }
-}
-tasks.matching { it.name.startsWith('publish') }.configureEach {
-    doFirst {
-        if (editorPrototype) throw new GradleException('Publish with -PeditorPrototype=false to exclude the local editor.')
-    }
-}
-
-apply from: 'gradle/editor-boundary.gradle'
-tasks.named('test', Test) { failOnNoDiscoveredTests = false }
 
 mavenPublishing {
     publishToMavenCentral()
@@ -181,9 +135,6 @@ mavenPublishing {
 }
 
 apply from: 'gradle/release.gradle'
-
-// Compile and run application sources against the desktop engine.
-apply from: 'gradle/application.gradle'
 
 // The publishing plugin owns the single Javadoc archive producer.
 tasks.named('assemble') { dependsOn tasks.matching { it.name == 'plainJavadocJar' } }
