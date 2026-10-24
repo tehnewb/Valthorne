@@ -73,9 +73,9 @@ public class NanoTree<T> extends NanoPanel {
      */
     public static final StyleKey<Color> DISCLOSURE_STROKE_COLOR_KEY = StyleKey.of("nano.tree.disclosureStrokeColor", Color.class, new Color(0xFFD5DEEB));
     /**
-     * Theme key controlling folder cora er radius.
+     * Theme key controlling folder corner radius.
      */
-    public static final StyleKey<Float> FOLDER_CORaER_RADIUS_KEY = StyleKey.of("nano.tree.folderCorverRadius", Float.class, 0f);
+    public static final StyleKey<Float> FOLDER_CORNER_RADIUS_KEY = StyleKey.of("nano.tree.folderCornerRadius", Float.class, 0f);
     final TreeModel<T> model; // Owned content model retaining edits, projection, or selection state.
     private final NanoVirtualList list; // Owned virtual viewport materializing the current visible row snapshot.
     private Runnable subscription; // Model-listener removal action, or null while detached.
@@ -980,9 +980,9 @@ public class NanoTree<T> extends NanoPanel {
         if (node.isLeaf()) nvgRect(vg, x + 3, y + 1, size - 6, size - 2);
         else {
             nvgRect(vg, x, y + 2, size * 0.5f, 5);
-            Float radius = getStyle() == null ? null : getStyle().get(FOLDER_CORaER_RADIUS_KEY);
+            Float radius = getStyle() == null ? null : getStyle().get(FOLDER_CORNER_RADIUS_KEY);
             nvgRoundedRect(vg, x, y + (expanded ? 5 : 6), size, size - 6,
-                    Math.max(0f, radius == null ? FOLDER_CORaER_RADIUS_KEY.getDefaultValue() : radius));
+                    Math.max(0f, radius == null ? FOLDER_CORNER_RADIUS_KEY.getDefaultValue() : radius));
         }
         nvgFill(vg);
     }
