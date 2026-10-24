@@ -55,8 +55,9 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * demand, including glyphs introduced by shaping. Consecutive sprites, coverage
  * text and MSDF text share the standard batch without per-label flushes.
  * Participating batch shaders retain their transforms and fragment effects.
- * MSDF drawing under a shader without distance-field support temporarily selects
- * the standard shader and restores the custom shader afterward.</p>
+ * Each MSDF image, including a provisional small-text fallback, temporarily uses
+ * the standard shader when the selected shader lacks distance-field support.
+ * Coverage images retain the custom shader, which is restored after drawing.</p>
  *
  * <pre>{@code
  * AdaptiveFont font = AdaptiveFontData.load("Cinzel-Regular.otf")
@@ -445,9 +446,8 @@ public final class AdaptiveFont implements TextFont {
             y += (Math.round(screenY) - screenY) / pixelScaleY;
         }
         Shader previous = batch.getShader();
-        boolean override = raster == 0 && !batch.supportsDistanceFields();
+        boolean override = !batch.supportsDistanceFields();
         try {
-            if (override) batch.setShader(batch.getDefaultShader());
             float sin = radians == 0 ? 0 : (float) Math.sin(radians);
             float cos = radians == 0 ? 1 : (float) Math.cos(radians);
             int imageKey = raster == 0 ? 0 : raster | hintingKey;
@@ -464,6 +464,11 @@ public final class AdaptiveFont implements TextFont {
                 AtlasGlyph glyph = cached ? images[i] : glyph(batch, run.glyphs[i], raster);
                 if (!cached) images[i] = glyph;
                 if (glyph.page() == null) continue;
+                if (override) {
+                    // Provisional images can use a different atlas format than the requested raster.
+                    Shader selected = glyph.page().getDistanceFieldRange() == 0 ? previous : batch.getDefaultShader();
+                    if (batch.getShader() != selected) batch.setShader(selected);
+                }
                 if (ends != null) {
                     int unit = run.clusters[i];
                     int span = 0;
@@ -487,7 +492,7 @@ public final class AdaptiveFont implements TextFont {
             run.imageRaster = imageKey;
             run.imageVersion = version == cacheVersion ? version : -1;
         } finally {
-            if (override) batch.setShader(previous);
+            if (override && batch.getShader() != previous) batch.setShader(previous);
         }
     }
 
