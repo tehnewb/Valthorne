@@ -1,5 +1,7 @@
 package valthorne.graphics.font;
 
+import valthorne.graphics.font.adaptive.AdaptiveFont;
+
 /**
  * Represents a functional interface for applying custom styling to glyphs during rendering.
  * Implementations of this interface define the logic for modifying glyph styles based
@@ -11,11 +13,16 @@ package valthorne.graphics.font;
  * <p>
  * This interface is typically used to define transformations or effects to be applied
  * to individual glyphs in a textual rendering pipeline.
+ * Both {@link Font} and {@link AdaptiveFont}
+ * accept this callback through their {@code setStyler} methods. The renderer
+ * resets and reuses both arguments; implementations must not retain them.
+ * Adaptive callbacks use the original UTF-16 cluster start for character indices,
+ * including ligatures and reordered text. Styling changes drawing, not layout.
  * <p>
  * Example usage:
  * <pre>{@code
  * FontStyler styler = (style, ctx) -> {
- *     style.setOffset(ctx.getCharIndex() * 2.0f, 0f);
+ *     style.setOffset(ctx.charIndex() * 2.0f, 0f);
  *     style.setScale(1.5f, 1.5f);
  *     style.setColor(1.0f, 0.5f, 0.0f, 1.0f);
  * };

@@ -36,6 +36,8 @@ public final class AdaptiveTextRun implements TextRun {
     private float height; // Normalized line-box height.
     int count; // Used prefix of parallel glyph arrays, borrowed by the font.
     int[] clusters; // Lazy glyph-to-source offsets for styled drawing, null for ordinary layouts.
+    int[] sourceLines; // Lazy zero-based source line indices for FontStyler callbacks.
+    private int shapingLine; // Source line currently being copied from HarfBuzz.
     private int sourceLength; // Full UTF-16 length supplied as context to HarfBuzz during rebuilding.
     private float penX; // Temporary normalized horizontal shaping pen.
     private float penY; // Temporary normalized baseline position.
@@ -90,6 +92,7 @@ public final class AdaptiveTextRun implements TextRun {
                         if (end < 0) end = normalized.length();
                         int contentEnd = end > start && normalized.charAt(end - 1) == '\r' ? end - 1 : end;
                         penX = 0;
+                        shapingLine = lines;
                         shapeLine(normalized, chars, start, contentEnd);
                         width = Math.max(width, penX);
                         penY -= font.lineHeight();
@@ -268,6 +271,7 @@ public final class AdaptiveTextRun implements TextRun {
             long position = positions + (long) i * hb_glyph_position_t.SIZEOF;
             glyphs[count] = hb_glyph_info_t.ncodepoint(info + (long) i * hb_glyph_info_t.SIZEOF);
             if (clusters != null) clusters[count] = hb_glyph_info_t.ncluster(info + (long) i * hb_glyph_info_t.SIZEOF);
+            if (sourceLines != null) sourceLines[count] = shapingLine;
             xs[count] = penX + hb_glyph_position_t.nx_offset(position) * inverseEm;
             ys[count] = penY + hb_glyph_position_t.ny_offset(position) * inverseEm;
             penX += hb_glyph_position_t.nx_advance(position) * inverseEm;
@@ -301,6 +305,21 @@ public final class AdaptiveTextRun implements TextRun {
         xs = Arrays.copyOf(xs, capacity);
         ys = Arrays.copyOf(ys, capacity);
         if (clusters != null) clusters = Arrays.copyOf(clusters, capacity);
+        if (sourceLines != null) sourceLines = Arrays.copyOf(sourceLines, capacity);
+    }
+
+    /**
+     * Retains source mapping on first styled draw, replaying shaping only when
+     * new metadata is needed. Plain runs allocate neither mapping array.
+     * @param lineIndices whether callbacks also need source line indices
+     */
+    void ensureStyleContext(boolean lineIndices) {
+        if (clusters != null && (!lineIndices || sourceLines != null)) return;
+        if (clusters == null) clusters = new int[glyphs.length];
+        if (lineIndices && sourceLines == null) sourceLines = new int[glyphs.length];
+        String source = text;
+        text = null;
+        rebuild(source, size);
     }
 
     @Override
@@ -324,12 +343,7 @@ public final class AdaptiveTextRun implements TextRun {
             draw(batch, x, y, colors[0]);
             return;
         }
-        if (clusters == null) {
-            clusters = new int[glyphs.length];
-            String source = text;
-            text = null;
-            rebuild(source, size);
-        }
+        ensureStyleContext(false);
         font.drawRun(batch, this, x, y, 0, null, ends, colors, count);
     }
 

@@ -4,6 +4,9 @@ import org.lwjgl.system.MemoryStack;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.FontStyler;
+import valthorne.graphics.font.GlyphContext;
+import valthorne.graphics.font.GlyphStyle;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.texture.TextureBatch;
 
@@ -27,6 +30,14 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * all subsequent draws, including previously created retained layouts. Cached
  * coverage variants coexist within the existing bounded atlas; MSDF images and
  * shaping metrics are shared across hinting modes.
+ * {@link #setStyler(FontStyler)} applies live per-glyph color, visibility, scale
+ * and offsets to direct and retained drawing, including borrowing UI controls.
+ * Styling does not change advances, wrapping or caret geometry. Context indices
+ * use original UTF-16 cluster starts, visual glyph order and source line order;
+ * ligatures share their first source character. Scratch context and style objects
+ * are reused and must not be retained. Fractional offsets remain smooth; scaled
+ * glyphs request MSDF automatically. Callbacks run on the owner thread during
+ * every draw and must not recursively draw this font or mutate its resources.
  * Initial and stable small text rasterizes at its requested physical resolution,
  * so visible text never waits behind speculative background work to become sharp.
  * Small-size cache misses generate inexpensive coverage immediately rather than
@@ -159,6 +170,9 @@ public final class AdaptiveFont implements TextFont {
     private boolean preparing; // Whether completed CPU images may need owner-thread upload.
     private long nextUpload = System.nanoTime(); // Earliest monotonic time for another bounded upload group.
     private boolean disposed; // Prevents native access after release.
+    private FontStyler styler; // Optional borrowed callback evaluated for every shaped glyph during drawing.
+    private GlyphStyle glyphStyle; // Lazily allocated reusable callback output, reset before each glyph.
+    private GlyphContext glyphContext; // Lazily allocated reusable original-layout context.
 
     /**
      * Creates native font resources using NORMAL hinting, requiring no OpenGL
@@ -268,6 +282,35 @@ public final class AdaptiveFont implements TextFont {
         checkOwner();
         if (!Float.isFinite(size) || size < 0) throw new IllegalArgumentException("Size must be finite and nonnegative");
         this.size = size;
+        return this;
+    }
+
+    /**
+     * Returns the current glyph callback without copying or allocating.
+     * @return borrowed callback, or null when per-glyph styling is disabled
+     */
+    public FontStyler getStyler() {
+        checkOwner();
+        return styler;
+    }
+
+    /**
+     * Assigns a live drawing callback, preserving existing layouts and images.
+     * Explicit callback colors replace span colors or the supplied tint; offsets
+     * and scaling affect glyph quads only. Positive Y offsets follow the font's
+     * upward baseline coordinates and rotate with the run. Callback exceptions
+     * propagate to the caller. Scratch objects are borrowed only for the callback.
+     * Source mappings are allocated once per styled run, then reused on rebuilds.
+     * @param styler callback or null to restore the ordinary drawing fast path
+     * @return this font for fluent configuration
+     */
+    public AdaptiveFont setStyler(FontStyler styler) {
+        checkOwner();
+        if (styler != null && glyphStyle == null) {
+            glyphStyle = new GlyphStyle();
+            glyphContext = new GlyphContext();
+        }
+        this.styler = styler;
         return this;
     }
 
@@ -446,6 +489,8 @@ public final class AdaptiveFont implements TextFont {
         int count = run.count;
         float size = run.size;
         if (count == 0 || size == 0) return;
+        FontStyler callback = styler;
+        if (callback != null) run.ensureStyleContext(true);
         if (preparing) uploadPrepared(batch);
         int raster = rasterSize(batch, size, radians);
         float pixelOffsetX = batch.getTranslationX() * pixelScaleX + pixelOriginX;
@@ -463,17 +508,11 @@ public final class AdaptiveFont implements TextFont {
             AtlasGlyph[] images = run.images;
             float[] xs = run.xs;
             float[] ys = run.ys;
-            Color drawTint = tint == null ? Color.WHITE : tint;
             long version = cacheVersion;
             for (int i = 0; i < count; i++) {
                 AtlasGlyph glyph = cached ? images[i] : glyph(batch, run.glyphs[i], raster);
                 if (!cached) images[i] = glyph;
-                if (glyph.page() == null) continue;
-                if (override) {
-                    // Provisional images can use a different atlas format than the requested raster.
-                    Shader selected = glyph.page().getDistanceFieldRange() <= 0 ? previous : batch.getDefaultShader();
-                    if (batch.getShader() != selected) batch.setShader(selected);
-                }
+                Color drawTint = tint == null ? Color.WHITE : tint;
                 if (ends != null) {
                     int unit = run.clusters[i];
                     int span = 0;
@@ -495,7 +534,36 @@ public final class AdaptiveFont implements TextFont {
                     drawX = (Math.round(drawX * pixelScaleX + pixelOffsetX) - pixelOffsetX) * inversePixelScaleX;
                     drawY = (Math.round(drawY * pixelScaleY + pixelOffsetY) - pixelOffsetY) * inversePixelScaleY;
                 }
-                batch.drawUV(glyph.page(), drawX, drawY, glyph.width() * size, glyph.height() * size, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), -localX, -localY, sin, cos, drawTint);
+                float width = glyph.width() * size;
+                float height = glyph.height() * size;
+                if (callback != null) {
+                    int character = run.clusters[i];
+                    glyphStyle.reset();
+                    glyphContext.set(run.text.charAt(character), character, i, run.sourceLines[i], localX, localY, width, height, drawX, drawY);
+                    callback.style(glyphStyle, glyphContext);
+                    if (!glyphStyle.isVisible()) continue;
+                    float scaleX = glyphStyle.getScaleX();
+                    float scaleY = glyphStyle.getScaleY();
+                    if (scaleX != 1 || scaleY != 1) {
+                        if (raster != 0) glyph = glyph(batch, run.glyphs[i], 0);
+                        localX = (xs[i] + glyph.left()) * size;
+                        localY = (ys[i] + glyph.bottom()) * size;
+                        drawX = x + localX;
+                        drawY = y + localY;
+                        width = glyph.width() * size * scaleX;
+                        height = glyph.height() * size * scaleY;
+                    }
+                    drawX += glyphStyle.getOffsetX();
+                    drawY += glyphStyle.getOffsetY();
+                    if (glyphStyle.hasColor()) drawTint = glyphStyle.getColor();
+                }
+                if (glyph.page() == null) continue;
+                if (override) {
+                    // A styled scale or provisional image can change the atlas format.
+                    Shader selected = glyph.page().getDistanceFieldRange() <= 0 ? previous : batch.getDefaultShader();
+                    if (batch.getShader() != selected) batch.setShader(selected);
+                }
+                batch.drawUV(glyph.page(), drawX, drawY, width, height, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), x - drawX, y - drawY, sin, cos, drawTint);
             }
             run.imageRaster = imageKey;
             run.imageVersion = version == cacheVersion ? version : -1;
