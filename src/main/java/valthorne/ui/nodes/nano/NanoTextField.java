@@ -399,9 +399,9 @@ public class NanoTextField extends UINode implements NanoNode {
      * @param style current owning composite style
      */
     final void applyTypography(ResolvedStyle style) {
-        setSkinStyle(NanoText.SLUG_FONT, style.get(NanoText.SLUG_FONT));
-        setSkinStyle(NanoText.SLUG_CODE_FONT, style.get(NanoText.SLUG_CODE_FONT));
-        setSkinStyle(NanoText.SLUG_HEADING_FONT, style.get(NanoText.SLUG_HEADING_FONT));
+        setSkinStyle(NanoText.FONT, style.get(NanoText.FONT));
+        setSkinStyle(NanoText.CODE_FONT, style.get(NanoText.CODE_FONT));
+        setSkinStyle(NanoText.HEADING_FONT, style.get(NanoText.HEADING_FONT));
     }
 
     /**

@@ -80,7 +80,7 @@ final class NanoDirectoryRow extends NanoContainer {
      * @param size resolved logical em size
      */
     private void fitCaption(long vg, float available, float size) {
-        SlugFont font = getTheme() == null ? null : getTheme().getToken(NanoText.SLUG_FONT);
+        SlugFont font = getTheme() == null ? null : getTheme().getToken(NanoText.FONT);
         if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
         if (captionWidth == available && captionSize == size && captionFont == font) return;
         captionWidth = available;

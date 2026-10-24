@@ -531,9 +531,9 @@ public class NanoLabel extends UINode implements NanoNode {
         setSkinStyle(FONT_NAME_KEY, name);
         setSkinStyle(FONT_SIZE_KEY, size);
         setSkinStyle(COLOR_KEY, tint);
-        setSkinStyle(NanoText.SLUG_FONT, ownerStyle.get(NanoText.SLUG_FONT));
-        setSkinStyle(NanoText.SLUG_CODE_FONT, ownerStyle.get(NanoText.SLUG_CODE_FONT));
-        setSkinStyle(NanoText.SLUG_HEADING_FONT, ownerStyle.get(NanoText.SLUG_HEADING_FONT));
+        setSkinStyle(NanoText.FONT, ownerStyle.get(NanoText.FONT));
+        setSkinStyle(NanoText.CODE_FONT, ownerStyle.get(NanoText.CODE_FONT));
+        setSkinStyle(NanoText.HEADING_FONT, ownerStyle.get(NanoText.HEADING_FONT));
         ResolvedStyle style = getStyleOrDefaults();
         String resolvedName = style.get(FONT_NAME_KEY);
         if (resolvedName != null && !resolvedName.isBlank()) fontName = resolvedName;

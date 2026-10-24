@@ -483,7 +483,8 @@ public final class SlugFont implements Dimensional {
                 addLine(curves, currentX, currentY, startX, startY);
             }
         } finally {
-            stbtt_FreeShape(info, vertices);
+            // CFF glyphs can allocate zero vertices; the checked wrapper rejects empty buffers.
+            nstbtt_FreeShape(info.address(), vertices.address());
         }
 
         return curves;

@@ -15,26 +15,26 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * The active root coordinates backend transitions and painter order. Font
  * ownership stays with the theme, and controls retain their normal text input.
  * <pre>{@code
- * label.setStyle(NanoText.SLUG_FONT, borrowedFont);
- * label.clearStyle(NanoText.SLUG_FONT); // Restore current theme/root typography.
+ * label.setStyle(NanoText.FONT, borrowedFont);
+ * label.clearStyle(NanoText.FONT); // Restore current theme/root typography.
  * }</pre>
  */
 public final class NanoText {
     /**
      * Optional curve font resolved from local overrides, rules, and theme tokens.
      */
-    public static final StyleKey<SlugFont> SLUG_FONT = StyleKey.of("nano.slugFont", SlugFont.class);
+    public static final StyleKey<SlugFont> FONT = StyleKey.of("nano.slugFont", SlugFont.class);
 
     /**
      * Optional monospace face for editable source and line-number glyphs;
      * attached editors fall back to the root's monospace Slug face.
      */
-    public static final StyleKey<SlugFont> SLUG_CODE_FONT = StyleKey.of("nano.slugCodeFont", SlugFont.class);
+    public static final StyleKey<SlugFont> CODE_FONT = StyleKey.of("nano.slugCodeFont", SlugFont.class);
 
     /**
      * Semibold face for window captions and inspector section headings.
      */
-    public static final StyleKey<SlugFont> SLUG_HEADING_FONT = StyleKey.of("nano.slugHeadingFont", SlugFont.class);
+    public static final StyleKey<SlugFont> HEADING_FONT = StyleKey.of("nano.slugHeadingFont", SlugFont.class);
 
     /**
      * Prevents construction of the text rendering facade.
@@ -174,12 +174,12 @@ public final class NanoText {
         ResolvedStyle style = node.getStyleOrDefaults();
         boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);
         if (monospace) {
-            SlugFont code = style.get(SLUG_CODE_FONT);
+            SlugFont code = style.get(CODE_FONT);
             return code != null ? code : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(true);
         }
-        SlugFont heading = "editor-section".equals(node.getStyleName()) || "window-caption".equals(node.getStyleName()) ? style.get(SLUG_HEADING_FONT) : null;
+        SlugFont heading = "editor-section".equals(node.getStyleName()) || "window-caption".equals(node.getStyleName()) ? style.get(HEADING_FONT) : null;
         if (heading != null) return heading;
-        SlugFont selected = style.get(SLUG_FONT);
+        SlugFont selected = style.get(FONT);
         return selected != null ? selected : node.getRoot() == null ? null : node.getRoot().getNanoTextFont(monospace);
     }
 }
