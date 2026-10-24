@@ -23,18 +23,18 @@ public final class NanoText {
     /**
      * Optional curve font resolved from local overrides, rules, and theme tokens.
      */
-    public static final StyleKey<SlugFont> FONT = StyleKey.of("nano.slugFont", SlugFont.class);
+    public static final StyleKey<SlugFont> FONT = StyleKey.of("nano.font", SlugFont.class);
 
     /**
      * Optional monospace face for editable source and line-number glyphs;
      * attached editors fall back to the root's monospace Slug face.
      */
-    public static final StyleKey<SlugFont> CODE_FONT = StyleKey.of("nano.slugCodeFont", SlugFont.class);
+    public static final StyleKey<SlugFont> CODE_FONT = StyleKey.of("nano.codeFont", SlugFont.class);
 
     /**
      * Semibold face for window captions and inspector section headings.
      */
-    public static final StyleKey<SlugFont> HEADING_FONT = StyleKey.of("nano.slugHeadingFont", SlugFont.class);
+    public static final StyleKey<SlugFont> HEADING_FONT = StyleKey.of("nano.headingFont", SlugFont.class);
 
     /**
      * Prevents construction of the text rendering facade.
@@ -130,7 +130,7 @@ public final class NanoText {
         else if ((align & NVG_ALIGN_MIDDLE) != 0) baseline += (font.ascent() + font.descent()) * size * .5f;
         else if ((align & NVG_ALIGN_BOTTOM) != 0) baseline += font.descent() * size;
         root.getRenderContext()
-                .drawNanoSlug(node, font, text, left, baseline, size, color);
+                .drawNanoText(node, font, text, left, baseline, size, color);
         return left + width;
     }
 
