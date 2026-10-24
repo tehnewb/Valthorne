@@ -22,7 +22,9 @@ import static org.lwjgl.util.msdfgen.MSDFGenExt.*;
 /**
  * Owns the encoded memory, FreeType raster face, immutable HarfBuzz font and
  * msdfgen face for one adaptive font. All calls are confined to the font's owner
- * thread. HarfBuzz uses design units so hinting never alters layout advances.
+ * thread for rendering. Preparation instances are used serially by background
+ * tasks and never shared with rendering. HarfBuzz uses design units so hinting
+ * never alters layout advances.
  * Raster buffers are transient and belong to the caller; all native handles are
  * released even when initialization fails. No OpenGL access occurs here.
  */

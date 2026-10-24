@@ -1025,7 +1025,7 @@ public class UIRoot extends UIContainer {
         if (nanoVGHandle == 0) return null;
         TextFont current = code ? nanoCodeFont : nanoFont;
         if (current != null) return current;
-        current = AdaptiveFontData.load(SystemFonts.find(code).toString(), 20)
+        current = AdaptiveFontData.load(SystemFonts.find(code).toString())
                 .asFont();
         if (code) nanoCodeFont = current;
         else nanoFont = current;
