@@ -10,17 +10,19 @@ import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
- * Owns one immutable sampled texture uploaded through bgfx-owned memory. This
+ * Owns one sampled texture uploaded through bgfx-owned memory. This
  * initial desktop API accepts RGBA8, RGBA32F and RG32U data with tightly packed
  * rows. An owned CPU copy, including optional mip levels, restores the texture
- * after device replacement. Caller staging may be freed immediately; close frees
- * the native texture and its retained upload bytes.
+ * after device replacement. Mip storage can be replaced without changing the
+ * engine binding ID, preserving queued draws and bound texture slots. Caller
+ * staging may be freed immediately; close frees the native texture and its
+ * retained upload bytes. Allocation failures retain the previous usable storage.
  */
 public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, BgfxTextureReference {
     private final int width; // Retained pixel width for device replacement.
     private final int height; // Retained pixel height for device replacement.
     private final int format; // Immutable sampled texture format.
-    private final boolean mipmaps; // Whether the retained upload includes a mip chain.
+    private boolean mipmaps; // Whether the retained upload includes a mip chain.
     private ByteBuffer retainedPixels; // Owned immutable recovery upload including mip levels.
     private int id = -1; // Stable engine binding ID, or negative for standalone allocations.
     private TextureFilter filter; // Optional sampler override restored with this allocation.
@@ -74,29 +76,14 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
             throw new UnsupportedOperationException("The device cannot sample the requested texture format");
         if (mipmaps && format != BGFX_TEXTURE_FORMAT_RGBA8)
             throw new IllegalArgumentException("Automatic mipmaps require RGBA8 pixels");
-        long total = size;
-        if (mipmaps) {
-            for (int w = width, h = height; w > 1 || h > 1; ) {
-                w = Math.max(1, w / 2);
-                h = Math.max(1, h / 2);
-                total += (long) w * h * stride;
-            }
-        }
-        if (total > Integer.MAX_VALUE) throw new IllegalArgumentException("Mip chain exceeds upload limits");
         this.window = window;
         this.width = width;
         this.height = height;
         this.format = format;
         this.mipmaps = mipmaps;
-        retainedPixels = memAlloc((int) total);
+        retainedPixels = copyPixels(pixels, width, height, mipmaps);
         try {
-            retainedPixels.put(pixels.duplicate());
-            if (mipmaps) generateMipmaps(retainedPixels, width, height);
-            retainedPixels.clear();
-            BGFXMemory memory = bgfx_copy(retainedPixels);
-            if (memory == null) throw new IllegalStateException("Could not allocate texture upload memory");
-            handle = bgfx_create_texture_2d(width, height, mipmaps, 1, format, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, memory, 0);
-            if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not create bgfx texture");
+            handle = createTexture(retainedPixels, mipmaps);
             if (BgfxGraphics.isActive()) {
                 BgfxGraphics.resetTextureState(Short.toUnsignedInt(handle));
                 id = BgfxTextureHandles.register(this);
@@ -109,6 +96,55 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
             retainedPixels = null;
             throw failure;
         }
+    }
+
+    /**
+     * Copies base pixels and optionally appends RGBA8 mip levels in one allocation.
+     *
+     * @param pixels validated tightly packed base pixels
+     * @param width base pixel width
+     * @param height base pixel height
+     * @param mipmaps whether to generate the RGBA8 mip chain
+     * @return owned upload buffer positioned at its beginning
+     */
+    private static ByteBuffer copyPixels(ByteBuffer pixels, int width, int height, boolean mipmaps) {
+        /*
+         * Size the complete upload before allocation; mip generation reads each
+         * preceding level in place and never needs a second scratch image.
+         */
+        long total = pixels.remaining();
+        if (mipmaps) {
+            for (int w = width, h = height; w > 1 || h > 1; ) {
+                w = Math.max(1, w / 2);
+                h = Math.max(1, h / 2);
+                total += (long) w * h * 4;
+            }
+        }
+        if (total > Integer.MAX_VALUE) throw new IllegalArgumentException("Mip chain exceeds upload limits");
+        ByteBuffer upload = memAlloc((int) total);
+        try {
+            upload.put(pixels.duplicate());
+            if (mipmaps) generateMipmaps(upload, width, height);
+            return upload.clear();
+        } catch (RuntimeException | Error failure) {
+            memFree(upload);
+            throw failure;
+        }
+    }
+
+    /**
+     * Creates a native allocation from a retained upload using default sampling.
+     *
+     * @param pixels complete base and optional mip bytes
+     * @param mipmaps whether the upload includes mip levels
+     * @return owned valid native texture handle
+     */
+    private short createTexture(ByteBuffer pixels, boolean mipmaps) {
+        BGFXMemory memory = bgfx_copy(pixels);
+        if (memory == null) throw new IllegalStateException("Could not allocate texture upload memory");
+        short texture = bgfx_create_texture_2d(width, height, mipmaps, 1, format, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, memory, 0);
+        if (texture == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not create bgfx texture");
+        return texture;
     }
 
     /**
@@ -193,6 +229,43 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         this.filter = filter;
     }
 
+    /**
+     * Replaces mip storage while retaining this resource and its engine binding ID.
+     * Already submitted commands retain their native allocation through bgfx's
+     * deferred destruction; pending engine batches resolve the replacement allocation.
+     * This configuration operation allocates only when the mip policy changes.
+     * Native handles borrowed by standalone callers must be fetched again afterward.
+     *
+     * @param mipmaps whether to retain generated RGBA8 mip levels
+     * @throws IllegalArgumentException if mipmaps are requested for another format
+     * @throws IllegalStateException if this texture is closed or allocation fails
+     */
+    public void setMipmaps(boolean mipmaps) {
+        handle();
+        if (this.mipmaps == mipmaps) return;
+        if (format != BGFX_TEXTURE_FORMAT_RGBA8) throw new IllegalArgumentException("Automatic mipmaps require RGBA8 pixels");
+        ByteBuffer base = retainedPixels.duplicate()
+                .limit(width * height * 4);
+        ByteBuffer replacement = copyPixels(base, width, height, mipmaps);
+        short replacementHandle = BGFX_INVALID_HANDLE;
+        try {
+            replacementHandle = createTexture(replacement, mipmaps);
+            if (BgfxGraphics.isActive()) {
+                BgfxGraphics.resetTextureState(Short.toUnsignedInt(replacementHandle));
+                if (filter != null) BgfxGraphics.setTextureFilter(Short.toUnsignedInt(replacementHandle), filter);
+            }
+        } catch (RuntimeException | Error failure) {
+            if (replacementHandle != BGFX_INVALID_HANDLE) bgfx_destroy_texture(replacementHandle);
+            memFree(replacement);
+            throw failure;
+        }
+        releaseGraphicsResources();
+        memFree(retainedPixels);
+        retainedPixels = replacement;
+        handle = replacementHandle;
+        this.mipmaps = mipmaps;
+    }
+
     @Override
     public void releaseGraphicsResources() {
         if (handle == BGFX_INVALID_HANDLE) return;
@@ -206,8 +279,7 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         int maximum = bgfx_get_caps().limits().maxTextureSize();
         if (width > maximum || height > maximum || !bgfx_is_texture_valid(0, false, 1, format, BGFX_TEXTURE_NONE))
             throw new UnsupportedOperationException("The replacement device cannot restore this sampled texture");
-        handle = bgfx_create_texture_2d(width, height, mipmaps, 1, format, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, bgfx_copy(retainedPixels), 0);
-        if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not restore sampled texture");
+        handle = createTexture(retainedPixels, mipmaps);
         BgfxGraphics.resetTextureState(Short.toUnsignedInt(handle));
         if (filter != null) BgfxGraphics.setTextureFilter(Short.toUnsignedInt(handle), filter);
     }

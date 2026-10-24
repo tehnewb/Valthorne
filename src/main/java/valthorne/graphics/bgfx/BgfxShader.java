@@ -224,7 +224,7 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
             BgfxUniform uniform = uniforms[i];
             if (uniform.name.equals(name)) return uniform;
             int length = uniform.name.length();
-            if (name.length() > length + 2 && name.charAt(length) == '[' && name.charAt(name.length() - 1) == ']' && name.startsWith(uniform.name))
+            if (name.length() >= length + 2 && name.charAt(length) == '[' && name.charAt(name.length() - 1) == ']' && name.startsWith(uniform.name))
                 return uniform;
         }
         return null;
@@ -239,6 +239,7 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
      */
     private int element(BgfxUniform uniform, String name) {
         if (name.length() == uniform.name.length()) return 0;
+        if (name.length() == uniform.name.length() + 2) throw new IllegalArgumentException("Invalid uniform element: " + name);
         int index = 0;
         for (int i = uniform.name.length() + 1; i < name.length() - 1; i++) {
             char digit = name.charAt(i);
@@ -272,17 +273,22 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
     }
 
     /**
-     * Updates a retained matrix or vector array.
+     * Updates retained matrix or vector elements, starting at the optional
+     * array index in the uniform name. Values beyond the copied range remain
+     * unchanged, and an invalid index or range is rejected before mutation.
      *
      * @param name uniform name
      * @param values complete float values in column-major matrix order
+     * @throws IllegalArgumentException if the uniform is a sampler or the indexed range exceeds its capacity
      */
     public void values(String name, float[] values) {
         checkOpen();
         BgfxUniform uniform = find(name);
         if (uniform == null) return;
-        if (values.length > uniform.values.length) throw new IllegalArgumentException("Uniform array exceeds declared capacity: " + name);
-        System.arraycopy(values, 0, uniform.values, 0, values.length);
+        if (uniform.type == BGFX_UNIFORM_TYPE_SAMPLER) throw new IllegalArgumentException("Uniform is not numeric: " + name);
+        int offset = element(uniform, name) * (uniform.values.length / uniform.count);
+        if (values.length > uniform.values.length - offset) throw new IllegalArgumentException("Uniform array exceeds declared capacity: " + name);
+        System.arraycopy(values, 0, uniform.values, offset, values.length);
     }
 
     /**

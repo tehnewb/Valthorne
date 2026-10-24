@@ -242,9 +242,10 @@ public class Texture implements Poolable, GraphicsResource {
      * </p>
      *
      * <p>
-     * The texture is bound, the minification and magnification parameters are
-     * updated, and mipmaps are generated automatically when the supplied filter
-     * requires them.
+     * The minification and magnification parameters are updated, and mipmaps
+     * are generated automatically when the supplied filter
+     * requires them. Replacing mip storage preserves the engine texture ID and
+     * pending batch references.
      * </p>
      *
      * @param filter the new filter to apply
@@ -256,10 +257,7 @@ public class Texture implements Poolable, GraphicsResource {
         if (disposed) throw new IllegalStateException("Texture is disposed");
         if (this.filter.usesMipmaps() != filter.usesMipmaps()) {
             if (bgfxTexture == null) throw new UnsupportedOperationException("Wrapped textures cannot replace their mip storage");
-            BgfxTexture2D replacement = new BgfxTexture2D(BgfxGraphics.device(), data.width(), data.height(), BGFX_TEXTURE_FORMAT_RGBA8, data.buffer(), filter.usesMipmaps());
-            bgfxTexture.close();
-            bgfxTexture = replacement;
-            textureID = replacement.id();
+            bgfxTexture.setMipmaps(filter.usesMipmaps());
         }
         if (bgfxTexture != null) bgfxTexture.setFilter(filter);
         else BgfxGraphics.setTextureFilter(textureID, filter);
@@ -285,9 +283,8 @@ public class Texture implements Poolable, GraphicsResource {
     /**
      * <p>
      * Returns the engine texture ID used by engine drawing APIs. Owned asset IDs
-     * survive backend changes. Changing mip storage can replace the ID, so fetch
-     * it after filter configuration. Native integrations must resolve the current
-     * device handle through {@link BgfxGraphics#textureHandle(int)}.
+     * survive backend and mip storage changes. Native integrations must resolve
+     * the current device handle through {@link BgfxGraphics#textureHandle(int)}.
      * </p>
      *
      * @return engine texture identifier, or a wrapped native handle
