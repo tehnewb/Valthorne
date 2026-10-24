@@ -1,6 +1,0 @@
-rootProject.name = 'ground-shadow-benchmark'
-includeBuild('../..') {
-    dependencySubstitution {
-        substitute module('io.github.tehnewb:Valthorne') using project(':')
-    }
-}
