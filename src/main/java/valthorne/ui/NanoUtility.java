@@ -34,7 +34,12 @@ public final class NanoUtility {
     /**
      * Registers a font from a filesystem path, including extracted classpath fonts.
      */
-    public static int loadFont(long vg, String name, String path) {return NanoVG.nvgCreateFont(vg, name, path);}
+    public static int loadFont(long vg, String name, String path) {
+        /*
+         * Root-owned contexts replay successful registrations after device changes.
+         */
+        return NanoFontRegistry.load(vg, name, path);
+    }
 
     /**
      * Registers a bundled classpath font; the browser fetches the exported resource directly.

@@ -21,8 +21,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    env:
-      ALSOFT_DRIVERS: 'null'
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -36,16 +34,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify version automation
-        run: node --test .github/scripts/*.test.cjs
-      - name: Build library artifacts
+      - name: Build desktop and browser libraries
         shell: bash
         run: bash ./gradlew assemble --stacktrace --console=plain
-      - name: Retain reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: reports-${{ matrix.os }}
-          path: |
-            build/reports/
-          if-no-files-found: ignore

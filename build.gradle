@@ -15,11 +15,11 @@ repositories {
 
 def lwjglVersion = "3.4.3"
 def joltVersion = "6.0.0"
-
+ext.fastjson2Version = '2.0.66'
+// If you want more modules, add them to both lists below.
 def lwjglModules = [
         "lwjgl",
         "lwjgl-glfw",
-        "lwjgl-opengl",
         "lwjgl-bgfx",
         "lwjgl-stb",
         "lwjgl-freetype",
@@ -31,6 +31,7 @@ def lwjglModules = [
         "lwjgl-tinyfd"
 ]
 
+// “All natives” set (common targets).
 def lwjglNativeClassifiers = [
         "natives-windows",
         "natives-windows-arm64",
@@ -56,7 +57,8 @@ dependencies {
     implementation "com.googlecode.soundlibs:mp3spi:1.9.5-1"
     implementation "com.googlecode.soundlibs:tritonus-share:0.3.7-2"
     implementation "org.apache.commons:commons-compress:1.28.0"
-    implementation "com.fasterxml.jackson.core:jackson-databind:2.18.2"
+    implementation "org.tukaani:xz:1.10"
+    implementation "com.alibaba.fastjson2:fastjson2:$fastjson2Version"
     // Jolt remains shared with constrained 2D physics.
     implementation "com.github.stephengold:jolt-jni-Windows64:$joltVersion"
     ['Windows64', 'Windows_ARM64', 'Linux64', 'Linux_ARM64', 'Linux_ARM32hf', 'MacOSX64', 'MacOSX_ARM64'].each { platform ->
@@ -80,17 +82,14 @@ java {
     withSourcesJar()
 }
 
-apply from: 'gradle/bgfx.gradle'
-// Only production sources and resources belong in the library.
-sourceSets.main.java.exclude 'valthorne/threed/**', 'valthorne/ui/engine/**'
-sourceSets.main.resources.exclude 'ui/icons/**', 'ui/scene-selection.png',
-        'valthorne/filament/**', 'valthorne/shaders/model3d/**',
-        'valthorne/shaders/pathtrace/**', 'META-INF/licenses/*filament*'
-tasks.withType(Jar).configureEach {
-    exclude 'valthorne/threed/**', 'valthorne/ui/engine/**', 'ui/icons/**',
-            'ui/scene-selection.png', 'valthorne/filament/**',
-            'valthorne/shaders/model3d/**', 'valthorne/shaders/pathtrace/**',
-            'META-INF/licenses/*filament*'
+// Keep private local sources and resources outside the public library build.
+sourceSets {
+    main {
+        java.exclude 'valthorne/threed/**', 'valthorne/ui/engine/**'
+        resources.exclude 'ui/icons/**', 'ui/scene-selection.png',
+                'valthorne/filament/**', 'valthorne/shaders/model3d/**',
+                'valthorne/shaders/pathtrace/**', 'META-INF/licenses/*filament*'
+    }
 }
 
 mavenPublishing {
@@ -138,22 +137,7 @@ mavenPublishing {
     }
 }
 
-tasks.withType(AbstractArchiveTask).configureEach {
-    preserveFileTimestamps = false
-    reproducibleFileOrder = true
-}
-
-tasks.named('jar', Jar) {
-    from('LICENSE') { into 'META-INF' }
-    from('THIRD_PARTY_NOTICES.md') { into 'META-INF' }
-    manifest {
-        attributes('Implementation-Title': 'Valthorne',
-                'Implementation-Version': project.version.toString())
-    }
-}
-
-// Shared-source desktop/web application entry point.
-apply from: 'portable/desktop.gradle'
+apply from: 'gradle/release.gradle'
 
 // The publishing plugin owns the single Javadoc archive producer.
 tasks.named('assemble') { dependsOn tasks.matching { it.name == 'plainJavadocJar' } }

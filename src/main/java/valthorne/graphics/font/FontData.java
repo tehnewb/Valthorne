@@ -4,6 +4,7 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBTTFontinfo;
 import org.lwjgl.stb.STBTTPackContext;
 import org.lwjgl.stb.STBTTPackedchar;
+import org.lwjgl.system.MemoryStack;
 import valthorne.graphics.texture.TextureData;
 import valthorne.math.MathUtils;
 
@@ -25,24 +26,13 @@ import static org.lwjgl.stb.STBTruetype.*;
  *   <li>{@code baseline} is equivalent to {@code ascent} in pixels (baseline-to-top).</li>
  *   <li>Includes an STB font handle + backing buffer so we can query <b>kerning</b>.</li>
  * </ul>
+ * Loads use independent native metric and packing storage, allowing different fonts
+ * to be prepared concurrently without sharing mutable output buffers.
  *
  * @author Albert Beaupre
  * @since February 2nd, 2026
  */
 public record FontData(TextureData textureData, int fontSize, char startChar, char endChar, int atlasWidth, int atlasHeight, float ascent, float descent, float scale, float baseline, float lineHeight, Glyph[] glyphs, STBTTFontinfo stbInfo, ByteBuffer stbFontBuffer) {
-
-    /**
-     * Shared native output buffer for STB ascent metrics.
-     */
-    private static final IntBuffer ASC_BUF = BufferUtils.createIntBuffer(1);
-    /**
-     * Shared native output buffer for STB descent metrics.
-     */
-    private static final IntBuffer DESC_BUF = BufferUtils.createIntBuffer(1);
-    /**
-     * Shared native output buffer for STB line-gap metrics.
-     */
-    private static final IntBuffer GAP_BUF = BufferUtils.createIntBuffer(1);
 
     /**
      * Loads font data from a byte array and bakes an atlas using stb_truetype.
@@ -54,6 +44,10 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
      * @return baked {@link FontData}
      */
     public static FontData load(byte[] fontBytes, int fontSize, int startChar, int numChars) {
+        /*
+         * Per-load metric outputs keep concurrent asset preparation independent.
+         * Only the font's backing buffer must survive for later kerning queries.
+         */
         if (fontBytes == null || fontBytes.length == 0)
             throw new IllegalArgumentException("fontBytes cannot be null/empty");
         if (fontSize <= 0) throw new IllegalArgumentException("fontSize must be > 0");
@@ -66,11 +60,18 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
         STBTTFontinfo info = STBTTFontinfo.create();
         if (!stbtt_InitFont(info, fontBuffer)) throw new RuntimeException("Failed to init STB font");
 
-        stbtt_GetFontVMetrics(info, ASC_BUF, DESC_BUF, GAP_BUF);
-
-        float ascentRaw = ASC_BUF.get(0);
-        float descentRaw = DESC_BUF.get(0);
-        float lineGapRaw = GAP_BUF.get(0);
+        float ascentRaw;
+        float descentRaw;
+        float lineGapRaw;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer ascent = stack.mallocInt(1);
+            IntBuffer descent = stack.mallocInt(1);
+            IntBuffer lineGap = stack.mallocInt(1);
+            stbtt_GetFontVMetrics(info, ascent, descent, lineGap);
+            ascentRaw = ascent.get(0);
+            descentRaw = descent.get(0);
+            lineGapRaw = lineGap.get(0);
+        }
 
         float scale = stbtt_ScaleForPixelHeight(info, fontSize);
 
@@ -150,8 +151,9 @@ public record FontData(TextureData textureData, int fontSize, char startChar, ch
      * Releases native resources owned by this baked font data.
      *
      * <p>
-     * This frees the decoded atlas image data while leaving lightweight metric and glyph
-     * metadata available for any callers that still hold references to this object.
+     * Atlas disposal follows {@link TextureData} ownership. This loader's baked pixel
+     * buffers and font backing storage are garbage collected once no longer referenced;
+     * metric and glyph metadata remain available to callers retaining this record.
      * </p>
      */
     public void dispose() {

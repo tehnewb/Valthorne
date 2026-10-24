@@ -1,17 +1,14 @@
 package valthorne.graphics.font.adaptive;
 
-import org.lwjgl.system.MemoryStack;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.TextFont;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.texture.TextureBatch;
 
-import java.nio.IntBuffer;
 import java.util.Arrays;
 
 import static org.lwjgl.system.MemoryUtil.memFree;
-import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
 
 /**
  * One font API for naturally spaced, hinted small text and scalable MSDF text.
@@ -28,9 +25,9 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * after ending batches that reference the font. Access is confined to the
  * constructing thread, including measurement and disposal.</p>
  *
- * <p>Coverage pages use R8 at 256 square; MSDF pages use RGB8 at 512 square.
+ * <p>Coverage pages use R8 at 256 square; MSDF pages use RGB8, or RGBA8 when required by the backend, at 512 square.
  * Oversized glyphs may use pages up to 1024 square. At most eight pages and 8192
- * glyph entries bound storage to 24 MiB of texel data in the worst case. The
+ * glyph entries bound storage to 32 MiB of GPU texel data plus retained recovery pixels in the worst case. The
  * sparse glyph table grows on demand. Full caches flush the batch before page
  * eviction. Retained runs validate cached image references against an eviction
  * version and remain usable after eviction. A warm
@@ -41,11 +38,12 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * demand, including glyphs introduced by shaping. Consecutive sprites, coverage
  * text and MSDF text share the standard batch without per-label flushes.
  * Participating batch shaders retain their transforms and fragment effects.
- * MSDF drawing under a shader without distance-field support temporarily selects
- * the standard shader and restores the custom shader afterward.</p>
+ * Coverage and MSDF drawing under a shader without atlas decoding temporarily
+ * select the standard shader and restore the custom shader afterward.</p>
  *
  * <pre>{@code
- * AdaptiveFont font = AdaptiveFontData.load("Cinzel-Regular.otf", 20).asFont();
+ * AdaptiveFont font = AdaptiveFontData.load("Cinzel-Regular.otf", 20)
+ *         .asFont();
  * AdaptiveTextRun title = font.createRun("Valthorne", 96);
  * batch.begin();
  * font.draw(batch, "Inventory", 24, 100, 20, Color.WHITE);
@@ -84,7 +82,7 @@ public final class AdaptiveFont implements TextFont {
      * At least two physical pixels of transparent antialiasing guard remain.
      */
     private static final int MSDF_QUAD_INSET = 3;
-    private final Thread owner = Thread.currentThread(); // Native and OpenGL owner thread.
+    private final Thread owner = Thread.currentThread(); // Native and graphics owner thread.
     private final AdaptiveNativeFace face; // Owned native backends and encoded source memory.
     private final FontHinting hinting; // Immutable small-text raster policy shared by all cached coverage glyphs.
     private AdaptiveTextRun scratch = new AdaptiveTextRun(this); // Owned long-text scratch; released on disposal.
@@ -103,7 +101,7 @@ public final class AdaptiveFont implements TextFont {
     private int pageCount; // Active prefix of atlas pages.
     private int entries; // Current cache occupancy.
     private long cacheVersion; // Changes whenever atlas eviction invalidates retained image references.
-    private long atlasBytes; // Exact allocated R8/RGB8 texel storage, excluding driver bookkeeping.
+    private long atlasBytes; // Exact allocated atlas texel storage, excluding driver bookkeeping.
     private float pixelScaleX; // Horizontal physical pixels per logical unit for the current hinted draw.
     private float pixelScaleY; // Vertical physical pixels per logical unit for the current hinted draw.
     private float pixelOriginX; // Viewport/projection horizontal physical origin.
@@ -113,7 +111,7 @@ public final class AdaptiveFont implements TextFont {
     private boolean disposed; // Prevents native access after release.
 
     /**
-     * Creates native font resources using NORMAL hinting, requiring no OpenGL
+     * Creates native font resources using NORMAL hinting, requiring no graphics device
      * until first drawing.
      * @param data immutable encoded asset
      */
@@ -137,15 +135,10 @@ public final class AdaptiveFont implements TextFont {
         firstCharacter = data.firstCharacterIndex();
         prewarmCount = Math.min(data.characterCount(), 256);
         face = new AdaptiveNativeFace(data.bytes());
-        float inverseEm = 1f / face.face().units_per_EM();
-        ascent = face.face().ascender() * inverseEm;
-        descent = face.face().descender() * inverseEm;
-        lineHeight = Math.max(ascent - descent, face.face().height() * inverseEm);
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer out = stack.callocInt(1);
-            hb_font_get_nominal_glyph(face.font(), ' ', out);
-            spaceAdvance = hb_font_get_glyph_h_advance(face.font(), out.get(0)) * inverseEm;
-        }
+        ascent = face.ascent();
+        descent = face.descent();
+        lineHeight = face.lineHeight();
+        spaceAdvance = face.spaceAdvance();
     }
 
     /**
@@ -327,16 +320,15 @@ public final class AdaptiveFont implements TextFont {
             y += (Math.round(screenY) - screenY) / pixelScaleY;
         }
         Shader previous = batch.getShader();
-        boolean override = raster == 0 && !batch.supportsDistanceFields();
+        // R8 coverage requires atlas decoding just as RGB distance fields do.
+        boolean override = !batch.supportsDistanceFields();
         try {
             if (override) batch.setShader(batch.getDefaultShader());
             if (!warmed) {
-                try (MemoryStack stack = MemoryStack.stackPush()) {
-                    IntBuffer out = stack.callocInt(1);
-                    int warmSize = initialSize <= HINT_LIMIT ? initialSize : 0;
-                    for (int i = 0; i < prewarmCount; i++) {
-                        if (hb_font_get_nominal_glyph(face.font(), firstCharacter + i, out)) glyph(batch, out.get(0), warmSize);
-                    }
+                int warmSize = initialSize <= HINT_LIMIT ? initialSize : 0;
+                for (int i = 0; i < prewarmCount; i++) {
+                    int index = face.nominalGlyph(firstCharacter + i);
+                    if (index != 0) glyph(batch, index, warmSize);
                 }
                 warmed = true;
             }
@@ -410,7 +402,7 @@ public final class AdaptiveFont implements TextFont {
             FontAtlasPage page = null;
             if (image.pixels() != null) {
                 for (int i = 0; i < pageCount; i++) {
-                    if ((pages[i].getDistanceFieldRange() != 0) != (raster == 0)) continue;
+                    if ((pages[i].getDistanceFieldRange() > 0) != (raster == 0)) continue;
                     if (!pages[i].reserve(image.width(), image.height())) continue;
                     page = pages[i];
                     break;

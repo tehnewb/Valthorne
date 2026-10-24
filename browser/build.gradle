@@ -1,0 +1,350 @@
+plugins {
+    id 'java-library'
+    id 'org.teavm' version '0.16.0'
+    id 'com.vanniktech.maven.publish'
+}
+
+group = rootProject.group
+version = rootProject.version
+description = 'Valthorne browser runtime with bgfx WebAssembly and WebGL 2'
+
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+
+def replacements = [
+    'valthorne/ui/behavior/file/FileTransferable',
+    'valthorne/graphics/map/tiled/TiledResolvers',
+    'valthorne/graphics/map/ldtk/LdtkLoader', 'valthorne/graphics/map/tiled/TiledMapLoader',
+    'valthorne/ui/behavior/DirectoryBrowserModel', 'valthorne/ui/behavior/file/FileCopyVisitor', 'valthorne/graphics/map/tiled/TiledDecoding',
+    'valthorne/graphics/map/tiled/TiledXML',
+    'valthorne/graphics/map/tiled/TileAnimationFrame',
+    'valthorne/graphics/map/tiled/TileDefinition',
+    'valthorne/graphics/map/tiled/TileSetData',
+    'valthorne/graphics/map/tiled/TiledMapData',
+    'valthorne/graphics/map/tiled/TiledTileMapLayer',
+    'valthorne/graphics/map/tiled/TiledObjectMapLayer',
+    'valthorne/graphics/map/tiled/TiledImageMapLayerData',
+    'valthorne/graphics/map/tiled/TiledObject',
+    'valthorne/graphics/map/tiled/FileSystemResolver',
+    'valthorne/graphics/map/ldtk/LdtkProject',
+    'valthorne/graphics/map/ldtk/LdtkResolvers',
+    'valthorne/asset/Assets',
+    'valthorne/graphics/font/FontData',
+    'valthorne/ui/behavior/file/FileOperations',
+    'valthorne/ui/behavior/file/FileClipboard',
+    'valthorne/ui/behavior/file/FileOpenActions',
+    'valthorne/ui/nodes/DirectoryTree',
+    'valthorne/ui/nodes/nano/NanoDirectoryTree',
+    'valthorne/ui/nodes/FileChooser',
+    'valthorne/ui/nodes/nano/NanoFileChooser',
+    'valthorne/ui/nodes/nano/NanoFileContextMenu',
+    'valthorne/io/file/NativeFileDialog',
+
+    'valthorne/JGL', 'valthorne/JGLConfiguration', 'valthorne/Window', 'valthorne/Keyboard', 'valthorne/Mouse',
+    'valthorne/graphics/shader/ComputeBuffer', 'valthorne/Audio', 'valthorne/AudioRuntime', 'valthorne/PlatformTools',
+    'valthorne/audio/SoundData', 'valthorne/audio/SoundPlayer', 'valthorne/audio/WaveSoundDecoder', 'valthorne/audio/OggSoundDecoder', 'valthorne/audio/Mp3SoundDecoder',
+    'valthorne/graphics/font/adaptive/FontHinting', 'valthorne/graphics/font/adaptive/AdaptiveNativeFace', 'valthorne/graphics/font/adaptive/OpenTypeContainer',
+    'valthorne/graphics/font/adaptive/AdaptiveFontData', 'valthorne/graphics/font/adaptive/AdaptiveTextRun', 'valthorne/graphics/font/adaptive/AdaptiveTextCarets',
+    'valthorne/graphics/texture/TextureData', 'valthorne/graphics/font/SystemFonts',
+    'valthorne/ui/behavior/TextEditing', 'valthorne/ui/behavior/TextEditModel', 'valthorne/ui/nodes/nano/NanoHyperlink', 'valthorne/ui/NanoUtility',
+    'valthorne/graphics/bgfx/BgfxDesktopWindow', 'valthorne/graphics/bgfx/BgfxCallbacks',
+    'valthorne/graphics/bgfx/BgfxPlatform', 'valthorne/graphics/bgfx/BgfxWindowsSurface',
+    'valthorne/graphics/bgfx/BgfxMipmaps',
+    'valthorne/graphics/bgfx/BgfxGraphics', 'valthorne/graphics/bgfx/BgfxBatchRenderer', 'valthorne/graphics/bgfx/BgfxMeshRenderer',
+    'valthorne/graphics/bgfx/BgfxMesh', 'valthorne/graphics/bgfx/BgfxVertexBuffer',
+    'valthorne/math/physics/JoltRuntime', 'valthorne/math/physics/CollisionShape2D',
+    'valthorne/math/physics/PhysicsWorld2D', 'valthorne/math/physics/PhysicsWorldSettings2D', 'valthorne/math/physics/RigidBody2D',
+    'valthorne/math/physics/SoftBody2D', 'valthorne/math/physics/PhysicsSoftContacts2D',
+    'valthorne/math/physics/PhysicsContacts2D', 'valthorne/math/physics/PhysicsContactBridge2D',
+    'valthorne/math/physics/PhysicsQueries2D', 'valthorne/math/physics/PhysicsQueryCollector2D',
+    'valthorne/math/physics/PhysicsRigidBodyFilter2D', 'valthorne/math/physics/PhysicsPoses2D',
+    'valthorne/math/physics/PhysicsJoints2D', 'valthorne/math/physics/PhysicsJoint2D'
+]
+
+def browserEngineApi = tasks.register('browserEngineApi', Jar) {
+    inputs.property('replacedTypes', replacements)
+    archiveFileName = 'valthorne-browser-api.jar'
+    dependsOn rootProject.tasks.named('jar')
+    from { zipTree(rootProject.tasks.named('jar').get().archiveFile) }
+    replacements.each { type -> exclude "${type}.class", "${type}\$*.class" }
+    exclude 'META-INF/MANIFEST.MF'
+}
+
+dependencies {
+    compileOnly project(':')
+    implementation files(browserEngineApi)
+    api 'org.teavm:teavm-jso:0.16.0'
+    api 'org.teavm:teavm-jso-apis:0.16.0'
+
+    api('org.joml:joml-primitives:1.10.0') { transitive = false }
+    api 'net.onedaybeard.artemis:artemis-odb:2.3.0'
+    compileOnly 'org.teavm:teavm-core:0.16.0'
+    compileOnly 'org.teavm:teavm-classlib:0.16.0'
+}
+
+sourceSets {
+    application {
+        java.srcDir rootProject.file(providers.gradleProperty('applicationSources').orElse('src/game/java').get())
+        if (providers.gradleProperty('applicationResources').isPresent())
+            resources.srcDir rootProject.file(providers.gradleProperty('applicationResources').get())
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+
+teavm.js {
+    mainClass = providers.gradleProperty('applicationMain').orElse('valthorne.browser.BrowserRuntime')
+    targetFileName = 'application.js'
+    obfuscated = providers.gradleProperty('browserDebug').map { !it.toBoolean() }.orElse(true)
+    sourceMap = providers.gradleProperty('browserDebug').map { it.toBoolean() }.orElse(false)
+    debugInformation = false
+}
+
+tasks.named('generateJavaScript') {
+    dependsOn tasks.named('applicationClasses')
+    classpath.from(sourceSets.application.output)
+    // Rebuilt local runtime archives must not reuse a persistent compiler's stale ZIP handles.
+    outOfProcess = false
+    doFirst {
+        if (!providers.gradleProperty('applicationMain').isPresent())
+            throw new GradleException('Set -PapplicationMain to the application main class for the browser export.')
+    }
+}
+
+tasks.register('webExport', Sync) {
+    dependsOn tasks.named('generateJavaScript')
+    from(layout.buildDirectory.dir('generated/teavm/js'))
+    from('src/main/resources')
+    into(layout.buildDirectory.dir('dist'))
+}
+
+// Generate platform variants from current engine sources rather than stale copies.
+def preparePlatform = tasks.register('preparePlatform', Exec) {
+    inputs.files('prepare-platform.mjs', 'prepare-physics.mjs', 'prepare-loaders.mjs')
+    inputs.dir(rootProject.file('src/main/java'))
+    outputs.dir(layout.buildDirectory.dir('generated/platform'))
+    commandLine 'node', 'prepare-platform.mjs'
+}
+sourceSets.main.java.srcDir(preparePlatform)
+sourceSets.main.java.exclude('valthorne/graphics/font/slug/**')
+tasks.named('compileJava') { dependsOn preparePlatform }
+
+// Select JOML's ordinary NIO path; unsafe JVM memory access does not exist in a browser.
+configurations { jomlSources; jomlBinary }
+dependencies {
+    jomlSources('org.joml:joml:1.10.9:sources') { transitive = false }
+    jomlBinary('org.joml:joml:1.10.9') { transitive = false }
+}
+def prepareBrowserJoml = tasks.register('prepareBrowserJoml') {
+    inputs.files(configurations.jomlSources)
+    outputs.dir(layout.buildDirectory.dir('generated/joml'))
+    doLast {
+        def source = zipTree(configurations.jomlSources.singleFile).matching { include 'org/joml/MemUtil.java' }.singleFile.getText('UTF-8')
+        def factory = /(?s)private static MemUtil createInstance\(\) \{.*?return accessor;\s*\}/
+        if ((source =~ factory).count != 1) throw new GradleException('Review the JOML browser NIO adaptation after upgrading JOML.')
+        def output = layout.buildDirectory.file('generated/joml/org/joml/MemUtil.java').get().asFile
+        output.parentFile.mkdirs()
+        source = source.replaceAll(factory, 'private static MemUtil createInstance() { return new MemUtilNIO(); }')
+        for (def type : ['MemUtilUnsafe', 'MemUtilInternalUnsafe']) {
+            def start = source.indexOf('    public static class ' + type + ' extends MemUtilNIO')
+            if (start < 0) throw new GradleException('Review the JOML unsafe-class boundaries after upgrading JOML.')
+            def body = source.indexOf('{', start)
+            def depth = 1
+            def end = body + 1
+            while (depth > 0 && end < source.length()) {
+                def value = source.charAt(end++)
+                if (value == '{') depth++
+                else if (value == '}') depth--
+            }
+            if (depth != 0) throw new GradleException('Unbalanced JOML unsafe class.')
+            source = source.substring(0, start) + source.substring(end)
+        }
+        output.setText(source.replace('    @SuppressWarnings("Since15")', ''), 'UTF-8')
+        def math = zipTree(configurations.jomlSources.singleFile).matching { include 'org/joml/Math.java' }.singleFile.getText('UTF-8')
+        def intrinsic = /(?m)        if \(Runtime.HAS_Math_fma\)\r?\n            return java.lang.Math.fma\(a, b, c\);\r?\n/
+        if ((math =~ intrinsic).count != 2) throw new GradleException('Review the JOML browser arithmetic adaptation after upgrading JOML.')
+        layout.buildDirectory.file('generated/joml/org/joml/Math.java').get().asFile.setText(math.replaceAll(intrinsic, ''), 'UTF-8')
+        def options = zipTree(configurations.jomlSources.singleFile).matching { include 'org/joml/Options.java' }.singleFile.getText('UTF-8')
+        def abbreviatedNegativePattern = '+ "E0;-"'
+        if (!options.contains(abbreviatedNegativePattern)) throw new GradleException('Review the JOML browser number format after upgrading JOML.')
+        layout.buildDirectory.file('generated/joml/org/joml/Options.java').get().asFile.setText(options.replace(abbreviatedNegativePattern, '+ "E0;-0." + new String(prec) + "E0"'), 'UTF-8')
+    }
+}
+def browserJoml = tasks.register('browserJoml', Jar) {
+    archiveFileName = 'joml-browser.jar'
+    from { configurations.jomlBinary.collect { zipTree(it) } }
+    inputs.property('replacedTypes', ['Math', 'MemUtil', 'Options'])
+    exclude 'org/joml/Math.class', 'org/joml/MemUtil.class', 'org/joml/MemUtil$*.class', 'org/joml/Options.class'
+}
+sourceSets.main.java.srcDir(prepareBrowserJoml)
+tasks.named('compileJava') { dependsOn prepareBrowserJoml }
+dependencies { implementation files(browserJoml) }
+
+// Use fastjson2's maintained parser with browser-safe memory access and tree binding.
+configurations { fastjsonBrowserSources; fastjsonBrowserBinary }
+dependencies {
+    fastjsonBrowserSources("com.alibaba.fastjson2:fastjson2:${rootProject.fastjson2Version}.android5:sources") { transitive = false }
+    fastjsonBrowserBinary("com.alibaba.fastjson2:fastjson2:${rootProject.fastjson2Version}.android5") { transitive = false }
+}
+def fastjsonReplacements = ['JSONReader', 'JSONReaderUTF16', 'util/JDKUtils']
+def extractBrowserFastjson = tasks.register('extractBrowserFastjson', Sync) {
+    from { zipTree(configurations.fastjsonBrowserSources.singleFile) }
+    fastjsonReplacements.each { type -> include "com/alibaba/fastjson2/${type}.java" }
+    into(layout.buildDirectory.dir('generated/fastjson2-upstream'))
+}
+def prepareBrowserFastjson = tasks.register('prepareBrowserFastjson', Exec) {
+    dependsOn extractBrowserFastjson
+    inputs.file('prepare-fastjson2.mjs')
+    inputs.dir(layout.buildDirectory.dir('generated/fastjson2-upstream'))
+    outputs.dir(layout.buildDirectory.dir('generated/fastjson2'))
+    commandLine 'node', 'prepare-fastjson2.mjs', layout.buildDirectory.dir('generated/fastjson2-upstream').get().asFile.absolutePath, layout.buildDirectory.dir('generated/fastjson2').get().asFile.absolutePath
+}
+def browserFastjson = tasks.register('browserFastjson', Jar) {
+    archiveFileName = 'fastjson2-browser.jar'
+    inputs.property('replacedTypes', fastjsonReplacements)
+    from { zipTree(configurations.fastjsonBrowserBinary.singleFile) }
+    fastjsonReplacements.each { type -> exclude "com/alibaba/fastjson2/${type}.class", "com/alibaba/fastjson2/${type}\$*.class" }
+    exclude 'META-INF/MANIFEST.MF', 'META-INF/maven/**'
+}
+sourceSets.main.java.srcDir(prepareBrowserFastjson)
+tasks.named('compileJava') { dependsOn prepareBrowserFastjson }
+dependencies { implementation files(browserFastjson) }
+
+// Embed the same classpath assets used by unchanged engine and application code.
+def browserResourceManifest = tasks.register('browserResourceManifest') {
+    inputs.dir(rootProject.file('src/main/resources'))
+    inputs.dir('src/main/resources/fonts')
+    outputs.dir(layout.buildDirectory.dir('generated/resource-manifest'))
+    doLast {
+        def names = new TreeSet<String>()
+        def roots = [rootProject.file('src/main/resources')]
+        fileTree('src/main/resources/fonts').files.each { resource -> names.add('fonts/' + resource.name) }
+        roots.each { resourceRoot ->
+            fileTree(resourceRoot).files.each { resource ->
+                names.add(resourceRoot.toPath().relativize(resource.toPath()).toString().replace(File.separatorChar, '/' as char))
+            }
+        }
+        def destination = layout.buildDirectory.file('generated/resource-manifest/META-INF/valthorne-browser-resources.list').get().asFile
+        destination.parentFile.mkdirs()
+        destination.setText(names.join('\n'), 'UTF-8')
+    }
+}
+sourceSets.main.resources.srcDir(browserResourceManifest)
+tasks.named('processResources') { dependsOn browserResourceManifest }
+
+def applicationResourceManifest = tasks.register('applicationResourceManifest') {
+    inputs.files(sourceSets.application.resources.sourceDirectories)
+    outputs.dir(layout.buildDirectory.dir('generated/application-resource-manifest'))
+    doLast {
+        def names = new TreeSet<String>()
+        sourceSets.application.resources.srcDirs.each { resourceRoot ->
+            if (resourceRoot.exists()) fileTree(resourceRoot).files.each { resource ->
+                names.add(resourceRoot.toPath().relativize(resource.toPath()).toString().replace(File.separatorChar, '/' as char))
+            }
+        }
+        def destination = layout.buildDirectory.file('generated/application-resource-manifest/META-INF/valthorne-application-resources.list').get().asFile
+        destination.parentFile.mkdirs()
+        destination.setText(names.join('\n'), 'UTF-8')
+    }
+}
+tasks.named('processApplicationResources') {
+    dependsOn applicationResourceManifest
+    from(applicationResourceManifest)
+}
+
+// The official Yoga browser distribution contains its own WebAssembly module.
+def browserDependencies = tasks.register('browserDependencies', Exec) {
+    inputs.files('package.json', 'package-lock.json')
+    outputs.files('node_modules/bidi-js/package.json', 'node_modules/yoga-layout/package.json', 'node_modules/mpg123-decoder/package.json', 'node_modules/@wasm-audio-decoders/ogg-vorbis/package.json')
+    commandLine System.getProperty('os.name').startsWith('Windows') ? 'npm.cmd' : 'npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'
+}
+tasks.named('webExport', Sync) {
+    dependsOn browserDependencies
+    from('node_modules/bidi-js/dist/bidi.mjs') { into 'vendor' }
+    from('node_modules/bidi-js/LICENSE.txt') { into 'META-INF/licenses/bidi-js' }
+    from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
+    from('node_modules/yoga-layout/LICENSE') { into 'vendor/yoga' }
+    from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }
+    from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include '*.min.js'; into 'vendor/audio' }
+    from('node_modules/mpg123-decoder') { include '*LICENSE*', '*COPYING*'; into 'vendor/audio/mpg123' }
+    from('node_modules/@wasm-audio-decoders/ogg-vorbis') { include '*LICENSE*', '*COPYING*'; into 'vendor/audio/vorbis' }
+}
+
+// Cooperative stages preserve the engine's existing public async APIs in TeaVM.
+def browserCompatibility = tasks.register('browserCompatibility', JavaCompile) {
+    source = fileTree('src/compat/java') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('classes/java/compat')
+    options.compilerArgs += ['--patch-module', 'java.base=' + file('src/compat/java').absolutePath]
+}
+dependencies { implementation files(browserCompatibility.map { it.destinationDirectory }) }
+
+// The browser artifact carries adapted engine classes and native runtime assets;
+// applications compile in their own source set and never enter a library release.
+tasks.named('jar', Jar) {
+    dependsOn browserEngineApi, browserJoml, browserFastjson, browserCompatibility, browserDependencies
+    from { zipTree(browserEngineApi.get().archiveFile) }
+    from { zipTree(browserJoml.get().archiveFile) }
+    from { zipTree(browserFastjson.get().archiveFile) }
+    from(browserCompatibility.map { it.destinationDirectory })
+    from('node_modules/bidi-js/dist/bidi.mjs') { into 'vendor' }
+    from('node_modules/bidi-js/LICENSE.txt') { into 'META-INF/licenses/bidi-js' }
+    from('node_modules/yoga-layout/dist') { into 'vendor/yoga/dist' }
+    from('node_modules/mpg123-decoder/dist') { include '*.min.js'; into 'vendor/audio' }
+    from('node_modules/@wasm-audio-decoders/ogg-vorbis/dist') { include '*.min.js'; into 'vendor/audio' }
+    exclude 'module-info.class', 'META-INF/versions/**/module-info.class'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest { attributes('Implementation-Title': 'Valthorne browser', 'Implementation-Version': project.version.toString()) }
+}
+
+tasks.withType(Jar).matching { it.name == 'sourcesJar' || it.name == 'plainSourcesJar' }.configureEach {
+    from(rootProject.sourceSets.main.allJava) {
+        replacements.each { type -> exclude "${type}.java" }
+    }
+    from('src/compat/java')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+tasks.withType(Javadoc).configureEach { options.addStringOption('Xdoclint:none', '-quiet') }
+
+mavenPublishing {
+    publishToMavenCentral()
+    if (providers.gradleProperty('releaseSigning').map { it.toBoolean() }.getOrElse(false)) signAllPublications()
+    coordinates(group.toString(), 'Valthorne-browser', version.toString())
+    pom {
+        name = 'Valthorne browser'
+        description = project.description
+        url = 'https://github.com/tehnewb/Valthorne'
+        inceptionYear = '2025'
+        licenses {
+            license {
+                name = 'The Apache License, Version 2.0'
+                url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                distribution = 'repo'
+            }
+        }
+        developers {
+            developer {
+                id = 'tehnewb'
+                name = 'Albert Beaupre'
+                url = 'https://github.com/tehnewb/'
+            }
+        }
+        scm {
+            url = 'https://github.com/tehnewb/Valthorne'
+            connection = 'scm:git:https://github.com/tehnewb/Valthorne.git'
+            developerConnection = 'scm:git:ssh://git@github.com/tehnewb/Valthorne.git'
+        }
+    }
+}
+
+tasks.matching { it.name.contains('MavenCentral') }.configureEach {
+    doFirst {
+        if (!providers.gradleProperty('releaseSigning').map { it.toBoolean() }.getOrElse(false))
+            throw new GradleException('Maven Central publication requires -PreleaseSigning=true and private signing credentials.')
+    }
+}

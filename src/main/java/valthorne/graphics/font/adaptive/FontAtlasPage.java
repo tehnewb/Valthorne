@@ -1,25 +1,19 @@
 package valthorne.graphics.font.adaptive;
 
-import org.lwjgl.system.MemoryStack;
+import valthorne.graphics.texture.TextureFilter;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureData;
 
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL12.*;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
-import static org.lwjgl.opengl.GL21.*;
-import static org.lwjgl.opengl.GL30.GL_R8;
-import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryUtil.memCalloc;
+import static org.lwjgl.bgfx.BGFX.*;
 import static org.lwjgl.system.MemoryUtil.memFree;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
 
 /**
- * One linear R8 coverage or RGB8 MSDF shelf-packed atlas page. An empty texel gutter keeps
- * linear filtering from sampling neighboring glyphs. Uploads restore texture,
- * pixel-buffer and unpack state; no CPU copy of a page is retained.
+ * One linear R8 coverage or RGB8/RGBA8 MSDF shelf-packed atlas page. An empty
+ * texel gutter prevents neighboring glyphs from bleeding through linear filtering.
+ * Managed texture updates retain base pixels for backend changes and recovery.
  */
 final class FontAtlasPage extends Texture {
     /**
@@ -35,6 +29,7 @@ final class FontAtlasPage extends Texture {
      */
     static final int MAX_SIDE = 1024;
 
+    private final int pixelBytes; // Actual compact storage width, with RGBA fallback when RGB8 is unsupported.
     private final boolean distanceField; // Whether this page contains RGB distance fields instead of R8 coverage.
     private int cursorX = 1; // Next free shelf column including gutter.
     private int cursorY = 1; // Current shelf bottom including gutter.
@@ -43,15 +38,16 @@ final class FontAtlasPage extends Texture {
     private int imageY; // Most recently reserved image row.
 
     /**
-     * Allocates compact, zero-filled linear storage without retaining CPU pixels.
+     * Allocates compact, zero-filled linear storage with retained recovery pixels.
      * @param distanceField whether to use RGB8 distance fields instead of R8 coverage
      * @param side power-of-two side length sufficient for the requested glyph
      */
     FontAtlasPage(boolean distanceField, int side) {
-        super(glGenTextures(), new TextureData(null, side, side));
+        super(new TextureData(null, side, side), distanceField ? distanceFormat() : BGFX_TEXTURE_FORMAT_R8);
         this.distanceField = distanceField;
+        pixelBytes = distanceField ? (distanceFormat() == BGFX_TEXTURE_FORMAT_RGB8 ? 3 : 4) : 1;
         try {
-            upload(null, 0, 0, side, side, true);
+            setFilter(TextureFilter.LINEAR);
         } catch (RuntimeException | Error failure) {
             dispose();
             throw failure;
@@ -59,13 +55,13 @@ final class FontAtlasPage extends Texture {
     }
 
     @Override
-    public float getDistanceFieldRange() { return distanceField ? AdaptiveNativeFace.MSDF_RANGE : 0; }
+    public float getDistanceFieldRange() { return distanceField ? AdaptiveNativeFace.MSDF_RANGE : -1; }
 
     /**
      * Returns exact allocated texel storage, excluding driver bookkeeping.
-     * @return bytes in this page's R8 or RGB8 image
+     * @return bytes in this page's actual R8, RGB8 or RGBA8 image
      */
-    long storageBytes() { return (long) getWidth() * getHeight() * (distanceField ? 3 : 1); }
+    long storageBytes() { return (long) getWidth() * getHeight() * pixelBytes; }
 
     /**
      * Reserves a shelf rectangle without modifying the page on failure.
@@ -110,69 +106,34 @@ final class FontAtlasPage extends Texture {
      * @param raster borrowed pixels, released by caller after this operation
      */
     void upload(FontRaster raster) {
-        upload(raster.pixels(), imageX, imageY, raster.width(), raster.height(), false);
+        if (pixelBytes != 4) {
+            updatePixels(imageX, imageY, raster.width(), raster.height(), raster.pixels());
+            return;
+        }
+        ByteBuffer expanded = memAlloc(raster.width() * raster.height() * 4);
+        try {
+            ByteBuffer source = raster.pixels();
+            for (int i = source.position(); i < source.limit(); i += 3)
+                expanded.put(source.get(i))
+                        .put(source.get(i + 1))
+                        .put(source.get(i + 2))
+                        .put((byte) 255);
+            expanded.flip();
+            updatePixels(imageX, imageY, raster.width(), raster.height(), expanded);
+        } finally {
+            memFree(expanded);
+        }
     }
 
     /**
-     * Performs isolated texture allocation or subimage upload. Resetting every
-     * relevant unpack value prevents application PBOs or row skips corrupting data.
-     * @param pixels borrowed RGB or coverage bytes, null only for allocation
-     * @param x destination column
-     * @param y destination row
-     * @param width rectangle width
-     * @param height rectangle height
-     * @param allocate whether to initialize the whole page
+     * Selects compact RGB8 where supported, retaining full RGB precision otherwise.
+     * @return RGB8 or universal RGBA8 sampling format
      */
-    private void upload(ByteBuffer pixels, int x, int y, int width, int height, boolean allocate) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer state = stack.mallocInt(8);
-            state.put(0, glGetInteger(GL_TEXTURE_BINDING_2D));
-            state.put(1, glGetInteger(GL_PIXEL_UNPACK_BUFFER_BINDING));
-            state.put(2, glGetInteger(GL_UNPACK_ALIGNMENT));
-            state.put(3, glGetInteger(GL_UNPACK_ROW_LENGTH));
-            state.put(4, glGetInteger(GL_UNPACK_SKIP_PIXELS));
-            state.put(5, glGetInteger(GL_UNPACK_SKIP_ROWS));
-            state.put(6, glGetInteger(GL_UNPACK_SWAP_BYTES));
-            state.put(7, glGetInteger(GL_UNPACK_LSB_FIRST));
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-            glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-            glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-            glPixelStorei(GL_UNPACK_SWAP_BYTES, 0);
-            glPixelStorei(GL_UNPACK_LSB_FIRST, 0);
-            glBindTexture(GL_TEXTURE_2D, textureID);
-            try {
-                int format = distanceField ? GL_RGB : GL_RED;
-                if (allocate) {
-                    // A cleared gutter is required because uninitialized texture storage is undefined.
-                    ByteBuffer zeroes = memCalloc(width * height * (distanceField ? 3 : 1));
-                    try {
-                        glTexImage2D(GL_TEXTURE_2D, 0, distanceField ? GL_RGB8 : GL_R8, width, height, 0, format, GL_UNSIGNED_BYTE, zeroes);
-                    } finally {
-                        memFree(zeroes);
-                    }
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                    if (!distanceField) {
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ONE);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_ONE);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_ONE);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED);
-                    }
-                } else glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, format, GL_UNSIGNED_BYTE, pixels);
-            } finally {
-                glBindTexture(GL_TEXTURE_2D, state.get(0));
-                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, state.get(1));
-                glPixelStorei(GL_UNPACK_ALIGNMENT, state.get(2));
-                glPixelStorei(GL_UNPACK_ROW_LENGTH, state.get(3));
-                glPixelStorei(GL_UNPACK_SKIP_PIXELS, state.get(4));
-                glPixelStorei(GL_UNPACK_SKIP_ROWS, state.get(5));
-                glPixelStorei(GL_UNPACK_SWAP_BYTES, state.get(6));
-                glPixelStorei(GL_UNPACK_LSB_FIRST, state.get(7));
-            }
-        }
+    private static int distanceFormat() {
+        /*
+         * Vulkan devices may omit three-channel sampled images. The fallback
+         * adds only an unused alpha channel; distance samples retain their RGB.
+         */
+        return bgfx_is_texture_valid(0, false, 1, BGFX_TEXTURE_FORMAT_RGB8, BGFX_TEXTURE_NONE) ? BGFX_TEXTURE_FORMAT_RGB8 : BGFX_TEXTURE_FORMAT_RGBA8;
     }
 }

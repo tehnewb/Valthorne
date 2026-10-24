@@ -1,6 +1,5 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
 
 import valthorne.graphics.Sprite;
 
@@ -62,10 +61,10 @@ public class WaterShader extends TexturedQuadShader {
     /**
      * Fragment source loaded from the packaged water effect shader resource.
      */
-    public static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/water.frag");
+    public static final String FRAG_SRC = "engine/effects/water.frag";
 
     /**
-     * Creates a new {@code WaterShader} using the built-in GLSL sources.
+     * Creates a new {@code WaterShader} using the packaged compiled stages.
      */
     public WaterShader() {
         super(FRAG_SRC);
@@ -75,7 +74,7 @@ public class WaterShader extends TexturedQuadShader {
      * Binds the water program and configures distortion uniforms from the sprite's
      * backing texture dimensions. Leaves the shader bound for a subsequent draw;
      * this method does not itself render the sprite or unbind the program. Requires
-     * a current OpenGL context and a sprite with a valid, nonzero-size texture.
+     * a current graphics device and a sprite with a valid, nonzero-size texture.
      *
      * @param sprite sprite supplying texture dimensions
      * @param timeSeconds animation time in seconds

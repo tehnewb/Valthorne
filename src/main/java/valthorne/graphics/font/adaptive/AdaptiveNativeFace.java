@@ -11,6 +11,8 @@ import org.lwjgl.util.msdfgen.MSDFGenTransform;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import org.lwjgl.util.harfbuzz.hb_glyph_info_t;
+import org.lwjgl.util.harfbuzz.hb_glyph_position_t;
 
 import static org.lwjgl.system.MemoryUtil.*;
 import static org.lwjgl.util.freetype.FreeType.*;
@@ -40,6 +42,9 @@ final class AdaptiveNativeFace implements AutoCloseable {
      */
     static final int MSDF_RANGE = 8;
 
+    private final FontShape shapeOutput = new FontShape(); // Owned reusable cross-platform shaping result.
+    private ByteBuffer textBytes; // Reused UTF-16 staging for ordinary labels.
+    private int textLength; // Complete source length supplying shaping context.
     private ByteBuffer bytes; // Owned canonical font memory retained by every native backend.
     private long library; // Owned FreeType library.
     private FT_Face face; // Owned mutable raster face.
@@ -55,7 +60,8 @@ final class AdaptiveNativeFace implements AutoCloseable {
      */
     AdaptiveNativeFace(byte[] source) {
         bytes = memAlloc(source.length);
-        bytes.put(source).flip();
+        bytes.put(source)
+                .flip();
         long blob = 0;
         long hbFace = 0;
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -129,6 +135,87 @@ final class AdaptiveNativeFace implements AutoCloseable {
      * @return borrowed FreeType face
      */
     FT_Face face() { return face; }
+
+    /**
+     * Returns normalized typographic ascent.
+     * @return ascent in em units
+     */
+    float ascent() { return face.ascender() / (float) face.units_per_EM(); }
+    /**
+     * Returns normalized typographic descent.
+     * @return descent in em units
+     */
+    float descent() { return face.descender() / (float) face.units_per_EM(); }
+    /**
+     * Returns normalized baseline spacing.
+     * @return baseline spacing in em units
+     */
+    float lineHeight() { return Math.max(ascent() - descent(), face.height() / (float) face.units_per_EM()); }
+    /**
+     * Resolves a nominal Unicode character without shaping a new layout.
+     * @param codepoint Unicode scalar
+     * @return glyph index, or zero for a missing character
+     */
+    int nominalGlyph(int codepoint) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            var out = stack.callocInt(1);
+            return hb_font_get_nominal_glyph(font, codepoint, out) ? out.get(0) : 0;
+        }
+    }
+    /**
+     * Returns the nominal space advance used for tab layout.
+     * @return advance in em units
+     */
+    float spaceAdvance() { return hb_font_get_glyph_h_advance(font, nominalGlyph(' ')) / (float) face.units_per_EM(); }
+    /**
+     * Encodes one complete source once before shaping contextual segments.
+     * @param source immutable source for the current layout rebuild
+     */
+    void prepareText(String source) {
+        int length = Math.multiplyExact(source.length(), 2);
+        if (textBytes == null) textBytes = memAlloc(Math.max(256, length));
+        else if (textBytes.capacity() < length) textBytes = memRealloc(textBytes, Math.max(length, textBytes.capacity() * 2));
+        textLength = source.length();
+        for (int i = 0; i < textLength; i++) textBytes.putShort(i * 2, (short) source.charAt(i));
+    }
+    /**
+     * Releases unusually large transient text while retaining ordinary label scratch.
+     */
+    void releaseText() {
+        if (textBytes != null && textBytes.capacity() > 8192) { memFree(textBytes); textBytes = null; }
+        textLength = 0;
+    }
+    /**
+     * Shapes one source segment while preserving the complete UTF-16 context.
+     * @param start first UTF-16 unit
+     * @param end boundary after the segment
+     * @param rtl whether the directional run is right to left
+     * @return borrowed shaping result, replaced by the next call
+     */
+    FontShape shape(int start, int end, boolean rtl) {
+        hb_buffer_reset(buffer);
+        nhb_buffer_add_utf16(buffer, memAddress(textBytes), textLength, start, end - start);
+        hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
+        hb_buffer_set_language(buffer, LANGUAGE_UND);
+        hb_buffer_guess_segment_properties(buffer);
+        hb_shape(font, buffer, null);
+        if (!hb_buffer_allocation_successful(buffer)) throw new OutOfMemoryError("HarfBuzz layout allocation failed");
+        int length = hb_buffer_get_length(buffer);
+        ByteBuffer output = shapeOutput.prepare(length);
+        long infos = nhb_buffer_get_glyph_infos(buffer, 0);
+        long positions = nhb_buffer_get_glyph_positions(buffer, 0);
+        float scale = 1f / face.units_per_EM();
+        for (int i = 0; i < length; i++) {
+            long info = infos + (long) i * hb_glyph_info_t.SIZEOF;
+            long position = positions + (long) i * hb_glyph_position_t.SIZEOF;
+            output.putInt(hb_glyph_info_t.ncodepoint(info))
+                    .putInt(hb_glyph_info_t.ncluster(info));
+            output.putFloat(hb_glyph_position_t.nx_advance(position) * scale);
+            output.putFloat(hb_glyph_position_t.nx_offset(position) * scale)
+                    .putFloat(hb_glyph_position_t.ny_offset(position) * scale);
+        }
+        return shapeOutput;
+    }
 
     /**
      * Rasterizes grayscale coverage using the selected outline hinting policy
@@ -237,6 +324,9 @@ final class AdaptiveNativeFace implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        shapeOutput.close();
+        memFree(textBytes);
+        textBytes = null;
         if (buffer != 0) hb_buffer_destroy(buffer);
         if (font != 0) hb_font_destroy(font);
         if (msdfFont != 0) msdf_ft_font_destroy(msdfFont);

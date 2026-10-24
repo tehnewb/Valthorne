@@ -1,7 +1,5 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 import valthorne.graphics.Sprite;
 
 /**
@@ -51,23 +49,18 @@ import valthorne.graphics.Sprite;
 public class OutlineShader extends TexturedQuadShader {
 
     /**
-     * Fragment source loaded from the packaged outline effect shader resource.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/outline.frag");
-
-    /**
      * Compiles and links the packaged outline fragment program with the shared
-     * textured-quad vertex program. A current OpenGL context is required; dispose
+     * textured-quad vertex program. A current graphics device is required; dispose
      * the shader when it is no longer needed to release its native program.
      */
     public OutlineShader() {
-        super(FRAG_SRC);
+        super("engine/effects/outline.frag");
     }
 
     /**
      * Binds the outline effect using the sprite's backing texture dimensions, draws
      * the sprite immediately, and unbinds the program on normal completion. Requires
-     * a current OpenGL context. The previous shader is not restored, and exceptions
+     * a current graphics device. The previous shader is not restored, and exceptions
      * can leave this program bound.
      *
      * @param sprite sprite with a valid backing texture

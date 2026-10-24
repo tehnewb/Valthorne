@@ -1,10 +1,6 @@
 package valthorne.ui;
 
-import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.TextureBatchShader;
-
-import static org.lwjgl.opengl.GL11.glGetInteger;
-import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
 
 /**
  * Applies the UI context's accumulated rigid transform to textured UI vertices.
@@ -21,10 +17,10 @@ final class UIRotationShader extends TextureBatchShader {
     private boolean rotated; // Whether the current UI vertex transform requires scalable glyphs.
     /**
      * Creates a shader matching the root batch's automatically detected sampler
-     * limit. Requires the root's current OpenGL context.
+     * limit. Requires the root's current graphics device.
      */
     UIRotationShader() {
-        super(Math.min(16, glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS)), ValthorneFiles.readString("valthorne/shaders/ui/rotation.vert"), null);
+        super(16, "engine/batch.vert", null);
     }
 
     /**

@@ -3,8 +3,10 @@ package valthorne.graphics.particle;
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.Color;
+import valthorne.graphics.GraphicsViewport;
+import valthorne.graphics.bgfx.BgfxBatchRenderer;
+import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.shader.Shader;
-import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.Texture;
 import valthorne.io.pool.Pool;
 import valthorne.math.MathUtils;
@@ -13,26 +15,15 @@ import valthorne.math.physics.RigidBody2D;
 import java.util.Objects;
 
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
-import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
-import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
+import java.nio.ByteBuffer;
 import java.util.Random;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
-import static org.lwjgl.opengl.GL30.glGenVertexArrays;
-import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
 
 /**
  * Particle system optimized for rendering speed using instanced particle quads (one instance record per particle) and a single draw call.
  *
  * <h2>Key features</h2>
  * <ul>
- *     <li><b>Instanced quad rendering</b>: uploads one instance record per particle and renders with {@code glDrawArraysInstanced(GL_TRIANGLES)}.</li>
+ *     <li><b>Instanced quad rendering</b>: uploads one instance record per particle and renders with {@code an instanced GPU submission}.</li>
  *     <li><b>No per-particle {@link Texture} mutation</b> during drawing (including rotated, non-square particles).</li>
  *     <li><b>Explicit projection state</b>: uses an engine-managed projection uniform instead of the fixed-function matrix stack.</li>
  *     <li><b>Frame-rate independent continuous emission</b>: uses an accumulator (rate * delta).</li>
@@ -43,7 +34,7 @@ import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
  *
  * <h2>Required render state</h2>
  * <ul>
- *     <li>Blending should be enabled for typical particles: {@code glEnable(GL_BLEND)}.</li>
+ *     <li>The particle pass supplies source-over blending for translucent particles.</li>
  *     <li>The active window or viewport projection must be configured through the engine before drawing.</li>
  * </ul>
  *
@@ -101,12 +92,12 @@ import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
  * @since February 15th, 2026
  */
 public final class ParticleSystem {
-
     private ParticlePhysics physics; // Optional reusable per-particle bodies borrowing a shared world.
-    private final IntBuffer renderViewport = BufferUtils.createIntBuffer(4); // Reused GL viewport dimensions for quad projection.
+    private final int[] renderViewport = new int[4]; // Reused physical viewport dimensions for particle projection.
     private float sizeScaleX = 1; // Pixels per particle width unit; standalone drawing defaults to pixels.
     private float sizeScaleY = 1; // Pixels per particle height unit.
     private float discSoftness = -1; // Negative uses the supplied image; nonnegative enables analytic discs.
+
     /**
      * Power-of-two angular lookup-table length covering one full revolution.
      */
@@ -139,56 +130,6 @@ public final class ParticleSystem {
      * Byte stride between consecutive packed particle vertices.
      */
     private static final int STRIDE_BYTES = FLOATS_PER_PARTICLE * BYTES_PER_FLOAT;
-    /**
-     * Attribute location for two-component particle position.
-     */
-    private static final int ATTR_POS = 0;
-    /**
-     * Attribute location for scalar particle size.
-     */
-    private static final int ATTR_SIZE = 1;
-    /**
-     * Attribute location for two-component particle aspect.
-     */
-    private static final int ATTR_ASPECT = 2;
-    /**
-     * Attribute location for particle rotation.
-     */
-    private static final int ATTR_ROT = 3;
-    /**
-     * Attribute location for RGBA particle color.
-     */
-    private static final int ATTR_COL = 4;
-    /**
-     * Bundled particle vertex-stage GLSL loaded once at class initialization.
-     */
-    private static final String VERT = ValthorneFiles.readString("valthorne/shaders/particle/particle.vert");
-    /**
-     * Bundled particle fragment-stage GLSL loaded once at class initialization.
-     */
-    private static final String FRAG = ValthorneFiles.readString("valthorne/shaders/particle/particle.frag");
-    private final int maxParticles;                                                           // Maximum number of simultaneously active particles.
-    private final FloatBuffer batch;                                                          // CPU staging buffer for interleaved particle vertex data.
-    private final int vbo;                                                                    // OpenGL buffer object storing particle vertex data.
-    private final int vao;                                                                    // Vertex array object storing the particle attribute layout.
-    private final Shader shader = new Shader(VERT, FRAG);                                     // Shader used to render instanced particle quads.
-    private final Random random = new Random();                                               // Random source used only for spawn distributor offsets.
-    private final float[] spawnTmp = new float[2];                                            // Scratch spawn offset array (dx, dy).
-    private final Texture texture;                                                            // Shared texture used for all particles.
-    private final ParticleEmitter emitter;                                                    // Emitter configuration for spawning and interpolation endpoints.
-    private final Pool<Particle> pool;                                                        // Reuse-only particle pool.
-    private final Particle[] active;                                                          // Active particle list (swap-remove compacted).
-    private int activeCount;                                                                  // Current number of active particles.
-    private boolean externalMotion; // Whether a scene physics owner integrates positions and velocities.
-    private float x;                                                                          // Emitter world-space x position.
-    private float y;                                                                          // Emitter world-space y position.
-    private int burstRemaining;                                                               // Remaining burst particles queued to spawn.
-    private float burstRatePerSecond;                                                         // Burst release rate in particles per second.
-    private float burstAccumulator;                                                           // Fractional accumulator for burst spawning.
-    private float renderInterval = 0f;                                                        // Seconds between draws; 0 means draw every frame.
-    private float renderTimer = 0f;                                                           // Accumulator used to enforce renderInterval.
-    private int maxDrawPerFrame = Integer.MAX_VALUE;                                          // Cap particles drawn per draw() call.
-    private int drawCursor = 0;                                                               // Round-robin cursor for partial drawing.
 
     static {
         for (int i = 0; i < TRIG_LUT_SIZE; i++) {
@@ -197,6 +138,35 @@ public final class ParticleSystem {
             COS_LUT[i] = (float) Math.cos(radians);
         }
     }
+
+    private final int maxParticles;                                                           // Maximum number of simultaneously active particles.
+    private final FloatBuffer batch;                                                          // CPU staging buffer for interleaved particle vertex data.
+    private final ByteBuffer batchBytes; // Owned packed particle storage shared with the float view.
+    private final BgfxBatchRenderer bgfxRenderer; // Owned native instance renderer, owned by this renderer.
+
+    private final Shader shader; // Owned shader matching the selected rendering backend.
+    private final Random random = new Random();                                               // Random source used only for spawn distributor offsets.
+    private final float[] spawnTmp = new float[2];                                            // Scratch spawn offset array (dx, dy).
+
+    private final Texture texture;                                                            // Shared texture used for all particles.
+    private final ParticleEmitter emitter;                                                    // Emitter configuration for spawning and interpolation endpoints.
+    private final Pool<Particle> pool;                                                        // Reuse-only particle pool.
+    private final Particle[] active;                                                          // Active particle list (swap-remove compacted).
+
+    private int activeCount;                                                                  // Current number of active particles.
+    private boolean externalMotion; // Whether a scene physics owner integrates positions and velocities.
+    private float x;                                                                          // Emitter world-space x position.
+    private float y;                                                                          // Emitter world-space y position.
+
+    private int burstRemaining;                                                               // Remaining burst particles queued to spawn.
+    private float burstRatePerSecond;                                                         // Burst release rate in particles per second.
+    private float burstAccumulator;                                                           // Fractional accumulator for burst spawning.
+
+    private float renderInterval = 0f;                                                        // Seconds between draws; 0 means draw every frame.
+    private float renderTimer = 0f;                                                           // Accumulator used to enforce renderInterval.
+
+    private int maxDrawPerFrame = Integer.MAX_VALUE;                                          // Cap particles drawn per draw() call.
+    private int drawCursor = 0;                                                               // Round-robin cursor for partial drawing.
 
     /**
      * Creates a new quad particle system.
@@ -230,22 +200,10 @@ public final class ParticleSystem {
 
         this.maxParticles = maxParticles;
 
-        this.batch = BufferUtils.createFloatBuffer(maxParticles * FLOATS_PER_PARTICLE);
-
-        this.vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, (long) maxParticles * FLOATS_PER_PARTICLE * BYTES_PER_FLOAT, GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        shader.bindAttribLocation(ATTR_POS, "a_pos");
-        shader.bindAttribLocation(ATTR_SIZE, "a_size");
-        shader.bindAttribLocation(ATTR_ASPECT, "a_aspect");
-        shader.bindAttribLocation(ATTR_ROT, "a_rot");
-        shader.bindAttribLocation(ATTR_COL, "a_col");
-        shader.reload();
-
-        this.vao = glGenVertexArrays();
-        configureVertexArray();
+        this.batchBytes = BufferUtils.createByteBuffer(Math.multiplyExact(maxParticles, STRIDE_BYTES));
+        this.batch = batchBytes.asFloatBuffer();
+        shader = new Shader("bgfx:engine/particle.vert", "bgfx:engine/particle.frag");
+        bgfxRenderer = new BgfxBatchRenderer(maxParticles, 48);
     }
 
     /**
@@ -284,7 +242,7 @@ public final class ParticleSystem {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(settings, "settings");
         if (externalMotion) throw new IllegalStateException("External motion and particle physics cannot both own motion");
-        ParticlePhysics next = new ParticlePhysics(world, settings, maxParticles);
+        ParticlePhysics next = new JoltParticlePhysics(world, settings, maxParticles);
         disablePhysics();
         physics = next;
         return this;
@@ -498,7 +456,7 @@ public final class ParticleSystem {
     /**
      * Draws particles using instanced particle quads.
      *
-     * <p>This performs one upload to the VBO and one {@code glDrawArraysInstanced(GL_TRIANGLES)} call.
+     * <p>This performs one upload to the VBO and one {@code an instanced GPU submission} call.
      * If render throttling is enabled, this may skip drawing until enough time has elapsed.</p>
      */
     public void draw() {
@@ -529,7 +487,6 @@ public final class ParticleSystem {
         }
 
         buildBatch(toDraw);
-        uploadBatch();
         renderQuads(toDraw, u0, v0, u1, v1);
     }
 
@@ -571,8 +528,7 @@ public final class ParticleSystem {
         clear();
         disablePhysics();
         shader.dispose();
-        glDeleteVertexArrays(vao);
-        glDeleteBuffers(vbo);
+        bgfxRenderer.close();
     }
 
     /**
@@ -726,15 +682,6 @@ public final class ParticleSystem {
     }
 
     /**
-     * Uploads the current CPU batch to the GPU VBO using {@code glBufferSubData}.
-     */
-    private void uploadBatch() {
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, batch);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-
-    /**
      * Renders the uploaded batch as instanced particle quads using the internal shader.
      *
      * @param toDraw number of particles (vertices) to draw
@@ -744,63 +691,17 @@ public final class ParticleSystem {
      * @param v1     atlas v1 (bottom)
      */
     private void renderQuads(int toDraw, float u0, float v0, float u1, float v1) {
-        glGetIntegerv(GL_VIEWPORT, renderViewport);
+        GraphicsViewport.get(renderViewport);
         shader.bind();
         shader.setUniformMatrix4("u_mvp", Window.getProjectionMatrix());
         shader.setUniform1i("u_texture", 0);
         shader.setUniform4f("u_uvRect", u0, v0, u1, v1);
-        shader.setUniform2f("u_pixelScale", 2f * sizeScaleX / Math.max(1, renderViewport.get(2)), 2f * sizeScaleY / Math.max(1, renderViewport.get(3)));
+        shader.setUniform2f("u_pixelScale", 2f * sizeScaleX / Math.max(1, renderViewport[2]), 2f * sizeScaleY / Math.max(1, renderViewport[3]));
         shader.setUniform1f("u_discSoftness", discSoftness);
-        glBindTexture(GL_TEXTURE_2D, texture.getTextureID());
-        glBindVertexArray(vao);
-        boolean culling = glIsEnabled(GL_CULL_FACE);
-        glDisable(GL_CULL_FACE);
-        try {
-            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, toDraw);
-        } finally {
-            if (culling) glEnable(GL_CULL_FACE);
-        }
-        glBindVertexArray(0);
+        BgfxGraphics.bindTexture(0, texture.getTextureID());
+        batchBytes.position(0).limit(toDraw * STRIDE_BYTES);
+        bgfxRenderer.submit(batchBytes, toDraw, STRIDE_BYTES, shader, BgfxGraphics.textures(), 1, false);
         shader.unbind();
-    }
-
-    /**
-     * Associates the owned VBO with the particle vertex array using a ten-float
-     * layout: XY position, scalar size, XY aspect, rotation, and RGBA color.
-     * Leaves array-buffer and vertex-array bindings at zero; requires the current GL context.
-     */
-    private void configureVertexArray() {
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-        long offset = 0L;
-
-        glEnableVertexAttribArray(ATTR_POS);
-        glVertexAttribDivisor(ATTR_POS, 1);
-        glVertexAttribPointer(ATTR_POS, 2, GL_FLOAT, false, STRIDE_BYTES, offset);
-        offset += 2L * BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(ATTR_SIZE);
-        glVertexAttribDivisor(ATTR_SIZE, 1);
-        glVertexAttribPointer(ATTR_SIZE, 1, GL_FLOAT, false, STRIDE_BYTES, offset);
-        offset += BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(ATTR_ASPECT);
-        glVertexAttribDivisor(ATTR_ASPECT, 1);
-        glVertexAttribPointer(ATTR_ASPECT, 2, GL_FLOAT, false, STRIDE_BYTES, offset);
-        offset += 2L * BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(ATTR_ROT);
-        glVertexAttribDivisor(ATTR_ROT, 1);
-        glVertexAttribPointer(ATTR_ROT, 1, GL_FLOAT, false, STRIDE_BYTES, offset);
-        offset += BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(ATTR_COL);
-        glVertexAttribDivisor(ATTR_COL, 1);
-        glVertexAttribPointer(ATTR_COL, 4, GL_FLOAT, false, STRIDE_BYTES, offset);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
     }
 
     /**
@@ -857,6 +758,7 @@ public final class ParticleSystem {
         p.getColor()
                 .set(p.getStartColor());
     }
+
     /**
      * Configures projected dimensions independently of particle simulation.
      *

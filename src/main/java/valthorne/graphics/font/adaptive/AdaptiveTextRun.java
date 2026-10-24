@@ -1,8 +1,5 @@
 package valthorne.graphics.font.adaptive;
 
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.util.harfbuzz.hb_glyph_info_t;
-import org.lwjgl.util.harfbuzz.hb_glyph_position_t;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
@@ -10,9 +7,6 @@ import valthorne.graphics.texture.TextureBatch;
 import java.text.Bidi;
 import java.util.Arrays;
 import java.lang.Character.UnicodeScript;
-
-import static org.lwjgl.system.MemoryUtil.*;
-import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
 
 /**
  * Retained HarfBuzz glyph-index layout. Repeated unchanged rebuilds and warm
@@ -36,7 +30,6 @@ public final class AdaptiveTextRun implements TextRun {
     private float height; // Normalized line-box height.
     int count; // Used prefix of parallel glyph arrays, borrowed by the font.
     int[] clusters; // Lazy glyph-to-source offsets for styled drawing, null for ordinary layouts.
-    private int sourceLength; // Full UTF-16 length supplied as context to HarfBuzz during rebuilding.
     private float penX; // Temporary normalized horizontal shaping pen.
     private float penY; // Temporary normalized baseline position.
     private AdaptiveTextCarets carets; // Lazy single-line editing geometry, null for drawing-only layouts.
@@ -77,28 +70,23 @@ public final class AdaptiveTextRun implements TextRun {
         if (carets != null && !multiline) carets.reset(normalized);
         int lines = 0;
         if (!normalized.isEmpty()) {
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                int bytes = Math.multiplyExact(normalized.length(), 2);
-                long chars = bytes <= 8192 ? stack.nmalloc(2, bytes) : nmemAlloc(bytes);
-                if (chars == 0) throw new OutOfMemoryError("UTF-16 layout staging allocation failed");
-                try {
-                    sourceLength = normalized.length();
-                    for (int i = 0; i < sourceLength; i++) memPutShort(chars + (long) i * 2, (short) normalized.charAt(i));
-                    int start = 0;
-                    do {
-                        int end = normalized.indexOf('\n', start);
-                        if (end < 0) end = normalized.length();
-                        int contentEnd = end > start && normalized.charAt(end - 1) == '\r' ? end - 1 : end;
-                        penX = 0;
-                        shapeLine(normalized, chars, start, contentEnd);
-                        width = Math.max(width, penX);
-                        penY -= font.lineHeight();
-                        lines++;
-                        start = end + 1;
-                    } while (start <= normalized.length());
-                } finally {
-                    if (bytes > 8192) nmemFree(chars);
-                }
+            AdaptiveNativeFace nativeFace = font.nativeFace();
+            nativeFace.prepareText(normalized);
+            try {
+                int start = 0;
+                do {
+                    int end = normalized.indexOf('\n', start);
+                    if (end < 0) end = normalized.length();
+                    int contentEnd = end > start && normalized.charAt(end - 1) == '\r' ? end - 1 : end;
+                    penX = 0;
+                    shapeLine(normalized, start, contentEnd);
+                    width = Math.max(width, penX);
+                    penY -= font.lineHeight();
+                    lines++;
+                    start = end + 1;
+                } while (start <= normalized.length());
+            } finally {
+                nativeFace.releaseText();
             }
         }
         height = lines == 0 ? 0 : font.ascent() - font.descent() + (lines - 1) * font.lineHeight();
@@ -142,11 +130,10 @@ public final class AdaptiveTextRun implements TextRun {
     /**
      * Resolves directional runs in visual order before shaping each segment.
      * @param source complete source string
-     * @param chars native UTF-16 source
      * @param start first character of paragraph
      * @param end paragraph boundary excluding newline
      */
-    private void shapeLine(String source, long chars, int start, int end) {
+    private void shapeLine(String source, int start, int end) {
         if (start == end) return;
         boolean directional = false;
         for (int i = start; i < end; i++) {
@@ -155,7 +142,7 @@ public final class AdaptiveTextRun implements TextRun {
             break;
         }
         if (!directional) {
-            shapeTabs(source, chars, start, end, 0);
+            shapeTabs(source, start, end, 0);
             return;
         }
         String line = source.substring(start, end);
@@ -170,39 +157,38 @@ public final class AdaptiveTextRun implements TextRun {
         Bidi.reorderVisually(levels, 0, visual, 0, runs);
         for (int i = 0; i < runs; i++) {
             int run = visual[i];
-            shapeTabs(source, chars, start + bidi.getRunStart(run), start + bidi.getRunLimit(run), bidi.getRunLevel(run));
+            shapeTabs(source, start + bidi.getRunStart(run), start + bidi.getRunLimit(run), bidi.getRunLevel(run));
         }
     }
 
     /**
      * Keeps tab controls out of OpenType substitution while preserving visual order.
      * @param source complete source
-     * @param chars native UTF-16 source
      * @param start segment start
      * @param end segment boundary
      * @param level bidi embedding level controlling visual direction and carets
      */
-    private void shapeTabs(String source, long chars, int start, int end, int level) {
+    private void shapeTabs(String source, int start, int end, int level) {
         if ((level & 1) != 0) {
             int limit = end;
             for (int i = end - 1; i >= start; i--) {
                 if (source.charAt(i) != '\t') continue;
-                shapeScripts(source, chars, i + 1, limit, level);
+                shapeScripts(source, i + 1, limit, level);
                 if (carets != null && !multiline) carets.cluster(i, i + 1, penX, font.spaceAdvance() * 4, level);
                 penX += font.spaceAdvance() * 4;
                 limit = i;
             }
-            shapeScripts(source, chars, start, limit, level);
+            shapeScripts(source, start, limit, level);
         } else {
             int first = start;
             for (int i = start; i < end; i++) {
                 if (source.charAt(i) != '\t') continue;
-                shapeScripts(source, chars, first, i, level);
+                shapeScripts(source, first, i, level);
                 if (carets != null && !multiline) carets.cluster(i, i + 1, penX, font.spaceAdvance() * 4, level);
                 penX += font.spaceAdvance() * 4;
                 first = i + 1;
             }
-            shapeScripts(source, chars, first, end, level);
+            shapeScripts(source, first, end, level);
         }
     }
 
@@ -211,12 +197,11 @@ public final class AdaptiveTextRun implements TextRun {
      * OpenType shaper to each writing system. Common and inherited characters
      * travel with their neighboring strong script; supplementary units stay paired.
      * @param source complete source
-     * @param chars native UTF-16 source
      * @param start segment start
      * @param end segment boundary
      * @param level bidi embedding level controlling visual traversal
      */
-    private void shapeScripts(String source, long chars, int start, int end, int level) {
+    private void shapeScripts(String source, int start, int end, int level) {
         boolean rtl = (level & 1) != 0;
         UnicodeScript previous = null;
         int boundary = rtl ? end : start;
@@ -228,62 +213,51 @@ public final class AdaptiveTextRun implements TextRun {
             UnicodeScript script = UnicodeScript.of(codepoint);
             if (script != UnicodeScript.COMMON && script != UnicodeScript.INHERITED && script != UnicodeScript.UNKNOWN) {
                 if (previous != null && previous != script) {
-                    if (rtl) shape(chars, position, boundary, level);
-                    else shape(chars, boundary, position, level);
+                    if (rtl) shape(position, boundary, level);
+                    else shape(boundary, position, level);
                     boundary = position;
                 }
                 previous = script;
             }
             position = rtl ? characterStart : position + length;
         }
-        if (rtl) shape(chars, start, boundary, level);
-        else shape(chars, boundary, end, level);
+        if (rtl) shape(start, boundary, level);
+        else shape(boundary, end, level);
     }
 
     /**
      * Copies visual glyph indices and design positions from reusable native scratch.
-     * @param chars complete native UTF-16 source
      * @param start first UTF-16 unit
      * @param end boundary after last unit
      * @param level bidi embedding level controlling HarfBuzz direction
      */
-    private void shape(long chars, int start, int end, int level) {
+    private void shape(int start, int end, int level) {
         if (start == end) return;
         boolean rtl = (level & 1) != 0;
         AdaptiveNativeFace face = font.nativeFace();
-        long buffer = face.buffer();
-        nhb_buffer_add_utf16(buffer, chars, sourceLength, start, end - start);
-        hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-        hb_buffer_set_language(buffer, AdaptiveNativeFace.LANGUAGE_UND);
-        hb_buffer_guess_segment_properties(buffer);
-        hb_shape(face.font(), buffer, null);
-        if (!hb_buffer_allocation_successful(buffer)) throw new OutOfMemoryError("HarfBuzz layout allocation failed");
-        int length = hb_buffer_get_length(buffer);
+        FontShape shaped = face.shape(start, end, rtl);
+        int length = shaped.count();
         ensureCapacity(count + length);
-        long info = nhb_buffer_get_glyph_infos(buffer, 0);
-        long positions = nhb_buffer_get_glyph_positions(buffer, 0);
-        float inverseEm = 1f / face.face().units_per_EM();
         float segmentX = penX;
         for (int i = 0; i < length; i++) {
-            long position = positions + (long) i * hb_glyph_position_t.SIZEOF;
-            glyphs[count] = hb_glyph_info_t.ncodepoint(info + (long) i * hb_glyph_info_t.SIZEOF);
-            if (clusters != null) clusters[count] = hb_glyph_info_t.ncluster(info + (long) i * hb_glyph_info_t.SIZEOF);
-            xs[count] = penX + hb_glyph_position_t.nx_offset(position) * inverseEm;
-            ys[count] = penY + hb_glyph_position_t.ny_offset(position) * inverseEm;
-            penX += hb_glyph_position_t.nx_advance(position) * inverseEm;
+            glyphs[count] = shaped.glyph(i);
+            if (clusters != null) clusters[count] = shaped.cluster(i);
+            xs[count] = penX + shaped.offsetX(i);
+            ys[count] = penY + shaped.offsetY(i);
+            penX += shaped.advance(i);
             count++;
         }
         if (carets == null || multiline) return;
         int limit = end;
         int i = 0;
         while (i < length) {
-            int cluster = hb_glyph_info_t.ncluster(info + (long) i * hb_glyph_info_t.SIZEOF);
+            int cluster = shaped.cluster(i);
             float advance = 0;
             do {
-                advance += hb_glyph_position_t.nx_advance(positions + (long) i * hb_glyph_position_t.SIZEOF) * inverseEm;
+                advance += shaped.advance(i);
                 i++;
-            } while (i < length && hb_glyph_info_t.ncluster(info + (long) i * hb_glyph_info_t.SIZEOF) == cluster);
-            int next = rtl ? limit : i == length ? end : hb_glyph_info_t.ncluster(info + (long) i * hb_glyph_info_t.SIZEOF);
+            } while (i < length && shaped.cluster(i) == cluster);
+            int next = rtl ? limit : i == length ? end : shaped.cluster(i);
             carets.cluster(cluster, next, segmentX, advance, level);
             segmentX += advance;
             limit = cluster;
