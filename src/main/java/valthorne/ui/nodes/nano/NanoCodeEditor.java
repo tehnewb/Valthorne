@@ -9,7 +9,10 @@ import valthorne.event.events.MouseDragEvent;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.TextInputEvent;
 import valthorne.graphics.Color;
+import valthorne.graphics.font.TextRun;
 import valthorne.ui.NanoUtility;
+import valthorne.ui.UIRenderContext;
+import valthorne.ui.UIRoot;
 import valthorne.ui.behavior.TextEditModel;
 import valthorne.ui.behavior.TextEditing;
 import valthorne.ui.theme.ResolvedStyle;
@@ -80,6 +83,9 @@ public class NanoCodeEditor extends NanoPanel {
     private float blink; // Elapsed time used to alternate caret visibility.
     private int preferredColumn = -1; // Retained horizontal caret column, or minus one before vertical navigation.
     private String fontName = "default"; // Borrowed registered font name used for measurement and rendering.
+    private float[] selectionRanges = new float[8]; // Reused visual selection pairs for the current shaped line.
+    private int[] highlightEnds = new int[8]; // Reused exclusive display offsets for syntax-color spans.
+    private Color[] highlightColors = new Color[8]; // Borrowed colors paired with the current highlighted line's spans.
 
     /**
      * Builds the control and its owned children from the supplied configuration.
@@ -149,7 +155,10 @@ public class NanoCodeEditor extends NanoPanel {
     }
 
     /**
-     * Installs the callback producing ordered colored runs for each visible source line.
+     * Installs the callback producing ordered colored runs for each visible source
+     * line. Run text must concatenate to the unchanged input line. Adaptive text
+     * is shaped once for the complete line; clusters spanning color boundaries
+     * retain the color of their first source character.
      *
      * @param value replacement value applied to this control
      * @return this control for further configuration
@@ -328,6 +337,33 @@ public class NanoCodeEditor extends NanoPanel {
     }
 
     /**
+     * Maps a source insertion offset into the tab-expanded display line.
+     *
+     * @param value complete source line
+     * @param index source UTF-16 insertion offset
+     * @return corresponding display UTF-16 offset
+     */
+    private int displayOffset(String value, int index) {
+        int result = Math.clamp(index, 0, value.length());
+        for (int i = 0; i < index && i < value.length(); i++)
+            if (value.charAt(i) == '\t') result += 3;
+        return result;
+    }
+
+    /**
+     * Resolves the primary shaped caret within a complete tab-expanded line.
+     * Custom NanoVG faces retain their existing prefix measurement path.
+     *
+     * @param value complete source line
+     * @param index source UTF-16 insertion boundary
+     * @return visual horizontal offset from the line origin
+     */
+    private float caretPosition(String value, int index) {
+        TextRun layout = NanoText.layout(this, fontName, fontSize, visible(value));
+        return layout == null ? width(value.substring(0, index)) : layout.caretX(displayOffset(value, index));
+    }
+
+    /**
      * Adjusts scrolling only as needed to keep the insertion caret visible.
      */
     private void revealCaret() {
@@ -337,7 +373,7 @@ public class NanoCodeEditor extends NanoPanel {
         float top = line * lineHeight, bottom = top + lineHeight;
         if (top < panel.getScrollY()) panel.scrollY(top);
         else if (bottom > panel.getScrollY() + panel.getHeight()) panel.scrollY(bottom - panel.getHeight());
-        float x = TEXT_X + width(model.text().substring(starts.get(line), model.caret()));
+        float x = TEXT_X + caretPosition(lineText(line), model.caret() - starts.get(line));
         if (x < panel.getScrollX() + TEXT_X) panel.scrollX(Math.max(0, x - TEXT_X));
         else if (x > panel.getScrollX() + panel.getWidth() - 12) panel.scrollX(x - panel.getWidth() + 12);
     }
@@ -354,6 +390,19 @@ public class NanoCodeEditor extends NanoPanel {
         int line = Math.clamp((int) ((point.y() - getAbsoluteY()) / lineHeight), 0, starts.size() - 1);
         String value = lineText(line);
         float x = point.x() - getAbsoluteX() - TEXT_X;
+        TextRun layout = NanoText.layout(this, fontName, fontSize, visible(value));
+        if (layout != null) {
+            int display = layout.hitTest(x);
+            int source = 0;
+            int offset = 0;
+            while (source < value.length() && offset < display) {
+                int length = value.charAt(source) == '\t' ? 4 : 1;
+                if (offset + length > display && display - offset < length * 0.5f) break;
+                offset += length;
+                source++;
+            }
+            return model.boundary(starts.get(line) + source);
+        }
         if (x <= 0) return starts.get(line);
         int index = 0;
         while (index < value.length()) {
@@ -477,10 +526,24 @@ public class NanoCodeEditor extends NanoPanel {
             int begin = Math.max(model.start(), starts.get(line));
             int end = Math.min(model.end(), lineEnd(line));
             if (begin < end) {
-                float left = x + TEXT_X + width(model.text().substring(starts.get(line), begin));
-                float right = x + TEXT_X + width(model.text().substring(starts.get(line), end));
                 nvgBeginPath(vg);
-                nvgRect(vg, left, top - 1, Math.max(1, right - left), lineHeight);
+                TextRun layout = NanoText.layout(this, fontName, fontSize, visible(value));
+                if (layout == null) {
+                    float left = width(value.substring(0, begin - starts.get(line)));
+                    float right = width(value.substring(0, end - starts.get(line)));
+                    nvgRect(vg, x + TEXT_X + left, top - 1, Math.max(1, right - left), lineHeight);
+                } else {
+                    int ranges = layout.selectionRanges(displayOffset(value, begin - starts.get(line)), displayOffset(value, end - starts.get(line)), selectionRanges);
+                    if (ranges * 2 > selectionRanges.length) {
+                        selectionRanges = new float[ranges * 2];
+                        layout.selectionRanges(displayOffset(value, begin - starts.get(line)), displayOffset(value, end - starts.get(line)), selectionRanges);
+                    }
+                    for (int i = 0; i < ranges; i++) {
+                        float left = selectionRanges[i * 2];
+                        float right = selectionRanges[i * 2 + 1];
+                        nvgRect(vg, x + TEXT_X + left, top - 1, right - left, lineHeight);
+                    }
+                }
                 nvgFillColor(vg, NanoUtility.color1(selectionColor));
                 nvgFill(vg);
             }
@@ -490,17 +553,36 @@ public class NanoCodeEditor extends NanoPanel {
                 nvgFillColor(vg, NanoUtility.color1(textColor));
                 NanoText.draw(this, vg, fontName, x + TEXT_X, top, visible(value), fontSize, textColor, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
             } else {
-                float cursor = x + TEXT_X;
-                for (NanoColoredRun run : highlighter.apply(value)) {
-                    nvgFillColor(vg, NanoUtility.color1(run.color()));
-                    cursor = NanoText.draw(this, vg, fontName, cursor, top, visible(run.text()), fontSize, run.color(), NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+                List<NanoColoredRun> runs = highlighter.apply(value);
+                TextRun layout = NanoText.layout(this, fontName, fontSize, visible(value));
+                UIRoot root = getRoot();
+                UIRenderContext context = root == null ? null : root.getRenderContext();
+                if (layout != null && context != null) {
+                    if (runs.size() > highlightEnds.length) {
+                        highlightEnds = new int[runs.size()];
+                        highlightColors = new Color[runs.size()];
+                    }
+                    int offset = 0;
+                    for (int i = 0; i < runs.size(); i++) {
+                        NanoColoredRun run = runs.get(i);
+                        offset += visible(run.text()).length();
+                        highlightEnds[i] = offset;
+                        highlightColors[i] = run.color();
+                    }
+                    context.drawNanoTextStyled(this, layout, highlightEnds, highlightColors, runs.size(), x + TEXT_X, top + layout.font().ascent() * fontSize);
+                } else {
+                    float cursor = x + TEXT_X;
+                    for (NanoColoredRun run : runs) {
+                        nvgFillColor(vg, NanoUtility.color1(run.color()));
+                        cursor = NanoText.draw(this, vg, fontName, cursor, top, visible(run.text()), fontSize, run.color(), NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+                    }
                 }
             }
         }
         if (isFocused() && (blink % 1f) < 0.5f) {
             int line = lineAt(model.caret());
             if (line >= first && line < last) {
-                float cursor = x + TEXT_X + width(model.text().substring(starts.get(line), model.caret()));
+                float cursor = x + TEXT_X + caretPosition(lineText(line), model.caret() - starts.get(line));
                 nvgBeginPath(vg);
                 nvgRect(vg, cursor, y + line * lineHeight + 2, 1.5f, fontSize + 3);
                 nvgFillColor(vg, NanoUtility.color1(caretColor));

@@ -300,6 +300,14 @@ public class Texture implements Poolable {
     }
 
     /**
+     * Describes signed-distance sampling to the standard batch shader. Ordinary
+     * textures return zero; MSDF atlas textures return their full distance range
+     * in texels. This immutable metadata is read only when binding a new texture.
+     * @return full MSDF distance range, or zero for ordinary RGBA sampling
+     */
+    public float getDistanceFieldRange() { return 0f; }
+
+    /**
      * <p>
      * Returns the height of this texture in pixels.
      * </p>

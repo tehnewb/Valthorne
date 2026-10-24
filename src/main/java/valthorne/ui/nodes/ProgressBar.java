@@ -1,8 +1,8 @@
 package valthorne.ui.nodes;
 
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugTextRun;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.ui.theme.ResolvedStyle;
@@ -69,7 +69,7 @@ import valthorne.graphics.Color;
  * float current = bar.getProgress();
  * boolean vertical = bar.isVertical();
  * boolean showingPercent = bar.isDisplayPercentage();
- * SlugFont font = bar.getFont();
+ * TextFont font = bar.getFont();
  *
  * root.add(bar);
  * // The root's normal update and draw lifecycle visits the progress bar.
@@ -99,7 +99,7 @@ public class ProgressBar extends Panel {
     /**
      * Style key used to resolve the font used for percentage text rendering.
      */
-    public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
+    public static final StyleKey<TextFont> FONT_KEY = StyleKey.of("font", TextFont.class);
 
     /**
      * Em scale shared by all regular UI text controls through the semantic size token.
@@ -117,8 +117,8 @@ public class ProgressBar extends Panel {
     private Drawable background; // Resolved background drawable from the active style
     private Drawable foreground; // Resolved foreground drawable from the active style
     private String displayText = "0%"; // Cached formatted percentage drawn without changing the font's text during painting.
-    private SlugFont font; // Resolved font used for percentage text rendering
-    private SlugTextRun run; // Retained percentage layout; rebuilds only when content, font or size changes.
+    private TextFont font; // Resolved font used for percentage text rendering
+    private TextRun run; // Retained percentage layout; rebuilds only when content, font or size changes.
     private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
 
     /**
@@ -289,7 +289,7 @@ public class ProgressBar extends Panel {
      *
      * @return the resolved font, or {@code null} if none is available
      */
-    public SlugFont getFont() {
+    public TextFont getFont() {
         return font;
     }
 
@@ -333,7 +333,7 @@ public class ProgressBar extends Panel {
      * rendered on top of the bar.
      * Horizontal fill grows from the left; vertical fill grows from the bottom
      * in render coordinates. Label.COLOR_KEY supplies text color when present,
-     * otherwise white is used. The cached percentage uses a retained SlugTextRun at the resolved em size.
+     * otherwise white is used. The cached percentage uses a retained TextRun at the resolved em size.
      * This method does not call Panel.draw or render children, and it relies on
      * the root for visibility checks and a prepared batch.
      * </p>

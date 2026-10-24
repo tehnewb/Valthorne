@@ -12,8 +12,8 @@ import valthorne.event.EventHandler;
 import valthorne.event.EventTypes;
 import valthorne.event.events.*;
 import valthorne.graphics.font.SystemFonts;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugData;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.adaptive.AdaptiveFontData;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.behavior.TextEditing;
 import valthorne.ui.nodes.Panel;
@@ -156,8 +156,8 @@ public class UIRoot extends UIContainer {
     private final List<UIFocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
-    private SlugFont nanoFont; // Default proportional face for smooth Nano text.
-    private SlugFont nanoCodeFont; // Default monospace face for smooth code text.
+    private TextFont nanoFont; // Default proportional face for smooth Nano text.
+    private TextFont nanoCodeFont; // Default monospace face for smooth code text.
     private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
@@ -1019,13 +1019,14 @@ public class UIRoot extends UIContainer {
      * @param code true for the monospace editing face
      * @return borrowed root-owned font, or null before graphics initialization
      */
-    SlugFont getNanoTextFont(boolean code) {
+    TextFont getNanoTextFont(boolean code) {
         if (disposed) return null;
         if (!code && defaultTheme != null) return defaultTheme.getFont();
         if (nanoVGHandle == 0) return null;
-        SlugFont current = code ? nanoCodeFont : nanoFont;
+        TextFont current = code ? nanoCodeFont : nanoFont;
         if (current != null) return current;
-        current = new SlugFont(SlugData.load(SystemFonts.find(code).toString(), 32, 224), true);
+        current = AdaptiveFontData.load(SystemFonts.find(code).toString(), 20)
+                .asFont();
         if (code) nanoCodeFont = current;
         else nanoFont = current;
         return current;
@@ -1817,7 +1818,7 @@ public class UIRoot extends UIContainer {
      *
      * @return borrowed proportional font, or null before graphics initialization
      */
-    public SlugFont getDefaultFont() {
+    public TextFont getDefaultFont() {
         return getNanoTextFont(false);
     }
 

@@ -6,6 +6,7 @@ import org.lwjgl.nanovg.NVGColor;
 import valthorne.Keyboard;
 import valthorne.event.events.*;
 import valthorne.graphics.Color;
+import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import org.joml.Vector2f;
@@ -183,6 +184,7 @@ public class NanoTextField extends UINode implements NanoNode {
 
     private String fontName = "default"; // Borrowed NanoVG font registration name.
     private float fontSize = 18f; // Font size in UI units.
+    private float[] selectionRanges = new float[8]; // Reused visual selection pairs for contextual and bidi text.
     private boolean fontLoaded; // Reserved load flag reset on font changes; no font loading occurs here.
 
     private NodeAction<NanoTextField> action; // Optional local callback for valid Enter submission.
@@ -906,13 +908,27 @@ public class NanoTextField extends UINode implements NanoNode {
             int a = Math.min(selectionStart, selectionEnd);
             int b = Math.max(selectionStart, selectionEnd);
 
-            float x1 = drawX + measureTextWidth(visibleText, 0, a);
-            float x2 = drawX + measureTextWidth(visibleText, 0, b);
             float selectionH = Math.max(0f, height - caretPadY * 2f);
             float selectionY = y + (height - selectionH) * 0.5f;
 
             nvgBeginPath(vg);
-            nvgRect(vg, x1, selectionY, Math.max(0f, x2 - x1), selectionH);
+            TextRun layout = NanoText.layout(this, fontName, fontSize, visibleText);
+            if (layout == null) {
+                float left = measureTextWidth(visibleText, 0, a);
+                float right = measureTextWidth(visibleText, 0, b);
+                nvgRect(vg, drawX + left, selectionY, Math.max(0f, right - left), selectionH);
+            } else {
+                int ranges = layout.selectionRanges(a, b, selectionRanges);
+                if (ranges * 2 > selectionRanges.length) {
+                    selectionRanges = new float[ranges * 2];
+                    layout.selectionRanges(a, b, selectionRanges);
+                }
+                for (int i = 0; i < ranges; i++) {
+                    float left = selectionRanges[i * 2];
+                    float right = selectionRanges[i * 2 + 1];
+                    nvgRect(vg, drawX + left, selectionY, right - left, selectionH);
+                }
+            }
             nvgFillColor(vg, aux);
             nvgFill(vg);
         }
@@ -921,7 +937,7 @@ public class NanoTextField extends UINode implements NanoNode {
         NanoText.draw(this, vg, fontName, empty ? x + padding + placeholderOffsetX : drawX, drawY, drawText, fontSize, empty ? placeholderColor : textColor, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
         if (isFocused() && caretVisible) {
-            float caretX = drawX + measureTextWidth(visibleText, 0, Math.min(caretIndex, visibleText.length()));
+            float caretX = drawX + caretPosition(visibleText, caretIndex);
             float caretH = Math.max(0f, height - caretPadY * 2f);
             float caretY1 = y + (height - caretH) * 0.5f;
             float caretY2 = caretY1 + caretH;
@@ -1197,9 +1213,8 @@ public class NanoTextField extends UINode implements NanoNode {
     }
 
     /**
-     * Maps content-space X to the first grapheme boundary whose measured prefix
-     * reaches the pointer. Uses right-boundary selection rather than nearest-glyph
-     * midpoint selection; positions before/after the text clamp to its endpoints.
+     * Maps content-space X to a shaped visual caret without assuming logical
+     * left-to-right ordering. Custom NanoVG faces retain prefix-based hit testing.
      *
      * @param mouseX pointer X in the content coordinate space
      * @return raw UTF-16 editor boundary
@@ -1207,6 +1222,8 @@ public class NanoTextField extends UINode implements NanoNode {
     private int getIndexAtMouseX(float mouseX) {
         String visibleText = getDisplayText();
         float local = mouseX - (getAbsoluteX() + padding + textOffsetX);
+        TextRun layout = NanoText.layout(this, fontName, fontSize, visibleText);
+        if (layout != null) return layout.hitTest(local);
         if (local <= 0f)
             return 0;
 
@@ -1265,7 +1282,7 @@ public class NanoTextField extends UINode implements NanoNode {
             return;
         }
 
-        float caretX = measureTextWidth(visibleText, 0, Math.min(caretIndex, visibleText.length()));
+        float caretX = caretPosition(visibleText, caretIndex);
         float minOffset = available - textWidth;
         float maxOffset = 0f;
 
@@ -1306,6 +1323,19 @@ public class NanoTextField extends UINode implements NanoNode {
     private float measureTextWidth(String value, int start, int end) {
         long vg = getRoot() == null ? 0 : getRoot().getNanoVGHandle();
         return NanoText.measureTextWidth(this, vg, fontName, fontSize, value, start, end);
+    }
+
+    /**
+     * Resolves the full line's primary caret, preserving contextual shaping and
+     * direction. A registered custom NanoVG face uses its existing prefix metrics.
+     *
+     * @param value complete display line
+     * @param index UTF-16 editor insertion boundary
+     * @return visual coordinate relative to the line origin
+     */
+    private float caretPosition(String value, int index) {
+        TextRun layout = NanoText.layout(this, fontName, fontSize, value);
+        return layout == null ? measureTextWidth(value, 0, Math.clamp(index, 0, value.length())) : layout.caretX(index);
     }
 
     /**
