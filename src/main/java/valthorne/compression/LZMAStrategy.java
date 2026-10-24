@@ -62,20 +62,10 @@ public class LZMAStrategy implements CompressionStrategy {
      */
     @Override
     public byte[] decompress(byte[] data) {
-        try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            LZMACompressorInputStream lzma = new LZMACompressorInputStream(bais);
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int n;
-
-            while ((n = lzma.read(buffer)) != -1)
-                out.write(buffer, 0, n);
-
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException("LZMA decompression failed", e);
+        try (LZMACompressorInputStream lzma = new LZMACompressorInputStream(new ByteArrayInputStream(data))) {
+            return lzma.readAllBytes();
+        } catch (IOException failure) {
+            throw new RuntimeException("LZMA decompression failed", failure);
         }
     }
 }
