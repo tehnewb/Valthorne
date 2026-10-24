@@ -1,0 +1,9 @@
+plugins { id 'application' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+dependencies { implementation 'io.github.tehnewb:Valthorne:benchmark' }
+application { mainClass = 'valthorne.graphics.lighting2d.GroundShadowBenchmark' }
+tasks.named('run', JavaExec) {
+    jvmArgs '--enable-native-access=ALL-UNNAMED', '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED'
+    if (System.getProperty('os.name').toLowerCase().contains('mac')) jvmArgs '-XstartOnFirstThread'
+}

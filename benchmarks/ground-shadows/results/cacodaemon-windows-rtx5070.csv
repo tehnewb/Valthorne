@@ -1,0 +1,19 @@
+# GPU: NVIDIA GeForce RTX 5070/PCIe/SSE2
+# Vendor: NVIDIA Corporation
+# OpenGL: 3.3.0 NVIDIA 610.88
+# Java: 25.0.2; OS: Windows 11
+# Fixture: external Cacodaemon first-row animation
+# Warmup=80; samples=160; alternating backend order; RGBA8; shadow pass only
+casters,mode,textures,reference_draws,batched_draws,reference_cpu_us,batched_cpu_us,cpu_speedup,reference_gpu_us,batched_gpu_us,reference_allocated_bytes,batched_allocated_bytes
+64,silhouette,one atlas,64,1,66.900,54.000,1.24,154.912,2.656,176,176
+64,volume+contact,one atlas,128,1,75.100,50.200,1.50,287.424,2.688,176,176
+256,silhouette,one atlas,256,1,133.800,77.900,1.72,649.952,3.328,176,176
+256,volume+contact,one atlas,512,1,193.300,92.300,2.09,1264.832,3.776,176,176
+512,silhouette,one atlas,512,1,221.100,113.900,1.94,1325.024,4.128,176,176
+512,volume+contact,one atlas,1024,1,365.400,159.000,2.30,2742.208,5.792,176,176
+1000,silhouette,one atlas,1000,1,514.900,213.400,2.41,2787.616,6.496,176,176
+1000,volume+contact,one atlas,2000,2,787.300,285.600,2.76,5328.064,11.040,176,176
+512,volume+contact,32-card runs,1024,16,411.800,167.800,2.45,2598.816,14.528,176,176
+512,volume+contact,alternating,1024,512,415.300,293.300,1.42,2720.672,671.296,112,112
+512,silhouette,alternating,512,512,302.900,322.500,0.94,1334.144,515.520,112,112
+# Exact comparisons=192; compared bytes=522240000; state assertions=3456
