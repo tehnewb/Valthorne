@@ -14,6 +14,7 @@ import valthorne.graphics.shader.Shader;
  * }</pre>
  */
 public class TextureBatchShader extends Shader {
+    private final boolean distanceFields; // Whether the compiled fragment stage accepts adaptive MSDF ranges.
     private final int maxTextureUnits; // Number of sampled texture slots exposed by this program.
 
     /**
@@ -45,6 +46,7 @@ public class TextureBatchShader extends Shader {
     public TextureBatchShader(int maxTextureUnits, String vertexStage, String fragmentStage) {
         super(selectVertex(maxTextureUnits, vertexStage), selectFragment(fragmentStage));
         this.maxTextureUnits = maxTextureUnits;
+        distanceFields = bgfx().hasUniform("u_distanceRange");
         TextureBatchContract.bindSamplers(this, maxTextureUnits);
     }
 
@@ -84,4 +86,15 @@ public class TextureBatchShader extends Shader {
     public int getMaxTextureUnits() {
         return maxTextureUnits;
     }
+    /**
+     * Reports whether the selected fragment stage handles adaptive atlas sampling.
+     * @return whether coverage/MSDF textures can use this shader
+     */
+    public boolean supportsDistanceFields() { return distanceFields; }
+
+    /**
+     * Reports additional vertex transforms that require scalable text rendering.
+     * @return false for an ordinary batch shader
+     */
+    public boolean transformsText() { return false; }
 }

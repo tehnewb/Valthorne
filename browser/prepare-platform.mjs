@@ -66,8 +66,10 @@ for (const name of [
     "Window",
     "Keyboard",
     "Mouse",
-    "graphics/font/slug/SlugOutlines",
-    "graphics/font/slug/SlugData",
+    "graphics/font/adaptive/FontHinting",
+    "graphics/font/adaptive/AdaptiveFontData",
+    "graphics/font/adaptive/AdaptiveTextRun",
+    "graphics/font/adaptive/AdaptiveTextCarets",
     "graphics/texture/TextureData",
     "graphics/bgfx/BgfxGraphics",
     "graphics/bgfx/BgfxBatchRenderer",
@@ -77,17 +79,35 @@ for (const name of [
 ]) {
     let source = await readFile(path.join(root, "src/main/java/valthorne", name + ".java"), "utf8");
     source = callbackInterfaces(source);
-    if (name === "graphics/font/slug/SlugOutlines") {
-        source = source
-            .replace(
-                "import org.lwjgl.stb.STBTTVertex;",
-                "import org.lwjgl.stb.STBTTVertex;\nimport org.lwjgl.stb.STBTTVertexBuffer;",
-            )
-            .replaceAll("STBTTVertex.Buffer", "STBTTVertexBuffer");
-    }
-    if (name === "graphics/font/slug/SlugData" || name === "graphics/texture/TextureData") {
+    if (name === "graphics/font/adaptive/AdaptiveFontData" || name === "graphics/texture/TextureData") {
         source = source.replace("import java.nio.file.Files;", "import valthorne.browser.BrowserAssets;");
         source = source.replaceAll("Files.readAllBytes(Path.of(path))", "BrowserAssets.read(path)");
+    }
+    if (name === "graphics/font/adaptive/FontHinting") {
+        source = source.replace("import static org.lwjgl.util.freetype.FreeType.*;", "")
+            .replaceAll("FT_LOAD_TARGET_NORMAL", "0")
+            .replaceAll("FT_LOAD_TARGET_LIGHT", "(1 << 16)")
+            .replaceAll("FT_LOAD_NO_HINTING", "(1 << 1)")
+            .replaceAll("FT_LOAD_NO_AUTOHINT", "(1 << 15)")
+            .replaceAll("FT_LOAD_FORCE_AUTOHINT", "(1 << 5)");
+    }
+    if (name === "graphics/font/adaptive/AdaptiveTextRun") {
+        source = source.replace("import java.text.Bidi;", "import valthorne.browser.font.BrowserBidi;")
+            .replace(/\bBidi\b/g, "BrowserBidi")
+            .replace("import java.lang.Character.UnicodeScript;", "")
+            .replace("UnicodeScript previous = null;", "int previous = 0;")
+            .replace("UnicodeScript script = UnicodeScript.of(codepoint);", "int script = AdaptiveNativeFace.script(codepoint);")
+            .replaceAll("UnicodeScript.COMMON", "0x5a797979")
+            .replaceAll("UnicodeScript.INHERITED", "0x5a696e68")
+            .replaceAll("UnicodeScript.UNKNOWN", "0x5a7a7a7a")
+            .replace("previous != null", "previous != 0");
+    }
+    if (name === "graphics/font/adaptive/AdaptiveTextCarets") {
+        source = source.replace("import java.util.regex.Matcher;", "import valthorne.browser.BrowserGraphemes;")
+            .replace("import java.util.regex.Pattern;", "")
+            .replace(/    \/\*\*[\s\S]*?private static final Pattern GRAPHEME[^\n]*\n/, "")
+            .replace(/            Matcher matcher = GRAPHEME.matcher\(source\);\s*while \(matcher.find\(\)\) offsets\[count\+\+\] = matcher.start\(\);/,
+                "            count = BrowserGraphemes.fill(source, offsets) - 1;");
     }
     if (name === "graphics/texture/TextureData") {
         source = source.replaceAll("\r\n", "\n");

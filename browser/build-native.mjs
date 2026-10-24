@@ -6,6 +6,9 @@ import path from "node:path";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const sourceRoot = path.resolve(root, "../build/browser-tools");
 const dependencies = [
+    ["freetype", "https://github.com/freetype/freetype.git", "526ec5c47b9ebccc4754c85ac0c0cdf7c85a5e9b"],
+    ["harfbuzz", "https://github.com/harfbuzz/harfbuzz.git", "bf8929fbfb623703cf1522b372cab80002c17c95"],
+    ["msdfgen", "https://github.com/Chlumsky/msdfgen.git", "6574da1310df433c97ca0fddcab7e463c31e58f8"],
     ["bgfx", "https://github.com/LWJGL-CI/bgfx.git", "f564ae8bf92cd2ac27d95b12408bd68be3ddf955"],
     ["bx", "https://github.com/bkaradzic/bx.git", "f3a9adb603c5677731e7cf10622fa16e1dfe9ea5"],
     ["bimg", "https://github.com/bkaradzic/bimg.git", "9bfbd6493b48a15238f2d1374a718ec026524515"],
@@ -25,7 +28,7 @@ for (const [name, url, revision] of dependencies) {
     if (!existsSync(path.join(destination, ".git")))
         run("git", ["clone", "--filter=blob:none", "--no-checkout", url, destination]);
     const current = spawnSync("git", ["rev-parse", "HEAD"], { cwd: destination, encoding: "utf8" }).stdout.trim();
-    if (current !== revision || !existsSync(path.join(destination, "LICENSE"))) {
+    if (current !== revision) {
         run("git", ["fetch", "origin", revision, "--depth=1"], destination);
         run("git", ["checkout", "--detach", revision], destination);
     }
@@ -110,8 +113,27 @@ amalgamated = amalgamated.replace(
 );
 const amalgamatedFile = path.join(generated, "amalgamated.cpp");
 writeFileSync(amalgamatedFile, amalgamated);
+const fontBuild = path.join(sourceRoot, "font-build");
+const cmake = process.env.CMAKE || "cmake";
+const configure = ["-S", path.join(root, "native/font"), "-B", fontBuild, "-G", "Ninja",
+    "-DFONT_SOURCES=" + sourceRoot.replaceAll("\\", "/"),
+    "-DCMAKE_TOOLCHAIN_FILE=" + path.join(sdk, "upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"),
+    "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_C_FLAGS=-O2", "-DCMAKE_CXX_FLAGS=-O2"];
+if (process.env.CMAKE_MAKE_PROGRAM) configure.push("-DCMAKE_MAKE_PROGRAM=" + process.env.CMAKE_MAKE_PROGRAM);
+run(cmake, configure);
+run(cmake, ["--build", fontBuild, "--parallel", "4"]);
+for (const [name, file] of [["freetype", "freetype/docs/FTL.TXT"], ["harfbuzz", "harfbuzz/COPYING"], ["msdfgen", "msdfgen/LICENSE.txt"]])
+    writeLicense(name, readFileSync(path.join(sourceRoot, file)));
 const args = [
     "src/main/cpp/runtime.cpp",
+    ...["libvalthorne-fonts.a", "msdfgen/libmsdfgen-core.a", "harfbuzz/libharfbuzz.a", "freetype/libfreetype.a"].map(file => path.join(fontBuild, file)),
+    ...["freetype/include", "harfbuzz/src", "msdfgen"].map(file => "-I" + path.join(sourceRoot, file)),
+    "-I" + path.join(fontBuild, "msdfgen"),
+    "-DMSDFGEN_DISABLE_VARIABLE_FONTS",
+    "-DMSDFGEN_DISABLE_SVG",
+    "-DMSDFGEN_DISABLE_PNG",
+    "-DMSDFGEN_PUBLIC=",
+    "-DMSDFGEN_USE_CPP11",
     path.join(sourceRoot, "bgfx/examples/common/nanovg/nanovg.cpp"),
     path.join(sourceRoot, "bgfx/examples/common/nanovg/nanovg_bgfx.cpp"),
     amalgamatedFile,

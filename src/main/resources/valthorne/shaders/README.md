@@ -13,7 +13,6 @@ must be prepended before compilation.
 |---------------------|-----------------------------------------------------------------------------------------------|
 | `core`              | Shapes and textured quads                                                                     |
 | `effects`           | Blur, burn, flash, glow, outline, reflection, and water; share the textured-quad vertex stage |
-| `font`              | Slug vector-font vertex and fragment stages                                                   |
 | `lighting`          | Ray lights, light-map compositing, and irradiance baking                                      |
 | `lighting2d`        | Instanced 2D lights and fullscreen compositing                                                |
 | `model3d`           | Meshes, billboards, depth passes, and forward lighting; lighting shares the mesh vertex stage |

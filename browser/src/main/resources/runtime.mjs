@@ -1,3 +1,4 @@
+import bidiFactory from "./vendor/bidi.mjs";
 import { BrowserFiles } from "./files.mjs";
 import { BrowserPhysics } from "./physics.mjs";
 import createBgfx from "./native/bgfx.mjs";
@@ -71,6 +72,7 @@ export class BrowserHost {
     constructor(canvas, native) {
         if (typeof FinalizationRegistry !== "function")
             throw new Error("This browser runtime requires native-allocation finalization support");
+        this.bidi = bidiFactory();
         this.files = new BrowserFiles();
         this.yoga = new BrowserYoga();
         this.physics = new BrowserPhysics();
@@ -581,6 +583,7 @@ export async function launch(canvas, applicationUrl = "./application.js", args =
             globalThis.valthorneHost = host;
             await new Promise((resolve, reject) => {
                 script = document.createElement("script");
+                script.charset = "utf-8";
                 script.src = new URL(applicationUrl, import.meta.url).href;
                 script.onload = resolve;
                 script.onerror = () => reject(new Error("Could not load application JavaScript"));

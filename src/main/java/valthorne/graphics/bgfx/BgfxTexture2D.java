@@ -7,6 +7,7 @@ import valthorne.graphics.texture.TextureFilter;
 
 import static org.lwjgl.bgfx.BGFX.*;
 import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memCalloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
@@ -22,6 +23,8 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     private final int width; // Retained pixel width for device replacement.
     private final int height; // Retained pixel height for device replacement.
     private final int format; // Immutable sampled texture format.
+    private final boolean mutable; // Whether region uploads require mutable native storage.
+    private final int pixelBytes; // Packed bytes per texel for validated region uploads.
     private boolean mipmaps; // Whether the retained upload includes a mip chain.
     private ByteBuffer retainedPixels; // Owned immutable base image used for recovery and mip regeneration.
     private int id = -1; // Stable engine binding ID, or negative for standalone allocations.
@@ -36,8 +39,8 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
      * @param window initialized runtime owner
      * @param width positive image width
      * @param height positive image height
-     * @param format RGBA8, RGBA32F or RG32U bgfx texture format
-     * @param pixels tightly packed source bytes, copied without changing position
+     * @param format R8, RGB8, RGBA8, RGBA32F or RG32U bgfx texture format
+     * @param pixels tightly packed source bytes, or null for a zeroed allocation
      */
     public BgfxTexture2D(BgfxDesktopWindow window, int width, int height, int format, ByteBuffer pixels) {
         this(window, width, height, format, pixels, false);
@@ -51,8 +54,8 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
      * @param window initialized runtime owner
      * @param width positive image width
      * @param height positive image height
-     * @param format RGBA8, RGBA32F or RG32U format
-     * @param pixels tightly packed base-level bytes
+     * @param format R8, RGB8, RGBA8, RGBA32F or RG32U format
+     * @param pixels tightly packed base-level bytes, or null for a zeroed allocation
      * @param mipmaps whether RGBA8 minification levels should be generated
      */
     public BgfxTexture2D(BgfxDesktopWindow window, int width, int height, int format, ByteBuffer pixels, boolean mipmaps) {
@@ -66,11 +69,13 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
             throw new IllegalArgumentException("Texture exceeds this device's maximum size: " + maximum);
         int stride;
         if (format == BGFX_TEXTURE_FORMAT_RGBA8) stride = 4;
+        else if (format == BGFX_TEXTURE_FORMAT_R8) stride = 1;
+        else if (format == BGFX_TEXTURE_FORMAT_RGB8) stride = 3;
         else if (format == BGFX_TEXTURE_FORMAT_RGBA32F) stride = 16;
         else if (format == BGFX_TEXTURE_FORMAT_RG32U) stride = 8;
         else throw new IllegalArgumentException("Unsupported desktop texture format");
         long size = (long) width * height * stride;
-        if (size > Integer.MAX_VALUE || pixels.remaining() != size)
+        if (size > Integer.MAX_VALUE || pixels != null && pixels.remaining() != size)
             throw new IllegalArgumentException("Pixel byte count does not match texture dimensions");
         if (!bgfx_is_texture_valid(0, false, 1, format, BGFX_TEXTURE_NONE))
             throw new UnsupportedOperationException("The device cannot sample the requested texture format");
@@ -80,8 +85,10 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         this.width = width;
         this.height = height;
         this.format = format;
+        this.pixelBytes = stride;
+        this.mutable = pixels == null;
         this.mipmaps = mipmaps;
-        retainedPixels = copyPixels(pixels);
+        retainedPixels = pixels == null ? memCalloc((int) size) : copyPixels(pixels);
         try {
             handle = createTexture(retainedPixels, mipmaps);
             if (BgfxGraphics.isActive()) {
@@ -128,10 +135,18 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
      */
     private short createTexture(ByteBuffer pixels, boolean mipmaps) {
         if (mipmaps) return BgfxMipmaps.create(window, pixels, width, height);
-        BGFXMemory memory = bgfx_copy(pixels);
-        if (memory == null) throw new IllegalStateException("Could not allocate texture upload memory");
+        BGFXMemory memory = mutable ? null : bgfx_copy(pixels);
+        if (!mutable && memory == null) throw new IllegalStateException("Could not allocate texture upload memory");
         short texture = bgfx_create_texture_2d(width, height, mipmaps, 1, format, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, memory, 0);
         if (texture == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not create bgfx texture");
+        if (mutable) {
+            BGFXMemory initial = bgfx_copy(pixels);
+            if (initial == null) {
+                bgfx_destroy_texture(texture);
+                throw new IllegalStateException("Could not allocate mutable texture initialization");
+            }
+            bgfx_update_texture_2d(texture, 0, 0, 0, 0, width, height, initial, 0xffff);
+        }
         return texture;
     }
 
@@ -175,6 +190,27 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
     public void setFilter(TextureFilter filter) {
         BgfxGraphics.setTextureFilter(Short.toUnsignedInt(handle()), filter);
         this.filter = filter;
+    }
+
+    /**
+     * Updates a tightly packed rectangle and its retained recovery pixels.
+     * @param x destination column
+     * @param y destination row in stored texture order
+     * @param width rectangle width
+     * @param height rectangle height
+     * @param pixels borrowed packed pixels; cursor is preserved
+     */
+    public void update(int x, int y, int width, int height, ByteBuffer pixels) {
+        handle();
+        if (!mutable || mipmaps) throw new IllegalStateException("Region updates require mutable texture storage without mipmaps");
+        if (x < 0 || y < 0 || width < 1 || height < 1 || width > this.width - x || height > this.height - y || pixels == null || pixels.remaining() != (long) width * height * pixelBytes)
+            throw new IllegalArgumentException("Invalid packed texture update rectangle");
+        BGFXMemory upload = bgfx_copy(pixels);
+        if (upload == null) throw new IllegalStateException("Could not allocate texture update");
+        int rowBytes = width * pixelBytes;
+        for (int row = 0; row < height; row++)
+            retainedPixels.put(((y + row) * this.width + x) * pixelBytes, pixels, pixels.position() + row * rowBytes, rowBytes);
+        bgfx_update_texture_2d(handle, 0, 0, x, y, width, height, upload, 0xffff);
     }
 
     /**

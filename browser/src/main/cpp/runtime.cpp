@@ -1,4 +1,5 @@
 #include "operations.h"
+#include "adaptive_font.h"
 #include <bgfx/bgfx.h>
 #include <emscripten/emscripten.h>
 #include <cstdint>
@@ -83,6 +84,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t valthorne_command(uint32_t operation, uint32_t* w,
         if (!active) { std::free(canvasSelector); canvasSelector = nullptr; }
         return active ? 1 : 0;
     }
+    case ADAPTIVE_FONT_CREATE: case ADAPTIVE_FONT_FREE: case ADAPTIVE_FONT_METRICS:
+    case ADAPTIVE_FONT_NOMINAL: case ADAPTIVE_FONT_SHAPE: case ADAPTIVE_FONT_RASTER:
+    case ADAPTIVE_FONT_SCRIPT: return adaptiveFontCommand(operation, w, bytes, length);
     case SHUTDOWN: if (active) { bgfx::shutdown(); active = false; std::free(canvasSelector); canvasSelector = nullptr; } return 0;
     case MIPMAP_FRAMEBUFFER: {
         bgfx::Attachment attachment;

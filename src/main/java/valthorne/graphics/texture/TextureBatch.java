@@ -13,8 +13,6 @@ import valthorne.graphics.Sprite;
 import valthorne.graphics.bgfx.BgfxBatchRenderer;
 import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.bgfx.BgfxResources;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugTextRun;
 import valthorne.graphics.shader.Shader;
 
 /**
@@ -26,7 +24,7 @@ import valthorne.graphics.shader.Shader;
  * shader overrides, and rendering into a {@link FrameBuffer}.
  * </p>
  * <p>
- * Slug fonts and retained text runs use live outline coverage within this same
+ * Adaptive fonts and retained text runs use coverage/MSDF atlases within this same
  * begin/end scope. The batch lazily creates a curve shader, groups consecutive text
  * submissions, and flushes at sprite/text boundaries to preserve painter order.
  * Glyphs share sprite staging storage, quad geometry and the instance VBO.
@@ -108,11 +106,14 @@ public final class TextureBatch implements GraphicsResource {
     private final ByteBuffer instanceBytes; // Shared native staging storage for sprite and glyph segments.
     private final FloatBuffer instanceBuffer; // Float view of shared staging storage used for sprite instances.
     private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
-    private TextureBatchGlyphs glyphs; // Lazily owned live-outline implementation sharing the sprite buffers.
     private float opacityMultiplier = 1f; // Multiplies final per-sprite alpha for temporary translucent rendering.
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
+    private final int[] textViewport = new int[4]; // Cached physical viewport for adaptive glyph grid fitting.
+    private boolean textViewportValid; // Whether textViewport belongs to the current batch scope.
+    private final float[] distanceRanges = new float[64]; // Packed per-slot MSDF range or negative R8 coverage marker.
+    private final String[] distanceUniforms = new String[16]; // Stable indexed uniform names allocated only at construction.
     private final int[] vp = new int[4]; // Temporary viewport storage used when switching framebuffer targets
     private final float[] clipStack = new float[256]; // Stack storing nested clip rectangles as x, y, width, height groups
     private final float[] translationStack = new float[256]; // Stack storing nested translation states as x and y pairs
@@ -201,6 +202,7 @@ public final class TextureBatch implements GraphicsResource {
         }
 
         this.maxSprites = maxSprites;
+        for (int i = 0; i < distanceUniforms.length; i++) distanceUniforms[i] = "u_distanceRange[" + i + "]";
         this.maxTextureUnits = Math.min(maxTextureUnits, 16);
 
         this.textureUnitCapacity = Math.min(4, this.maxTextureUnits);
@@ -529,6 +531,7 @@ public final class TextureBatch implements GraphicsResource {
      * stacks, tint, shader choice, and framebuffer ownership.
      */
     public void resumeAfterExternalDraw() {
+        textViewportValid = false;
         if (!drawing) throw new IllegalStateException("The batch is not drawing");
         BgfxGraphics.configureView();
     }
@@ -1499,15 +1502,14 @@ public final class TextureBatch implements GraphicsResource {
             return;
         }
 
-        finishGlyphs();
         if (instanceCount >= maxSprites) {
             flush();
         }
 
-        int texUnit = getOrBindTextureUnit(tex.getTextureID());
+        int texUnit = getOrBindTextureUnit(tex);
         if (texUnit < 0) {
             flush();
-            texUnit = getOrBindTextureUnit(tex.getTextureID());
+            texUnit = getOrBindTextureUnit(tex);
             if (texUnit < 0) {
                 return;
             }
@@ -1565,19 +1567,7 @@ public final class TextureBatch implements GraphicsResource {
         instanceCount++;
     }
 
-    /**
-     * Lazily creates glyph implementation state while borrowing existing storage.
-     * Sprite-only batches allocate no glyph component or associated matrices.
-     *
-     * The component is borrowed and remains owned by this batch. Its public
-     * text API requires an active begin/end scope on this graphics thread.
-     *
-     * @return this batch's reusable glyph component
-     */
-    public TextureBatchGlyphs getGlyphs() {
-        if (glyphs == null) glyphs = new TextureBatchGlyphs(this, instanceBytes, maxSprites, bgfxRenderer);
-        return glyphs;
-    }
+
 
     /**
      * Reports the parent's drawing scope to its owned rendering components.
@@ -1598,18 +1588,7 @@ public final class TextureBatch implements GraphicsResource {
         return color;
     }
 
-    /**
-     * Finishes exclusive glyph use and restores the sprite view of shared storage,
-     * including when a disposed queued font causes glyph submission to fail.
-     */
-    private void finishGlyphs() {
-        if (glyphs == null || !glyphs.isDrawing()) return;
-        try {
-            glyphs.finish();
-        } finally {
-            instanceBuffer.clear();
-        }
-    }
+
 
     /**
      * <p>
@@ -1637,12 +1616,12 @@ public final class TextureBatch implements GraphicsResource {
     private void beginBgfx(FrameBuffer fbo) {
         BgfxGraphics.device();
         if (drawing) throw new IllegalStateException("Already drawing");
+        textViewportValid = false;
         translationDepth = 0;
         translationX = translationY = 0;
         clipDepth = 0;
         clipEnabled = false;
         clipX = clipY = clipW = clipH = 0;
-        if (glyphs != null) glyphs.resetTransform();
         usingFBO = fbo != null;
         if (usingFBO) {
             previousFBO = BgfxGraphics.target();
@@ -1730,24 +1709,22 @@ public final class TextureBatch implements GraphicsResource {
 
     /**
      * Returns the cumulative count of nonempty sprite and glyph draws, including
-     * glyph capacity/font flushes within a currently active text segment.
+     * atlas capacity flushes during adaptive text drawing.
      *
      * @return lifetime draw-call count
      */
     public long getTotalDrawCalls() {
-        return totalDrawCalls + (glyphs == null ? 0L : glyphs.getTotalDrawCalls());
+        return totalDrawCalls;
     }
 
     /**
-     * Finishes any live glyph segment and restores the sprite pipeline, then
-     * uploads queued sprite instances into an unused range after applying the active
+     * Uploads queued sprite and adaptive glyph instances into an unused range after applying the active
      * projection, and issues one instanced draw. Clears CPU instance/texture-slot
      * bookkeeping afterward while retaining the drawing scope. Empty queues return
      * immediately. Call within an active batch scope with its engine render state intact;
      * this method does not establish or restore the full scope itself.
      */
     public void flush() {
-        finishGlyphs();
         if (instanceCount == 0) {
             return;
         }
@@ -1773,14 +1750,13 @@ public final class TextureBatch implements GraphicsResource {
      * </p>
      *
      * <p>
-     * This disposes the internally owned default shader, any lazily created curve
-     * shader, and the quad and instance VBOs. Pending text is discarded; borrowed
+     * This disposes the internally owned default shader and the quad and instance
+     * buffers. Pending instances are discarded; borrowed
      * fonts remain alive. After this method is called, the batch should no longer be used.
      * </p>
      */
     public void dispose() {
         BgfxResources.unregister(this);
-        if (glyphs != null) glyphs.dispose();
         defaultShader.dispose();
         bgfxRenderer.close();
     }
@@ -1812,6 +1788,8 @@ public final class TextureBatch implements GraphicsResource {
      */
     private void applyActiveProjection() {
         activeShader.setUniformMatrix4(TextureBatchContract.UNIFORM_MVP, Window.getProjectionMatrix());
+        for (int i = 0; i < activeTextureCount; i++)
+            activeShader.setUniform4f(distanceUniforms[i], distanceRanges[i * 4], distanceRanges[i * 4 + 1], 0, 0);
     }
 
     /**
@@ -1828,10 +1806,11 @@ public final class TextureBatch implements GraphicsResource {
      * can flush and retry.
      * </p>
      *
-     * @param textureID the GPU texture ID to resolve
+     * @param texture texture whose managed binding and sampling mode are resolved
      * @return the texture unit index, or {@code -1} if the batch must flush first
      */
-    private int getOrBindTextureUnit(int textureID) {
+    private int getOrBindTextureUnit(Texture texture) {
+        int textureID = texture.getTextureID();
         if (lastTextureID == textureID && lastTextureUnit >= 0 && lastTextureUnit < activeTextureCount) {
             return lastTextureUnit;
         }
@@ -1853,6 +1832,9 @@ public final class TextureBatch implements GraphicsResource {
 
         int unit = activeTextureCount++;
         textureIDs[unit] = textureID;
+        float range = texture.getDistanceFieldRange();
+        distanceRanges[unit * 4] = range > 0 ? range / texture.getWidth() : range;
+        distanceRanges[unit * 4 + 1] = range > 0 ? range / texture.getHeight() : 0;
 
         lastTextureID = textureID;
         lastTextureUnit = unit;
@@ -1875,6 +1857,94 @@ public final class TextureBatch implements GraphicsResource {
         textureIDs = Arrays.copyOf(textureIDs, newCapacity);
         Arrays.fill(textureIDs, oldCapacity, newCapacity, -1);
         textureUnitCapacity = newCapacity;
+    }
+
+    /**
+     * Reports whether the selected shader supports ordinary and MSDF sampling.
+     * @return whether adaptive text can stay in the current shader and queue
+     */
+    public boolean supportsDistanceFields() {
+        return activeShader == defaultShader || activeShader instanceof TextureBatchShader shader && shader.supportsDistanceFields();
+    }
+
+    /**
+     * Reports vertex transformations that bypass coverage grid fitting.
+     * @return whether the selected shader transforms text beyond the projection
+     */
+    public boolean transformsText() {
+        return activeShader instanceof TextureBatchShader shader && shader.transformsText();
+    }
+
+    /**
+     * Samples the active viewport once per drawing scope for adaptive text.
+     * Resume after external rendering to invalidate this snapshot when another
+     * renderer changes the viewport. Projection values remain live independently.
+     */
+    private void sampleTextViewport() {
+        if (!drawing) throw new IllegalStateException("Call begin() before reading the text viewport.");
+        if (textViewportValid) return;
+        BgfxGraphics.getViewport(textViewport);
+        textViewportValid = true;
+    }
+
+    /**
+     * Returns the batch scope's sampled physical viewport origin.
+     * @return horizontal viewport origin in pixels
+     */
+    public int getViewportX() { sampleTextViewport(); return textViewport[0]; }
+
+    /**
+     * Returns the batch scope's sampled physical viewport origin.
+     * @return vertical viewport origin in pixels
+     */
+    public int getViewportY() { sampleTextViewport(); return textViewport[1]; }
+
+    /**
+     * Returns the batch scope's sampled physical viewport width.
+     * @return viewport width in pixels
+     */
+    public int getViewportWidth() { sampleTextViewport(); return textViewport[2]; }
+
+    /**
+     * Returns the batch scope's sampled physical viewport height.
+     * @return viewport height in pixels
+     */
+    public int getViewportHeight() { sampleTextViewport(); return textViewport[3]; }
+
+    /**
+     * Aligns a logical text origin to a physical pixel for uniform axis-aligned
+     * projections. Glyph advances stay fractional; transformed text stays unsnapped.
+     * @param x logical horizontal position before batch translation
+     * @return aligned horizontal origin in the same logical coordinate system
+     */
+    public float alignTextOrigin(float x) { return alignTextCoordinate(x, false); }
+
+    /**
+     * Aligns a logical baseline using the same policy as text origins and carets.
+     * @param y logical baseline before batch translation
+     * @return aligned baseline in the same logical coordinate system
+     */
+    public float alignTextBaseline(float y) { return alignTextCoordinate(y, true); }
+
+    /**
+     * Projects, rounds and unprojects one coordinate without native scratch buffers.
+     * @param value logical coordinate before batch translation
+     * @param vertical whether to use the vertical axis
+     * @return unchanged value for general transforms, otherwise a physical-pixel alignment
+     */
+    private float alignTextCoordinate(float value, boolean vertical) {
+        if (!Float.isFinite(value)) throw new IllegalArgumentException("Text coordinate must be finite");
+        sampleTextViewport();
+        float[] matrix = Window.getProjectionMatrix();
+        if (transformsText() || matrix[1] != 0 || matrix[4] != 0 || matrix[3] != 0 || matrix[7] != 0 || matrix[15] != 1 || matrix[0] <= 0 || matrix[5] <= 0) return value;
+        float sx = matrix[0] * textViewport[2] * 0.5f;
+        float sy = matrix[5] * textViewport[3] * 0.5f;
+        if (sx <= 0 || sy <= 0 || Math.abs(sx - sy) > Math.max(sx, sy) * 0.0001f) return value;
+        float scale = vertical ? sy : sx;
+        float origin = vertical ? textViewport[1] + (matrix[13] * 0.5f + 0.5f) * textViewport[3] : textViewport[0] + (matrix[12] * 0.5f + 0.5f) * textViewport[2];
+        float translated = value + (vertical ? translationY : translationX);
+        float screen = translated * scale + origin;
+        return value + (Math.round(screen) - screen) / scale;
     }
 
     @Override

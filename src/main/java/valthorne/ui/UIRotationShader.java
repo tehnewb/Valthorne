@@ -6,7 +6,7 @@ import valthorne.graphics.texture.TextureBatchShader;
  * Applies the UI context's accumulated rigid transform to textured UI vertices.
  * The owning root creates this shader only when rotated content is first drawn
  * and disposes it with the root. World coordinates are transformed before both
- * projection and clipping, matching NanoVG and Slug placement.
+ * projection and clipping, matching NanoVG and adaptive text placement.
  *
  * <p>The context flushes queued texture work before changing the transform and
  * restores the caller's shader on scope exit. Unrotated UI outside such a scope
@@ -14,6 +14,7 @@ import valthorne.graphics.texture.TextureBatchShader;
  * textures, or transform stack and is confined to the graphics thread.</p>
  */
 final class UIRotationShader extends TextureBatchShader {
+    private boolean rotated; // Whether the current UI vertex transform requires scalable glyphs.
     /**
      * Creates a shader matching the root batch's automatically detected sampler
      * limit. Requires the root's current graphics device.
@@ -31,6 +32,10 @@ final class UIRotationShader extends TextureBatchShader {
      * @param y combined world translation Y
      */
     void transform(float cosine, float sine, float x, float y) {
+        rotated = sine != 0 || cosine != 1;
         setUniform4f("u_uiTransform", cosine, sine, x, y);
     }
+
+    @Override
+    public boolean transformsText() { return rotated; }
 }

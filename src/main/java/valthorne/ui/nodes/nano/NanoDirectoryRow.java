@@ -4,7 +4,7 @@ import valthorne.Mouse;
 import valthorne.event.events.MousePressEvent;
 import valthorne.event.events.MouseReleaseEvent;
 import valthorne.graphics.Color;
-import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.TextFont;
 import valthorne.ui.NanoText;
 import valthorne.ui.NanoUtility;
 
@@ -34,7 +34,7 @@ final class NanoDirectoryRow extends NanoContainer {
     private String caption; // Cached full or ellipsized caption for the current width.
     private float captionWidth = Float.NaN; // Last measured horizontal space, invalidated by resizing.
     private float captionSize = Float.NaN; // Last measured font size, invalidated by theme changes.
-    private SlugFont captionFont; // Borrowed smooth font identity used by the last caption measurement.
+    private TextFont captionFont; // Borrowed smooth font identity used by the last caption measurement.
 
     /**
      * Creates one virtual row with no button chrome or separate text child.
@@ -80,7 +80,7 @@ final class NanoDirectoryRow extends NanoContainer {
      * @param size resolved logical em size
      */
     private void fitCaption(long vg, float available, float size) {
-        SlugFont font = getTheme() == null ? null : getTheme().getToken(NanoText.SLUG_FONT);
+        TextFont font = getTheme() == null ? null : getTheme().getToken(NanoText.FONT);
         if (font == null && getRoot() != null) font = getRoot().getDefaultFont();
         if (captionWidth == available && captionSize == size && captionFont == font) return;
         captionWidth = available;

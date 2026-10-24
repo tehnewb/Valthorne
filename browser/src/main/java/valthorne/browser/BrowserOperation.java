@@ -526,6 +526,35 @@ public final class BrowserOperation {
     public static final int MIPMAP_FRAMEBUFFER = 115;
 
     /**
+     * Opens a scalable native font face.
+     */
+    public static final int ADAPTIVE_FONT_CREATE = 116;
+    /**
+     * Closes an owned native adaptive face.
+     */
+    public static final int ADAPTIVE_FONT_FREE = 117;
+    /**
+     * Reads normalized design metrics.
+     */
+    public static final int ADAPTIVE_FONT_METRICS = 118;
+    /**
+     * Resolves one nominal Unicode glyph.
+     */
+    public static final int ADAPTIVE_FONT_NOMINAL = 119;
+    /**
+     * Shapes a contextual UTF-16 segment.
+     */
+    public static final int ADAPTIVE_FONT_SHAPE = 120;
+    /**
+     * Rasterizes coverage or an MSDF image.
+     */
+    public static final int ADAPTIVE_FONT_RASTER = 121;
+    /**
+     * Resolves a Unicode script tag.
+     */
+    public static final int ADAPTIVE_FONT_SCRIPT = 122;
+
+    /**
      * Prevents constructing protocol constant holders.
      */
     private BrowserOperation() {

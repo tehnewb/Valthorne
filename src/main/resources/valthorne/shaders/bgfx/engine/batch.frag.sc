@@ -16,6 +16,7 @@ SAMPLER2D(u_tex12, 12);
 SAMPLER2D(u_tex13, 13);
 SAMPLER2D(u_tex14, 14);
 SAMPLER2D(u_tex15, 15);
+uniform vec4 u_distanceRange[16];
 void main() {
     if (v_params.y > 0.5 && (v_world.x < v_clip.x || v_world.y < v_clip.y ||
         v_world.x > v_clip.x + v_clip.z || v_world.y > v_clip.y + v_clip.w)) discard;
@@ -36,5 +37,13 @@ void main() {
     else if (v_params.x < 13.5) color = texture2D(u_tex13, v_uv);
     else if (v_params.x < 14.5) color = texture2D(u_tex14, v_uv);
     else color = texture2D(u_tex15, v_uv);
+    vec2 unitRange = u_distanceRange[int(v_params.x)].xy;
+    if (unitRange.x < 0.0) color = vec4(1.0, 1.0, 1.0, color.r);
+    else if (unitRange.x > 0.0) {
+        float median = max(min(color.r, color.g), min(max(color.r, color.g), color.b));
+        vec2 screenTexSize = vec2_splat(1.0) / max(fwidth(v_uv), vec2_splat(0.000001));
+        float range = max(0.5 * dot(unitRange, screenTexSize), 1.0);
+        color = vec4(1.0, 1.0, 1.0, clamp(range * (median - 0.5) + 0.5, 0.0, 1.0));
+    }
     gl_FragColor = color * v_color;
 }

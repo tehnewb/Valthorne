@@ -12,7 +12,7 @@ import static org.lwjgl.bgfx.BGFX.*;
 /**
  * Coordinates the engine's bgfx frame, render-target and viewport state. These values are explicit inputs to sequential bgfx views. All calls belong to the application thread; no synchronization is used.
  *
- * <p>Painter-ordered sprite, Slug and NanoVG submissions share a view until the
+ * <p>Painter-ordered sprite, adaptive-text and NanoVG submissions share a view until the
  * render target or viewport changes. Matrices are per-draw uniforms, preventing
  * later camera changes from mutating earlier queued draws. Clear operations start
  * a fresh view so a mid-frame clear cannot erase earlier work out of order. A

@@ -33,9 +33,9 @@ public final class BgfxBatchRenderer implements AutoCloseable, GraphicsResource 
      */
     private static final long SPRITE_STATE = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA);
     /**
-     * Slug fragment shaders produce premultiplied color coverage.
+     * Blend state for callers supplying premultiplied fragment colors.
      */
-    private static final long GLYPH_STATE = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA);
+    private static final long PREMULTIPLIED_STATE = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA);
 
     private final int capacity; // Number of instances held in one reusable upload chunk.
     private final int instanceStride; // Aligned bytes per instance, selected once at construction.
@@ -62,13 +62,13 @@ public final class BgfxBatchRenderer implements AutoCloseable, GraphicsResource 
      * Allocates compact instance storage for a shader's vec4 input records.
      *
      * @param capacity positive maximum records per submission
-     * @param instanceStride record bytes, a multiple of 16 between 16 and 96
+     * @param instanceStride record bytes, a multiple of 16 between 16 and 128
      */
     public BgfxBatchRenderer(int capacity, int instanceStride) {
         BgfxGraphics.device();
         if (capacity < 1) throw new IllegalArgumentException("capacity must be positive");
-        if (instanceStride < 16 || instanceStride > DEFAULT_INSTANCE_STRIDE || (instanceStride & 15) != 0)
-            throw new IllegalArgumentException("Instance stride must be a multiple of 16 between 16 and 96");
+        if (instanceStride < 16 || instanceStride > 128 || (instanceStride & 15) != 0)
+            throw new IllegalArgumentException("Instance stride must be a multiple of 16 between 16 and 128");
         this.capacity = capacity;
         this.instanceStride = instanceStride;
         try {
@@ -101,10 +101,10 @@ public final class BgfxBatchRenderer implements AutoCloseable, GraphicsResource 
      * @param shader compiled batch-compatible program
      * @param textures borrowed sampled texture handles indexed by unit
      * @param textureCount populated texture units
-     * @param glyphs whether fragments produce premultiplied glyph coverage
+     * @param premultiplied whether fragments contain premultiplied color
      */
-    public void submit(ByteBuffer records, int count, int sourceStride, Shader shader, int[] textures, int textureCount, boolean glyphs) {
-        submit(records, count, sourceStride, shader, textures, textureCount, glyphs ? GLYPH_STATE : SPRITE_STATE);
+    public void submit(ByteBuffer records, int count, int sourceStride, Shader shader, int[] textures, int textureCount, boolean premultiplied) {
+        submit(records, count, sourceStride, shader, textures, textureCount, premultiplied ? PREMULTIPLIED_STATE : SPRITE_STATE);
     }
 
     /**

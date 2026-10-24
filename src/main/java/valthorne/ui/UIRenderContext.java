@@ -1,9 +1,9 @@
 package valthorne.ui;
 
 import valthorne.graphics.bgfx.BgfxGraphics;
-
 import valthorne.Window;
-import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.shader.Shader;
 import valthorne.ui.nodes.nano.NanoNode;
@@ -47,8 +47,8 @@ import valthorne.graphics.Color;
  *
  * <h2>Rotation</h2>
  * <p>This context composes cached node rotations around layout centers. Previous
- * transforms live in traversal locals rather than a batch stack. NanoVG and Slug
- * receive the same transform; textured nodes use a root-owned rotation shader.
+ * transforms live in traversal locals rather than a batch stack. NanoVG, adaptive text and textured nodes receive the same composed transform.
+ * Textured drawing uses a root-owned MSDF-capable rotation shader.
  * Entering or leaving a rotated subtree flushes texture work before changing
  * shader state. Visibility and rotation remain responsibilities of the UI.</p>
  *
@@ -162,21 +162,55 @@ public final class UIRenderContext {
     }
 
     /**
-     * Paints curve glyphs within a Nano control while retaining backend order.
+     * Paints adaptive glyphs within a Nano control while retaining backend order.
      * Coordinates use the same top-left logical space as the Nano callback;
      * clipping intersects the control and its current ancestor clip.
      * Axis-aligned line origins and baselines align to physical pixels without
      * changing fractional glyph advances or kerning.
      *
      * @param node owning Nano control
-     * @param font borrowed curve font
+     * @param font borrowed text font
      * @param text line contents
      * @param x left pen coordinate
      * @param baseline top-down baseline coordinate
      * @param size logical em size
      * @param color borrowed tint
      */
-    public void drawNanoSlug(UINode node, SlugFont font, String text, float x, float baseline, float size, Color color) {
+    public void drawNanoText(UINode node, TextFont font, String text, float x, float baseline, float size, Color color) {
+        TextRun layout = font.layout(text, size);
+        drawNanoLayout(node, layout, x, baseline, color, null, null, 0);
+    }
+
+    /**
+     * Paints a complete styled layout in visual glyph order, retaining contextual
+     * shapes and overlapping coverage across syntax-color boundaries.
+     *
+     * @param node owning Nano control
+     * @param layout borrowed complete text layout
+     * @param ends exclusive UTF-16 display span boundaries
+     * @param colors borrowed span colors
+     * @param count used prefix of the style arrays
+     * @param x complete line's left baseline coordinate
+     * @param baseline top-down baseline coordinate
+     */
+    public void drawNanoTextStyled(UINode node, TextRun layout, int[] ends, Color[] colors, int count, float x, float baseline) {
+        drawNanoLayout(node, layout, x, baseline, null, ends, colors, count);
+    }
+
+    /**
+     * Coordinates a Nano-to-text backend transition with shared node clipping.
+     * Null style arrays select the uniform-tint path without temporary wrappers.
+     *
+     * @param node owning Nano control
+     * @param layout borrowed complete text layout
+     * @param x complete line's left baseline coordinate
+     * @param baseline top-down baseline coordinate
+     * @param color uniform tint, ignored when style arrays are supplied
+     * @param ends optional exclusive display span boundaries
+     * @param colors optional borrowed span colors
+     * @param count used style count, zero for uniform tint
+     */
+    private void drawNanoLayout(UINode node, TextRun layout, float x, float baseline, Color color, int[] ends, Color[] colors, int count) {
         selectBackend(false);
         float tx = batch.getTranslationX();
         float ty = batch.getTranslationY();
@@ -192,7 +226,8 @@ public final class UIRenderContext {
         }
         batch.beginScissor(left, bottom, Math.max(0f, right - left), Math.max(0f, top - bottom));
         try {
-            font.draw(batch, text, batch.getGlyphs().alignTextOrigin(x), batch.getGlyphs().alignTextBaseline(height - baseline), size, color);
+            if (ends == null) layout.draw(batch, x, height - baseline, color);
+            else layout.drawStyled(batch, x, height - baseline, ends, colors, count);
         } finally {
             batch.endScissor();
             selectBackend(true);
@@ -283,8 +318,6 @@ public final class UIRenderContext {
         transformCosine = previousCosine * cosine - previousSine * sine;
         transformSine = previousSine * cosine + previousCosine * sine;
         shader.transform(transformCosine, transformSine, transformX, transformY);
-        batch.getGlyphs()
-                .setTextTransform(transformCosine, transformSine, transformX, transformY);
         try {
             drawNodeContents(node, restoreBackend);
         } finally {
@@ -295,8 +328,6 @@ public final class UIRenderContext {
                 transformSine = previousSine;
                 transformX = previousX;
                 transformY = previousY;
-                batch.getGlyphs()
-                        .setTextTransform(previousCosine, previousSine, previousX, previousY);
                 batch.setShader(previousShader);
                 if (previousShader instanceof UIRotationShader previousRotation)
                     previousRotation.transform(previousCosine, previousSine, previousX, previousY);

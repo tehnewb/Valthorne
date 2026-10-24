@@ -1,5 +1,6 @@
 package valthorne.graphics.texture;
 
+import java.nio.ByteBuffer;
 import valthorne.graphics.GraphicsBackend;
 import valthorne.graphics.GraphicsResource;
 import valthorne.graphics.Sprite;
@@ -162,13 +163,45 @@ public class Texture implements Poolable, GraphicsResource {
      * @throws NullPointerException if data is null
      */
     protected Texture(TextureData data, boolean ownsData) {
+        this(data, ownsData, BGFX_TEXTURE_FORMAT_RGBA8);
+    }
+
+    /**
+     * Allocates a managed atlas in a compact native format with recovery storage.
+     * @param data dimensions and optional initial pixels; null pixels clear the atlas
+     * @param format supported bgfx sampled texture format
+     */
+    protected Texture(TextureData data, int format) {
+        this(data, false, format);
+    }
+
+    /**
+     * Creates the native allocation while retaining logical texture ownership.
+     * @param data validated dimensions and optional initial image
+     * @param ownsData whether decoded pixels are owned
+     * @param format native storage format matching the packed pixels
+     */
+    private Texture(TextureData data, boolean ownsData, int format) {
         if (data == null) throw new NullPointerException("TextureData cannot be null");
 
-        bgfxTexture = new BgfxTexture2D(BgfxGraphics.device(), data.width(), data.height(), BGFX_TEXTURE_FORMAT_RGBA8, data.buffer());
+        bgfxTexture = new BgfxTexture2D(BgfxGraphics.device(), data.width(), data.height(), format, data.buffer());
         textureID = bgfxTexture.id();
         this.data = data;
         this.ownsData = ownsData;
         BgfxResources.register(this);
+    }
+
+    /**
+     * Copies one packed atlas rectangle into the GPU and retained recovery image.
+     * @param x destination column
+     * @param y destination row
+     * @param width rectangle width
+     * @param height rectangle height
+     * @param pixels borrowed packed pixels
+     */
+    protected final void updatePixels(int x, int y, int width, int height, ByteBuffer pixels) {
+        if (disposed || bgfxTexture == null) throw new IllegalStateException("Texture is not a live managed allocation");
+        bgfxTexture.update(x, y, width, height, pixels);
     }
 
     /**
@@ -303,6 +336,14 @@ public class Texture implements Poolable, GraphicsResource {
     public int getWidth() {
         return data.width();
     }
+
+    /**
+     * Describes signed-distance sampling to the standard batch shader. Ordinary
+     * textures return zero; MSDF atlas textures return their full distance range
+     * in texels; R8 coverage pages return a negative marker. This immutable metadata is read only when binding a new texture.
+     * @return full MSDF range, negative R8 coverage marker, or zero for RGBA sampling
+     */
+    public float getDistanceFieldRange() { return 0f; }
 
     /**
      * <p>

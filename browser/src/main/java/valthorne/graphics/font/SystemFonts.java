@@ -23,7 +23,7 @@ public final class SystemFonts {
     public static Path find(boolean code) {
         /*
          * Stable bundled defaults make text rendering independent of local OS
-         * fonts and let the same Slug compiler run on every browser platform.
+         * fonts and let the same adaptive font pipeline run on every browser platform.
          */
         String override = System.getProperty(code ? "valthorne.ui.codeFont" : "valthorne.ui.defaultFont");
         if (override != null && !override.isBlank()) {

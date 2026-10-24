@@ -20,8 +20,8 @@ import valthorne.graphics.GraphicsViewport;
 import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.bgfx.BgfxResources;
 import valthorne.graphics.font.SystemFonts;
-import valthorne.graphics.font.slug.SlugData;
-import valthorne.graphics.font.slug.SlugFont;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.adaptive.AdaptiveFontData;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.behavior.TextEditing;
 import valthorne.ui.nodes.Panel;
@@ -157,8 +157,8 @@ public class UIRoot extends UIContainer implements GraphicsResource {
     private final List<UIFocusScope> focusScopes = new ArrayList<>(); // Modal scope stack with prior-focus restoration targets.
     private final long yogaConfig; // Yoga configuration handle owned by this UI root
     private TextureBatch batch; // Root-owned batch created only when drawing or explicitly requested.
-    private SlugFont nanoSlugFont; // Default proportional face for smooth Nano text.
-    private SlugFont nanoSlugCodeFont; // Default monospace face for smooth code text.
+    private TextFont nanoFont; // Default proportional face for smooth Nano text.
+    private TextFont nanoCodeFont; // Default monospace face for smooth code text.
     private ProfessionalTheme defaultTheme; // Owned shared desktop-editor skin retained until this root is disposed.
     private final Panel overlayLayer = new Panel(); // Top-most overlay container used for tooltips and floating UI
     private final UIDragPreview dragPreview = new UIDragPreview(); // Paints the captured item above scroll clips while dragging.
@@ -993,13 +993,13 @@ public class UIRoot extends UIContainer implements GraphicsResource {
         Yoga.YGConfigFree(yogaConfig);
         if (batch != null) batch.dispose();
         if (rotationShader != null) rotationShader.dispose();
-        if (nanoSlugFont != null) {
-            nanoSlugFont.dispose();
-            nanoSlugFont = null;
+        if (nanoFont != null) {
+            nanoFont.dispose();
+            nanoFont = null;
         }
-        if (nanoSlugCodeFont != null) {
-            nanoSlugCodeFont.dispose();
-            nanoSlugCodeFont = null;
+        if (nanoCodeFont != null) {
+            nanoCodeFont.dispose();
+            nanoCodeFont = null;
         }
         BgfxResources.unregister(this);
         releaseGraphicsResources();
@@ -1027,15 +1027,16 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      * @param code true for the monospace editing face
      * @return borrowed root-owned font, or null before graphics initialization
      */
-    SlugFont getNanoTextFont(boolean code) {
+    TextFont getNanoTextFont(boolean code) {
         if (disposed) return null;
         if (!code && defaultTheme != null) return defaultTheme.getFont();
         if (nanoVGHandle == 0) return null;
-        SlugFont current = code ? nanoSlugCodeFont : nanoSlugFont;
+        TextFont current = code ? nanoCodeFont : nanoFont;
         if (current != null) return current;
-        current = new SlugFont(SlugData.load(SystemFonts.find(code).toString(), 32, 224), true);
-        if (code) nanoSlugCodeFont = current;
-        else nanoSlugFont = current;
+        current = AdaptiveFontData.load(SystemFonts.find(code).toString(), 20)
+                .asFont();
+        if (code) nanoCodeFont = current;
+        else nanoFont = current;
         return current;
     }
 
@@ -1835,7 +1836,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      *
      * @return borrowed proportional font, or null before graphics initialization
      */
-    public SlugFont getDefaultFont() {
+    public TextFont getDefaultFont() {
         return getNanoTextFont(false);
     }
 

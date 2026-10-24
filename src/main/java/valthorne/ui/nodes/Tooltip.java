@@ -1,8 +1,8 @@
 package valthorne.ui.nodes;
 
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugTextRun;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
 import valthorne.ui.theme.ResolvedStyle;
@@ -68,7 +68,7 @@ public class Tooltip extends UINode {
     /**
      * Style key used to resolve the tooltip font.
      */
-    public static final StyleKey<SlugFont> FONT_STYLE_KEY = StyleKey.of("font", SlugFont.class);
+    public static final StyleKey<TextFont> FONT_STYLE_KEY = StyleKey.of("font", TextFont.class);
 
     /**
      * Em scale shared by all regular UI text controls through the semantic size token.
@@ -86,8 +86,8 @@ public class Tooltip extends UINode {
     public static final StyleKey<Float> PADDING_STYLE_KEY = StyleKey.of("padding", Float.class, 6f);
 
     private String text; // Current text displayed by the tooltip
-    private SlugFont font; // Resolved font used to render tooltip text
-    private SlugTextRun run; // Retained multiline layout borrowing the resolved font.
+    private TextFont font; // Resolved font used to render tooltip text
+    private TextRun run; // Retained multiline layout borrowing the resolved font.
     private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
     private Drawable background; // Resolved background drawable for the tooltip box
     private float padding = 6f; // Resolved padding applied around the tooltip text

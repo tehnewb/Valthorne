@@ -15,3 +15,6 @@ vec4 i_data4 : TEXCOORD27;
 vec4 i_data5 : TEXCOORD26;
 
 vec2 a_texcoord1 : TEXCOORD1;
+
+vec4 i_data6 : TEXCOORD25;
+vec4 i_data7 : TEXCOORD24;

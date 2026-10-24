@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.3.1.0" src="https://img.shields.io/badge/version-1.3.1.0-blue" /></a>
+  <a href="https://github.com/tehnewb/Valthorne/blob/main/gradle.properties"><img alt="Version 1.4.1.0" src="https://img.shields.io/badge/version-1.4.1.0-blue" /></a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/tehnewb/Valthorne/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/tehnewb/Valthorne" /></a>
   &nbsp;&nbsp;&nbsp;
@@ -38,9 +38,9 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 - **Animation and particles:** Frame-based animation with playback modes and
   listeners, plus particle emitters with box, circle, cone, and line spawning.
 - **2D lighting:** Batched lights and ground-shadow rendering.
-- **Fonts and vector drawing:** Bitmap fonts, live Slug curve fonts, and NanoVG
-  drawing. Regular UI uses Slug; Nano controls use NanoVG. Default fonts are
-  loaded from installed system fonts.
+- **Fonts and vector drawing:** Adaptive FreeType/MSDF fonts with shared HarfBuzz
+  layout, optional bitmap fonts, and NanoVG drawing. UI text uses
+  adaptive fonts by default, loaded from installed system fonts.
 - **UI layout and styling:** Retained UI trees, Yoga layout, themes, gradients,
   borders, scrolling, and a UI inspector.
 - **UI controls:** Buttons, checkboxes, radio groups, sliders, number spinners,
@@ -62,7 +62,7 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 
 ## Release version
 
-**Current Valthorne version: 1.3.1.0.** Versions use four numbers:
+**Current Valthorne version: 1.4.1.0.** Versions use four numbers:
 
 | Position | Meaning |
 | --- | --- |
@@ -74,11 +74,11 @@ NanoVG drawing, Yoga layout, and Artemis ECS integration.
 When a number increases, the numbers to its right reset to zero.
 
 Merged pull requests can update the development version automatically with
-`version:feature` (second number), `version:patch` (third number), or
+`version:major` (first number), `version:feature` (second number), `version:patch` (third number), or
 `version:hotfix` (fourth number). Unlabeled PRs
 leave it unchanged. See [automatic version setup](.github/VERSION_AUTOMATION.md)
 for the owner-controlled GitHub App configuration and release behavior.
-The `version:feature` label publishes automatically after release checks pass.
+The `version:major` and `version:feature` labels publish automatically after release checks pass.
 Adding `release:urgent` alongside a version label also requests automatic Maven
 Central publication. Increasing the first or second version number explicitly
 also requests publication; routine version bumps do not.
@@ -105,7 +105,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.tehnewb:Valthorne:1.3.1.0'
+    implementation 'io.github.tehnewb:Valthorne:1.4.1.0'
 }
 
 java {
@@ -143,7 +143,7 @@ sections. Maven Central is Maven's default repository:
     <dependency>
         <groupId>io.github.tehnewb</groupId>
         <artifactId>Valthorne</artifactId>
-        <version>1.3.1.0</version>
+        <version>1.4.1.0</version>
     </dependency>
 </dependencies>
 ```

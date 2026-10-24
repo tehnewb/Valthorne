@@ -1,8 +1,8 @@
 package valthorne.ui.nodes;
 
 import valthorne.graphics.Color;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugTextRun;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.UINode;
 import valthorne.ui.enums.Alignment;
@@ -38,7 +38,7 @@ import valthorne.ui.theme.UITokens;
  * <p>
  * During drawing, if a font is present, the label renders its text at its render
  * position. If a color is also present, that color is used; otherwise the batch
- * color is used. Live Slug curves follow camera zoom without raster caches.
+ * color is used. Adaptive text follows camera zoom using shared hinted/MSDF metrics.
  * </p>
  *
  * <p>
@@ -74,9 +74,9 @@ import valthorne.ui.theme.UITokens;
 public class Label extends UINode {
 
     /**
-     * Shared Slug outline font used by regular UI text controls.
+     * Shared text font used by regular UI text controls.
      */
-    public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
+    public static final StyleKey<TextFont> FONT_KEY = StyleKey.of("font", TextFont.class);
 
     /**
      * Logical em size shared with the theme's density-scaled font-size token.
@@ -86,7 +86,7 @@ public class Label extends UINode {
     /**
      * Empty retained layout shared by labels with no drawable text.
      */
-    private static final SlugTextRun[] EMPTY_LINES = new SlugTextRun[0];
+    private static final TextRun[] EMPTY_LINES = new TextRun[0];
 
     /**
      * Style key used to resolve the text color used for rendering the label.
@@ -101,10 +101,10 @@ public class Label extends UINode {
     private float measuredWidth = Float.NaN; // Last intrinsic width, used to retain explicit application dimensions.
     private float measuredHeight = Float.NaN; // Last intrinsic height, updated as text or font changes.
     private String text = ""; // Retained nonnull text, with newline-separated lines.
-    private SlugFont font; // Borrowed explicit or style-resolved font, possibly null.
+    private TextFont font; // Borrowed explicit or style-resolved font, possibly null.
     private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
-    private SlugTextRun[] lines = EMPTY_LINES; // Retained line layouts, rebuilt only when font, text or size changes.
-    private SlugFont layoutFont; // Font used to build the current retained lines.
+    private TextRun[] lines = EMPTY_LINES; // Retained line layouts, rebuilt only when font, text or size changes.
+    private TextFont layoutFont; // Font used to build the current retained lines.
     private String layoutText; // Source text used to build the current retained lines.
     private float layoutSize; // Em scale used to build the current retained lines.
     private float textWidth; // Cached maximum line advance in world units.
@@ -199,7 +199,7 @@ public class Label extends UINode {
      * @param font font to use, or null to restore theme or root font selection
      * @return this label
      */
-    public Label font(SlugFont font) {
+    public Label font(TextFont font) {
         this.font = font;
         setStyle(FONT_KEY, font);
         recalculateSize();
@@ -212,7 +212,7 @@ public class Label extends UINode {
      *
      * @return the font currently assigned to this label
      */
-    public SlugFont getFont() {
+    public TextFont getFont() {
         return font;
     }
 
@@ -300,7 +300,7 @@ public class Label extends UINode {
         font = null;
         color = null;
 
-        SlugFont resolvedFont = style.get(FONT_KEY);
+        TextFont resolvedFont = style.get(FONT_KEY);
         Color resolvedColor = style.get(COLOR_KEY);
         Alignment resolvedAlignment = style.get(ALIGNMENT_KEY);
         float resolvedSize = style.get(FONT_SIZE_KEY);
@@ -357,14 +357,14 @@ public class Label extends UINode {
         int count = 1;
         for (int i = 0; i < text.length(); i++)
             if (text.charAt(i) == '\n') count++;
-        SlugTextRun[] previous = lines;
-        if (lines.length != count) lines = new SlugTextRun[count];
+        TextRun[] previous = lines;
+        if (lines.length != count) lines = new TextRun[count];
         int start = 0;
         for (int i = 0; i < count; i++) {
             int end = text.indexOf('\n', start);
             if (end < 0) end = text.length();
             String line = start == 0 && end == text.length() ? text : text.substring(start, end);
-            SlugTextRun run = i < previous.length ? previous[i] : null;
+            TextRun run = i < previous.length ? previous[i] : null;
             if (run == null || run.font() != font) run = font.createRun(line, fontSize);
             else run.rebuild(line, fontSize);
             lines[i] = run;
@@ -382,13 +382,13 @@ public class Label extends UINode {
         float advance = font.lineHeight() * fontSize;
         float availableWidth = getWidth();
         for (int i = 0; i < lines.length; i++) {
-            SlugTextRun line = lines[i];
+            TextRun line = lines[i];
             float lineX = switch (alignment) {
                 case START -> x;
                 case CENTER -> x + (availableWidth - line.width()) * .5f;
                 case END -> x + availableWidth - line.width();
             };
-            line.draw(batch, batch.getGlyphs().alignTextOrigin(lineX), batch.getGlyphs().alignTextBaseline(baseline - i * advance), color);
+            line.draw(batch, batch.alignTextOrigin(lineX), batch.alignTextBaseline(baseline - i * advance), color);
         }
     }
 }

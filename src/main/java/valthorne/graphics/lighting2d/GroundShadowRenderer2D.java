@@ -1,17 +1,20 @@
 package valthorne.graphics.lighting2d;
 
-import org.lwjgl.BufferUtils;
 import valthorne.Window;
 import valthorne.graphics.bgfx.BgfxGraphics;
-import valthorne.graphics.bgfx.BgfxMeshRenderer;
+import valthorne.graphics.bgfx.BgfxBatchRenderer;
 import valthorne.graphics.bgfx.BgfxRenderState;
-
-import static org.lwjgl.bgfx.BGFX.*;
 import valthorne.graphics.shader.Shader;
+import java.nio.ByteBuffer;
+import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 
 import java.nio.FloatBuffer;
 import java.util.List;
+
+import static org.lwjgl.bgfx.BGFX.*;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * Finite alpha-textured ground shadows for a dominant elevated light.
@@ -20,15 +23,39 @@ import java.util.List;
  * Multiple lights need a separate receiver/visibility pipeline; do not stack one overlay
  * per light. TextureBatch translation/custom clipping is not applied: pass world sprites
  * and the active Window projection, with normal framebuffer viewport/scissor settings.
- * Resources and draw calls belong to the creating rendering thread.
+ * Resources and draw calls belong to the creating graphics thread.
+ *
+ * <p>Consecutive cards sharing a texture are submitted as ordered instances,
+ * including interleaved contact shadows. A texture change or 1024 queued quads
+ * flushes the batch without sorting painter order. The five-tap alpha filter,
+ * projection and blend equations are unchanged. Streaming storage is allocated
+ * once (104 KiB CPU staging, 112 KiB per padded GPU upload); queueing a card
+ * allocates no Java objects. The existing pass-state snapshot is taken once per
+ * draw invocation, not once per caster.</p>
  */
 public final class GroundShadowRenderer2D implements AutoCloseable {
-    private final BgfxMeshRenderer bgfx; // Owned native mesh path.
-    private final BgfxRenderState bgfxState = new BgfxRenderState(); // Reused external drawing scope.
+    /**
+     * Maximum projected/contact quads submitted in one instanced draw.
+     */
+    private static final int BATCH_CAPACITY = 1024;
+    /**
+     * Four interleaved homogeneous XYZ/UV vertices, bounds, opacity and contact flag.
+     */
+    private static final int INSTANCE_FLOATS = 26;
+    /**
+     * Byte stride shared by the instance attributes and streaming buffer.
+     */
+    private static final int INSTANCE_BYTES = INSTANCE_FLOATS * Float.BYTES;
     private final Shader shader; // Owned shader for this rendering pass.
-    private final FloatBuffer vertices = BufferUtils.createFloatBuffer(20); // Reusable projected-shadow quad staging.
-    private boolean closed; // Whether the owned GL resources were released.
+    private final BgfxBatchRenderer renderer; // Ordered, frame-safe native instance storage.
+    private final BgfxRenderState state = new BgfxRenderState(); // Reused external pass snapshot.
+    private final ByteBuffer vertexBytes; // Owned packed source records for native uploads.
+    private final FloatBuffer vertices; // Owned packed instance storage, released explicitly on close.
+    private boolean closed; // Whether the owned graphics resources were released.
     private int drawCalls; // Draw count in the latest shadow pass.
+    private int shadowCount; // Projected/contact quads rendered in the latest pass.
+    private int instanceCount; // Complete quads currently queued in the streaming buffer.
+    private int texture; // Borrowed texture used by the pending ordered batch.
     private final PointLight2D blended = new PointLight2D(); // Reusable virtual source blended from nearby lights.
 
     /**
@@ -37,17 +64,37 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
      * graphics thread after the final pass.
      */
     public GroundShadowRenderer2D() {
-        shader = new Shader("bgfx:engine/lighting/ground-shadow.vert", "bgfx:engine/lighting/ground-shadow.frag");
-        bgfx = new BgfxMeshRenderer(3, 2);
+        shader = new Shader("engine/lighting/ground-shadow.vert", "engine/lighting/ground-shadow.frag");
+        BgfxBatchRenderer created = null;
+        try {
+            created = new BgfxBatchRenderer(BATCH_CAPACITY, 112);
+            vertexBytes = memAlloc(BATCH_CAPACITY * INSTANCE_BYTES);
+            vertices = vertexBytes.asFloatBuffer();
+            renderer = created;
+        } catch (RuntimeException | Error failure) {
+            if (created != null) created.close();
+            shader.dispose();
+            throw failure;
+        }
     }
 
     /**
      * Returns the draw count from the latest shadow pass.
      *
-     * @return projected and contact shadow draw calls
+     * @return actual instanced batch submissions, not individual shadow quads
      */
     public int getDrawCalls() {
         return drawCalls;
+    }
+
+    /**
+     * Returns the number of projected and contact quads submitted by the latest pass.
+     * A single batch may contain many quads; culled/disabled cards are excluded.
+     *
+     * @return rendered shadow quad count
+     */
+    public int getShadowCount() {
+        return shadowCount;
     }
 
     /**
@@ -74,19 +121,17 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     public void draw(TextureBatch sceneBatch, PointLight2D light, List<SpriteGroundShadow2D> casters, PointLight2D[] fills) {
         if (closed) throw new IllegalStateException("Ground shadow renderer is closed");
         drawCalls = 0;
+        shadowCount = 0;
         if (!light.enabled || !light.shadows || light.elevation <= 0 || light.intensity <= 0 || light.r + light.g + light.b <= 0)
             return;
         sceneBatch.flush();
-
-        bgfxState.store();
+        state.store();
         try {
-
             shader.bind();
             shader.setUniform1i("u_texture", 2);
             shader.setUniform1i("u_volume", fills == null ? 0 : 1);
             shader.setUniformMatrix4("u_projection", Window.getProjectionMatrix());
             shader.setUniform1f("u_softness", Math.min(2, light.sourceRadius * .15f));
-
             for (int n = 0; n < casters.size(); n++) {
                 SpriteGroundShadow2D caster = casters.get(n);
                 if (!caster.enabled || caster.height <= 0 || caster.opacity <= 0 || caster.sprite.getColor().a() <= 0)
@@ -108,7 +153,8 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                         sz += fill.elevation * weight;
                     }
                     if (sum > 0) {
-                        blended.setPosition(sx / sum, sy / sum).setElevation(Math.max(80, sz / sum));
+                        blended.setPosition(sx / sum, sy / sum)
+                                .setElevation(Math.max(80, sz / sum));
                         source = blended;
                     }
                 }
@@ -116,7 +162,15 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                 if (distance > light.radius + Math.abs(dx)) continue;
                 distance = (float) Math.hypot(baseX - source.x, baseY - source.y);
                 float height = SpriteGroundShadow2D.boundedHeight(caster.height, source.elevation, distance + Math.abs(dx) + Math.abs(vx), caster.maxLength);
-                vertices.clear();
+                Texture casterImage = caster.sprite.getTexture();
+                int casterTexture = casterImage.getTextureID();
+                float halfU = .5f / casterImage.getWidth(), halfV = .5f / casterImage.getHeight();
+                float minU = Math.min(uv.get(0), uv.get(4)) + halfU;
+                float minV = Math.min(uv.get(1), uv.get(5)) + halfV;
+                float maxU = Math.max(uv.get(0), uv.get(4)) - halfU;
+                float maxV = Math.max(uv.get(1), uv.get(5)) - halfV;
+                float opacity = caster.opacity * caster.sprite.getColor().a();
+                beginQuad(casterTexture);
                 for (int corner = 0; corner < 4; corner++) {
                     float u = (corner & 1), v = (corner & 2) == 0 ? caster.anchorV : caster.topV;
                     float z = (corner & 2) == 0 ? 0 : height;
@@ -124,34 +178,74 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
                     // The lower card edge rests on the ground; its upper edge is vertical.
                     float groundY = baseY + (u - caster.anchorU) * dy;
                     float denominator = source.elevation - z;
-                    vertices.put(source.elevation * worldX - z * source.x).put(source.elevation * groundY - z * source.y).put(denominator);
-                    vertices.put(uv.get(0) + u * (uv.get(4) - uv.get(0))).put(uv.get(1) + v * (uv.get(5) - uv.get(1)));
+                    vertices.put(source.elevation * worldX - z * source.x)
+                            .put(source.elevation * groundY - z * source.y)
+                            .put(denominator)
+                            .put(uv.get(0) + u * (uv.get(4) - uv.get(0)))
+                            .put(uv.get(1) + v * (uv.get(5) - uv.get(1)));
                 }
-                vertices.flip();
-
-                BgfxGraphics.bindTexture(2, caster.sprite.getTexture().getTextureID());
-                float halfU = .5f / caster.sprite.getTexture().getWidth(), halfV = .5f / caster.sprite.getTexture().getHeight();
-                shader.setUniform4f("u_uvBounds", Math.min(uv.get(0), uv.get(4)) + halfU, Math.min(uv.get(1), uv.get(5)) + halfV, Math.max(uv.get(0), uv.get(4)) - halfU, Math.max(uv.get(1), uv.get(5)) - halfV);
-                shader.setUniform1f("u_opacity", caster.opacity * caster.sprite.getColor().a());
-                shader.setUniform1i("u_contact", 0);
-                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_MSAA | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
-                drawCalls++;
+                vertices.put(minU)
+                        .put(minV)
+                        .put(maxU)
+                        .put(maxV)
+                        .put(opacity)
+                        .put(0);
+                instanceCount++;
+                shadowCount++;
                 if (fills == null) continue;
                 // Compact receiver-space contact shadow stays beneath the trunk/feet.
                 float radius = Math.max(7, Math.min(24, caster.height * .14f));
-                vertices.clear();
+                beginQuad(casterTexture);
                 for (int c = 0; c < 4; c++) {
                     float u = c & 1, v = (c >> 1);
-                    vertices.put(baseX + (u * 2 - 1) * radius).put(baseY + (v * 2 - 1) * radius * .4f).put(1).put(u).put(v);
+                    vertices.put(baseX + (u * 2 - 1) * radius)
+                            .put(baseY + (v * 2 - 1) * radius * .4f)
+                            .put(1)
+                            .put(u)
+                            .put(v);
                 }
-                vertices.flip();
-                shader.setUniform1i("u_contact", 1);
-                bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_MSAA | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
-                drawCalls++;
+                vertices.put(minU)
+                        .put(minV)
+                        .put(maxU)
+                        .put(maxV)
+                        .put(opacity)
+                        .put(1);
+                instanceCount++;
+                shadowCount++;
             }
+            flush();
         } finally {
-            bgfxState.restore();
+            instanceCount = 0;
+            vertices.clear();
+            state.restore();
         }
+    }
+
+    /**
+     * Makes room for a complete instance while retaining input painter order.
+     *
+     * @param nextTexture borrowed texture for the next quad
+     */
+    private void beginQuad(int nextTexture) {
+        if (instanceCount == BATCH_CAPACITY || instanceCount != 0 && texture != nextTexture) flush();
+        texture = nextTexture;
+    }
+
+    /**
+     * Uploads and draws one ordered texture run. Frame-owned native ranges avoid overwriting
+     * storage still consumed by an earlier submission; the native staging buffer
+     * is retained and immediately reused after the upload returns. Only the used
+     * prefix is uploaded, so short texture runs do not allocate full-size GPU batches.
+     */
+    private void flush() {
+        if (instanceCount == 0) return;
+        vertices.flip();
+        BgfxGraphics.bindTexture(2, texture);
+        vertexBytes.position(0).limit(instanceCount * INSTANCE_BYTES);
+        renderer.submit(vertexBytes, instanceCount, INSTANCE_BYTES, shader, BgfxGraphics.textures(), 3, BGFX_STATE_WRITE_RGB | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+        drawCalls++;
+        instanceCount = 0;
+        vertices.clear();
     }
 
     /**
@@ -178,6 +272,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (closed) return;
         closed = true;
         shader.dispose();
-        bgfx.close();
+        renderer.close();
+        memFree(vertexBytes);
     }
 }

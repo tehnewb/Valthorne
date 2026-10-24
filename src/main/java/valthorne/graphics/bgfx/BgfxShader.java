@@ -231,6 +231,16 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
     }
 
     /**
+     * Reports whether a compiled program retains the named uniform.
+     * @param name exact base uniform name
+     * @return whether the uniform participates in this program
+     */
+    public boolean hasUniform(String name) {
+        checkOpen();
+        return find(name) != null;
+    }
+
+    /**
      * Resolves an optional decimal array index without allocating a substring.
      *
      * @param uniform reflected base uniform

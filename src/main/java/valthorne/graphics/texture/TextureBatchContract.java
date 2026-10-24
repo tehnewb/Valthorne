@@ -3,16 +3,12 @@ package valthorne.graphics.texture;
 import valthorne.graphics.shader.Shader;
 
 /**
- * Packed sprite and glyph record sizes shared by the batch writers and native
+ * Packed sprite record sizes shared by the batch writers and native
  * instance uploaders. Compiled stages declare their vertex semantics at build
  * time; sampler bindings are initialized once when a batch shader is created.
  */
 public final class TextureBatchContract {
 
-    /**
-     * Byte stride of packed glyph metadata followed by a world clip rectangle and flag.
-     */
-    public static final int GLYPH_STRIDE_BYTES = 84;
 
     /**
      * Uniform name used for the batch projection matrix.

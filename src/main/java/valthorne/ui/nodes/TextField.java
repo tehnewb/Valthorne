@@ -5,8 +5,8 @@ import valthorne.Keyboard;
 import valthorne.event.events.*;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
-import valthorne.graphics.font.slug.SlugFont;
-import valthorne.graphics.font.slug.SlugTextRun;
+import valthorne.graphics.font.TextFont;
+import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
@@ -147,7 +147,7 @@ public class TextField extends Panel {
     /**
      * Style key used to resolve the text field font.
      */
-    public static final StyleKey<SlugFont> FONT_KEY = StyleKey.of("font", SlugFont.class);
+    public static final StyleKey<TextFont> FONT_KEY = StyleKey.of("font", TextFont.class);
 
     /**
      * Em scale shared by all regular UI text controls through the semantic size token.
@@ -243,9 +243,10 @@ public class TextField extends Panel {
     private Drawable background; // Resolved normal background drawable
     private Drawable hoverBackground; // Resolved hovered background drawable
     private Drawable focusedBackground; // Resolved focused background drawable
-    private SlugFont font; // Resolved font used for rendering text
-    private SlugTextRun textRun; // Reusable visible or masked text layout borrowing the resolved font.
-    private SlugTextRun placeholderRun; // Reusable placeholder layout independent of editable text.
+    private TextFont font; // Resolved font used for rendering text
+    private TextRun textRun; // Reusable visible or masked text layout borrowing the resolved font.
+    private TextRun placeholderRun; // Reusable placeholder layout independent of editable text.
+    private float[] selectionRanges = new float[8]; // Reused visual selection pairs, including disjoint bidi spans.
     private float fontSize = 16f; // Resolved world units per em, independent of the shared font state.
     private Color textColor; // Resolved text color
     private Color placeholderColor; // Resolved placeholder text color
@@ -840,7 +841,7 @@ public class TextField extends Panel {
      * <p>
      * If the visible text is empty, placeholder text is rendered when available.
      * Otherwise the visible text is drawn at the horizontally scrolled text origin.
-     * Axis-aligned Slug line origins and baselines align to physical pixels to
+     * Axis-aligned text line origins and baselines align to physical pixels to
      * keep small text steady while preserving fractional advances and kerning.
      * </p>
      *
@@ -850,23 +851,19 @@ public class TextField extends Panel {
         String visibleText = getDisplayText();
         boolean empty = visibleText.isEmpty();
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float drawX = batch.alignTextOrigin(getRenderX() + padding + textOffsetX);
         float baseline = getRenderY() + (getHeight() - (font.ascent() - font.descent()) * fontSize) * .5f - font.descent() * fontSize;
-        float drawY = batch.getGlyphs()
-                .alignTextBaseline(baseline);
+        float drawY = batch.alignTextBaseline(baseline);
         if (empty) {
             if (!placeholder.isEmpty()) {
                 if (placeholderRun == null || placeholderRun.font() != font)
                     placeholderRun = font.createRun(placeholder, fontSize);
                 else placeholderRun.rebuild(placeholder, fontSize);
-                placeholderRun.draw(batch, batch.getGlyphs().alignTextOrigin(getRenderX() + padding + placeholderOffsetX), drawY, placeholderColor);
+                placeholderRun.draw(batch, batch.alignTextOrigin(getRenderX() + padding + placeholderOffsetX), drawY, placeholderColor);
             }
             return;
         }
-        if (textRun == null || textRun.font() != font) textRun = font.createRun(visibleText, fontSize);
-        else textRun.rebuild(visibleText, fontSize);
-        textRun.draw(batch, drawX, drawY, textColor);
+        textLayout().draw(batch, drawX, drawY, textColor);
     }
 
     /**
@@ -875,8 +872,8 @@ public class TextField extends Panel {
      * </p>
      *
      * <p>
-     * The selection rectangle is computed from the measured width up to the selected
-     * character indices. A solid color quad is drawn using the shared caret pixel
+     * Visual selection spans come from the complete shaped line, including disjoint
+     * bidi spans. Solid color quads are drawn using the shared caret pixel
      * texture and the resolved or fallback selection color. Its origin uses the
      * same physical pixel alignment as the text so their positions remain consistent.
      * </p>
@@ -887,16 +884,23 @@ public class TextField extends Panel {
         int a = Math.min(selectionStart, selectionEnd);
         int b = Math.max(selectionStart, selectionEnd);
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
-        float x1 = drawX + getTextWidthUpTo(a);
-        float x2 = drawX + getTextWidthUpTo(b);
+        float drawX = batch.alignTextOrigin(getRenderX() + padding + textOffsetX);
+        TextRun layout = textLayout();
+        int ranges = layout.selectionRanges(a, b, selectionRanges);
+        if (ranges * 2 > selectionRanges.length) {
+            selectionRanges = new float[ranges * 2];
+            layout.selectionRanges(a, b, selectionRanges);
+        }
 
         float selectionH = Math.max(0f, getHeight() - caretPadY * 2f);
         float selectionY = getRenderY() + (getHeight() - selectionH) * 0.5f;
 
         Color drawSelectionColor = selectionColor != null ? selectionColor : defaultSelectionColor;
-        batch.draw(getCaretPixel(), x1, selectionY, x2 - x1, selectionH, drawSelectionColor);
+        for (int i = 0; i < ranges; i++) {
+            float left = selectionRanges[i * 2];
+            float right = selectionRanges[i * 2 + 1];
+            batch.draw(getCaretPixel(), drawX + left, selectionY, right - left, selectionH, drawSelectionColor);
+        }
     }
 
     /**
@@ -905,8 +909,8 @@ public class TextField extends Panel {
      * </p>
      *
      * <p>
-     * The caret X position is based on the measured width up to the current caret
-     * index plus the horizontal text offset. Its origin uses the same physical
+     * The caret X position follows the complete line's shaped grapheme geometry
+     * plus the horizontal text offset. Its origin uses the same physical
      * pixel alignment as the text, preserving the measured character offsets.
      * </p>
      *
@@ -915,9 +919,8 @@ public class TextField extends Panel {
     private void drawCaret(TextureBatch batch) {
         if (!isFocused() || !caretVisible) return;
 
-        float drawX = batch.getGlyphs()
-                .alignTextOrigin(getRenderX() + padding + textOffsetX);
-        float caretX = drawX + getTextWidthUpTo(caretIndex);
+        float drawX = batch.alignTextOrigin(getRenderX() + padding + textOffsetX);
+        float caretX = drawX + caretPosition(caretIndex);
         float caretH = Math.max(0f, getHeight() - caretPadY * 2f);
         float caretY = getRenderY() + (getHeight() - caretH) * 0.5f;
 
@@ -1190,17 +1193,27 @@ public class TextField extends Panel {
 
     /**
      * <p>
-     * Returns the rendered width of the visible text up to the given character index.
+     * Resolves a primary caret from the complete shaped display line.
      * </p>
      *
-     * @param index the exclusive character index
-     * @return the rendered width up to the given index
+     * @param index UTF-16 insertion offset, clamped to a grapheme boundary
+     * @return visual horizontal caret coordinate relative to the line origin
      */
-    private float getTextWidthUpTo(int index) {
-        if (font == null || index <= 0) return 0f;
+    private float caretPosition(int index) {
+        return font == null ? 0 : textLayout().caretX(index);
+    }
 
+    /**
+     * Reuses the complete display layout for drawing, selection and hit testing.
+     * Unchanged text and size keep both shaping and lazy editing storage warm.
+     *
+     * @return retained display layout borrowing the currently resolved font
+     */
+    private TextRun textLayout() {
         String visibleText = getDisplayText();
-        return font.getWidth(visibleText, 0, Math.min(index, visibleText.length()), fontSize);
+        if (textRun == null || textRun.font() != font) textRun = font.createRun(visibleText, fontSize);
+        else textRun.rebuild(visibleText, fontSize);
+        return textRun;
     }
 
     /**
@@ -1210,8 +1223,8 @@ public class TextField extends Panel {
      *
      * <p>
      * The coordinate is interpreted relative to the left edge of the visible text area
-     * including horizontal scrolling. The method walks forward through the visible
-     * text until the measured width meets or exceeds the local coordinate.
+     * including horizontal scrolling. Nearest shaped grapheme carets handle
+     * contextual substitutions and mixed visual directions without prefix slicing.
      * </p>
      *
      * @param mouseX the mouse X coordinate in the active interaction space
@@ -1221,16 +1234,7 @@ public class TextField extends Panel {
         if (font == null) return text.length();
 
         float local = mouseX - (getRenderX() + padding + textOffsetX);
-        if (local <= 0f) return 0;
-
-        String visibleText = getDisplayText();
-        int length = visibleText.length();
-
-        for (int i = editor.next(0); i <= length && i > 0; i = i == length ? length + 1 : editor.next(i)) {
-            if (font.getWidth(visibleText, 0, i, fontSize) >= local) return i;
-        }
-
-        return length;
+        return textLayout().hitTest(local);
     }
 
     /**
@@ -1294,7 +1298,7 @@ public class TextField extends Panel {
             return;
         }
 
-        float caretX = getTextWidthUpTo(caretIndex);
+        float caretX = caretPosition(caretIndex);
         float minOffset = available - textWidth;
         float maxOffset = 0f;
 
