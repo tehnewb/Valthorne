@@ -445,7 +445,7 @@ public final class TextureBatchGlyphs {
 
     /**
      * Uploads the shared byte storage as packed glyphs and draws the existing
-     * quad through four strip indices. Keeps shader/coverage state active for
+     * shared six-vertex triangle quad. Keeps shader/coverage state active for
      * subsequent text and preserves the original antialiasing interpolation.
      */
     private void flushGlyphs() {

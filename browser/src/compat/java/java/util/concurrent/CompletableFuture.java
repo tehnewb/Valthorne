@@ -617,14 +617,17 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     /**
      * Flattens a completion mapping into one independent result and forwards nested failures.
+     * A completed or cancelled destination skips mappings that have not started,
+     * including work already queued on an explicit executor.
      * @param fn nonnull completion mapping
-     * @param executor nonnull cooperative execution target
+     * @param executor cooperative execution target, or null for inline completion
      * @return independently owned completion stage
      */
     private <U> CompletableFuture<U> compose(BiFunction<? super T, Throwable, ? extends CompletionStage<U>> fn, Executor executor) {
         CompletableFuture<U> result = newIncompleteFuture();
         transform(
                         (v, e) -> {
+                            if (result.isDone()) return null;
                             CompletionStage<U> next = Objects.requireNonNull(fn.apply(v, e));
                             next.whenComplete(
                                     (value, error) -> {

@@ -18,8 +18,11 @@ import java.util.Collection;
  * A simple, general-purpose shader for drawing {@link Shape} polygons with explicit
  * vertex buffers and projection uniforms.
  *
- * <p>Filled polygons are rendered as triangle fans built from the shape centroid and
- * border paths are rendered as line loops when requested.</p>
+ * <p>Filled polygons use independent triangles built from the shape centroid.
+ * Borders use triangle pairs expanded on the CPU to the requested physical pixel
+ * width. Both paths upload into bgfx's frame-owned transient geometry without
+ * changing native line-width state. Reusable CPU staging and the compiled program
+ * belong to this renderer; dispose it on the graphics owner before shutdown.</p>
  *
  * @author Albert Beaupre
  * @since April 9th, 2026
@@ -38,12 +41,12 @@ public class ShapeShader extends Shader {
     private final BgfxMeshRenderer bgfxRenderer; // Owned procedural-mesh path, owned by this renderer.
     private final int[] viewport = new int[4]; // Reused physical viewport for pixel-width polygon borders.
     private FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(32); // Reusable direct CPU position staging buffer.
-    private int floatCapacity = 32; // Current CPU/GPU staging capacity in floats.
+    private int floatCapacity = 32; // Current reusable CPU position staging capacity in floats.
 
     /**
-     * Compiles the bundled polygon shader and allocates an owned VAO/VBO with
-     * two-float position attributes. Requires a current graphics device and leaves array
-     * bindings at zero.
+     * Loads the bundled polygon program and retains a two-float position layout.
+     * Requires the active graphics device; frame-owned vertex storage is allocated
+     * only when geometry is submitted.
      */
     public ShapeShader() {
         super("engine/shape.vert", "engine/shape.frag");
@@ -51,11 +54,11 @@ public class ShapeShader extends Shader {
     }
 
     /**
-     * Draws a shape's centroid triangle fan and optional positive-width line-loop
+     * Draws a shape's centroid triangle fan and optional positive-width triangle
      * border using the current Window projection. Skips null shapes and boundaries
      * with fewer than three points. Fan filling assumes a suitable polygon and does
-     * not tessellate arbitrary concavity. Leaves the shader and vertex array unbound;
-     * border drawing changes GL line width.
+     * not tessellate arbitrary concavity. Clears this shader's immediate selection
+     * after submission. Border width is measured in physical viewport pixels.
      *
      * @param shape borrowed polygon to draw
      */
@@ -120,11 +123,6 @@ public class ShapeShader extends Shader {
         }
     }
 
-    /**
-     * Disposes the shader program and owned vertex-array/buffer names. Requires
-     * the graphics device. This override does not clear its numeric object names, so
-     * callers should dispose the instance once.
-     */
     @Override
     public void dispose() {
         super.dispose();
@@ -132,9 +130,9 @@ public class ShapeShader extends Shader {
     }
 
     /**
-     * Uses the arithmetic mean of boundary vertices as a fan center, appends the
-     * boundary and repeated first point, uploads them, and draws a filled fan.
-     * Null color selects white. The caller has bound this shader and vertex array.
+     * Uses the arithmetic mean of boundary vertices as a fan center and emits one
+     * independent triangle per boundary edge before uploading the complete fill.
+     * Null color selects white. The caller has selected this shader.
      *
      * @param points ordered boundary with at least three nonnull points
      * @param color fill tint, or null for white
@@ -163,12 +161,12 @@ public class ShapeShader extends Shader {
     }
 
     /**
-     * Uploads the boundary as a GL line loop and sets the requested line width.
-     * Does not restore the prior width; supported width ranges depend on the context.
+     * Expands boundary segments into independent triangle pairs using the current
+     * projection and physical viewport to preserve pixel width across backends.
      *
      * @param points ordered polygon boundary
      * @param color nonnull border tint
-     * @param thickness requested GL line width
+     * @param thickness requested border width in physical pixels
      */
     private void drawBorder(Vector2f[] points, Color color, float thickness) {
         setColorUniform(color);
@@ -208,7 +206,7 @@ public class ShapeShader extends Shader {
     }
 
     /**
-     * Replaces CPU/GPU staging storage when needed, choosing the larger of the
+     * Replaces CPU position staging when needed, choosing the larger of the
      * requested capacity or twice the old capacity. Existing contents are discarded
      * because the next draw writes a complete replacement.
      *

@@ -152,21 +152,20 @@ public final class TextureBatch implements GraphicsResource {
 
     /**
      * <p>
-     * Creates a new {@code TextureBatch} with the requested sprite capacity and an
-     * automatically detected texture unit limit clamped to sixteen.
+     * Creates a new {@code TextureBatch} with the requested sprite capacity and
+     * sixteen texture slots exposed by the packaged batch shaders.
      * </p>
      *
      * <p>
-     * This constructor is convenient for most normal usage. It queries the OpenGL
-     * context for supported texture image units and keeps the batch within a safe
-     * upper bound.
+     * The same sampler contract applies across supported bgfx backends; construction
+     * does not query implicit graphics state to choose a slot count.
      * </p>
      *
      * @param maxSprites the maximum number of sprite instances that may be queued
      *                   before the batch must flush
      */
     public TextureBatch(int maxSprites) {
-        this(maxSprites, detectTextureUnitsClamped(16));
+        this(maxSprites, 16);
     }
 
     /**
@@ -252,27 +251,6 @@ public final class TextureBatch implements GraphicsResource {
          * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
          */
         return size > 1f ? value + size - 0.5f : value + size;
-    }
-
-    /**
-     * <p>
-     * Detects the number of supported texture image units from the current OpenGL
-     * context and clamps the result to a caller-provided maximum.
-     * </p>
-     *
-     * <p>
-     * If the driver reports an invalid value less than or equal to zero, the method
-     * falls back to eight texture units as a conservative default.
-     * </p>
-     *
-     * @param clampTo the maximum allowed texture unit count
-     * @return the detected and clamped texture unit count
-     */
-    private static int detectTextureUnitsClamped(int clampTo) {
-        /*
-         * Every packaged batch contract exposes sixteen sampled texture slots.
-         */
-        return Math.min(16, clampTo);
     }
 
     /**
@@ -501,7 +479,7 @@ public final class TextureBatch implements GraphicsResource {
 
     /**
      * Reports whether the batch currently has a logical clip rectangle enabled.
-     * This is batch state rather than a fresh query of GL scissor enablement.
+     * This reflects the batch's shader clip state independently of physical scissor state.
      *
      * @return whether logical clipping is active
      */
@@ -569,7 +547,7 @@ public final class TextureBatch implements GraphicsResource {
      *
      * <p>
      * The clip rectangle is stored as instance data and later interpreted by the shader.
-     * It does not directly call {@code glScissor} for every nested region.
+     * Nested regions do not change the coordinator's physical scissor state.
      * </p>
      *
      * @param x      the clip region X coordinate
@@ -1635,9 +1613,8 @@ public final class TextureBatch implements GraphicsResource {
 
     /**
      * <p>
-     * Ends the current batch, flushes any remaining queued instances, restores OpenGL
-     * state modified by {@link #begin()} and unbinds textures and shaders used by the
-     * batch.
+     * Ends the current batch, flushes any remaining queued instances, and clears its
+     * selected shader and texture-slot bookkeeping.
      * </p>
      *
      * <p>
@@ -1763,8 +1740,8 @@ public final class TextureBatch implements GraphicsResource {
 
     /**
      * Finishes any live glyph segment and restores the sprite pipeline, then
-     * uploads queued sprite instances after applying the active projection, orphans the
-     * stream buffer, and issues one instanced draw. Clears CPU instance/texture-slot
+     * uploads queued sprite instances into an unused range after applying the active
+     * projection, and issues one instanced draw. Clears CPU instance/texture-slot
      * bookkeeping afterward while retaining the drawing scope. Empty queues return
      * immediately. Call within an active batch scope with its engine render state intact;
      * this method does not establish or restore the full scope itself.
