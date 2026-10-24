@@ -6,8 +6,9 @@ import static org.lwjgl.util.freetype.FreeType.*;
  * Selects FreeType outline hinting for an adaptive font's small-text coverage
  * images. All modes retain grayscale antialiasing and natural HarfBuzz advances.
  * Large, rotated and otherwise transformed text still uses unhinted MSDF images.
- * Set the mode when constructing the rendering font; it remains immutable so
- * cached glyphs cannot mix hinting policies or require runtime invalidation.
+ * Change the mode at runtime with {@link AdaptiveFont#setHinting(FontHinting)}.
+ * Coverage caches distinguish policies, so switching does not invalidate queued
+ * drawing or discard reusable atlas images. MSDF images are shared across modes.
  * Font format, embedded instructions and FreeType's driver determine how much
  * the modes differ visually. LCD subpixel and monochrome rendering are separate
  * pixel formats and are not provided by this grayscale renderer.

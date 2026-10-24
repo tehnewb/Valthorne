@@ -29,7 +29,7 @@ public final class AdaptiveTextRun implements TextRun {
     float[] ys = new float[0]; // Normalized vertical positions borrowed by the font.
     AtlasGlyph[] images = new AtlasGlyph[0]; // Reused image references validated against the font's eviction version.
     long imageVersion = -1; // Font cache version supplying all image references; negative means invalid.
-    int imageRaster = -1; // Physical coverage size, or zero for MSDF, supplying cached images.
+    int imageRaster = -1; // Packed physical coverage size and hinting mode, or zero for shared MSDF images.
     String text; // Immutable source key borrowed by the font's layout cache; null before a successful rebuild.
     float size; // Logical units per em borrowed by the owning font's drawing loop.
     private float width; // Normalized maximum advance across lines.
