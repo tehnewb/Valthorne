@@ -1473,7 +1473,6 @@ Do not write empty documentation that merely repeats the method name.
 Every static method requires:
 
 1. Multi-line Javadoc above the method.
-2. A meaningful multi-line block comment inside the method body.
 
 ### Correct
 
@@ -1485,10 +1484,6 @@ Every static method requires:
  * @return equivalent duration in nanoseconds
  */
 public static long secondsToNanos(long seconds) {
-    /*
-     * Use direct integer multiplication to avoid temporary duration objects
-     * and unnecessary floating-point conversion.
-     */
     return seconds * 1_000_000_000L;
 }
 ```
