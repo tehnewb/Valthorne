@@ -9,7 +9,7 @@ import org.teavm.jso.JSObject;
  * CDATA preserve their decoded contents; comments and processing instructions
  * are skipped. Closing releases the entire DOM even if parsing stopped early.
  */
-public final class XMLStreamReader implements AutoCloseable {
+public final class XMLStreamReader {
     private JSObject cursor; // Owned document and current traversal position; null after close.
 
     /**
@@ -70,7 +70,9 @@ public final class XMLStreamReader implements AutoCloseable {
         return attribute(cursor, namespace, name);
     }
 
-    @Override
+    /**
+     * Drops the DOM cursor; the input stream remains owned by the caller.
+     */
     public void close() {
         cursor = null;
     }

@@ -891,6 +891,10 @@ Use primitives instead of wrappers when object semantics are unnecessary.
 
 Prefer explicit loops when they are cheaper and clearer.
 
+## Autocloseable
+
+The Autocloseable interface should NOT be used unless specifically stated to be used or if there are actual resources needing handled.
+
 ## Prefer Arrays When Appropriate
 
 Use arrays when:
