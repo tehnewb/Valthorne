@@ -8,9 +8,10 @@ import valthorne.graphics.texture.TextureData;
 
 /**
  * Releases cached browser asset values through known lifecycle contracts. Custom
- * loader values implement AutoCloseable; arbitrary reflection is not available in
- * the browser export. Disposal failures are returned so cache cleanup can proceed
- * and report all failures through the shared Assets error aggregation.
+ * loader values that own resources implement AutoCloseable; ordinary managed values
+ * need no cleanup contract. Arbitrary reflection is unavailable in the browser export.
+ * Disposal failures are returned so cache cleanup can proceed and report all failures
+ * through the shared Assets error aggregation.
  */
 public final class BrowserAssetDisposal {
     /**

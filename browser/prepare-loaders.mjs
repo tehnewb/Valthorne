@@ -104,15 +104,16 @@ export async function prepareBrowserLoaders(root, output) {
             source = source.replace("recreating it under the service lock when", "recreating it on the UI coroutine when");
             source = source.replace("absent, shut down, or terminated. Uses a volatile fast path for normal access.", "absent or shut down. This non-suspending operation needs no synchronization.");
             source = source.replace("Volatile owned virtual-thread executor", "Owned cooperative executor");
-            source = source.replace(" * @author Albert Beaupre", " * <p>Browser loaders execute on cooperative UI coroutines. Custom asset values\n * implement AutoCloseable for managed cleanup; built-in assets use direct disposal\n * calls. Arbitrary reflective dispose-method discovery is unavailable.</p>\n *\n * @author Albert Beaupre");
+            source = source.replace(" * @author Albert Beaupre", " * <p>Browser loaders execute on cooperative UI coroutines. Custom resource-owning assets\n * implement AutoCloseable for cleanup; ordinary managed values need no cleanup\n * contract. Built-in assets use direct disposal calls. Arbitrary reflective dispose-method discovery is unavailable.</p>\n *\n * @author Albert Beaupre");
 
             const start = source.indexOf("    private static Throwable disposeAssetValue(Object asset) {");
             const end = source.indexOf("\n    /**", start);
             if (start < 0 || end < 0) throw new Error("Review browser asset disposal adaptation");
             source = source.slice(0, start) + `    private static Throwable disposeAssetValue(Object asset) {
         /*
-         * Known asset resources use direct calls; custom browser assets implement
-         * AutoCloseable because arbitrary reflective method discovery is absent.
+         * Known asset resources use direct calls; custom browser resource owners
+         * implement AutoCloseable. Managed values need no cleanup contract; arbitrary
+         * reflective method discovery is absent.
          */
         return BrowserAssetDisposal.dispose(asset);
     }
@@ -124,7 +125,7 @@ export async function prepareBrowserLoaders(root, output) {
             source = source.replaceAll("Captures failures and unwraps reflective invocation causes so other assets can", "Captures cleanup failures so other assets can");
             source = source.replaceAll("otherwise a public no-argument\n     * dispose method discovered by reflection", "otherwise direct built-in asset lifecycle calls");
             source = source.replaceAll("All loading work runs on", "Loading is cooperatively scheduled on the browser UI thread through");
-            source = source.replace("Releases a loaded value using AutoCloseable first, otherwise a public no-argument\n     * dispose method discovered by reflection. Values with neither contract are ignored.", "Releases AutoCloseable values and built-in engine asset types through direct calls.\n     * Custom browser assets must implement AutoCloseable for managed disposal.");
+            source = source.replace("Releases a loaded value using AutoCloseable first, otherwise a public no-argument\n     * dispose method discovered by reflection. Values with neither contract are ignored.", "Releases AutoCloseable values and built-in engine asset types through direct calls.\n     * Custom resource-owning browser assets implement AutoCloseable for disposal.");
         }
         if (type === "ui/behavior/file/FileOperations") {
             source = source.replace("import java.io.IOException;", "import java.io.IOException;\nimport valthorne.browser.BrowserTrash;");
