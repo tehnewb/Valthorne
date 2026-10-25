@@ -31,7 +31,7 @@ import valthorne.math.MathUtils;
  */
 public class ReflectionShader extends TexturedQuadShader {
 
-    /*
+    /**
      * Fragment source loaded from the packaged reflection effect shader resource.
      */
     private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/reflection.frag");

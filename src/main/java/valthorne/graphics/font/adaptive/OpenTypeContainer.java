@@ -28,9 +28,6 @@ final class OpenTypeContainer {
      * @return whether the input uses a compressed web-font container
      */
     static boolean isCompressed(ByteBuffer bytes) {
-        /*
-         * Inspect signature bytes directly rather than trusting a filename extension.
-         */
         return bytes.remaining() >= 4 && bytes.get(0) == 'w' && bytes.get(1) == 'O' && bytes.get(2) == 'F' && (bytes.get(3) == 'F' || bytes.get(3) == '2');
     }
 
@@ -40,9 +37,6 @@ final class OpenTypeContainer {
      * @param bytes encoded source at position zero
      */
     static void validate(ByteBuffer bytes) {
-        /*
-         * An actionable format error is preferable to an opaque native error code.
-         */
         if (isCompressed(bytes) && bytes.get(3) == '2')
             throw new IllegalArgumentException("WOFF2 decoding is unavailable in the bundled FreeType build; convert the font to TTF, OTF or WOFF before loading");
     }

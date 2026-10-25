@@ -39,9 +39,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromPath(String path) {
-        /*
-         * Defer file reads to the asset executor.
-         */
         return fromPath(path, path);
     }
 
@@ -52,9 +49,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromPath(String path, String name) {
-        /*
-         * Rendering configuration does not duplicate encoded font assets.
-         */
         return fromPath(path, name, 32, 95);
     }
 
@@ -67,9 +61,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromPath(String path, String name, int firstChar, int count) {
-        /*
-         * PathSource validates without performing I/O.
-         */
         return new AdaptiveFontParameters(new PathSource(path), name, firstChar, count);
     }
 
@@ -80,9 +71,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromBytes(byte[] bytes, String name) {
-        /*
-         * Use the same bounded defaults as filesystem sources.
-         */
         return fromBytes(bytes, name, 32, 95);
     }
 
@@ -95,9 +83,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromBytes(byte[] bytes, String name, int firstChar, int count) {
-        /*
-         * BytesSource takes ownership through a defensive copy.
-         */
         return new AdaptiveFontParameters(new BytesSource(bytes), name, firstChar, count);
     }
 
@@ -108,9 +93,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromClasspath(String resourcePath, String name) {
-        /*
-         * Resource lookup follows the library's defining class loader.
-         */
         return fromClasspath(resourcePath, name, 32, 95);
     }
 
@@ -123,9 +105,6 @@ public record AdaptiveFontParameters(FontSource source, String name, int firstCh
      * @return immutable loading request
      */
     public static AdaptiveFontParameters fromClasspath(String resourcePath, String name, int firstChar, int count) {
-        /*
-         * Share encoded-byte ownership and validation with the byte factory.
-         */
         return fromBytes(ValthorneFiles.readBytes(resourcePath), name, firstChar, count);
     }
 

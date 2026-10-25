@@ -31,10 +31,6 @@ final class NanoWindowDockLayout {
      * @return allocated rectangle
      */
     static Frame resolve(NanoWindow target, NanoWindow proposed, WindowSnapArea proposedArea, float inset) {
-        /*
-         * Scan sibling membership once rather than allocate a docking tree for
-         * each pointer event. Creation order keeps equal slots stable on focus.
-         */
         WindowSnapArea area = target == proposed ? proposedArea : target.getSnapArea();
         int occupied = 0;
         int count = 0;
@@ -145,9 +141,6 @@ final class NanoWindowDockLayout {
      * @return whether the region has a visible dock
      */
     private static boolean contains(int occupied, WindowSnapArea area) {
-        /*
-         * Enum ordinals are private transient bit positions, never persisted.
-         */
         return (occupied & (1 << area.ordinal())) != 0;
     }
 }

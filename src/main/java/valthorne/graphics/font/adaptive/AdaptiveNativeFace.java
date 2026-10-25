@@ -108,9 +108,6 @@ final class AdaptiveNativeFace implements AutoCloseable {
      * @param status native result, zero on success
      */
     static void check(int status) {
-        /*
-         * Both native libraries use zero for success; preserve error codes for diagnosis.
-         */
         if (status != 0) throw new IllegalStateException("Native font operation failed: " + status);
     }
 

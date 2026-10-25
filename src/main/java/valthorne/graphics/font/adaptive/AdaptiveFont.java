@@ -762,9 +762,6 @@ public final class AdaptiveFont implements TextFont {
      * @return mixed hash masked by the current table capacity at the call site
      */
     private static int cacheSlot(long key) {
-        /*
-         * An avalanche avoids clustering glyph size bits and similar numbered labels.
-         */
         key = (key ^ (key >>> 33)) * 0xff51afd7ed558ccdL;
         key = (key ^ (key >>> 33)) * 0xc4ceb9fe1a85ec53L;
         return (int) (key ^ (key >>> 33));

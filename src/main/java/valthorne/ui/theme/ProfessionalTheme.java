@@ -130,10 +130,6 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * @param value color reference to store
      */
     private static void color(ThemeRule rule, String name, String key, Color value) {
-        /*
-         * Resolve the existing registered key namespace so composite controls
-         * and leaf widgets can share palette references without extra wrappers.
-         */
         rule.set(StyleKey.of("nano." + name + "." + key, Color.class), value);
     }
 

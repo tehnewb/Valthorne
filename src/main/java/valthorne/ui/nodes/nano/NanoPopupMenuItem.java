@@ -73,9 +73,6 @@ public record NanoPopupMenuItem(String text, Runnable action, boolean enabled, b
      * @return this control for further configuration
      */
     public static NanoPopupMenuItem check(String text, Runnable action, boolean checked) {
-        /*
-         * Retain the original action and checkbox value in one immutable command description.
-         */
         return new NanoPopupMenuItem(text, action, true, true, checked, null, null);
     }
     /**
@@ -85,9 +82,6 @@ public record NanoPopupMenuItem(String text, Runnable action, boolean enabled, b
      * @return submenu entry
      */
     public static NanoPopupMenuItem submenu(String text, List<NanoPopupMenuItem> children) {
-        /*
-         * Capture fixed child membership once, or retain the provider when entries must refresh at opening time.
-         */
         List<NanoPopupMenuItem> snapshot = List.copyOf(children);
         return submenu(text, () -> snapshot);
     }
@@ -98,9 +92,6 @@ public record NanoPopupMenuItem(String text, Runnable action, boolean enabled, b
      * @return submenu entry
      */
     public static NanoPopupMenuItem submenu(String text, Supplier<List<NanoPopupMenuItem>> children) {
-        /*
-         * Capture fixed child membership once, or retain the provider when entries must refresh at opening time.
-         */
         return new NanoPopupMenuItem(text, () -> {}, true, false, false, null, Objects.requireNonNull(children));
     }
     /**

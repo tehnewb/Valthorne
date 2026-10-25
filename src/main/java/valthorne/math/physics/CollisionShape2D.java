@@ -68,9 +68,6 @@ public final class CollisionShape2D {
      * @return immutable collision descriptor
      */
     public static CollisionShape2D polygon(float... coordinates) {
-        /*
-         * Validation and copying happen once, keeping simulation and point queries allocation-free.
-         */
         return new CollisionShape2D(false, 0, 0, validatePolygon(coordinates));
     }
 
@@ -83,10 +80,6 @@ public final class CollisionShape2D {
      * @throws IllegalArgumentException if either dimension is too small or nonfinite
      */
     public static CollisionShape2D box(float width, float height) {
-        /*
-         * Descriptions stay independent of the native runtime so configuration
-         * can be assembled before a world is initialized.
-         */
         dimension(width, "width");
         dimension(height, "height");
         return new CollisionShape2D(false, width, height, null);
@@ -100,9 +93,6 @@ public final class CollisionShape2D {
      * @throws IllegalArgumentException if the radius is too small or nonfinite
      */
     public static CollisionShape2D circle(float radius) {
-        /*
-         * Store the radius directly; no native shape exists until body creation.
-         */
         dimension(radius, "radius");
         return new CollisionShape2D(true, radius, 0, null);
     }
@@ -114,9 +104,6 @@ public final class CollisionShape2D {
      * @param name dimension name used in failures
      */
     private static void dimension(float value, String name) {
-        /*
-         * Half extents must remain nonzero after conversion to native floats.
-         */
         if (!(value >= MIN_DIMENSION) || !Float.isFinite(value))
             throw new IllegalArgumentException(name + " must be finite and at least " + MIN_DIMENSION + " meters");
     }

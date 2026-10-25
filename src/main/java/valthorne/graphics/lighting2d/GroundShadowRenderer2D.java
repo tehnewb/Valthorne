@@ -285,10 +285,6 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
      * @return nonnegative attenuation-weighted luminance
      */
     private static float weight(PointLight2D light, float x, float y) {
-        /*
-         * Disabled and degenerate lights contribute nothing; squared falloff
-         * weights the virtual source without allocating intermediate vectors.
-         */
         if (!light.enabled || light.radius <= 0) return 0;
         float dx = x - light.x, dy = y - light.y;
         float attenuation = Math.max(0, 1 - (float) Math.sqrt(dx * dx + dy * dy + light.elevation * light.elevation) / light.radius);

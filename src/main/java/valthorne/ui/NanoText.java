@@ -93,9 +93,6 @@ public final class NanoText {
      * @return end pen X for syntax-highlighted runs
      */
     public static float draw(UINode node, long vg, float x, float y, String text, float size, Color color, int align) {
-        /*
-         * Delegate to named-font drawing so the default and explicit typography paths share layout and batching behavior.
-         */
         return draw(node, vg, node instanceof NanoCodeEditor ? "code" : "default", x, y, text, size, color, align);
     }
 
@@ -170,10 +167,6 @@ public final class NanoText {
      * @return borrowed shaped layout, or null for a NanoVG font
      */
     public static TextRun layout(UINode node, String name, float size, String text) {
-        /*
-         * Resolve once and reuse the font's bounded layout cache; editors do not
-         * need private native buffers or a second shaping implementation.
-         */
         TextFont selected = font(node, name);
         return selected == null ? null : selected.layout(text, size);
     }
@@ -189,10 +182,6 @@ public final class NanoText {
      * @return borrowed face or null for Nano rendering
      */
     private static TextFont font(UINode node, String name) {
-        /*
-         * Code controls use a matching monospace face while normal controls
-         * share the proportional interface face.
-         */
         if (!"default".equals(name) && !"code".equals(name)) return null;
         ResolvedStyle style = node.getStyleOrDefaults();
         boolean monospace = node instanceof NanoCodeEditor || "code".equals(name);

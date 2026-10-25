@@ -26,10 +26,6 @@ public final class SystemFonts {
      * @throws IllegalStateException if no supported font file is installed
      */
     public static Path find(boolean code) {
-        /*
-         * Prefer native UI families and inspect only a small deterministic file list.
-         * Overrides are validated before loading rather than silently ignored.
-         */
         String property = code ? "valthorne.ui.codeFont" : "valthorne.ui.defaultFont";
         String override = System.getProperty(property);
         if (override != null && !override.isBlank()) {

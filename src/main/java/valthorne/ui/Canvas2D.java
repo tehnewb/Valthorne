@@ -35,9 +35,6 @@ public final class Canvas2D {
      * @param alpha opacity clamped between zero and one
      */
     public static void color(long vg, int rgb, float alpha) {
-        /*
-         * Pack RGB and clamped alpha directly into the reusable NanoVG color scratch.
-         */
         var ink = NanoUtility.color1((Math.round(Math.clamp(alpha, 0, 1) * 255) << 24) | (rgb & 0xffffff));
         nvgFillColor(vg, ink);
         nvgStrokeColor(vg, ink);
@@ -49,9 +46,6 @@ public final class Canvas2D {
      * @param vg current NanoVG context with an active frame
      */
     public static void beginPath(long vg) {
-        /*
-         * Delegate directly to the active context without allocating a path wrapper.
-         */
         nvgBeginPath(vg);
     }
 
@@ -61,9 +55,6 @@ public final class Canvas2D {
      * @param vg current NanoVG context with an active frame
      */
     public static void fill(long vg) {
-        /*
-         * Keep rasterization in NanoVG and reuse the current path state.
-         */
         nvgFill(vg);
     }
 
@@ -73,9 +64,6 @@ public final class Canvas2D {
      * @param vg current NanoVG context with an active frame
      */
     public static void stroke(long vg) {
-        /*
-         * Reuse the current native path and stroke configuration.
-         */
         nvgStroke(vg);
     }
 
@@ -90,9 +78,6 @@ public final class Canvas2D {
      * @param r corner radius in UI pixels
      */
     public static void roundedRect(long vg, float x, float y, float w, float h, float r) {
-        /*
-         * Pass geometry directly to NanoVG without constructing shape objects.
-         */
         nvgRoundedRect(vg, x, y, w, h, r);
     }
 
@@ -106,9 +91,6 @@ public final class Canvas2D {
      * @param h rectangle height in UI pixels
      */
     public static void rect(long vg, float x, float y, float w, float h) {
-        /*
-         * Append directly to the native path without allocating geometry.
-         */
         nvgRect(vg, x, y, w, h);
     }
 
@@ -120,9 +102,6 @@ public final class Canvas2D {
      * @param y vertical UI coordinate
      */
     public static void moveTo(long vg, float x, float y) {
-        /*
-         * Move the native path cursor without introducing a Java point object.
-         */
         nvgMoveTo(vg, x, y);
     }
 
@@ -134,9 +113,6 @@ public final class Canvas2D {
      * @param y vertical UI coordinate
      */
     public static void lineTo(long vg, float x, float y) {
-        /*
-         * Use primitive coordinates directly in the native path.
-         */
         nvgLineTo(vg, x, y);
     }
 
@@ -147,9 +123,6 @@ public final class Canvas2D {
      * @param face registered font name
      */
     public static void fontFace(long vg, String face) {
-        /*
-         * Borrow the registered font by name; this call does not own or load a font.
-         */
         nvgFontFace(vg, face);
     }
 
@@ -160,9 +133,6 @@ public final class Canvas2D {
      * @param size font size in UI pixels
      */
     public static void fontSize(long vg, float size) {
-        /*
-         * Change native text state without rebuilding font resources.
-         */
         nvgFontSize(vg, size);
     }
 
@@ -173,9 +143,6 @@ public final class Canvas2D {
      * @param align combined NanoVG alignment flags
      */
     public static void textAlign(long vg, int align) {
-        /*
-         * Pass the caller-selected alignment mask directly to NanoVG.
-         */
         nvgTextAlign(vg, align);
     }
 
@@ -188,9 +155,6 @@ public final class Canvas2D {
      * @param text text to draw
      */
     public static void text(long vg, float x, float y, String text) {
-        /*
-         * Use the existing native font state rather than constructing a layout object.
-         */
         nvgText(vg, x, y, text);
     }
 
@@ -201,9 +165,6 @@ public final class Canvas2D {
      * @param width stroke width in UI pixels
      */
     public static void strokeWidth(long vg, float width) {
-        /*
-         * Change only the current native stroke-width state.
-         */
         nvgStrokeWidth(vg, width);
     }
 }

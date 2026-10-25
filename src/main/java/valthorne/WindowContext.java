@@ -66,10 +66,6 @@ public final class WindowContext implements AutoCloseable {
      * @return preceding context
      */
     public static WindowContext use(WindowContext context) {
-        /*
-         * Validate only at scope boundaries; high-frequency input getters remain
-         * direct primitive reads with no allocation or synchronization.
-         */
         if (!Window.isRenderThread()) throw new IllegalStateException("Window contexts require the window/render thread");
         if (context != null && (context.owner != Thread.currentThread() || context.closed)) throw new IllegalStateException("Invalid or closed window context");
         WindowContext previous = active;

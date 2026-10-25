@@ -283,9 +283,6 @@ public final class TextureBatch {
      * @return the adjusted float value based on the size parameter
      */
     private static float insetMin(float value, float size) {
-        /*
-         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
-         */
         return size > 1f ? value + 0.5f : value;
     }
 
@@ -300,9 +297,6 @@ public final class TextureBatch {
      * modification for sizes greater than 1
      */
     private static float insetMax(float value, float size) {
-        /*
-         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
-         */
         return size > 1f ? value + size - 0.5f : value + size;
     }
 
@@ -321,9 +315,6 @@ public final class TextureBatch {
      * @return the detected and clamped texture unit count
      */
     private static int detectTextureUnitsClamped(int clampTo) {
-        /*
-         * Clamp native texture capacity to the supported batch contract before allocating indexed storage.
-         */
         int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
         if (units <= 0) {
             units = 8;

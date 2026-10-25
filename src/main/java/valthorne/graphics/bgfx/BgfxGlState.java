@@ -156,9 +156,6 @@ final class BgfxGlState {
      * @param enabled original enablement
      */
     private static void enable(int capability, boolean enabled) {
-        /*
-         * Direct capability writes avoid callback objects in frame execution.
-         */
         if (enabled) glEnable(capability);
         else glDisable(capability);
     }

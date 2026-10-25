@@ -239,9 +239,6 @@ public class NanoColorPicker extends NanoContainer {
      * @return independent color
      */
     private static Color hsv(float h, float s, float v, float alpha) {
-        /*
-         * Convert hue sectors directly into the destination color representation without intermediate color objects.
-         */
         float sector = h * 6, fraction = sector - (float) Math.floor(sector);
         float p = v * (1 - s), q = v * (1 - s * fraction), t = v * (1 - s * (1 - fraction));
         return switch ((int) sector % 6) {
