@@ -81,9 +81,6 @@ public final class BodySettings2D {
      * @return new reusable settings retaining the original shape
      */
     public static BodySettings2D fromGeometry(Shape shape) {
-        /*
-         * A named factory avoids ambiguity with the existing collision-descriptor constructor.
-         */
         return new BodySettings2D(new PhysicsGeometry2D(shape, null));
     }
 

@@ -296,9 +296,6 @@ public class TextField extends Panel {
      * @return the shared caret pixel texture
      */
     private static Texture getCaretPixel() {
-        /*
-         * Measure the requested prefix with the same retained font metrics used for text drawing.
-         */
         if (CARET_PIXEL == null) {
             ByteBuffer buffer = BufferUtils.createByteBuffer(4);
             buffer.put((byte) 255);

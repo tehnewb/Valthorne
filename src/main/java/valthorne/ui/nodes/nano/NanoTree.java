@@ -611,9 +611,6 @@ public class NanoTree<T> extends NanoPanel {
      * @return checks whether a hit node belongs to the requested subtree by walking parent identities
      */
     private static boolean within(UINode node, UINode ancestor) {
-        /*
-         * Walk parent identities directly, avoiding allocation of an ancestor collection.
-         */
         for (; node != null; node = node.getParent()) if (node == ancestor) return true;
         return false;
     }

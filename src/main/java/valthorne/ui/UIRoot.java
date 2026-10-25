@@ -415,9 +415,6 @@ public class UIRoot extends UIContainer {
      * @return true if ancestor occurs in the parent chain
      */
     private static boolean within(UINode node, UINode ancestor) {
-        /*
-         * Walk parent identities directly, avoiding allocation of an ancestor collection.
-         */
         for (UINode current = node; current != null; current = current.getParent())
             if (current == ancestor) return true;
         return false;

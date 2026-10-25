@@ -891,6 +891,10 @@ Use primitives instead of wrappers when object semantics are unnecessary.
 
 Prefer explicit loops when they are cheaper and clearer.
 
+## Autocloseable
+
+The Autocloseable interface should NOT be used unless specifically stated to be used or if there are actual resources needing handled.
+
 ## Prefer Arrays When Appropriate
 
 Use arrays when:
@@ -1299,11 +1303,7 @@ Block comments use:
  */
 ```
 
-Block comments are specifically required for:
-
-- Static methods, inside the method body
-
-Block comments may also be used elsewhere for genuinely useful implementation explanations.
+Internal block comments should be used only when necessary to explain complex implementation behavior. Do not add them to straightforward methods or repeat information already clear from the code or Javadoc.
 
 One-line block comments are prohibited.
 
@@ -1469,7 +1469,6 @@ Do not write empty documentation that merely repeats the method name.
 Every static method requires:
 
 1. Multi-line Javadoc above the method.
-2. A meaningful multi-line block comment inside the method body.
 
 ### Correct
 
@@ -1481,15 +1480,11 @@ Every static method requires:
  * @return equivalent duration in nanoseconds
  */
 public static long secondsToNanos(long seconds) {
-    /*
-     * Use direct integer multiplication to avoid temporary duration objects
-     * and unnecessary floating-point conversion.
-     */
     return seconds * 1_000_000_000L;
 }
 ```
 
-The internal block comment should explain something useful, such as:
+When necessary, an internal block comment should explain complex behavior, such as:
 
 - Algorithm choice
 - Optimization

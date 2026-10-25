@@ -95,9 +95,6 @@ public final class OpenGLStateSnapshot {
      * @param enabled    whether that capability was enabled at capture time
      */
     private static void enable(int capability, boolean enabled) {
-        /*
-         * Set only the capability captured by this guard, preserving unrelated state.
-         */
         if (enabled) glEnable(capability);
         else glDisable(capability);
     }

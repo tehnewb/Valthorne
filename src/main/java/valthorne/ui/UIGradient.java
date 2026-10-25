@@ -59,9 +59,6 @@ public final class UIGradient implements Drawable, AutoCloseable {
      * @return vertical gradient
      */
     public static UIGradient vertical(Color top, Color bottom) {
-        /*
-         * Normalized endpoints keep the same direction at every element size.
-         */
         return new UIGradient(top, bottom, 0f, 0f, 0f, 1f);
     }
 
@@ -73,9 +70,6 @@ public final class UIGradient implements Drawable, AutoCloseable {
      * @return horizontal gradient
      */
     public static UIGradient horizontal(Color left, Color right) {
-        /*
-         * Normalized endpoints keep the same direction at every element size.
-         */
         return new UIGradient(left, right, 0f, 0f, 1f, 0f);
     }
 

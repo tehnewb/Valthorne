@@ -60,10 +60,6 @@ public final class JoltRuntime {
      * @throws SecurityException             if runtime permissions deny a required property, file or load operation
      */
     public static synchronized void initialize() {
-        /*
-         * Share one native factory across both constrained 2D and prototype 3D
-         * worlds; initialization happens only after a caller requests physics.
-         */
         if (initialized) return;
         String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
         String arch = System.getProperty("os.arch").toLowerCase(Locale.ROOT);

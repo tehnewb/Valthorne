@@ -119,10 +119,6 @@ public final class Audio {
      * @return read-only readiness stage for the captured current session
      */
     public static CompletionStage<Void> whenReady() {
-        /*
-         * Keep failure observation tied to the current session rather than replacing
-         * a failed startup merely because another caller wants to observe readiness.
-         */
         return ensureStarted().ready().minimalCompletionStage();
     }
 
@@ -132,9 +128,6 @@ public final class Audio {
      * @return true only while the current session is READY
      */
     public static boolean isReady() {
-        /*
-         * Read one published session so this query never starts or waits for audio.
-         */
         AudioRuntime current = runtime;
         return current != null && current.state() == AudioState.READY;
     }
@@ -145,9 +138,6 @@ public final class Audio {
      * @return NOT_STARTED before the first request, otherwise the current session state
      */
     public static AudioState getState() {
-        /*
-         * Terminal sessions remain published until an explicit or lazy restart.
-         */
         AudioRuntime current = runtime;
         return current == null ? AudioState.NOT_STARTED : current.state();
     }
@@ -158,9 +148,6 @@ public final class Audio {
      * @return startup, runtime, or cleanup failure, or null if none is recorded
      */
     public static Throwable getFailure() {
-        /*
-         * Throwable publication is independent of command outcomes and survives teardown.
-         */
         AudioRuntime current = runtime;
         return current == null ? null : current.failure();
     }
@@ -170,9 +157,6 @@ public final class Audio {
      * Startup failure is observable through the public asynchronous lifecycle API.
      */
     static void init() {
-        /*
-         * JGL calls this after window creation; it must never await device/context setup.
-         */
         startAsync();
     }
 
@@ -184,9 +168,6 @@ public final class Audio {
      * @return read-only stage completing after native teardown, exceptional on lifecycle failure
      */
     public static CompletionStage<Void> shutdownAsync() {
-        /*
-         * Stopping the captured session cannot affect a later replacement session.
-         */
         AudioRuntime current = runtime;
         if (current == null) return CompletableFuture.<Void>completedFuture(null).minimalCompletionStage();
         current.stop();
@@ -199,9 +180,6 @@ public final class Audio {
      * Interruption is restored after cleanup rather than allowing premature restart.
      */
     static void dispose() {
-        /*
-         * Synchronous engine teardown preserves native ownership until the worker exits.
-         */
         AudioRuntime current = runtime;
         if (current == null) return;
         current.stop();
@@ -218,9 +196,6 @@ public final class Audio {
      * @throws IllegalArgumentException if any coordinate is nonfinite
      */
     public static void setListenerPosition(float x, float y, float z) {
-        /*
-         * Ambient positions are logical game state and need no native-context admission.
-         */
         if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z))
             throw new IllegalArgumentException("Listener coordinates must be finite");
         ListenerPosition current = listenerPosition;
@@ -234,9 +209,6 @@ public final class Audio {
      * @return logical world coordinates
      */
     public static ListenerPosition getListenerPosition() {
-        /*
-         * A volatile snapshot permits audio updates without sharing mutable coordinates.
-         */
         return listenerPosition;
     }
 
@@ -251,9 +223,6 @@ public final class Audio {
      * @return independent result future
      */
     public static <T> CompletableFuture<T> submitAsync(Callable<T> callable) {
-        /*
-         * Queue admission and session shutdown are coordinated inside AudioRuntime.
-         */
         Objects.requireNonNull(callable, "callable");
         return ensureStarted().submit(callable);
     }
@@ -266,9 +235,6 @@ public final class Audio {
      * @param runnable audio-thread work, or null to do nothing
      */
     public static void run(Runnable runnable) {
-        /*
-         * Keep commands asynchronous even while the native device is still opening.
-         */
         if (runnable == null) return;
         AudioRuntime current = ensureStarted();
         if (current.isAudioThread()) {
@@ -291,9 +257,6 @@ public final class Audio {
      * @param runnable nonnull operation
      */
     public static void sync(Runnable runnable) {
-        /*
-         * Preserve the established blocking API while providing explicit nonblocking alternatives.
-         */
         Objects.requireNonNull(runnable, "runnable");
         call(() -> {
             runnable.run();
@@ -312,9 +275,6 @@ public final class Audio {
      * @throws RuntimeException if interrupted or the operation/session fails
      */
     public static <T> T call(Callable<T> callable) {
-        /*
-         * This is the only command API that waits; bootstrap and asynchronous submission do not.
-         */
         return awaitResult(submitAsync(callable));
     }
 
@@ -327,9 +287,6 @@ public final class Audio {
      * @throws RuntimeException if the wait is interrupted or command execution fails
      */
     private static <T> T awaitResult(CompletableFuture<T> result) {
-        /*
-         * Session identity is fixed before this wait, including for synchronous creation.
-         */
         try {
             return result.get();
         } catch (InterruptedException failure) {
@@ -352,9 +309,6 @@ public final class Audio {
      * @return completion with the session-owned player
      */
     public static CompletableFuture<SoundPlayer> createAsync(SoundData data) {
-        /*
-         * Resource construction and registration are one operation on the owning worker.
-         */
         Objects.requireNonNull(data, "data");
         AudioRuntime current = ensureStarted();
         return current.submit(() -> createPlayer(current, data));
@@ -385,9 +339,6 @@ public final class Audio {
      * @return completion with a managed player or decode/lifecycle failure
      */
     public static CompletableFuture<SoundPlayer> loadAsync(byte[] bytes) {
-        /*
-         * Keep potentially expensive media probing and decoding off the caller's frame thread.
-         */
         Objects.requireNonNull(bytes, "bytes");
         AudioRuntime current = ensureStarted();
         return CompletableFuture.supplyAsync(() -> SoundData.load(bytes))
@@ -401,9 +352,6 @@ public final class Audio {
      * @return managed player
      */
     public static SoundPlayer load(String path) {
-        /*
-         * Retain blocking behavior for callers that require an immediately usable player.
-         */
         return create(SoundData.load(path));
     }
 
@@ -414,9 +362,6 @@ public final class Audio {
      * @return managed player
      */
     public static SoundPlayer load(byte[] bytes) {
-        /*
-         * Buffered and streaming loaders retain their existing detection behavior.
-         */
         return create(SoundData.load(bytes));
     }
 
@@ -464,9 +409,6 @@ public final class Audio {
      * @param player player to dispose
      */
     public static void destroy(SoundPlayer player) {
-        /*
-         * SoundPlayer disposal unregisters itself on the audio thread.
-         */
         if (player != null) run(player::dispose);
     }
 
@@ -489,9 +431,6 @@ public final class Audio {
      * @param player player to register, or null to ignore
      */
     public static void register(SoundPlayer player) {
-        /*
-         * Registry mutations share the same owner as native playback updates.
-         */
         if (player == null) return;
         AudioRuntime current = ensureStarted();
         if (current.isAudioThread()) current.register(player);
@@ -529,9 +468,6 @@ public final class Audio {
      * @throws IllegalStateException if called outside the current audio thread
      */
     static void assertAudioThread() {
-        /*
-         * No implicit startup or blocking is permitted as part of an ownership assertion.
-         */
         if (!isAudioThread()) throw new IllegalStateException("Audio operation must run on the audio thread");
     }
 
@@ -564,9 +500,6 @@ public final class Audio {
      * @return immutable device-name snapshot, empty if enumeration is unsupported
      */
     public static List<String> getDevices() {
-        /*
-         * Enumeration uses the active audio worker and matches the switching namespace.
-         */
         return call(() -> {
             int token;
             if (alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT")) token = ALC_ALL_DEVICES_SPECIFIER;
@@ -583,9 +516,6 @@ public final class Audio {
      * @return current default output name, or null if unavailable
      */
     public static String getDefaultDevice() {
-        /*
-         * Resolve system defaults at query time rather than retaining a startup snapshot.
-         */
         return call(() -> alcGetString(NULL, alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ? ALC_DEFAULT_ALL_DEVICES_SPECIFIER : ALC_DEFAULT_DEVICE_SPECIFIER));
     }
 
@@ -595,9 +525,6 @@ public final class Audio {
      * @return current endpoint name, or null if unavailable
      */
     public static String getCurrentDevice() {
-        /*
-         * The executing worker and native handle always belong to the captured session.
-         */
         return call(() -> alcGetString(runtime.device(), alcIsExtensionPresent(NULL, "ALC_ENUMERATE_ALL_EXT") ? ALC_ALL_DEVICES_SPECIFIER : ALC_DEVICE_SPECIFIER));
     }
 
@@ -607,9 +534,6 @@ public final class Audio {
      * @return whether the active device supports ALC_SOFT_reopen_device
      */
     public static boolean isDeviceSwitchingSupported() {
-        /*
-         * Extension support belongs to the current native device, not a previous session.
-         */
         return call(() -> alcIsExtensionPresent(runtime.device(), "ALC_SOFT_reopen_device"));
     }
 
@@ -622,9 +546,6 @@ public final class Audio {
      * @throws IllegalArgumentException if a nonnull name is blank or contains NUL
      */
     public static boolean switchDevice(String deviceName) {
-        /*
-         * Reopening remains serialized with all source, buffer, and listener operations.
-         */
         if (deviceName != null && (deviceName.isBlank() || deviceName.indexOf('\0') >= 0))
             throw new IllegalArgumentException("Device name must be nonblank and contain no NUL characters");
         return call(() -> {

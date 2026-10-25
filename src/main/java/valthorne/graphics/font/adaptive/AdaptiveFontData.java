@@ -47,9 +47,6 @@ public record AdaptiveFontData(byte[] bytes, int firstCharacterIndex, int charac
      * @return immutable encoded asset
      */
     public static AdaptiveFontData load(String path) {
-        /*
-         * Raster size is chosen during drawing rather than baked into the asset.
-         */
         return load(path, 32, 95);
     }
 
@@ -59,9 +56,6 @@ public record AdaptiveFontData(byte[] bytes, int firstCharacterIndex, int charac
      * @return immutable encoded asset
      */
     public static AdaptiveFontData load(byte[] bytes) {
-        /*
-         * The canonical constructor performs the ownership copy.
-         */
         return new AdaptiveFontData(bytes);
     }
 
@@ -74,9 +68,6 @@ public record AdaptiveFontData(byte[] bytes, int firstCharacterIndex, int charac
      * @throws UncheckedIOException if reading fails
      */
     public static AdaptiveFontData load(String path, int firstChar, int count) {
-        /*
-         * Preserve the original I/O cause at the asset boundary.
-         */
         try {
             return new AdaptiveFontData(Files.readAllBytes(Path.of(path)), firstChar, count);
         } catch (IOException failure) {
@@ -92,9 +83,6 @@ public record AdaptiveFontData(byte[] bytes, int firstCharacterIndex, int charac
      * @return immutable encoded asset
      */
     public static AdaptiveFontData load(byte[] bytes, int firstChar, int count) {
-        /*
-         * Share validation and copying with direct asset construction.
-         */
         return new AdaptiveFontData(bytes, firstChar, count);
     }
 
