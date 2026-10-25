@@ -33,6 +33,11 @@ import static org.lwjgl.bgfx.BGFX.*;
  * }</pre>
  */
 public class BgfxShapeRenderer implements AutoCloseable, GraphicsResource {
+    static {
+        // Blend helpers initialize LWJGL before any renderer constructor runs.
+        BgfxNativeLibrary.configure();
+    }
+
     /**
      * Solid shapes use vertex colors and conventional source-alpha compositing.
      * Alpha channels use source-over rather than squaring the source alpha.

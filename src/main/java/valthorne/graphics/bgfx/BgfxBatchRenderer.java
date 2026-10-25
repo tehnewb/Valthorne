@@ -24,6 +24,11 @@ import static org.lwjgl.system.MemoryUtil.*;
  * allocation and expanded per-glyph vertices. All resources are render-thread owned.</p>
  */
 public final class BgfxBatchRenderer implements AutoCloseable, GraphicsResource {
+    static {
+        // Blend helpers initialize LWJGL before any renderer constructor runs.
+        BgfxNativeLibrary.configure();
+    }
+
     /**
      * Six vec4 attributes shared by sprite and glyph instances.
      */

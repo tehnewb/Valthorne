@@ -29,6 +29,9 @@ node_modules/
 # Native extraction caches, recordings, and JVM diagnostics
 .lwjgl/
 lwjgl/
+# Bundled corrected bgfx runtimes are release resources, not extraction caches.
+!/src/main/resources/windows/*/org/lwjgl/
+!/src/main/resources/META-INF/windows/*/org/lwjgl/
 .filament-kmp/
 # These are authored Java packages, not build output or extracted native libraries.
 !/portable/web/src/main/java/valthorne/web/build/

@@ -240,7 +240,14 @@ public final class BgfxGraphics {
          * including resources rendered while application.init is running.
          */
         device().refreshSize();
-        if (frameActive) return;
+        if (frameActive) {
+            if (target == BGFX_INVALID_HANDLE && (targetWidth != device.width() || targetHeight != device.height())) {
+                targetWidth = device.width();
+                targetHeight = device.height();
+                currentView = -1;
+            }
+            return;
+        }
         frameActive = true;
         frameId++;
         nextView = 0;
@@ -661,8 +668,8 @@ public final class BgfxGraphics {
      * Selects a render target; callers must flush pending batches before switching.
      *
      * @param framebuffer unsigned handle or 65535 for the backbuffer
-     * @param width physical target width
-     * @param height physical target height
+     * @param width physical offscreen target width; the backbuffer uses its current device size
+     * @param height physical offscreen target height; the backbuffer uses its current device size
      */
     public static void setTarget(int framebuffer, int width, int height) {
         /*
@@ -671,8 +678,8 @@ public final class BgfxGraphics {
          */
         device();
         target = (short) framebuffer;
-        targetWidth = width;
-        targetHeight = height;
+        targetWidth = target == BGFX_INVALID_HANDLE ? device.width() : width;
+        targetHeight = target == BGFX_INVALID_HANDLE ? device.height() : height;
         currentView = -1;
     }
 

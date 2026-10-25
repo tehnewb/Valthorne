@@ -29,6 +29,7 @@ final class BgfxRuntime {
          * or adding synchronization to thread-confined rendering.
          */
         if (owner != null) throw new IllegalStateException("Another Valthorne renderer already owns bgfx");
+        BgfxNativeLibrary.configure();
         owner = candidate;
     }
 

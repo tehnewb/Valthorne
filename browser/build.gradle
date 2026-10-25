@@ -49,6 +49,7 @@ def replacements = [
     'valthorne/ui/behavior/TextEditing', 'valthorne/ui/behavior/TextEditModel', 'valthorne/ui/nodes/nano/NanoHyperlink', 'valthorne/ui/NanoUtility',
     'valthorne/graphics/bgfx/BgfxDesktopWindow', 'valthorne/graphics/bgfx/BgfxCallbacks',
     'valthorne/graphics/bgfx/BgfxPlatform', 'valthorne/graphics/bgfx/BgfxWindowsSurface',
+    'valthorne/graphics/bgfx/BgfxNativeLibrary',
     'valthorne/graphics/bgfx/BgfxMipmaps',
     'valthorne/graphics/bgfx/BgfxGraphics', 'valthorne/graphics/bgfx/BgfxBatchRenderer', 'valthorne/graphics/bgfx/BgfxMeshRenderer',
     'valthorne/graphics/bgfx/BgfxMesh', 'valthorne/graphics/bgfx/BgfxVertexBuffer',
@@ -68,6 +69,8 @@ def browserEngineApi = tasks.register('browserEngineApi', Jar) {
     from { zipTree(rootProject.tasks.named('jar').get().archiveFile) }
     replacements.each { type -> exclude "${type}.class", "${type}\$*.class" }
     exclude 'META-INF/MANIFEST.MF'
+    exclude 'windows/**/org/lwjgl/bgfx/valthorne-bgfx.dll'
+    exclude 'META-INF/windows/**/org/lwjgl/bgfx/valthorne-bgfx.dll.*', 'META-INF/valthorne-bgfx.json'
 }
 
 dependencies {
