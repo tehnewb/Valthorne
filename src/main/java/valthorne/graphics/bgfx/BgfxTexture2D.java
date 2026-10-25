@@ -218,6 +218,7 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
      * Already submitted commands retain their native allocation through bgfx's
      * deferred destruction; pending engine batches resolve the replacement allocation.
      * This configuration operation allocates only when the mip policy changes.
+     * The retained base pixels are reused without an additional CPU image copy.
      * Native handles borrowed by standalone callers must be fetched again afterward.
      *
      * @param mipmaps whether to retain generated RGBA8 mip levels
@@ -228,24 +229,18 @@ public final class BgfxTexture2D implements AutoCloseable, GraphicsResource, Bgf
         handle();
         if (this.mipmaps == mipmaps) return;
         if (format != BGFX_TEXTURE_FORMAT_RGBA8) throw new IllegalArgumentException("Automatic mipmaps require RGBA8 pixels");
-        ByteBuffer base = retainedPixels.duplicate()
-                .limit(width * height * 4);
-        ByteBuffer replacement = copyPixels(base);
         short replacementHandle = BGFX_INVALID_HANDLE;
         try {
-            replacementHandle = createTexture(replacement, mipmaps);
+            replacementHandle = createTexture(retainedPixels, mipmaps);
             if (BgfxGraphics.isActive()) {
                 BgfxGraphics.resetTextureState(Short.toUnsignedInt(replacementHandle));
                 if (filter != null) BgfxGraphics.setTextureFilter(Short.toUnsignedInt(replacementHandle), filter);
             }
         } catch (RuntimeException | Error failure) {
             if (replacementHandle != BGFX_INVALID_HANDLE) bgfx_destroy_texture(replacementHandle);
-            memFree(replacement);
             throw failure;
         }
         releaseGraphicsResources();
-        memFree(retainedPixels);
-        retainedPixels = replacement;
         handle = replacementHandle;
         this.mipmaps = mipmaps;
     }

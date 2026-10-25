@@ -44,7 +44,8 @@ public final class BgfxMesh implements AutoCloseable, GraphicsResource {
                 .set(layout);
         try {
             source = memAlloc(size);
-            source.put(data.duplicate().position(0).limit(size)).flip();
+            source.put(data.duplicate().position(0).limit(size))
+                    .flip();
             long memory = nbgfx_copy(memAddress(data) - size, size);
             if (memory == 0) throw new IllegalStateException("Could not allocate bgfx mesh upload memory");
             handle = nbgfx_create_vertex_buffer(memory, layout.address(), (short) BGFX_BUFFER_NONE);

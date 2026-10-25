@@ -14,7 +14,8 @@ import static org.lwjgl.bgfx.BGFX.*;
  * preserving the pre-migration filter on OpenGL and using the equivalent operation
  * on other APIs. Only immutable base pixels need CPU recovery storage. Creation
  * preserves the caller's target, viewport, textures and scissor; native framebuffer
- * destruction is deferred by bgfx. Calls belong to the graphics thread.
+ * destruction is deferred by bgfx. Calls belong to the graphics thread and start
+ * an upload frame when made between presentations.
  */
 final class BgfxMipmaps {
     /**
@@ -38,7 +39,6 @@ final class BgfxMipmaps {
          * avoid Java resampling, CPU mip storage, or a second base-level texture.
          */
         window.checkOwner();
-        BgfxGraphics.reserveUploadViews(2);
         short texture = bgfx_create_texture_2d(width, height, true, 1, BGFX_TEXTURE_FORMAT_RGBA8, BGFX_TEXTURE_RT | BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT | BGFX_SAMPLER_MIP_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP, null, 0);
         if (texture == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not allocate mipmapped texture");
         short framebuffer = BGFX_INVALID_HANDLE;
@@ -56,6 +56,8 @@ final class BgfxMipmaps {
             }
             if (framebuffer == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not create mip-generation framebuffer");
             saved.store();
+            BgfxGraphics.beginFrame();
+            BgfxGraphics.reserveUploadViews(2);
             BgfxGraphics.setTarget(Short.toUnsignedInt(framebuffer), width, height);
             BgfxGraphics.setViewport(0, 0, width, height);
             BgfxGraphics.setScissor(0, 0, 0, 0, false);

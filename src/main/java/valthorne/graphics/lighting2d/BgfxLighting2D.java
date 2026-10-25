@@ -168,7 +168,8 @@ final class BgfxLighting2D implements AutoCloseable, GraphicsResource {
         fullscreen.clear();
         float bottom = bgfx_get_caps().originBottomLeft() ? 0 : 1;
         float top = 1 - bottom;
-        fullscreen.put(new float[]{-1, -1, 0, bottom, 1, -1, 1, bottom, 1, 1, 1, top, 1, 1, 1, top, -1, 1, 0, top, -1, -1, 0, bottom}).flip();
+        fullscreen.put(new float[]{-1, -1, 0, bottom, 1, -1, 1, bottom, 1, 1, 1, top, 1, 1, 1, top, -1, 1, 0, top, -1, -1, 0, bottom})
+                .flip();
         int maximum = bgfx_get_caps().limits().maxTextureSize();
         if (resolution > maximum || capacity > maximum || !bgfx_is_texture_valid(0, false, 1, BGFX_TEXTURE_FORMAT_R32F, BGFX_TEXTURE_NONE))
             throw new UnsupportedOperationException("The replacement device cannot restore the polar-shadow atlas");

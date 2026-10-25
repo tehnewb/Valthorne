@@ -64,7 +64,8 @@ public final class ComputeBuffer implements AutoCloseable, GraphicsResource {
         this.access = access;
         if (access == ImageAccess.READ || initial != null) {
             recovery = memAlloc(size);
-            if (initial != null) recovery.put(initial.duplicate()).flip();
+            if (initial != null) recovery.put(initial.duplicate())
+                    .flip();
             else memSet(memAddress(recovery), 0, size);
         }
         try {
