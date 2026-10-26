@@ -1,14 +1,14 @@
 package valthorne.graphics.map.tiled;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
-import java.io.IOException;
 
 /**
  * Decodes TMX tile-layer payloads into raw global-ID bit patterns, including Tiled's
@@ -31,15 +31,19 @@ public class TiledDecoding {
      * @param text encoded payload, or null for an empty layer
      *
      * @param encoding case-insensitive CSV or Base64 encoding name
-     * @param compression Base64 compression name, or null/blank for uncompressed bytes
+     * @param compression case-insensitive Base64 compression name, or null/blank for uncompressed bytes
      * @param expectedCount positive output limit; CSV pads to this length, while binary
      *        data may return fewer IDs; nonpositive values retain all available IDs
      * @return newly allocated array containing signed Java representations of ID bits
-     * @throws java.io.IOException if decompression or reading fails
+     * @throws IOException if decompression or reading fails
      * @throws IllegalStateException if nonempty data uses an unsupported encoding or compression
      * @throws IllegalArgumentException if numeric CSV or Base64 data is malformed
      */
     public static int[] decodeLayerData(String text, String encoding, String compression, int expectedCount) throws IOException {
+        /*
+         * Uncompressed Base64 already supplies the required byte array; only
+         * compressed payloads need an owned decoding stream and a second buffer.
+         */
         if (text == null) return new int[Math.max(0, expectedCount)];
         String trimmed = text.trim();
         if (trimmed.isEmpty()) return new int[Math.max(0, expectedCount)];
@@ -55,19 +59,14 @@ public class TiledDecoding {
         if ("base64".equalsIgnoreCase(encoding)) {
             byte[] raw = Base64.getMimeDecoder().decode(trimmed);
 
-            InputStream in = new ByteArrayInputStream(raw);
-            if (compression != null && !compression.isBlank()) {
-                if ("gzip".equalsIgnoreCase(compression)) {
-                    in = new GZIPInputStream(in);
-                } else if ("zlib".equalsIgnoreCase(compression)) {
-                    in = new InflaterInputStream(in);
-                } else {
-                    throw new IllegalStateException("Unsupported TMX compression: " + compression);
-                }
+            if (compression == null || compression.isBlank()) return decodeLittleEndianU32(raw, expectedCount);
+            try (InputStream in = switch (compression.toLowerCase(Locale.ROOT)) {
+                case "gzip" -> new GZIPInputStream(new ByteArrayInputStream(raw));
+                case "zlib" -> new InflaterInputStream(new ByteArrayInputStream(raw));
+                default -> throw new IllegalStateException("Unsupported TMX compression: " + compression);
+            }) {
+                return decodeLittleEndianU32(in.readAllBytes(), expectedCount);
             }
-
-            byte[] bytes = readAllBytes(in);
-            return decodeLittleEndianU32(bytes, expectedCount);
         }
 
         throw new IllegalStateException("Unsupported TMX encoding: " + encoding);
@@ -86,6 +85,10 @@ public class TiledDecoding {
      * @throws NumberFormatException if a consumed token is not a valid decimal long
      */
     private static int[] decodeCsv(String csv, int expectedCount) {
+        /*
+         * Keep token order and Java long-to-int narrowing so unsigned flip bits
+         * retain their existing representation in signed global-ID arrays.
+         */
         String[] parts = csv.split("[,\\s]+");
         int n = expectedCount > 0 ? expectedCount : parts.length;
         int[] out = new int[n];
@@ -115,30 +118,17 @@ public class TiledDecoding {
      * @return newly allocated array preserving all 32 bits of each consumed ID
      */
     private static int[] decodeLittleEndianU32(byte[] bytes, int expectedCount) {
+        /*
+         * Consume only complete little-endian IDs, preserving all flag bits.
+         */
         int count = (bytes.length / 4);
         int n = expectedCount > 0 ? Math.min(expectedCount, count) : count;
 
         int[] out = new int[n];
-        ByteBuffer bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer bb = ByteBuffer.wrap(bytes)
+                .order(ByteOrder.LITTLE_ENDIAN);
         for (int i = 0; i < n; i++) out[i] = bb.getInt();
         return out;
     }
 
-    /**
-     * Consumes the stream from its current position through end of input.
-     * The stream remains open; this helper neither resets it nor limits the amount
-     * of memory needed for the accumulated payload.
-     *
-     * @param in stream supplying decoded bytes
-     *
-     * @return newly allocated array containing all remaining bytes
-     * @throws java.io.IOException if a stream read fails
-     */
-    private static byte[] readAllBytes(InputStream in) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(4096);
-        byte[] buf = new byte[8192];
-        int read;
-        while ((read = in.read(buf)) != -1) bos.write(buf, 0, read);
-        return bos.toByteArray();
-    }
 }
