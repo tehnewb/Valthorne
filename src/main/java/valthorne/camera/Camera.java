@@ -44,6 +44,8 @@ public abstract class Camera {
     /**
      * Returns the current center of the camera.
      *
+     * The returned vector is live. Built-in cameras validate it again during rebuild.
+     *
      * @return the camera's world-space center as a {@link Vector2f}
      */
     public Vector2f getCenter() {
@@ -55,8 +57,10 @@ public abstract class Camera {
      *
      * @param x the new x-coordinate of the camera center
      * @param y the new y-coordinate of the camera center
+     * @throws IllegalArgumentException if either coordinate is non-finite; state is unchanged
      */
     public void setCenter(float x, float y) {
+        if (!Float.isFinite(x) || !Float.isFinite(y)) throw new IllegalArgumentException("Camera center must be finite");
         center.set(x, y);
     }
 
@@ -73,9 +77,11 @@ public abstract class Camera {
      * Sets the zoom level of the camera. Zoom is clamped to a minimum of {@code 0.001f}
      * to prevent projection matrix instability or division-by-zero calculations.
      *
-     * @param z the desired zoom level
+     * @param z the desired finite zoom level
+     * @throws IllegalArgumentException if zoom is non-finite; state is unchanged
      */
     public void setZoom(float z) {
+        if (!Float.isFinite(z)) throw new IllegalArgumentException("Camera zoom must be finite");
         zoom = Math.max(0.001f, z);
     }
 
@@ -84,12 +90,49 @@ public abstract class Camera {
      * the camera changes (zoom, center) or once each frame depending on implementation.
      *
      * <p>Subclasses must define how the projection matrix is constructed based on
-     * the world width and height.</p>
+     * the world width and height. Built-in cameras reject non-finite/nonpositive dimensions
+     * and unrepresentable bounds before mutating the previous projection. Skip rebuild while
+     * minimized if dimensions are zero.</p>
      *
      * @param worldWidth  the width of the world or viewport
      * @param worldHeight the height of the world or viewport
      */
     public abstract void rebuild(float worldWidth, float worldHeight);
+
+    /**
+     * Validates dimensions and live camera state before a built-in projection rebuild.
+     *
+     * @param width positive finite world width
+     * @param height positive finite world height
+     * @throws IllegalArgumentException if dimensions or live camera state are invalid
+     */
+    protected final void validateProjectionDimensions(float width, float height) {
+        if (!Float.isFinite(width) || !Float.isFinite(height) || width <= 0f || height <= 0f)
+            throw new IllegalArgumentException("Projection dimensions must be positive and finite");
+        if (!Float.isFinite(zoom) || zoom <= 0f || !Float.isFinite(center.x) || !Float.isFinite(center.y))
+            throw new IllegalArgumentException("Camera zoom and center must be finite with positive zoom");
+    }
+
+    /**
+     * Commits finite orthographic bounds only when their float coefficients are representable.
+     * Preserves the previous matrix if extreme dimensions, zoom, or center collapse bounds.
+     *
+     * @param left horizontal lower bound
+     * @param right horizontal upper bound
+     * @param bottom first vertical bound, which may exceed top for UI projections
+     * @param top second vertical bound
+     * @throws IllegalArgumentException if bounds generate non-finite projection coefficients
+     */
+    protected final void setOrthographicProjection(float left, float right, float bottom, float top) {
+        float width = right - left;
+        float height = top - bottom;
+        if (!Float.isFinite(left) || !Float.isFinite(right) || !Float.isFinite(bottom) || !Float.isFinite(top)
+                || !Float.isFinite(width) || !Float.isFinite(height) || width == 0f || height == 0f
+                || !Float.isFinite(2f / width) || !Float.isFinite(2f / height)
+                || !Float.isFinite((right + left) / width) || !Float.isFinite((top + bottom) / height))
+            throw new IllegalArgumentException("Camera bounds do not produce a finite orthographic projection");
+        projection.setOrtho(left, right, bottom, top, -1f, 1f);
+    }
 
     /**
      * Returns the active projection matrix used by the camera during rendering.
