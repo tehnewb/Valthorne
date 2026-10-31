@@ -426,7 +426,9 @@ public final class TiledMap {
     }
 
     /**
-     * Emits one tile layer under the prepared map transform.
+     * Emits one tile layer under the prepared map transform. Bounded logical ranges
+     * are translated back through layer pixel offsets before grid/chunk rejection.
+     * Fractional shifts conservatively retain tiles touching the visible range.
      *
      * @param batch active destination batch
      * @param layer tile placements
@@ -444,6 +446,19 @@ public final class TiledMap {
         layerOffsetY = -layer.getOffsetY() * scaleY;
         batch.setOpacityMultiplier(previousOpacity * Math.clamp(layer.getOpacity(), 0, 1));
         try {
+            // Full-map calls include displaced tiles even outside the nominal map rectangle.
+            if (infinite || minTileX > 0 || minTileY > 0 || maxTileX < width - 1 || maxTileY < height - 1) {
+                float offsetColumns = layer.getOffsetX() / tileWidth;
+                float offsetRows = -layer.getOffsetY() / tileHeight;
+                if (isometric) {
+                    offsetColumns = layer.getOffsetX() / tileWidth + layer.getOffsetY() / tileHeight;
+                    offsetRows = layer.getOffsetX() / tileWidth - layer.getOffsetY() / tileHeight;
+                }
+                minTileX = (int) Math.floor(minTileX - offsetColumns);
+                maxTileX = (int) Math.ceil(maxTileX - offsetColumns);
+                minTileY = (int) Math.floor(minTileY - offsetRows);
+                maxTileY = (int) Math.ceil(maxTileY - offsetRows);
+            }
             renderTileLayerData(batch, layer, minTileX, minTileY, maxTileX, maxTileY);
         }
         finally {
