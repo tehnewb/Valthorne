@@ -118,9 +118,54 @@ public final class NanoText {
          * Themes scope font selection to editor descendants, preserving custom
          * project font previews and scene fonts outside the overlay.
          */
+        return draw(node, vg, name, x, y, text, size, color, align, null, 1f, NanoTextPass.FILL);
+    }
+
+    /**
+     * Draws one line with optional per-control paint effects. The adaptive backend
+     * reuses one shaped layout and clip; explicit NanoVG faces keep their own font
+     * and saved paint state. Font resources and configuration remain borrowed.
+     * @param node owning control
+     * @param vg active NanoVG context
+     * @param name selected face name
+     * @param x aligned horizontal coordinate
+     * @param y aligned vertical coordinate
+     * @param text line contents
+     * @param size logical em size
+     * @param color text tint
+     * @param align NanoVG alignment flags
+     * @param effects optional retained effect configuration
+     * @param effectScale positive multiplier for effect offsets
+     * @param pass requested paint stage, or ALL for a complete line
+     * @return end pen X for the fill
+     */
+    public static float draw(UINode node, long vg, String name, float x, float y, String text, float size, Color color, int align, NanoTextEffects effects, float effectScale, NanoTextPass pass) {
+        if (pass == null) throw new NullPointerException("pass");
+        if (!Float.isFinite(effectScale) || effectScale < 0f) throw new IllegalArgumentException("Effect scale must be finite and nonnegative");
+        if (effects != null && !effects.isEnabled()) effects = null;
         TextFont font = font(node, name);
         UIRoot root = node.getRoot();
-        if (font == null || root == null || root.getRenderContext() == null) return nvgText(vg, x, y, text);
+        if (font == null || root == null || root.getRenderContext() == null) {
+            if (effects == null) return pass == NanoTextPass.ALL || pass == NanoTextPass.FILL ? nvgText(vg, x, y, text) : x;
+            nvgSave(vg);
+            try {
+                float alpha = color == null ? 1f : color.a();
+                if (effects.isShadowEnabled() && (pass == NanoTextPass.ALL || pass == NanoTextPass.SHADOW)) {
+                    nvgFillColor(vg, NanoUtility.color1(effects.shadowTint(alpha)));
+                    nvgText(vg, x + effects.shadowX() * effectScale, y + effects.shadowY() * effectScale, text);
+                }
+                int[] offsets = effects.outlineOffsets();
+                if (offsets != null && (pass == NanoTextPass.ALL || pass == NanoTextPass.OUTLINE)) {
+                    nvgFillColor(vg, NanoUtility.color1(effects.outlineTint(alpha)));
+                    for (int i = 0; i < offsets.length; i += 2)
+                        nvgText(vg, x + offsets[i] * effectScale, y + offsets[i + 1] * effectScale, text);
+                }
+                nvgFillColor(vg, NanoUtility.color1(color == null ? Color.WHITE : color));
+                return pass == NanoTextPass.ALL || pass == NanoTextPass.FILL ? nvgText(vg, x, y, text) : x;
+            } finally {
+                nvgRestore(vg);
+            }
+        }
         float width = font.getWidth(text, size);
         float left = x - ((align & NVG_ALIGN_CENTER) != 0 ? width * .5f : (align & NVG_ALIGN_RIGHT) != 0 ? width : 0);
         float baseline = y;
@@ -128,8 +173,36 @@ public final class NanoText {
         else if ((align & NVG_ALIGN_MIDDLE) != 0) baseline += (font.ascent() + font.descent()) * size * .5f;
         else if ((align & NVG_ALIGN_BOTTOM) != 0) baseline += font.descent() * size;
         root.getRenderContext()
-                .drawNanoText(node, font, text, left, baseline, size, color);
+                .drawNanoText(node, font, text, left, baseline, size, color, effects, effectScale, pass);
         return left + width;
+    }
+
+    /**
+     * Attempts one adaptive backend scope for a complete effected label block.
+     * Explicit NanoVG faces return false so the caller keeps its registered renderer.
+     * Coordinates use top-aligned UI units and prepared per-line alignment positions.
+     * @param node owning label
+     * @param name selected face name
+     * @param lines normalized borrowed lines
+     * @param xs aligned line origins
+     * @param top first line top
+     * @param size logical em size
+     * @param advance distance between line tops
+     * @param color fill tint
+     * @param effects enabled per-label configuration
+     * @param scale effect scale
+     * @return whether the adaptive renderer painted the complete block
+     */
+    public static boolean drawEffectLines(UINode node, String name, String[] lines, float[] xs, float top, float size, float advance, Color color, NanoTextEffects effects, float scale) {
+        /*
+         * Switch backends once for the entire block rather than once per line and
+         * effect stage. Shaping stays in the font cache and styles remain per-label.
+         */
+        TextFont font = font(node, name);
+        UIRoot root = node.getRoot();
+        if (font == null || root == null || root.getRenderContext() == null) return false;
+        root.getRenderContext().drawNanoTextLines(font, lines, xs, top + font.ascent() * size, size, advance, color, effects, scale);
+        return true;
     }
 
     /**
