@@ -68,6 +68,8 @@ import java.util.function.IntFunction;
  * texture-space pixel edges matching ParticleEmitter.setRegion. Reversed edges
  * flip sampling. They must lie inside the supplied texture. Runtime counters,
  * active particles and integration clocks are never restored from a config.</p>
+ * <p>A complete example is bundled at valthorne/particles/sparks.properties and
+ * can be loaded with ParticleParameters.fromClasspath.</p>
  *
  * <h2>Physics</h2>
  * <p>physics.enabled=false. Enabling requires asParticleSystem(texture, world)

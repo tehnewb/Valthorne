@@ -22,7 +22,7 @@ import java.util.function.IntFunction;
  * across different resolvers, so use distinct names for separate cache variants.
  *
  * <pre>{@code
- * Assets.loadAsync(ParticleParameters.fromClasspath("particles/sparks.properties", "sparks"), ParticleData.class)
+ * Assets.loadAsync(ParticleParameters.fromClasspath("valthorne/particles/sparks.properties", "sparks"), ParticleData.class)
  *         .thenAccept(data -> JGL.runTask(() -> particles = data.asParticleSystem(texture)));
  * }</pre>
  */
