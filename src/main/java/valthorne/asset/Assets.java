@@ -14,6 +14,8 @@ import valthorne.graphics.map.ldtk.LdtkParameters;
 import valthorne.graphics.map.ldtk.LdtkProject;
 import valthorne.graphics.map.tiled.TiledMapLoader;
 import valthorne.graphics.map.tiled.TiledMapParameters;
+import valthorne.graphics.particle.ParticleLoader;
+import valthorne.graphics.particle.ParticleParameters;
 import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
 
@@ -129,6 +131,7 @@ public final class Assets {
         addLoader(AdaptiveFontParameters.class, new AdaptiveFontLoader());
         addLoader(TiledMapParameters.class, new TiledMapLoader());
         addLoader(LdtkParameters.class, new LdtkLoader());
+        addLoader(ParticleParameters.class, new ParticleLoader());
     }
 
     /**
