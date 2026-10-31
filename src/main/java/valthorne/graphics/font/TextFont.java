@@ -86,6 +86,77 @@ public interface TextFont {
     void draw(TextureBatch batch, String text, float x, float y, float size, Color tint);
 
     /**
+     * Enables a round outline using logical drawing units, without changing layout.
+     * Shared-font changes affect immediate text and all existing retained runs.
+     * Configure on the graphics owner thread. Implementations may bound the radius.
+     *
+     * @param width positive outline radius in logical units
+     * @param color outline color copied by the font; null retains its current color
+     * @return this font for chaining
+     */
+    TextFont setOutline(int width, Color color);
+
+    /**
+     * Disables outlining for subsequent draws, including already retained runs.
+     */
+    void disableOutline();
+
+    /**
+     * Reports whether outlining is enabled.
+     * @return whether subsequent draws include an outline
+     */
+    boolean isOutlineEnabled();
+
+    /**
+     * Returns the configured logical outline radius, even when disabled.
+     * @return positive outline radius
+     */
+    int getOutlineWidth();
+
+    /**
+     * Enables a shadow behind the complete run and its outline. Offsets use logical
+     * drawing units; positive X points right and positive Y points up in the batch's
+     * bottom-up coordinates. Rotated runs rotate the offset with the text. Colors
+     * are copied and alpha multiplies the corresponding fill/style opacity.
+     * @param offsetX finite horizontal displacement
+     * @param offsetY finite vertical displacement
+     * @param color copied shadow color, or null to keep the current color
+     * @return this font for chaining
+     * @throws IllegalArgumentException if an offset is non-finite
+     */
+    TextFont setShadow(float offsetX, float offsetY, Color color);
+
+    /**
+     * Disables the shadow while retaining its configured offsets and color.
+     */
+    void disableShadow();
+
+    /**
+     * Reports whether subsequent immediate and retained draws include a shadow.
+     * @return shadow state
+     */
+    boolean isShadowEnabled();
+
+    /**
+     * Returns the configured horizontal displacement in logical drawing units.
+     * @return shadow X offset, positive right
+     */
+    float getShadowOffsetX();
+
+    /**
+     * Returns the configured vertical displacement in logical drawing units.
+     * @return shadow Y offset, positive up in the drawing batch
+     */
+    float getShadowOffsetY();
+
+    /**
+     * Copies the configured shadow color without exposing mutable font state.
+     * This getter allocates a small color snapshot; it is not needed for drawing.
+     * @return caller-owned shadow color copy
+     */
+    Color getShadowColor();
+
+    /**
      * Reports whether native and GPU resources have been released.
      * @return whether this font is disposed
      */
