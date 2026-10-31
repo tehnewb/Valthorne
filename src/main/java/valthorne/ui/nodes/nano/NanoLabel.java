@@ -1,6 +1,8 @@
 package valthorne.ui.nodes.nano;
 
 import valthorne.ui.NanoText;
+import valthorne.ui.NanoTextEffects;
+import valthorne.ui.NanoTextPass;
 
 import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
@@ -37,6 +39,19 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * retain their alignment. Glyph ink may overhang advance-based label bounds;
  * ancestor containers and the root supply clipping. Text is normalized for measurement
  * and drawing without modifying getText().</p>
+ *
+ * <p>Optional per-label effects use the existing adaptive or explicitly named
+ * NanoVG face without modifying shared font configuration. They do not expand
+ * measurement, alignment, selection or hit bounds. Shadow paints before outline
+ * and fill, and effects remain subject to UI clipping. Configuration belongs on
+ * the UI graphics thread. Disable either effect without discarding its settings:</p>
+ * <pre>{@code
+ * NanoLabel status = new NanoLabel("Loading...")
+ *         .outline(1, Color.BLACK)
+ *         .shadow(2f, 2f, new Color(0f, 0f, 0f, .5f));
+ * status.outline(false).shadow(false);
+ * status.outline(true).shadow(true);
+ * }</pre>
  *
  * @author Albert Beaupre
  */
@@ -78,6 +93,8 @@ public class NanoLabel extends UINode implements NanoNode {
      */
     public static final StyleKey<Color> SELECTION_COLOR_KEY = StyleKey.of("nano.label.selectionColor", Color.class, new Color(0xFF40576D));
 
+    private float[] effectLineXs; // Reused aligned positions across effect passes; null before effects are drawn.
+    private NanoTextEffects textEffects; // Lazily allocated per-label paint configuration; null is the fill-only fast path.
     private String text = ""; // Raw non-null text before newline and tab normalization.
     private String fontName = "default"; // Borrowed NanoVG font registration name.
     private float fontSize = 18f; // Text measurement and drawing size in UI units.
@@ -95,6 +112,90 @@ public class NanoLabel extends UINode implements NanoNode {
     private float lastPressX; // Screen X of the preceding press for multiple-click tolerance.
     private float lastPressY; // Screen Y of the preceding press for multiple-click tolerance.
     private int clickCount; // Current single, double, or triple-click selection phase.
+    /**
+     * Enables a one-unit black outline without changing text layout or its shared font.
+     * @return this label
+     */
+    public NanoLabel outline() { return outline(1, Color.BLACK); }
+
+    /**
+     * Enables a round per-label outline. Colors are copied; radius changes rebuild a
+     * cached disk, while drawing reuses shaped lines. Configure and draw on the UI
+     * graphics thread. Effects stay inside existing clips and do not expand layout.
+     * @param width logical UI radius from 1 through 16
+     * @param color copied tint, or null to retain the current black/default tint
+     * @return this label
+     * @throws IllegalArgumentException if width is outside the supported range
+     */
+    public NanoLabel outline(int width, Color color) {
+        if (textEffects == null) textEffects = new NanoTextEffects();
+        textEffects.outline(width, color);
+        return this;
+    }
+
+    /**
+     * Enables the retained outline or disables it without losing its settings.
+     * @param enabled whether to paint the outline
+     * @return this label
+     */
+    public NanoLabel outline(boolean enabled) {
+        if (textEffects == null) {
+            if (!enabled) return this;
+            textEffects = new NanoTextEffects();
+        }
+        textEffects.outline(enabled);
+        return this;
+    }
+
+    /**
+     * Enables a shadow two UI units right and down, retaining its configured color.
+     * The initial color is half-opacity black.
+     * @return this label
+     */
+    public NanoLabel shadow() { return shadow(2f, 2f, null); }
+
+    /**
+     * Enables a per-label shadow behind the outline and fill. Offsets scale with
+     * projected previews; positive X points right and positive Y points down.
+     * The color is copied and its alpha multiplies fill and inherited opacity.
+     * @param x finite logical horizontal offset
+     * @param y finite logical vertical offset
+     * @param color copied tint, or null to retain the previous half-opacity black tint
+     * @return this label
+     * @throws IllegalArgumentException if either offset is non-finite
+     */
+    public NanoLabel shadow(float x, float y, Color color) {
+        if (textEffects == null) textEffects = new NanoTextEffects();
+        textEffects.shadow(x, y, color);
+        return this;
+    }
+
+    /**
+     * Enables or disables the retained shadow without changing its configuration.
+     * @param enabled whether to paint the shadow
+     * @return this label
+     */
+    public NanoLabel shadow(boolean enabled) {
+        if (textEffects == null) {
+            if (!enabled) return this;
+            textEffects = new NanoTextEffects();
+        }
+        textEffects.shadow(enabled);
+        return this;
+    }
+
+    /**
+     * Reports whether this label's optional outline is enabled.
+     * @return whether an outline is painted
+     */
+    public boolean isOutlineEnabled() { return textEffects != null && textEffects.isOutlineEnabled(); }
+
+    /**
+     * Reports whether this label's optional shadow is enabled.
+     * @return whether a shadow is painted
+     */
+    public boolean isShadowEnabled() { return textEffects != null && textEffects.isShadowEnabled(); }
+
     /**
      * Opts into read-only pointer selection and Ctrl/Cmd+C. Disabled by default.
      */
@@ -671,41 +772,40 @@ public class NanoLabel extends UINode implements NanoNode {
         float y = getAbsoluteY() + blockOffset(lines.length, lineHeight, lineSpacing, getHeight());
 
         int offset = 0;
-        for (int i = 0; i < lines.length; i++) {
+        for (int i = 0; selection != null && (isFocused() || documentSelection) && i < lines.length; i++) {
             float lineX = x + lineOffset(vg, lines[i], fontSize, getWidth());
-            if (selection != null && (isFocused() || documentSelection)) {
-                int start = Math.max(0, selection.start() - offset);
-                int end = Math.min(lines[i].length(), selection.end() - offset);
-                if (end > start) {
-                    nvgBeginPath(vg);
-                    TextRun layout = NanoText.layout(this, fontName, fontSize, lines[i]);
-                    float selectionY = y + i * (lineHeight + lineSpacing);
-                    if (layout == null) {
-                        float left = measure(vg, lines[i].substring(0, start));
-                        float right = measure(vg, lines[i].substring(0, end));
-                        nvgRect(vg, lineX + left, selectionY, right - left, lineHeight);
-                    } else {
-                        if (selectionRanges == null) selectionRanges = new float[8];
-                        int ranges = layout.selectionRanges(start, end, selectionRanges);
-                        if (ranges * 2 > selectionRanges.length) {
-                            selectionRanges = new float[ranges * 2];
-                            layout.selectionRanges(start, end, selectionRanges);
-                        }
-                        for (int range = 0; range < ranges; range++) {
-                            float left = selectionRanges[range * 2];
-                            float right = selectionRanges[range * 2 + 1];
-                            nvgRect(vg, lineX + left, selectionY, right - left, lineHeight);
-                        }
+            int start = Math.max(0, selection.start() - offset);
+            int end = Math.min(lines[i].length(), selection.end() - offset);
+            if (end > start) {
+                nvgBeginPath(vg);
+                TextRun layout = NanoText.layout(this, fontName, fontSize, lines[i]);
+                float selectionY = y + i * (lineHeight + lineSpacing);
+                if (layout == null) {
+                    float left = measure(vg, lines[i].substring(0, start));
+                    float right = measure(vg, lines[i].substring(0, end));
+                    nvgRect(vg, lineX + left, selectionY, right - left, lineHeight);
+                } else {
+                    if (selectionRanges == null) selectionRanges = new float[8];
+                    int ranges = layout.selectionRanges(start, end, selectionRanges);
+                    if (ranges * 2 > selectionRanges.length) {
+                        selectionRanges = new float[ranges * 2];
+                        layout.selectionRanges(start, end, selectionRanges);
                     }
-                    Color selectionColor = getStyle() == null ? SELECTION_COLOR_KEY.getDefaultValue() : getStyle().get(SELECTION_COLOR_KEY);
-                    nvgFillColor(vg, NanoUtility.color1(selectionColor));
-                    nvgFill(vg);
-                    nvgFillColor(vg, NanoUtility.color1(color));
+                    for (int range = 0; range < ranges; range++) {
+                        float left = selectionRanges[range * 2];
+                        float right = selectionRanges[range * 2 + 1];
+                        nvgRect(vg, lineX + left, selectionY, right - left, lineHeight);
+                    }
                 }
+                Color selectionColor = getStyle() == null ? SELECTION_COLOR_KEY.getDefaultValue() : getStyle().get(SELECTION_COLOR_KEY);
+                nvgFillColor(vg, NanoUtility.color1(selectionColor));
+                nvgFill(vg);
+                nvgFillColor(vg, NanoUtility.color1(color));
             }
-            NanoText.draw(this, vg, fontName, lineX, y + i * (lineHeight + lineSpacing), lines[i], fontSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
             offset += lines[i].length() + 1;
         }
+        drawTextLines(vg, lines, x, y, fontSize, lineHeight, lineSpacing, getWidth(), 1f);
     }
 
     /**
@@ -728,9 +828,48 @@ public class NanoLabel extends UINode implements NanoNode {
         nvgFillColor(vg, NanoUtility.color1(color));
         float lineHeight = NanoText.measureTextHeight(this, vg, fontName, projectedSize);
         float textY = y + blockOffset(lines.length, lineHeight, lineSpacing * scale, getHeight() * scale);
-        for (int index = 0; index < lines.length; index++) {
-            float lineX = x + lineOffset(vg, lines[index], projectedSize, getWidth() * scale);
-            NanoText.draw(this, vg, fontName, lineX, textY + index * (lineHeight + lineSpacing * scale), lines[index], projectedSize, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        drawTextLines(vg, lines, x, textY, projectedSize, lineHeight, lineSpacing * scale, getWidth() * scale, scale);
+    }
+
+    /**
+     * Paints all shadow lines before all outline lines and then the fill. Selection
+     * backgrounds have already been drawn, so negative offsets and overlapping line
+     * spacing cannot paint effects over a previous line's fill.
+     * @param vg active context
+     * @param lines normalized borrowed lines
+     * @param x block left
+     * @param y aligned block top
+     * @param size drawing em size
+     * @param lineHeight measured line height
+     * @param spacing extra line spacing
+     * @param width alignment width
+     * @param scale effect scale
+     */
+    private void drawTextLines(long vg, String[] lines, float x, float y, float size, float lineHeight, float spacing, float width, float scale) {
+        if (textEffects != null) {
+            if (textEffects.isShadowEnabled()) drawTextPass(vg, lines, x, y, size, lineHeight, spacing, width, scale, NanoTextPass.SHADOW);
+            if (textEffects.isOutlineEnabled()) drawTextPass(vg, lines, x, y, size, lineHeight, spacing, width, scale, NanoTextPass.OUTLINE);
+        }
+        drawTextPass(vg, lines, x, y, size, lineHeight, spacing, width, scale, NanoTextPass.FILL);
+    }
+
+    /**
+     * Submits one stage for the complete block without allocating wrapper layouts.
+     * @param vg active context
+     * @param lines normalized borrowed lines
+     * @param x block left
+     * @param y aligned block top
+     * @param size drawing em size
+     * @param lineHeight measured line height
+     * @param spacing extra line spacing
+     * @param width alignment width
+     * @param scale effect scale
+     * @param pass requested stage
+     */
+    private void drawTextPass(long vg, String[] lines, float x, float y, float size, float lineHeight, float spacing, float width, float scale, NanoTextPass pass) {
+        for (int i = 0; i < lines.length; i++) {
+            float lineX = x + lineOffset(vg, lines[i], size, width);
+            NanoText.draw(this, vg, fontName, lineX, y + i * (lineHeight + spacing), lines[i], size, color, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, textEffects, scale, pass);
         }
     }
 
