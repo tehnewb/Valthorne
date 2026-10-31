@@ -9,6 +9,7 @@ import valthorne.utility.properties.PropertyValue;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.IntFunction;
 
 /**
  * Validated CPU animation asset: one decoded image, source rectangles, durations
@@ -67,12 +68,26 @@ import java.util.Set;
  * counters, finished state and ping-pong return direction are runtime state,
  * not serializable settings; assign listeners on each constructed player.</p>
  *
+ * <h2>Cache image IDs</h2>
+ * <p>Replace image with imageID (a nonnegative int) and supply an image resolver
+ * when loading. The callback runs once on the loading thread and returns borrowed
+ * TextureData in the configured flipVertically orientation. It must not perform
+ * OpenGL work. The cache retains ownership, including when loading fails. Do not
+ * specify both image and imageID. With Assets, attach the callback using
+ * AnimationParameters.withImageResolver or its byte-source resolver factory.</p>
+ * <pre>{@code
+ * // Configuration contains imageID:integer=42 instead of image:string=...
+ * AnimationData data = AnimationData.load(properties, cache::getImageData);
+ * }</pre>
+ *
  * <h2>Ownership</h2>
- * <p>Loader-created data owns its decoded pixels. dispose releases only those
- * pixels and prevents further player creation. Existing uploaded players remain
+ * <p>Encoded-image loader requests own their decoded pixels; cache-resolver
+ * requests borrow theirs. dispose releases only owned pixels and prevents
+ * further player creation. Existing uploaded players remain
  * valid. asAnimation() owns a new GPU texture, released by Animation.dispose;
  * asAnimation(texture) borrows the caller's same-sized texture and never changes
- * its filter or disposes it. Direct load(properties, pixels) borrows CPU pixels.
+ * its filter or disposes it. Direct load(properties, pixels) and resolver loads
+ * borrow CPU pixels; disposing their AnimationData never disposes cache images.
  * Do not dispose borrowed data or pixels while another thread constructs a
  * player. Create and dispose GPU objects on the graphics thread, after ending
  * batches that reference them.</p>
@@ -87,10 +102,12 @@ import java.util.Set;
  * }</pre>
  */
 public final class AnimationData {
+
     /**
      * Supported scalar configuration names; frame-specific names are checked separately.
      */
-    private static final Set<String> KEYS = Set.of("image", "frameWidth", "frameHeight", "marginX", "marginY", "spacingX", "spacingY", "columns", "rows", "startFrame", "endFrame", "frames", "frameCount", "duration", "frameDuration", "speed", "playbackMode", "looping", "loopCount", "paused", "visible", "initialFrame", "initialTime", "randomStart", "x", "y", "width", "height", "rotation", "flipVertically", "filter");
+    private static final Set<String> KEYS = Set.of("image", "imageID", "frameWidth", "frameHeight", "marginX", "marginY", "spacingX", "spacingY", "columns", "rows", "startFrame", "endFrame", "frames", "frameCount", "duration", "frameDuration", "speed", "playbackMode", "looping", "loopCount", "paused", "visible", "initialFrame", "initialTime", "randomStart", "x", "y", "width", "height", "rotation", "flipVertically", "filter");
+
     /**
      * Grid and selection properties incompatible with explicit rectangle sequences.
      */
@@ -131,14 +148,36 @@ public final class AnimationData {
     }
 
     /**
+     * Reads a filesystem config and borrows its image from a caller-owned cache.
+     *
+     * @param path configuration containing imageID
+     * @param imageResolver non-null CPU-image lookup, invoked on the loading thread
+     * @return data borrowing the resolved image
+     */
+    public static AnimationData load(String path, IntFunction<TextureData> imageResolver) {
+        return new AnimationLoader().load(AnimationParameters.fromPath(path).withImageResolver(imageResolver));
+    }
+
+    /**
      * Decodes a text configuration and its supplied encoded image without GPU work.
      *
      * @param configBytes UTF-8 PropertySet configuration
-     * @param imageBytes encoded linked image
+     * @param imageBytes  encoded linked image
      * @return newly owned decoded asset
      */
     public static AnimationData load(byte[] configBytes, byte[] imageBytes) {
         return new AnimationLoader().load(AnimationParameters.fromBytes(configBytes, imageBytes, "animation-bytes"));
+    }
+
+    /**
+     * Parses UTF-8 configuration bytes and resolves their imageID through a cache.
+     *
+     * @param configBytes UTF-8 PropertySet text
+     * @param imageResolver non-null lookup returning borrowed decoded pixels
+     * @return data borrowing the cache image
+     */
+    public static AnimationData load(byte[] configBytes, IntFunction<TextureData> imageResolver) {
+        return new AnimationLoader().load(AnimationParameters.fromBytes(configBytes, "animation-bytes", imageResolver));
     }
 
     /**
@@ -147,11 +186,45 @@ public final class AnimationData {
      * property is optional here because the dependency is already supplied.
      *
      * @param properties animation configuration
-     * @param pixels borrowed decoded image, in the configured flipVertically orientation
+     * @param pixels     borrowed decoded image, in the configured flipVertically orientation
      * @return validated data without GPU allocation
      */
     public static AnimationData load(PropertySet properties, TextureData pixels) {
         return new AnimationData(properties, pixels, false);
+    }
+
+    /**
+     * Snapshots configuration and resolves its imageID exactly once. No filename
+     * is needed. A null result is rejected; callback exceptions propagate unchanged.
+     * Neither successful loading, failed validation nor disposal releases the
+     * cache-owned pixels. The cache must keep them alive during player construction.
+     *
+     * @param properties configuration containing imageID and no image path
+     * @param imageResolver non-null lookup returning pixels in the configured orientation
+     * @return validated data borrowing the resolved image
+     * @throws IllegalArgumentException if the ID is missing/invalid or lookup returns null
+     */
+    public static AnimationData load(PropertySet properties, IntFunction<TextureData> imageResolver) {
+        if (properties == null || imageResolver == null)
+            throw new IllegalArgumentException("Properties and image resolver cannot be null");
+        PropertySet snapshot = copy(properties);
+        int id = imageID(snapshot);
+        TextureData pixels = imageResolver.apply(id);
+        if (pixels == null) throw new IllegalArgumentException("No image data resolved for imageID " + id);
+        return new AnimationData(snapshot, pixels, false);
+    }
+
+    /**
+     * Validates the cache reference without narrowing fractional or overflowing IDs.
+     *
+     * @param properties configuration containing a cache ID
+     * @return nonnegative image ID
+     */
+    private static int imageID(PropertySet properties) {
+        if (properties.contains("image")) throw new IllegalArgumentException("Use image or imageID, not both");
+        int id = integer(properties, "imageID", -1);
+        if (id < 0) throw new IllegalArgumentException("imageID must be a nonnegative int");
+        return id;
     }
 
     /**
@@ -364,9 +437,10 @@ public final class AnimationData {
      * Validates all player settings before allowing GPU object construction.
      *
      * @param properties loading snapshot
-     * @param count selected frame count
+     * @param count      selected frame count
      */
     private static void validateSettings(PropertySet properties, int count) {
+        if (properties.contains("imageID")) imageID(properties);
         properties.getOrDefault("playbackMode", "FORWARD").asEnum(PlaybackMode.class);
         properties.getOrDefault("filter", "NEAREST").asEnum(TextureFilter.class);
         if (number(properties, "speed", 1) < .000001f)
