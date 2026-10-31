@@ -1,5 +1,7 @@
 {
-  "version": "1.4.5.0",
-  "reason": "manual-release",
-  "pullRequests": []
+  "version": "1.5.0.0",
+  "reason": "major-or-feature-version",
+  "pullRequests": [
+    117
+  ]
 }
