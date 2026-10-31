@@ -2,6 +2,8 @@ package valthorne.asset;
 
 import valthorne.audio.SoundLoader;
 import valthorne.audio.SoundParameters;
+import valthorne.graphics.animation.AnimationLoader;
+import valthorne.graphics.animation.AnimationParameters;
 import valthorne.graphics.font.FontLoader;
 import valthorne.graphics.font.adaptive.AdaptiveFontLoader;
 import valthorne.graphics.font.adaptive.AdaptiveFontParameters;
@@ -122,6 +124,7 @@ public final class Assets {
     static {
         addLoader(SoundParameters.class, new SoundLoader());
         addLoader(TextureParameters.class, new TextureLoader());
+        addLoader(AnimationParameters.class, new AnimationLoader());
         addLoader(FontParameters.class, new FontLoader());
         addLoader(AdaptiveFontParameters.class, new AdaptiveFontLoader());
         addLoader(TiledMapParameters.class, new TiledMapLoader());
