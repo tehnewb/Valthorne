@@ -67,6 +67,12 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * Unicode ranges cannot cause unbounded startup work. All other glyphs load on
  * demand, including glyphs introduced by shaping. Consecutive sprites, coverage
  * text and MSDF text share the standard batch without per-label flushes.
+ * Optional shadows submit one extra copy of the shaped run behind outlines and
+ * fill. Shadow offsets use logical bottom-up drawing units and rotate with the
+ * run; UI downwards shadows normally use a negative Y offset. Both effects are
+ * disabled by default, multiply fill/style alpha, reuse a submission color and
+ * leave shaping, layout and selection unchanged. Settings apply immediately to
+ * existing retained runs and borrowed theme fonts, including NanoLabel text.
  * Optional outlines replay the shaped run at cached integer offsets in a round disk,
  * behind its fill. The radius is in logical units (1 through 16), follows batch
  * scaling/rotation and uses the same coverage/MSDF path, clipping and shaders.
@@ -76,7 +82,7 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * The disabled path adds one branch; enabled drawing submits one extra quad per
  * drawable glyph per disk offset, with no new per-frame layout or color objects.
  * Large radii cost proportionally more submissions and should be used sparingly.
- * Glyph styling callbacks run for each outline pass as well as the fill, using
+ * Glyph styling callbacks run for each effect pass as well as the fill, using
  * the unshifted fill geometry; keep callbacks deterministic and side-effect free.
  * Participating batch shaders retain their transforms and fragment effects.
  * Each MSDF image, including a provisional small-text fallback, temporarily uses
@@ -88,13 +94,15 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  *         .asFont();
  * font.setSize(20)
  *         .setHinting(FontHinting.LIGHT);
- * font.setOutline(1, Color.BLACK);
+ * font.setOutline(1, Color.BLACK)
+ *         .setShadow(2f, -2f, new Color(0f, 0f, 0f, .5f));
  * AdaptiveTextRun title = font.createRun("Valthorne", 96);
  * batch.begin();
  * font.draw(batch, "Inventory", 24, 100, 20, Color.WHITE);
  * title.draw(batch, 24, 200, Color.WHITE);
  * batch.end();
- * font.disableOutline(); // Existing retained runs immediately use fill-only rendering.
+ * font.disableOutline();
+ * font.disableShadow(); // Existing retained runs immediately use fill-only rendering.
  * font.dispose();
  * }</pre>
  *
@@ -170,7 +178,11 @@ public final class AdaptiveFont implements TextFont {
      */
     private static final int MAX_OUTLINE_WIDTH = 16;
     private final Color outlineColor = new Color(0f, 0f, 0f, 1f); // Owned outline tint, copied at configuration time.
-    private final Color outlineTint = new Color(0f, 0f, 0f, 1f); // Reused submission color with fill alpha applied.
+    private final Color effectTint = new Color(0f, 0f, 0f, 1f); // Reused submission color with fill alpha applied.
+    private final Color shadowColor = new Color(0f, 0f, 0f, .75f); // Owned copied shadow color.
+    private float shadowOffsetX = 2f; // Logical displacement, positive right.
+    private float shadowOffsetY = -2f; // Logical displacement, positive up in batch coordinates.
+    private boolean shadowEnabled; // Whether all subsequent run draws include the shadow pass.
     private int[] outlineOffsets; // Cached disk offset pairs; allocated only when configuring a new radius.
     private int outlineWidth = 1; // Configured radius in logical drawing units.
     private boolean outlineEnabled; // Whether every run draw includes the cached outline passes.
@@ -304,6 +316,48 @@ public final class AdaptiveFont implements TextFont {
     public int getOutlineWidth() {
         checkOwner();
         return outlineWidth;
+    }
+
+    @Override
+    public AdaptiveFont setShadow(float offsetX, float offsetY, Color color) {
+        checkOwner();
+        if (!Float.isFinite(offsetX) || !Float.isFinite(offsetY))
+            throw new IllegalArgumentException("Shadow offsets must be finite");
+        shadowOffsetX = offsetX;
+        shadowOffsetY = offsetY;
+        if (color != null) shadowColor.set(color);
+        shadowEnabled = true;
+        return this;
+    }
+
+    @Override
+    public void disableShadow() {
+        checkOwner();
+        shadowEnabled = false;
+    }
+
+    @Override
+    public boolean isShadowEnabled() {
+        checkOwner();
+        return shadowEnabled;
+    }
+
+    @Override
+    public float getShadowOffsetX() {
+        checkOwner();
+        return shadowOffsetX;
+    }
+
+    @Override
+    public float getShadowOffsetY() {
+        checkOwner();
+        return shadowOffsetY;
+    }
+
+    @Override
+    public Color getShadowColor() {
+        checkOwner();
+        return new Color(shadowColor.r(), shadowColor.g(), shadowColor.b(), shadowColor.a());
     }
 
     /**
@@ -578,22 +632,28 @@ public final class AdaptiveFont implements TextFont {
         if (run.count == 0 || run.size == 0f) return;
         if (styler != null) run.ensureStyleContext(true);
         if (preparing) uploadPrepared(batch);
-        if (outlineEnabled && outlineColor.a() > 0f) {
+        boolean paintShadow = shadowEnabled && shadowColor.a() > 0f;
+        boolean paintOutline = outlineEnabled && outlineColor.a() > 0f;
+        if (paintShadow || paintOutline) {
             float sin = radians == 0f ? 0f : (float) Math.sin(radians);
             float cos = radians == 0f ? 1f : (float) Math.cos(radians);
-            for (int i = 0; i < outlineOffsets.length; i += 2) {
-                float dx = outlineOffsets[i];
-                float dy = outlineOffsets[i + 1];
-                drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, true, dx * cos - dy * sin, dx * sin + dy * cos);
+            if (paintShadow)
+                drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, shadowColor, shadowOffsetX * cos - shadowOffsetY * sin, shadowOffsetX * sin + shadowOffsetY * cos);
+            if (paintOutline) {
+                for (int i = 0; i < outlineOffsets.length; i += 2) {
+                    float dx = outlineOffsets[i];
+                    float dy = outlineOffsets[i + 1];
+                    drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, outlineColor, dx * cos - dy * sin, dx * sin + dy * cos);
+                }
             }
         }
-        drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, false, 0f, 0f);
+        drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, null, 0f, 0f);
     }
 
     /**
-     * Submits one cached shaped run with its normal fill or the reusable outline tint.
-     * Outline copies share glyph images, shader restoration and raster selection with
-     * the fill; styles contribute alpha without replacing the configured outline RGB.
+     * Submits one cached shaped run with its normal fill or a reusable effect tint.
+     * Effect copies share glyph images, shader restoration and raster selection with
+     * the fill; styles contribute alpha without replacing the configured effect RGB.
      *
      * @param batch active destination
      * @param run borrowed retained layout
@@ -604,11 +664,11 @@ public final class AdaptiveFont implements TextFont {
      * @param ends optional UTF-16 style boundaries
      * @param colors optional borrowed fill colors
      * @param spanCount used style count
-     * @param outline whether this pass submits outline copies
+     * @param effect optional shadow/outline tint, or null for the normal fill
      * @param offsetX world X offset applied after glyph styling
      * @param offsetY world Y offset applied after glyph styling
      */
-    private void drawRunPass(TextureBatch batch, AdaptiveTextRun run, float x, float y, float radians, Color tint, int[] ends, Color[] colors, int spanCount, boolean outline, float offsetX, float offsetY) {
+    private void drawRunPass(TextureBatch batch, AdaptiveTextRun run, float x, float y, float radians, Color tint, int[] ends, Color[] colors, int spanCount, Color effect, float offsetX, float offsetY) {
         int count = run.count;
         float size = run.size;
         FontStyler callback = styler;
@@ -684,10 +744,10 @@ public final class AdaptiveFont implements TextFont {
                     if (batch.getShader() != selected) batch.setShader(selected);
                 }
                 Color submissionTint = drawTint;
-                if (outline) {
-                    outlineTint.set(outlineColor);
-                    outlineTint.a(outlineColor.a() * drawTint.a());
-                    submissionTint = outlineTint;
+                if (effect != null) {
+                    effectTint.set(effect);
+                    effectTint.a(effect.a() * drawTint.a());
+                    submissionTint = effectTint;
                 }
                 batch.drawUV(glyph.page(), drawX + offsetX, drawY + offsetY, width, height, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), x - drawX, y - drawY, sin, cos, submissionTint);
             }
