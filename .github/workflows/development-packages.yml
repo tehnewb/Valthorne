@@ -1,0 +1,50 @@
+name: Publish development package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Select immutable development version
+        id: version
+        shell: bash
+        run: |
+          base=$(sed -n 's/^version=\([0-9][0-9.]*\)\r\{0,1\}$/\1/p' gradle.properties)
+          [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          commit=$(git rev-parse HEAD)
+          echo "value=$base-dev.$commit.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Build and publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEVELOPMENT_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          bash ./gradlew assemble publishAllPublicationsToGithubPackagesRepository \
+            -PgithubPackages=true "-PreleaseVersion=$DEVELOPMENT_VERSION" --console=plain
+      - name: Record dependency coordinate
+        env:
+          DEVELOPMENT_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          printf '### Development package\n\n`io.github.tehnewb:valthorne:%s`\n\nSource commit: `%s`\n' \
+            "$DEVELOPMENT_VERSION" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
