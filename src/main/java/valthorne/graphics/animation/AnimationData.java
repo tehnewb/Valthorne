@@ -2,7 +2,6 @@ package valthorne.graphics.animation;
 
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureData;
-import valthorne.graphics.texture.TextureFilter;
 import valthorne.graphics.texture.TextureRegionDrawable;
 import valthorne.utility.properties.PropertySet;
 import valthorne.utility.properties.PropertyValue;
@@ -62,8 +61,8 @@ import java.util.function.IntFunction;
  * the first selected frame's source size. Without bounds, draw coordinates
  * supplied by the caller remain in control.</p>
  *
- * <p>Image settings: flipVertically=true (normal OpenGL orientation) and
- * filter=NEAREST. filter accepts TextureFilter names. Unknown properties and
+ * <p>flipVertically=true selects normal OpenGL decoding orientation. Texture
+ * filtering belongs to the caller-supplied texture. Unknown properties and
  * out-of-image rectangles are rejected. Listener callbacks, completed-loop
  * counters, finished state and ping-pong return direction are runtime state,
  * not serializable settings; assign listeners on each constructed player.</p>
@@ -83,10 +82,9 @@ import java.util.function.IntFunction;
  * <h2>Ownership</h2>
  * <p>Encoded-image loader requests own their decoded pixels; cache-resolver
  * requests borrow theirs. dispose releases only owned pixels and prevents
- * further player creation. Existing uploaded players remain
- * valid. asAnimation() owns a new GPU texture, released by Animation.dispose;
- * asAnimation(texture) borrows the caller's same-sized texture and never changes
- * its filter or disposes it. Direct load(properties, pixels) and resolver loads
+ * further player creation. Existing players remain valid as long as their
+ * caller-supplied texture is alive. asAnimation(texture) borrows that same-sized
+ * texture and never changes its filter or disposes it. Direct load(properties, pixels) and resolver loads
  * borrow CPU pixels; disposing their AnimationData never disposes cache images.
  * Do not dispose borrowed data or pixels while another thread constructs a
  * player. Create and dispose GPU objects on the graphics thread, after ending
@@ -94,11 +92,12 @@ import java.util.function.IntFunction;
  *
  * <pre>{@code
  * AnimationData data = AnimationData.load("assets/hero.properties");
- * Animation hero = data.asAnimation(); // graphics thread
- * data.dispose();                    // uploaded player stays valid
+ * Texture sheet = data.textureData().asTexture(); // caller owns this upload
+ * Animation hero = data.asAnimation(sheet);
+ * data.dispose();                              // player stays valid
  * hero.update(delta);
  * hero.draw(batch, 100, 100, 64, 64);
- * hero.dispose();                    // after the final batch ends
+ * sheet.dispose();                             // after all sheet users finish
  * }</pre>
  */
 public final class AnimationData {
@@ -106,7 +105,7 @@ public final class AnimationData {
     /**
      * Supported scalar configuration names; frame-specific names are checked separately.
      */
-    private static final Set<String> KEYS = Set.of("image", "imageID", "frameWidth", "frameHeight", "marginX", "marginY", "spacingX", "spacingY", "columns", "rows", "startFrame", "endFrame", "frames", "frameCount", "duration", "frameDuration", "speed", "playbackMode", "looping", "loopCount", "paused", "visible", "initialFrame", "initialTime", "randomStart", "x", "y", "width", "height", "rotation", "flipVertically", "filter");
+    private static final Set<String> KEYS = Set.of("image", "imageID", "frameWidth", "frameHeight", "marginX", "marginY", "spacingX", "spacingY", "columns", "rows", "startFrame", "endFrame", "frames", "frameCount", "duration", "frameDuration", "speed", "playbackMode", "looping", "loopCount", "paused", "visible", "initialFrame", "initialTime", "randomStart", "x", "y", "width", "height", "rotation", "flipVertically");
 
     /**
      * Grid and selection properties incompatible with explicit rectangle sequences.
@@ -442,7 +441,6 @@ public final class AnimationData {
     private static void validateSettings(PropertySet properties, int count) {
         if (properties.contains("imageID")) imageID(properties);
         properties.getOrDefault("playbackMode", "FORWARD").asEnum(PlaybackMode.class);
-        properties.getOrDefault("filter", "NEAREST").asEnum(TextureFilter.class);
         if (number(properties, "speed", 1) < .000001f)
             throw new IllegalArgumentException("speed must be at least 0.000001");
         int loops = integer(properties, "loopCount", -1);
@@ -496,25 +494,6 @@ public final class AnimationData {
     }
 
     /**
-     * Uploads an independent GPU sheet and creates its owning player. This must
-     * run on the graphics thread. Disposing this data later does not invalidate
-     * the uploaded player, whose texture is released by Animation.dispose.
-     *
-     * @return independent configured player owning one GPU texture
-     */
-    public Animation asAnimation() {
-        ensureAlive();
-        Texture texture = textureData.asTexture();
-        try {
-            texture.setFilter(properties.getOrDefault("filter", "NEAREST").asEnum(TextureFilter.class));
-            return createAnimation(texture, true);
-        } catch (RuntimeException | Error failure) {
-            texture.dispose();
-            throw failure;
-        }
-    }
-
-    /**
      * Creates a player borrowing an existing same-sized, same-orientation sheet.
      * This avoids duplicate GPU uploads when many players share a sprite sheet.
      * The caller controls texture filtering and lifetime.
@@ -526,17 +505,6 @@ public final class AnimationData {
         ensureAlive();
         if (texture == null || texture.getWidth() != textureData.width() || texture.getHeight() != textureData.height())
             throw new IllegalArgumentException("Texture must match animation image dimensions");
-        return createAnimation(texture, false);
-    }
-
-    /**
-     * Builds independent GPU region wrappers and applies initial playback state.
-     *
-     * @param texture backing sheet
-     * @param owned whether player disposal releases the sheet
-     * @return configured player
-     */
-    private Animation createAnimation(Texture texture, boolean owned) {
         boolean flip = flag(properties, "flipVertically", true);
         AnimationFrame[] runtime = new AnimationFrame[frames.length];
         for (int i = 0; i < runtime.length; i++) {
@@ -545,7 +513,7 @@ public final class AnimationData {
             runtime[i] = new AnimationFrame(new TextureRegionDrawable(texture, frame.x(), y, frame.width(), frame.height()), frame.duration());
         }
         PlaybackMode mode = properties.getOrDefault("playbackMode", "FORWARD").asEnum(PlaybackMode.class);
-        Animation animation = owned ? new Animation(texture, mode, runtime) : new Animation(mode, runtime);
+        Animation animation = new Animation(mode, runtime);
         animation.setSpeed(number(properties, "speed", 1));
         int loops = integer(properties, "loopCount", -1);
         animation.loopCount(loops);

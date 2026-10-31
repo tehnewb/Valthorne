@@ -23,7 +23,7 @@ import java.util.function.IntFunction;
  *
  * <pre>{@code
  * Assets.loadAsync(AnimationParameters.fromClasspath("animations/walk.properties", "walk"), AnimationData.class)
- *         .thenAccept(data -> JGL.runTask(() -> animation = data.asAnimation()));
+ *         .thenAccept(data -> JGL.runTask(() -> animation = data.asAnimation(spriteSheet)));
  * }</pre>
  */
 public final class AnimationParameters implements AssetParameters {
