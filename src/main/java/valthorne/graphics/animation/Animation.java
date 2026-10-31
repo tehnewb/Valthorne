@@ -3,6 +3,7 @@ package valthorne.graphics.animation;
 import valthorne.collections.bits.ByteBits;
 import valthorne.graphics.Color;
 import valthorne.graphics.Drawable;
+import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.math.MathUtils;
 import valthorne.math.geometry.Rectangle;
@@ -72,6 +73,11 @@ import valthorne.math.geometry.Rectangle;
  * <p>This class uses {@link ByteBits} to pack common booleans into one byte:
  * paused, looping, returning (ping-pong), and finished.</p>
  *
+ * <p>Players created by {@link AnimationData#asAnimation()} own their uploaded
+ * sheet and must be disposed on the graphics thread after the final batch ends.
+ * Manually constructed players and players created with a supplied texture
+ * borrow their drawables and never dispose the backing textures.</p>
+ *
  * <p><b>Important:</b> If {@code frames} is null/empty, {@link #update(float)} and {@link #draw(TextureBatch, float, float, float, float)}
  * safely no-op and query methods return safe defaults.</p>
  *
@@ -113,6 +119,7 @@ public class Animation implements Drawable {
     private int loopsCompleted;                           // Number of completed loops (meaning depends on mode).
 
     private AnimationListener animationListener;          // Optional callbacks for frame changes/finish/loop.
+    private Texture ownedTexture; // Optional GPU sheet created by AnimationData; ordinary frame drawables remain borrowed.
 
     /**
      * Creates an {@code Animation} using a playback mode and a frame list.
@@ -140,6 +147,37 @@ public class Animation implements Drawable {
             }
         }
         reset();
+    }
+
+    /**
+     * Creates an asset-backed player that owns its newly uploaded sheet texture.
+     * CPU pixels remain owned by the loading data. Dispose on the graphics thread
+     * after ending any batch that uses the player.
+     *
+     * @param texture newly owned GPU texture
+     * @param playbackMode initial playback direction
+     * @param frames independent player frames borrowing the texture
+     */
+    Animation(Texture texture, PlaybackMode playbackMode, AnimationFrame... frames) {
+        this(playbackMode, frames);
+        ownedTexture = texture;
+    }
+
+    /**
+     * Releases the GPU sheet owned by an asset-created player, if present, and
+     * clears its frame references. Manually supplied drawables and textures are
+     * borrowed and never disposed here. Repeated calls are safe; setFrames may
+     * subsequently reuse this player with new borrowed frame data.
+     */
+    public void dispose() {
+        if (ownedTexture != null) {
+            ownedTexture.dispose();
+            ownedTexture = null;
+        }
+        frames = null;
+        totalDuration = 0;
+        currentIndex = 0;
+        elapsedTime = 0;
     }
 
     /**
