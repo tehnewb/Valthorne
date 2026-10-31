@@ -16,8 +16,6 @@ import valthorne.graphics.map.tiled.TiledMapLoader;
 import valthorne.graphics.map.tiled.TiledMapParameters;
 import valthorne.graphics.particle.ParticleLoader;
 import valthorne.graphics.particle.ParticleParameters;
-import valthorne.graphics.shader.ShaderLoader;
-import valthorne.graphics.shader.ShaderParameters;
 import valthorne.graphics.texture.TextureLoader;
 import valthorne.graphics.texture.TextureParameters;
 
@@ -134,7 +132,6 @@ public final class Assets {
         addLoader(TiledMapParameters.class, new TiledMapLoader());
         addLoader(LdtkParameters.class, new LdtkLoader());
         addLoader(ParticleParameters.class, new ParticleLoader());
-        addLoader(ShaderParameters.class, new ShaderLoader());
     }
 
     /**
