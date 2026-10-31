@@ -1,8 +1,9 @@
 package valthorne.graphics.animation;
 
-import valthorne.graphics.texture.Texture;
+import valthorne.graphics.Drawable;
+import valthorne.graphics.RegionDrawable;
+import valthorne.graphics.texture.TextureDrawable;
 import valthorne.graphics.texture.TextureData;
-import valthorne.graphics.texture.TextureRegionDrawable;
 import valthorne.utility.properties.PropertySet;
 import valthorne.utility.properties.PropertyValue;
 
@@ -83,8 +84,8 @@ import java.util.function.IntFunction;
  * <p>Encoded-image loader requests own their decoded pixels; cache-resolver
  * requests borrow theirs. dispose releases only owned pixels and prevents
  * further player creation. Existing players remain valid as long as their
- * caller-supplied texture is alive. asAnimation(texture) borrows that same-sized
- * texture and never changes its filter or disposes it. Direct load(properties, pixels) and resolver loads
+ * caller-supplied drawable is alive. asAnimation(drawable) borrows that same-sized
+ * drawable and never changes or disposes its resources. Direct load(properties, pixels) and resolver loads
  * borrow CPU pixels; disposing their AnimationData never disposes cache images.
  * Do not dispose borrowed data or pixels while another thread constructs a
  * player. Create and dispose GPU objects on the graphics thread, after ending
@@ -93,7 +94,7 @@ import java.util.function.IntFunction;
  * <pre>{@code
  * AnimationData data = AnimationData.load("assets/hero.properties");
  * Texture sheet = data.textureData().asTexture(); // caller owns this upload
- * Animation hero = data.asAnimation(sheet);
+ * Animation hero = data.asAnimation(new TextureDrawable(sheet));
  * data.dispose();                              // player stays valid
  * hero.update(delta);
  * hero.draw(batch, 100, 100, 64, 64);
@@ -494,23 +495,25 @@ public final class AnimationData {
     }
 
     /**
-     * Creates a player borrowing an existing same-sized, same-orientation sheet.
-     * This avoids duplicate GPU uploads when many players share a sprite sheet.
-     * The caller controls texture filtering and lifetime.
+     * Creates independent frames as rectangular views of a borrowed drawable.
+     * The source must match the loaded image's dimensions and orientation and
+     * honor source-rectangle drawing. {@link TextureDrawable}, region drawables and
+     * custom implementations can all supply the source without GPU allocation.
+     * The caller retains control of the drawable and its resource lifetime.
      *
-     * @param texture live texture matching this asset's decoded image
-     * @return independent player that never disposes the supplied texture
+     * @param drawable live source matching this asset's decoded image
+     * @return independent player borrowing the drawable
      */
-    public Animation asAnimation(Texture texture) {
+    public Animation asAnimation(Drawable drawable) {
         ensureAlive();
-        if (texture == null || texture.getWidth() != textureData.width() || texture.getHeight() != textureData.height())
-            throw new IllegalArgumentException("Texture must match animation image dimensions");
+        if (drawable == null || drawable.getWidth() != textureData.width() || drawable.getHeight() != textureData.height())
+            throw new IllegalArgumentException("Drawable must match animation image dimensions");
         boolean flip = flag(properties, "flipVertically", true);
         AnimationFrame[] runtime = new AnimationFrame[frames.length];
         for (int i = 0; i < runtime.length; i++) {
             AnimationFrameData frame = frames[i];
             int y = flip ? textureData.height() - frame.y() - frame.height() : frame.y();
-            runtime[i] = new AnimationFrame(new TextureRegionDrawable(texture, frame.x(), y, frame.width(), frame.height()), frame.duration());
+            runtime[i] = new AnimationFrame(new RegionDrawable(drawable, frame.x(), y, frame.width(), frame.height()), frame.duration());
         }
         PlaybackMode mode = properties.getOrDefault("playbackMode", "FORWARD").asEnum(PlaybackMode.class);
         Animation animation = new Animation(mode, runtime);
