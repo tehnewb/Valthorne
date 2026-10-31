@@ -86,6 +86,34 @@ public interface TextFont {
     void draw(TextureBatch batch, String text, float x, float y, float size, Color tint);
 
     /**
+     * Enables a round outline using logical drawing units, without changing layout.
+     * Shared-font changes affect immediate text and all existing retained runs.
+     * Configure on the graphics owner thread. Implementations may bound the radius.
+     *
+     * @param width positive outline radius in logical units
+     * @param color outline color copied by the font; null retains its current color
+     * @return this font for chaining
+     */
+    TextFont setOutline(int width, Color color);
+
+    /**
+     * Disables outlining for subsequent draws, including already retained runs.
+     */
+    void disableOutline();
+
+    /**
+     * Reports whether outlining is enabled.
+     * @return whether subsequent draws include an outline
+     */
+    boolean isOutlineEnabled();
+
+    /**
+     * Returns the configured logical outline radius, even when disabled.
+     * @return positive outline radius
+     */
+    int getOutlineWidth();
+
+    /**
      * Reports whether native and GPU resources have been released.
      * @return whether this font is disposed
      */

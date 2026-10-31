@@ -67,6 +67,17 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * Unicode ranges cannot cause unbounded startup work. All other glyphs load on
  * demand, including glyphs introduced by shaping. Consecutive sprites, coverage
  * text and MSDF text share the standard batch without per-label flushes.
+ * Optional outlines replay the shaped run at cached integer offsets in a round disk,
+ * behind its fill. The radius is in logical units (1 through 16), follows batch
+ * scaling/rotation and uses the same coverage/MSDF path, clipping and shaders.
+ * Outline settings are shared by all users of this font, including retained runs
+ * and NanoLabel theme text; use a separate font for independent styles. Layout,
+ * advances and selection bounds do not expand. Effects may be clipped by UI bounds.
+ * The disabled path adds one branch; enabled drawing submits one extra quad per
+ * drawable glyph per disk offset, with no new per-frame layout or color objects.
+ * Large radii cost proportionally more submissions and should be used sparingly.
+ * Glyph styling callbacks run for each outline pass as well as the fill, using
+ * the unshifted fill geometry; keep callbacks deterministic and side-effect free.
  * Participating batch shaders retain their transforms and fragment effects.
  * Each MSDF image, including a provisional small-text fallback, temporarily uses
  * the standard shader when the selected shader lacks distance-field support.
@@ -77,12 +88,24 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  *         .asFont();
  * font.setSize(20)
  *         .setHinting(FontHinting.LIGHT);
+ * font.setOutline(1, Color.BLACK);
  * AdaptiveTextRun title = font.createRun("Valthorne", 96);
  * batch.begin();
  * font.draw(batch, "Inventory", 24, 100, 20, Color.WHITE);
  * title.draw(batch, 24, 200, Color.WHITE);
  * batch.end();
+ * font.disableOutline(); // Existing retained runs immediately use fill-only rendering.
  * font.dispose();
+ * }</pre>
+ *
+ * <p>For standard UI labels, configure the borrowed font on the graphics thread
+ * before assigning it to the UI theme:</p>
+ * <pre>{@code
+ * AdaptiveFont uiFont = AdaptiveFontData.load("ui.ttf").asFont();
+ * uiFont.setOutline(1, Color.BLACK);
+ * ui.getTheme().setToken(NanoText.FONT, uiFont);
+ * ui.add(new NanoLabel("Loading..."));
+ * // Dispose uiFont on its owner thread after UI drawing has stopped.
  * }</pre>
  */
 public final class AdaptiveFont implements TextFont {
@@ -142,6 +165,15 @@ public final class AdaptiveFont implements TextFont {
      * Small fixed probe group balancing label reuse against lookup work.
      */
     private static final int LAYOUT_CACHE_WAYS = 8;
+    /**
+     * Maximum disk radius, bounding configuration storage and extra quad submissions.
+     */
+    private static final int MAX_OUTLINE_WIDTH = 16;
+    private final Color outlineColor = new Color(0f, 0f, 0f, 1f); // Owned outline tint, copied at configuration time.
+    private final Color outlineTint = new Color(0f, 0f, 0f, 1f); // Reused submission color with fill alpha applied.
+    private int[] outlineOffsets; // Cached disk offset pairs; allocated only when configuring a new radius.
+    private int outlineWidth = 1; // Configured radius in logical drawing units.
+    private boolean outlineEnabled; // Whether every run draw includes the cached outline passes.
     private final Thread owner = Thread.currentThread(); // Native and OpenGL owner thread.
     private final AdaptiveNativeFace face; // Owner-thread shaper and quick provisional coverage rasterizer.
     private final FontGlyphPreparation preparation; // Bounded background preparation with an independent native face.
@@ -215,6 +247,63 @@ public final class AdaptiveFont implements TextFont {
                 preparing |= preparation.request(glyphKey(glyph, (int) DEFAULT_SIZE), glyph, (int) DEFAULT_SIZE, hinting, false);
             }
         }
+    }
+
+    /**
+     * Enables a round outline shared by this font's immediate and retained draws.
+     * Radius changes rebuild a bounded disk-offset cache; color-only changes reuse it.
+     * The supplied color is copied. Outline alpha multiplies the corresponding fill
+     * alpha and batch opacity, so transparent text remains transparent.
+     *
+     * @param width outline radius in logical units, from 1 through 16
+     * @param color outline color, or null to retain the current color
+     * @return this font
+     * @throws IllegalArgumentException if width is outside the supported range
+     * @throws IllegalStateException if disposed or accessed from another thread
+     */
+    @Override
+    public AdaptiveFont setOutline(int width, Color color) {
+        checkOwner();
+        if (width < 1 || width > MAX_OUTLINE_WIDTH)
+            throw new IllegalArgumentException("Outline width must be between 1 and " + MAX_OUTLINE_WIDTH);
+        if (outlineOffsets == null || width != outlineWidth) {
+            int count = 0;
+            for (int y = -width; y <= width; y++)
+                for (int x = -width; x <= width; x++)
+                    if ((x != 0 || y != 0) && x * x + y * y <= width * width) count++;
+            int[] offsets = new int[count * 2];
+            int index = 0;
+            for (int y = -width; y <= width; y++) {
+                for (int x = -width; x <= width; x++) {
+                    if ((x == 0 && y == 0) || x * x + y * y > width * width) continue;
+                    offsets[index++] = x;
+                    offsets[index++] = y;
+                }
+            }
+            outlineOffsets = offsets;
+        }
+        outlineWidth = width;
+        if (color != null) outlineColor.set(color);
+        outlineEnabled = true;
+        return this;
+    }
+
+    @Override
+    public void disableOutline() {
+        checkOwner();
+        outlineEnabled = false;
+    }
+
+    @Override
+    public boolean isOutlineEnabled() {
+        checkOwner();
+        return outlineEnabled;
+    }
+
+    @Override
+    public int getOutlineWidth() {
+        checkOwner();
+        return outlineWidth;
     }
 
     /**
@@ -486,12 +575,43 @@ public final class AdaptiveFont implements TextFont {
     void drawRun(TextureBatch batch, AdaptiveTextRun run, float x, float y, float radians, Color tint, int[] ends, Color[] colors, int spanCount) {
         checkOwner();
         if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(radians)) throw new IllegalArgumentException("Position and rotation must be finite");
+        if (run.count == 0 || run.size == 0f) return;
+        if (styler != null) run.ensureStyleContext(true);
+        if (preparing) uploadPrepared(batch);
+        if (outlineEnabled && outlineColor.a() > 0f) {
+            float sin = radians == 0f ? 0f : (float) Math.sin(radians);
+            float cos = radians == 0f ? 1f : (float) Math.cos(radians);
+            for (int i = 0; i < outlineOffsets.length; i += 2) {
+                float dx = outlineOffsets[i];
+                float dy = outlineOffsets[i + 1];
+                drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, true, dx * cos - dy * sin, dx * sin + dy * cos);
+            }
+        }
+        drawRunPass(batch, run, x, y, radians, tint, ends, colors, spanCount, false, 0f, 0f);
+    }
+
+    /**
+     * Submits one cached shaped run with its normal fill or the reusable outline tint.
+     * Outline copies share glyph images, shader restoration and raster selection with
+     * the fill; styles contribute alpha without replacing the configured outline RGB.
+     *
+     * @param batch active destination
+     * @param run borrowed retained layout
+     * @param x baseline X
+     * @param y baseline Y
+     * @param radians counterclockwise rotation
+     * @param tint fill tint, or null for white
+     * @param ends optional UTF-16 style boundaries
+     * @param colors optional borrowed fill colors
+     * @param spanCount used style count
+     * @param outline whether this pass submits outline copies
+     * @param offsetX world X offset applied after glyph styling
+     * @param offsetY world Y offset applied after glyph styling
+     */
+    private void drawRunPass(TextureBatch batch, AdaptiveTextRun run, float x, float y, float radians, Color tint, int[] ends, Color[] colors, int spanCount, boolean outline, float offsetX, float offsetY) {
         int count = run.count;
         float size = run.size;
-        if (count == 0 || size == 0) return;
         FontStyler callback = styler;
-        if (callback != null) run.ensureStyleContext(true);
-        if (preparing) uploadPrepared(batch);
         int raster = rasterSize(batch, size, radians);
         float pixelOffsetX = batch.getTranslationX() * pixelScaleX + pixelOriginX;
         float pixelOffsetY = batch.getTranslationY() * pixelScaleY + pixelOriginY;
@@ -563,7 +683,13 @@ public final class AdaptiveFont implements TextFont {
                     Shader selected = glyph.page().getDistanceFieldRange() <= 0 ? previous : batch.getDefaultShader();
                     if (batch.getShader() != selected) batch.setShader(selected);
                 }
-                batch.drawUV(glyph.page(), drawX, drawY, width, height, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), x - drawX, y - drawY, sin, cos, drawTint);
+                Color submissionTint = drawTint;
+                if (outline) {
+                    outlineTint.set(outlineColor);
+                    outlineTint.a(outlineColor.a() * drawTint.a());
+                    submissionTint = outlineTint;
+                }
+                batch.drawUV(glyph.page(), drawX + offsetX, drawY + offsetY, width, height, glyph.u0(), glyph.v0(), glyph.u1(), glyph.v1(), x - drawX, y - drawY, sin, cos, submissionTint);
             }
             run.imageRaster = imageKey;
             run.imageVersion = version == cacheVersion ? version : -1;

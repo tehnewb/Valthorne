@@ -26,7 +26,9 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * label width; the complete text block is aligned within its height. In NanoVG's
  * top-left coordinates, vertical START means top and END means bottom. Selection
  * and projected previews use the same offsets. Default typography uses the
- * root's adaptive font through {@link NanoText}; explicit custom NanoVG names
+ * root's adaptive font through {@link NanoText}, including its built-in outline
+ * configuration. Shared font effects do not expand label layout or selection
+ * bounds and remain subject to the normal UI clip. Explicit custom NanoVG names
  * retain their registered face. This node does not load or own font resources.
  * Adaptive selection and pointer hits use complete shaped lines, preserving
  * grapheme boundaries and disjoint bidirectional highlight spans. Width and
