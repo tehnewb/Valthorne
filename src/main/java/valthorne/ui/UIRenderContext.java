@@ -176,7 +176,70 @@ public final class UIRenderContext {
      */
     public void drawNanoText(UINode node, TextFont font, String text, float x, float baseline, float size, Color color) {
         TextRun layout = font.layout(text, size);
-        drawNanoLayout(node, layout, x, baseline, color, null, null, 0);
+        drawNanoLayout(node, layout, x, baseline, color, null, null, 0, null, 1f, NanoTextPass.FILL);
+    }
+
+    /**
+     * Paints per-control effects and fill within one adaptive backend and clip scope.
+     * @param node owning control
+     * @param font borrowed selected font
+     * @param text complete shaped line
+     * @param x aligned baseline X
+     * @param baseline top-down baseline Y
+     * @param size logical em size
+     * @param color fill tint
+     * @param effects optional retained paint effects
+     * @param effectScale positive effect scale for projected previews
+     * @param pass requested paint stage
+     */
+    public void drawNanoText(UINode node, TextFont font, String text, float x, float baseline, float size, Color color, NanoTextEffects effects, float effectScale, NanoTextPass pass) {
+        TextRun layout = font.layout(text, size);
+        drawNanoLayout(node, layout, x, baseline, color, null, null, 0, effects, effectScale, pass);
+    }
+
+    /**
+     * Paints a complete label block inside its inherited clip with one backend switch.
+     * All shadows precede every outline and fill. Cached font layouts are borrowed
+     * and submitted immediately, avoiding an allocated array of retained layouts.
+     * @param font borrowed selected font
+     * @param lines normalized source lines
+     * @param xs aligned line origins
+     * @param baseline first top-down baseline
+     * @param size logical em size
+     * @param advance baseline spacing
+     * @param color fill tint
+     * @param effects enabled per-label paint configuration
+     * @param scale effect scale
+     */
+    void drawNanoTextLines(TextFont font, String[] lines, float[] xs, float baseline, float size, float advance, Color color, NanoTextEffects effects, float scale) {
+        selectBackend(false);
+        try {
+            if (effects.isShadowEnabled()) drawNanoTextLinesPass(font, lines, xs, baseline, size, advance, color, effects, scale, NanoTextPass.SHADOW);
+            if (effects.isOutlineEnabled()) drawNanoTextLinesPass(font, lines, xs, baseline, size, advance, color, effects, scale, NanoTextPass.OUTLINE);
+            drawNanoTextLinesPass(font, lines, xs, baseline, size, advance, color, effects, scale, NanoTextPass.FILL);
+        } finally {
+            selectBackend(true);
+        }
+    }
+
+    /**
+     * Submits one block stage while the adaptive backend and ancestor clip are active.
+     * @param font borrowed selected font
+     * @param lines normalized sources
+     * @param xs aligned line origins
+     * @param baseline first top-down baseline
+     * @param size logical em size
+     * @param advance baseline spacing
+     * @param color fill tint
+     * @param effects label-owned configuration
+     * @param scale effect scale
+     * @param pass requested paint stage
+     */
+    private void drawNanoTextLinesPass(TextFont font, String[] lines, float[] xs, float baseline, float size, float advance, Color color, NanoTextEffects effects, float scale, NanoTextPass pass) {
+        for (int i = 0; i < lines.length; i++) {
+            TextRun layout = font.layout(lines[i], size);
+            effects.draw(layout, batch, xs[i], height - baseline - i * advance, color, scale, pass);
+        }
     }
 
     /**
@@ -192,7 +255,7 @@ public final class UIRenderContext {
      * @param baseline top-down baseline coordinate
      */
     public void drawNanoTextStyled(UINode node, TextRun layout, int[] ends, Color[] colors, int count, float x, float baseline) {
-        drawNanoLayout(node, layout, x, baseline, null, ends, colors, count);
+        drawNanoLayout(node, layout, x, baseline, null, ends, colors, count, null, 1f, NanoTextPass.FILL);
     }
 
     /**
@@ -207,13 +270,17 @@ public final class UIRenderContext {
      * @param ends optional exclusive display span boundaries
      * @param colors optional borrowed span colors
      * @param count used style count, zero for uniform tint
+     * @param effects optional per-control paint effects for uniform text
+     * @param effectScale multiplier for effect offsets
+     * @param pass requested paint stage
      */
-    private void drawNanoLayout(UINode node, TextRun layout, float x, float baseline, Color color, int[] ends, Color[] colors, int count) {
+    private void drawNanoLayout(UINode node, TextRun layout, float x, float baseline, Color color, int[] ends, Color[] colors, int count, NanoTextEffects effects, float effectScale, NanoTextPass pass) {
         selectBackend(false);
         if (node instanceof NanoLabel) {
             try {
                 // Label advances are layout widths, not ink bounds; inherit ancestor clipping.
-                if (ends == null) layout.draw(batch, x, height - baseline, color);
+                if (effects != null && effects.isEnabled()) effects.draw(layout, batch, x, height - baseline, color, effectScale, pass);
+            else if (ends == null) layout.draw(batch, x, height - baseline, color);
                 else layout.drawStyled(batch, x, height - baseline, ends, colors, count);
             } finally {
                 selectBackend(true);
@@ -234,7 +301,8 @@ public final class UIRenderContext {
         }
         batch.beginScissor(left, bottom, Math.max(0f, right - left), Math.max(0f, top - bottom));
         try {
-            if (ends == null) layout.draw(batch, x, height - baseline, color);
+            if (effects != null && effects.isEnabled()) effects.draw(layout, batch, x, height - baseline, color, effectScale, pass);
+            else if (ends == null) layout.draw(batch, x, height - baseline, color);
             else layout.drawStyled(batch, x, height - baseline, ends, colors, count);
         } finally {
             batch.endScissor();
