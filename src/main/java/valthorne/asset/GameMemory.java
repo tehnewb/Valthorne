@@ -1,6 +1,7 @@
 package valthorne.asset;
 
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -8,8 +9,11 @@ import java.util.function.Consumer;
  * Owns named runtime resources uploaded or constructed by the application.
  * Unlike {@link Assets}, this store performs no loading or background work.
  * Register each resource once and borrow it through {@link #get(String, Class)}.
- * Retrieval uses an expected constant-time map lookup without temporary objects.
- * Registration checks object identity in linear time to reject owned aliases.
+ * Retrieval uses an expected constant-time hash lookup directly to the resource,
+ * without temporary objects or a cleanup-entry indirection. A separate array-backed
+ * list preserves disposal order without linked map entries. Registration checks
+ * object identity in linear time to reject owned aliases; register resources during
+ * setup rather than in frame loops.
  *
  * <p>Confine this store to the thread and graphics context that own its resources.
  * Destroy UI and other consumers before disposing the store, then release CPU
@@ -34,7 +38,8 @@ import java.util.function.Consumer;
  */
 public final class GameMemory {
 
-    private final LinkedHashMap<String, GameMemoryEntry<?>> entries = new LinkedHashMap<>(); // Resources in ownership registration order.
+    private final HashMap<String, Object> resources = new HashMap<>(); // Direct resource lookup without traversing cleanup entries.
+    private final ArrayList<GameMemoryEntry<?>> entries = new ArrayList<>(); // Compact registration order for identity checks and reverse cleanup.
     private boolean disposed; // True before cleanup begins, preventing reentrant access.
 
     /**
@@ -63,11 +68,13 @@ public final class GameMemory {
         Objects.requireNonNull(value, "value");
         Objects.requireNonNull(disposer, "disposer");
         if (key.isBlank()) throw new IllegalArgumentException("Resource key must not be blank");
-        if (entries.containsKey(key)) throw new IllegalArgumentException("Resource key already registered: " + key);
-        for (GameMemoryEntry<?> entry : entries.values()) {
+        if (resources.containsKey(key)) throw new IllegalArgumentException("Resource key already registered: " + key);
+        for (int i = 0; i < entries.size(); i++) {
+            GameMemoryEntry<?> entry = entries.get(i);
             if (entry.value() == value) throw new IllegalArgumentException("Resource is already owned by this store");
         }
-        entries.put(key, new GameMemoryEntry<>(value, disposer));
+        entries.add(new GameMemoryEntry<>(value, disposer));
+        resources.put(key, value);
         return value;
     }
 
@@ -89,9 +96,9 @@ public final class GameMemory {
         requireOpen();
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(type, "type");
-        GameMemoryEntry<?> entry = entries.get(key);
-        if (entry == null) throw new IllegalArgumentException("Unknown resource: " + key);
-        return type.cast(entry.value());
+        Object value = resources.get(key);
+        if (value == null) throw new IllegalArgumentException("Unknown resource: " + key);
+        return type.cast(value);
     }
 
     /**
@@ -109,9 +116,9 @@ public final class GameMemory {
         disposed = true;
         Throwable failure = null;
         try {
-            for (GameMemoryEntry<?> entry : entries.reversed().values()) {
+            for (int i = entries.size() - 1; i >= 0; i--) {
                 try {
-                    entry.dispose();
+                    entries.get(i).dispose();
                 } catch (RuntimeException | Error next) {
                     if (failure == null) failure = next;
                     else if (failure != next) failure.addSuppressed(next);
@@ -119,6 +126,7 @@ public final class GameMemory {
             }
         } finally {
             entries.clear();
+            resources.clear();
         }
         if (failure instanceof RuntimeException exception) throw exception;
         if (failure instanceof Error error) throw error;
