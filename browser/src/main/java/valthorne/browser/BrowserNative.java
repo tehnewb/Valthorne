@@ -162,6 +162,19 @@ public final class BrowserNative {
     public static native void readBytes(int address, @JSBuffer(JSBufferType.UINT8) ByteBuffer destination, int size);
 
     /**
+     * Copies native coverage rows into a zero-bordered Java image in one bridge
+     * call. The caller supplies a zeroed buffer of (width + 2) * (height + 2)
+     * bytes, preserving transparent filtering space without another pixel copy.
+     *
+     * @param address tightly packed bottom-up native alpha image
+     * @param destination zeroed padded destination
+     * @param width unpadded image width
+     * @param height unpadded image height
+     */
+    @JSBody(params = {"address", "destination", "width", "height"}, script = "const heap=globalThis.valthorneNative.HEAPU8,stride=width+2;for(let y=0;y<height;y++)destination.set(heap.subarray(address+y*width,address+(y+1)*width),(y+1)*stride+1);")
+    public static native void readPaddedAlpha(int address, @JSBuffer(JSBufferType.UINT8) ByteBuffer destination, int width, int height);
+
+    /**
      * Converts a native font alpha atlas directly into Java-owned RGBA pixels.
      * @param address first native alpha byte
      * @param destination direct RGBA destination with four bytes per pixel

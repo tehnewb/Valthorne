@@ -154,7 +154,16 @@ final class AdaptiveNativeFace implements AutoCloseable {
         if (width == 0 || height == 0) return new FontRaster(null, 0, 0, 0, 0, scale);
         ByteBuffer pixels = null;
         try {
-            int length = Math.multiplyExact(Math.multiplyExact(width, height), size == 0 ? 3 : 1);
+            if (size != 0) {
+                if (width > FontAtlasPage.MAX_SIDE - 4 || height > FontAtlasPage.MAX_SIDE - 4)
+                    throw new IllegalArgumentException("Glyph exceeds atlas dimensions");
+                int paddedWidth = Math.addExact(width, 2);
+                int paddedHeight = Math.addExact(height, 2);
+                pixels = memCalloc(Math.multiplyExact(paddedWidth, paddedHeight));
+                BrowserNative.readPaddedAlpha(pointer, pixels, width, height);
+                return new FontRaster(pixels, paddedWidth, paddedHeight, left - 1f / scale, bottom - 1f / scale, scale);
+            }
+            int length = Math.multiplyExact(Math.multiplyExact(width, height), 3);
             pixels = memAlloc(length);
             BrowserNative.readBytes(pointer, pixels, length);
             return new FontRaster(pixels, width, height, left, bottom, scale);
