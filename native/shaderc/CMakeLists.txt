@@ -1,0 +1,71 @@
+cmake_minimum_required(VERSION 3.20)
+project(PortableShaderCompiler LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 20)
+file(TO_CMAKE_PATH "${SOURCES}" SOURCES)
+set(BGFX "${SOURCES}/bgfx")
+set(SPIRV "${BGFX}/3rdparty/spirv-tools")
+set(GLSLANG "${BGFX}/3rdparty/glslang")
+set(CROSS "${BGFX}/3rdparty/spirv-cross")
+file(GLOB_RECURSE GLSLANG_FILES "${GLSLANG}/glslang/*.cpp" "${GLSLANG}/SPIRV/*.cpp" "${GLSLANG}/hlsl/*.cpp" "${GLSLANG}/OGLCompilersDLL/*.cpp")
+list(FILTER GLSLANG_FILES EXCLUDE REGEX "OSDependent/Windows/")
+file(GLOB SPIRV_FILES "${SPIRV}/source/*.cpp" "${SPIRV}/source/opt/*.cpp" "${SPIRV}/source/val/*.cpp" "${SPIRV}/source/util/*.cpp")
+list(FILTER SPIRV_FILES EXCLUDE REGEX "mimalloc.cpp")
+file(GLOB CROSS_FILES "${CROSS}/spirv_*.cpp")
+list(FILTER CROSS_FILES EXCLUDE REGEX "spirv_cross_c.cpp")
+file(GLOB SHADERC_FILES "${BGFX}/tools/shaderc/*.cpp")
+file(READ "${SOURCES}/bx/src/debug.cpp" BX_DEBUG)
+string(REPLACE "#\tinclude <execinfo.h>" "#\tif __has_include(<execinfo.h>)\n#\t\tinclude <execinfo.h>\n#\tendif" BX_DEBUG "${BX_DEBUG}")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/debug.cpp" CONTENT "${BX_DEBUG}" @ONLY)
+file(READ "${SOURCES}/bx/src/amalgamated.cpp" BX_SOURCE)
+string(REPLACE "#include \"" "#include \"${SOURCES}/bx/src/" BX_SOURCE "${BX_SOURCE}")
+string(REPLACE "${SOURCES}/bx/src/debug.cpp" "${CMAKE_CURRENT_BINARY_DIR}/generated/debug.cpp" BX_SOURCE "${BX_SOURCE}")
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/compiler_bx.cpp" CONTENT "${BX_SOURCE}" @ONLY)
+if(ANDROID OR EMSCRIPTEN)
+  # shaderc consumes its source and replaces it after preprocessing. Keep both
+  # allocations owned on every return path in a long-lived application session.
+  file(READ "${BGFX}/tools/shaderc/shaderc.cpp" SHADERC_SOURCE)
+  set(COMPILE_DECL "bool compileShader(const char* _varying, const char* _comment, char* _shader, uint32_t _shaderLen, const Options& _options, bx::WriterI* _shaderWriter, bx::WriterI* _messageWriter)\n\t{")
+  string(FIND "${SHADERC_SOURCE}" "${COMPILE_DECL}" COMPILE_START)
+  if(COMPILE_START EQUAL -1)
+    message(FATAL_ERROR "Review embedded shaderc source ownership after updating bgfx")
+  endif()
+  string(REPLACE "${COMPILE_DECL}" "${COMPILE_DECL}\n\t\tstd::unique_ptr<char[]> dataOwner(_shader);" SHADERC_SOURCE "${SHADERC_SOURCE}")
+  string(REPLACE "delete [] data;" "dataOwner.reset();" SHADERC_SOURCE "${SHADERC_SOURCE}")
+  string(REPLACE "data = new char[size+padding+1];" "dataOwner.reset(new char[size+padding+1]);\n\t\t\t\tdata = dataOwner.get();" SHADERC_SOURCE "${SHADERC_SOURCE}")
+  file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/shaderc-owned.cpp" CONTENT "#include <memory>\n${SHADERC_SOURCE}" @ONLY)
+  list(REMOVE_ITEM SHADERC_FILES "${BGFX}/tools/shaderc/shaderc.cpp")
+  list(APPEND SHADERC_FILES "${CMAKE_CURRENT_BINARY_DIR}/generated/shaderc-owned.cpp")
+endif()
+set(COMPILER_FILES ${SHADERC_FILES} ${GLSLANG_FILES} ${SPIRV_FILES} ${CROSS_FILES}
+  "${BGFX}/src/shader.cpp" "${BGFX}/src/vertexlayout.cpp" "${CMAKE_CURRENT_BINARY_DIR}/generated/compiler_bx.cpp")
+if(ANDROID)
+  add_library(shaderc SHARED ${COMPILER_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/../../android/src/main/cpp/native_shaderc.cpp")
+  set_target_properties(shaderc PROPERTIES OUTPUT_NAME valthorne_shaderc CXX_VISIBILITY_PRESET hidden C_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
+  target_link_libraries(shaderc PRIVATE android log)
+  target_link_options(shaderc PRIVATE "-Wl,-z,max-page-size=16384")
+else()
+  add_executable(shaderc ${COMPILER_FILES})
+endif()
+set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/generated/compiler_bx.cpp" PROPERTIES COMPILE_OPTIONS "-Wno-date-time")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/compiler_bx.cpp" APPEND PROPERTY COMPILE_OPTIONS -D_LARGEFILE64_SOURCE=1 -include sys/prctl.h)
+endif()
+target_include_directories(shaderc PRIVATE
+  "${BGFX}/tools/shaderc"
+  "${SOURCES}/bimg/include" "${BGFX}/include" "${BGFX}/src" "${BGFX}/3rdparty" "${SOURCES}/bx/include" "${SOURCES}/bx/3rdparty"
+  "${GLSLANG}" "${GLSLANG}/glslang/Public" "${GLSLANG}/glslang/Include"
+  "${SPIRV}" "${SPIRV}/include" "${SPIRV}/include/generated" "${SPIRV}/source"
+  "${BGFX}/3rdparty/spirv-headers/include" "${CROSS}")
+target_compile_definitions(shaderc PRIVATE BX_CONFIG_DEBUG=0 ENABLE_OPT=1 ENABLE_HLSL=1
+  SHADERC_CONFIG_HAS_GLSLANG=1 SHADERC_CONFIG_HAS_D3DCOMPILER=0 SHADERC_CONFIG_HAS_DXC=0 SHADERC_CONFIG_HAS_TINT=0
+  SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
+target_compile_options(shaderc PRIVATE -O1 -fno-strict-aliasing)
+if(EMSCRIPTEN)
+  target_compile_options(shaderc PRIVATE -include emscripten/version.h
+    -D__EMSCRIPTEN_MAJOR__=__EMSCRIPTEN_major__ -D__EMSCRIPTEN_MINOR__=__EMSCRIPTEN_minor__ -D__EMSCRIPTEN_TINY__=__EMSCRIPTEN_tiny__)
+  target_link_options(shaderc PRIVATE -O2 -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createShaderCompiler
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sSTACK_SIZE=1048576 -sINVOKE_RUN=0 -sEXIT_RUNTIME=0
+    -sENVIRONMENT=web,node "-sEXPORTED_RUNTIME_METHODS=['FS','callMain','stackSave','stackRestore']")
+  set_target_properties(shaderc PROPERTIES SUFFIX ".mjs")
+endif()

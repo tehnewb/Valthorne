@@ -1,7 +1,10 @@
 package valthorne.ui;
 
+import java.nio.file.Path;
+import java.util.*;
+import java.util.function.Consumer;
 import org.joml.Vector2f;
-import org.lwjgl.opengl.GL11;
+import org.lwjgl.nanovg.NanoVGBGFX;
 import org.lwjgl.util.yoga.Yoga;
 import valthorne.JGL;
 import valthorne.Keyboard;
@@ -11,6 +14,11 @@ import valthorne.event.Event;
 import valthorne.event.EventHandler;
 import valthorne.event.EventTypes;
 import valthorne.event.events.*;
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsResource;
+import valthorne.graphics.GraphicsViewport;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxResources;
 import valthorne.graphics.font.SystemFonts;
 import valthorne.graphics.font.TextFont;
 import valthorne.graphics.font.adaptive.AdaptiveFontData;
@@ -27,16 +35,8 @@ import valthorne.ui.theme.ThemeDataChangeEvent;
 import valthorne.ui.theme.ProfessionalTheme;
 import valthorne.viewport.Viewport;
 
-import java.nio.file.Path;
-import java.util.*;
-import java.util.function.Consumer;
-
 import static org.lwjgl.nanovg.NanoVG.nvgBeginFrame;
 import static org.lwjgl.nanovg.NanoVG.nvgCreateFont;
-import static org.lwjgl.nanovg.NanoVGGL3.NVG_ANTIALIAS;
-import static org.lwjgl.nanovg.NanoVGGL3.NVG_STENCIL_STROKES;
-import static org.lwjgl.nanovg.NanoVGGL3.nvgCreate;
-import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
 
 /**
  * <p>
@@ -149,7 +149,8 @@ import static org.lwjgl.nanovg.NanoVGGL3.nvgDelete;
  * @author Albert Beaupre
  * @since March 11th, 2026
  */
-public class UIRoot extends UIContainer {
+public class UIRoot extends UIContainer implements GraphicsResource {
+    private final int[] nanoViewport = new int[4]; // Reused physical viewport snapshot for NanoVG scaling.
 
     private final EventHandler<ThemeDataChangeEvent> themeListener = event -> refreshTheme(this, event.getData()); // Persistent listener invalidating nodes that use changed theme data.
     private final UIInspector inspector = new UIInspector(); // Root-owned optional draw inspection controller.
@@ -167,6 +168,9 @@ public class UIRoot extends UIContainer {
     private final UIRootScrollListener scrollListener = new UIRootScrollListener(this); // Root-level scroll listener instance
     private final UIRootWindowListener windowListener = new UIRootWindowListener(this); // Root-level window resize listener instance
     private long nanoVGHandle; // Stored NanoVG context deleted by this root on disposal, or zero when unavailable.
+    private final NanoFontRegistry nanoFonts = new NanoFontRegistry(); // Custom font registrations retained across devices.
+    private boolean managedNanoVG = true; // Whether the root can recreate its own native context.
+    private boolean nanoVGEnabled = true; // Whether vector rendering should be restored after a device change.
     private UIRotationShader rotationShader; // Lazily created texture shader owned by this root for rotated UI scopes.
     private UIRenderContext renderContext; // Borrowed active mixed-backend drawing context, null outside drawing.
     private boolean disposed; // Whether root resource disposal has been requested.
@@ -311,7 +315,8 @@ public class UIRoot extends UIContainer {
      */
     public UIRoot(int inputPriority) {
         this.inputPriority = inputPriority;
-        this.nanoVGHandle = nvgCreate(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+        // The render path selects the actual view; context creation may occur between frames.
+        this.nanoVGHandle = NanoVGBGFX.nvgCreate(true, 0, 0);
         if (nanoVGHandle != 0L) {
             registerDefaultNanoFont();
         }
@@ -351,6 +356,8 @@ public class UIRoot extends UIContainer {
         JGL.subscribe(EventTypes.WINDOW_FOCUS, focusListener);
         JGL.subscribe(EventTypes.TEXT_INPUT, inputPriority, textListener);
         JGL.subscribe(EventTypes.FILE_DROP, inputPriority, fileDropListener);
+        BgfxResources.register(this);
+        nanoFonts.attach(nanoVGHandle);
         JGL.subscribe(EventTypes.THEME_DATA_CHANGE, themeListener);
     }
 
@@ -945,10 +952,11 @@ public class UIRoot extends UIContainer {
     private void beginNanoFrame(long vg) {
         float width = viewport != null ? viewport.getWorldWidth() : getWidth();
         float height = viewport != null ? viewport.getWorldHeight() : getHeight();
-        int[] pixels = new int[4];
-        GL11.glGetIntegerv(GL11.GL_VIEWPORT, pixels);
+        int[] pixels = nanoViewport;
+        GraphicsViewport.get(pixels);
+        BgfxGraphics.selectNano(vg);
         float ratio = Math.max(pixels[2] / Math.max(1f, width), pixels[3] / Math.max(1f, height));
-        nvgBeginFrame(vg, width, height, Math.max(0.01f, ratio));
+        nvgBeginFrame(vg, BgfxGraphics.nanoWidth(width), BgfxGraphics.nanoHeight(height), Math.max(0.01f, ratio));
     }
 
     /**
@@ -991,12 +999,13 @@ public class UIRoot extends UIContainer {
             nanoCodeFont.dispose();
             nanoCodeFont = null;
         }
+        BgfxResources.unregister(this);
+        releaseGraphicsResources();
+        nanoFonts.clear();
         if (defaultTheme != null) {
             defaultTheme.close();
             defaultTheme = null;
         }
-        if (nanoVGHandle != 0L) nvgDelete(nanoVGHandle);
-        nanoVGHandle = 0L;
     }
 
     /**
@@ -1501,9 +1510,13 @@ public class UIRoot extends UIContainer {
             clearDocumentSelection();
 
         if (event.getKey() == Keyboard.TAB) {
-            if (event.isShiftDown()) focusPrevious();
-            else focusNext();
-            event.consume();
+            // Editors may consume Tab for indentation before normal focus traversal.
+            route(focused, event, Float.NaN, Float.NaN, node -> node.onKeyPress(event), true);
+            if (!event.isConsumed()) {
+                if (event.isShiftDown()) focusPrevious();
+                else focusNext();
+                event.consume();
+            }
             return;
         }
 
@@ -1791,10 +1804,16 @@ public class UIRoot extends UIContainer {
      * fonts on the replacement. The root will delete the stored nonzero handle during
      * disposal, so callers must arrange ownership of both contexts.
      *
+     * <p>Nonzero external contexts prevent automatic backend switching.</p>
+     *
      * @param nanoVGHandle replacement handle, or zero to disable NanoVG rendering
      */
     public void setNanoVGHandle(long nanoVGHandle) {
+        nanoFonts.detach();
+        managedNanoVG = nanoVGHandle == 0;
+        nanoVGEnabled = nanoVGHandle != 0;
         this.nanoVGHandle = nanoVGHandle;
+        nanoFonts.attach(nanoVGHandle);
     }
 
     /**
@@ -1817,6 +1836,34 @@ public class UIRoot extends UIContainer {
      */
     public TextFont getDefaultFont() {
         return getNanoTextFont(false);
+    }
+
+    @Override
+    public void validateGraphicsReset(GraphicsBackend backend) {
+        if (renderContext != null) throw new IllegalStateException("Finish UI drawing before switching graphics backends");
+        if (!managedNanoVG) throw new IllegalStateException("Externally supplied UI contexts require explicit restoration before backend switching");
+    }
+
+    @Override
+    public void releaseGraphicsResources() {
+        nanoFonts.detach();
+        if (nanoVGHandle == 0) return;
+        NanoVGBGFX.nvgDelete(nanoVGHandle);
+        nanoVGHandle = 0;
+    }
+
+    @Override
+    public void restoreGraphicsResources() {
+        if (!nanoVGEnabled) return;
+        nanoVGHandle = NanoVGBGFX.nvgCreate(true, 0, 0);
+        if (nanoVGHandle == 0) throw new IllegalStateException("Could not restore UI vector context");
+        try {
+            registerDefaultNanoFont();
+            nanoFonts.attach(nanoVGHandle);
+        } catch (RuntimeException | Error failure) {
+            releaseGraphicsResources();
+            throw failure;
+        }
     }
 
 }

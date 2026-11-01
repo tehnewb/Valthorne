@@ -12,7 +12,7 @@ import static org.lwjgl.glfw.GLFW.*;
  * allowing an embedded or secondary presentation to publish input independently.
  * Scope changes allocate nothing. Close invalidates late queued work and input.
  */
-public final class WindowContext implements AutoCloseable {
+public final class WindowContext {
     /**
      * Active render-thread view. Only the window thread may replace this reference.
      */
@@ -302,7 +302,10 @@ public final class WindowContext implements AutoCloseable {
         return closed;
     }
 
-    @Override
+    /**
+     * Invalidates this logical presentation and clears its input state.
+     * The associated native window remains owned by the host.
+     */
     public void close() {
         clearInput();
         focused = false;

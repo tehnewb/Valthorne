@@ -1,105 +1,65 @@
 package valthorne.graphics.texture;
 
-import static org.lwjgl.opengl.GL11.*;
-
 /**
- * Represents the filtering mode applied to an OpenGL texture.
- *
- * <p>This enum abstracts over the raw OpenGL constants and provides
- * descriptive names for common filtering behaviors. These modes determine
- * how OpenGL samples texture pixels when the texture is scaled.</p>
- *
- * <ul>
- *   <li>{@link #NEAREST} — crisp, blocky, pixel-art style</li>
- *   <li>{@link #LINEAR} — smooth, blended scaling</li>
- * </ul>
- *
- * <p>The values stored here are passed directly into
- * {@code glTexParameteri(GL_TEXTURE_2D, ...)}.</p>
- *
- * @author Albert Beaupre
- * @since November 26th, 2025
+ * Backend-independent sampling choices. Mipmap filters require a complete mip
+ * chain, which Texture creates when the filter changes. Pixel alignment remains
+ * the caller's responsibility when using nearest magnification.
  */
 public enum TextureFilter {
+    /**
+     * Nearest source pixels without mipmaps.
+     */
+    NEAREST(false, true),
+    /**
+     * Interpolated source pixels without mipmaps.
+     */
+    LINEAR(false, false),
+    /**
+     * Nearest pixels from the nearest mip level.
+     */
+    NEAREST_MIPMAP_NEAREST(true, true),
+    /**
+     * Nearest pixels interpolated between mip levels.
+     */
+    NEAREST_MIPMAP_LINEAR(true, true),
+    /**
+     * Interpolated pixels from the nearest mip level.
+     */
+    LINEAR_MIPMAP_NEAREST(true, false),
+    /**
+     * Interpolation between pixels and mip levels.
+     */
+    LINEAR_MIPMAP_LINEAR(true, false);
+
+    private final boolean mipmaps; // Whether minification requires mip storage.
+    private final boolean nearest; // Whether magnification samples nearest pixels.
 
     /**
-     * Nearest-neighbor filtering.
+     * Records portable sampling properties.
      *
-     * <p>Uses the closest pixel when scaling the texture. Produces a sharp,
-     * pixelated look. Ideal for retro art, voxel textures, or crisp UI.</p>
+     * @param mipmaps whether mip storage is required
+     * @param nearest whether magnification uses nearest samples
      */
-    NEAREST(GL_NEAREST, GL_NEAREST),
-
-    /**
-     * Linear filtering.
-     *
-     * <p>Interpolates between adjacent pixels, producing a smoother image.
-     * Best for modern graphics, high-res textures, and UI widgets.</p>
-     */
-    LINEAR(GL_LINEAR, GL_LINEAR),
-
-    /**
-     * Nearest filtering with mipmaps.
-     *
-     * <p>Uses nearest neighbor sampling and nearest mipmap level.
-     * Reduces aliasing at distance while keeping a pixel-art look.</p>
-     */
-    NEAREST_MIPMAP_NEAREST(GL_NEAREST_MIPMAP_NEAREST, GL_NEAREST),
-
-    /**
-     * Nearest filtering with linear mipmap blending.
-     *
-     * <p>Sharp pixels with smoother transitions between mip levels.</p>
-     */
-    NEAREST_MIPMAP_LINEAR(GL_NEAREST_MIPMAP_LINEAR, GL_NEAREST),
-
-    /**
-     * Linear filtering with nearest mipmap selection.
-     */
-    LINEAR_MIPMAP_NEAREST(GL_LINEAR_MIPMAP_NEAREST, GL_LINEAR),
-
-    /**
-     * Linear filtering with linear mipmap blending.
-     *
-     * <p>The highest quality standard OpenGL filtering.</p>
-     */
-    LINEAR_MIPMAP_LINEAR(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-
-    public final int minFilter; // OpenGL minification filter, including mipmap selection where applicable.
-
-    public final int magFilter; // OpenGL magnification filter; always nearest or linear.
-
-    /**
-     * Stores the OpenGL minification and magnification constants for an enum option.
-     * The constructor does not apply them to a texture or generate required mipmaps.
-     *
-     * @param minFilter OpenGL minification filter constant
-     * @param magFilter OpenGL magnification filter constant
-     */
-    TextureFilter(int minFilter, int magFilter) {
-        this.minFilter = minFilter;
-        this.magFilter = magFilter;
+    TextureFilter(boolean mipmaps, boolean nearest) {
+        this.mipmaps = mipmaps;
+        this.nearest = nearest;
     }
 
     /**
-     * Checks whether the minification filter selects a mipmapped OpenGL mode. It does not inspect a texture or generate missing mip levels.
+     * Reports whether this filter requires a complete mip chain.
      *
-     * @return true if this filter requires mipmaps
+     * @return whether mipmaps are required
      */
     public boolean usesMipmaps() {
-        return minFilter == GL_NEAREST_MIPMAP_NEAREST
-                || minFilter == GL_NEAREST_MIPMAP_LINEAR
-                || minFilter == GL_LINEAR_MIPMAP_NEAREST
-                || minFilter == GL_LINEAR_MIPMAP_LINEAR;
+        return mipmaps;
     }
 
     /**
-     * Checks whether magnification uses nearest-neighbor sampling. This predicate alone does not guarantee pixel alignment, integer scaling, or nearest sampling during minification.
+     * Reports whether magnification samples the nearest source pixel.
      *
-     * @return true if this filter is pixel-perfect
+     * @return whether nearest magnification is selected
      */
     public boolean isPixelPerfect() {
-        return magFilter == GL_NEAREST;
+        return nearest;
     }
-
 }

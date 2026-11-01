@@ -1,6 +1,5 @@
 package valthorne.graphics.font.adaptive;
 
-import org.lwjgl.system.MemoryStack;
 import valthorne.Window;
 import valthorne.graphics.Color;
 import valthorne.graphics.font.TextFont;
@@ -10,11 +9,9 @@ import valthorne.graphics.font.GlyphStyle;
 import valthorne.graphics.shader.Shader;
 import valthorne.graphics.texture.TextureBatch;
 
-import java.nio.IntBuffer;
 import java.util.Arrays;
 
 import static org.lwjgl.system.MemoryUtil.memFree;
-import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
 
 /**
  * One font API for naturally spaced, hinted small text and scalable MSDF text.
@@ -55,9 +52,9 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * after ending batches that reference the font. Access is confined to the
  * constructing thread, including measurement and disposal.</p>
  *
- * <p>Coverage pages use R8 at 256 square; MSDF pages use RGB8 at 512 square.
+ * <p>Coverage pages use R8 at 256 square; MSDF pages use RGB8, or RGBA8 when required by the backend, at 512 square.
  * Oversized glyphs may use pages up to 1024 square. At most eight pages and 8192
- * glyph entries bound storage to 24 MiB of texel data in the worst case. The
+ * glyph entries bound storage to 32 MiB of GPU texel data plus retained recovery pixels in the worst case. The
  * sparse glyph table grows on demand. Full caches flush the batch before page
  * eviction. Retained runs validate cached image references against an eviction
  * version and remain usable after eviction. A warm
@@ -85,9 +82,8 @@ import static org.lwjgl.util.harfbuzz.HarfBuzz.*;
  * Glyph styling callbacks run for each effect pass as well as the fill, using
  * the unshifted fill geometry; keep callbacks deterministic and side-effect free.
  * Participating batch shaders retain their transforms and fragment effects.
- * Each MSDF image, including a provisional small-text fallback, temporarily uses
- * the standard shader when the selected shader lacks distance-field support.
- * Coverage images retain the custom shader, which is restored after drawing.</p>
+ * Coverage and MSDF images temporarily use the standard shader when a custom
+ * shader lacks atlas decoding. The custom shader is restored after drawing.</p>
  *
  * <pre>{@code
  * AdaptiveFont font = AdaptiveFontData.load("Cinzel-Regular.otf")
@@ -186,7 +182,7 @@ public final class AdaptiveFont implements TextFont {
     private int[] outlineOffsets; // Cached disk offset pairs; allocated only when configuring a new radius.
     private int outlineWidth = 1; // Configured radius in logical drawing units.
     private boolean outlineEnabled; // Whether every run draw includes the cached outline passes.
-    private final Thread owner = Thread.currentThread(); // Native and OpenGL owner thread.
+    private final Thread owner = Thread.currentThread(); // Native and graphics owner thread.
     private final AdaptiveNativeFace face; // Owner-thread shaper and quick provisional coverage rasterizer.
     private final FontGlyphPreparation preparation; // Bounded background preparation with an independent native face.
     private FontHinting hinting; // Mutable small-text policy; coverage caches distinguish each mode.
@@ -205,7 +201,7 @@ public final class AdaptiveFont implements TextFont {
     private int pageCount; // Active prefix of atlas pages.
     private int entries; // Current cache occupancy.
     private long cacheVersion; // Changes whenever atlas eviction invalidates retained image references.
-    private long atlasBytes; // Exact allocated R8/RGB8 texel storage, excluding driver bookkeeping.
+    private long atlasBytes; // Exact allocated atlas texel storage, excluding driver bookkeeping.
     private float pixelScaleX; // Horizontal physical pixels per logical unit for the current hinted draw.
     private float pixelScaleY; // Vertical physical pixels per logical unit for the current hinted draw.
     private float pixelOriginX; // Viewport/projection horizontal physical origin.
@@ -219,7 +215,7 @@ public final class AdaptiveFont implements TextFont {
     private GlyphContext glyphContext; // Lazily allocated reusable original-layout context.
 
     /**
-     * Creates native font resources using NORMAL hinting, requiring no OpenGL
+     * Creates native font resources using NORMAL hinting, requiring no graphics device
      * until first drawing.
      * @param data immutable encoded asset
      */
@@ -245,19 +241,13 @@ public final class AdaptiveFont implements TextFont {
         byte[] source = data.bytes();
         face = new AdaptiveNativeFace(source);
         preparation = new FontGlyphPreparation(source);
-        float inverseEm = 1f / face.face().units_per_EM();
-        ascent = face.face().ascender() * inverseEm;
-        descent = face.face().descender() * inverseEm;
-        lineHeight = Math.max(ascent - descent, face.face().height() * inverseEm);
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer out = stack.callocInt(1);
-            hb_font_get_nominal_glyph(face.font(), ' ', out);
-            spaceAdvance = hb_font_get_glyph_h_advance(face.font(), out.get(0)) * inverseEm;
-            for (int i = 0; i < prewarmCount; i++) {
-                if (!hb_font_get_nominal_glyph(face.font(), firstCharacter + i, out)) continue;
-                int glyph = out.get(0);
-                preparing |= preparation.request(glyphKey(glyph, (int) DEFAULT_SIZE), glyph, (int) DEFAULT_SIZE, hinting, false);
-            }
+        ascent = face.ascent();
+        descent = face.descent();
+        lineHeight = face.lineHeight();
+        spaceAdvance = face.spaceAdvance();
+        for (int i = 0; i < prewarmCount; i++) {
+            int glyph = face.nominalGlyph(firstCharacter + i);
+            if (glyph != 0) preparing |= preparation.request(glyphKey(glyph, (int) DEFAULT_SIZE), glyph, (int) DEFAULT_SIZE, hinting, false);
         }
     }
 
@@ -680,6 +670,7 @@ public final class AdaptiveFont implements TextFont {
         Shader previous = batch.getShader();
         boolean override = !batch.supportsDistanceFields();
         try {
+            if (override) batch.setShader(batch.getDefaultShader());
             float sin = radians == 0 ? 0 : (float) Math.sin(radians);
             float cos = radians == 0 ? 1 : (float) Math.cos(radians);
             int imageKey = raster == 0 ? 0 : raster | hintingKey;
@@ -738,11 +729,6 @@ public final class AdaptiveFont implements TextFont {
                     if (glyphStyle.hasColor()) drawTint = glyphStyle.getColor();
                 }
                 if (glyph.page() == null) continue;
-                if (override) {
-                    // A styled scale or provisional image can change the atlas format.
-                    Shader selected = glyph.page().getDistanceFieldRange() <= 0 ? previous : batch.getDefaultShader();
-                    if (batch.getShader() != selected) batch.setShader(selected);
-                }
                 Color submissionTint = drawTint;
                 if (effect != null) {
                     effectTint.set(effect);

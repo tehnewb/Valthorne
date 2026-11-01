@@ -19,10 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
-    env:
-      ALSOFT_DRIVERS: 'null'
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -30,22 +28,27 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # Temurin has no Windows ARM64 JDK 25; build with x64 Java there.
+          # Native ARM64 Node still validates the packaged ARM64 compiler.
+          architecture: ${{ matrix.os == 'windows-11-arm' && 'x64' || '' }}
       - uses: gradle/actions/setup-gradle@v4
       - name: Check wrapper integrity
         uses: gradle/actions/wrapper-validation@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify version automation
-        run: node --test .github/scripts/*.test.cjs
-      - name: Build library artifacts
+      - name: Build desktop and browser libraries
         shell: bash
         run: bash ./gradlew assemble --stacktrace --console=plain
-      - name: Retain reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: reports-${{ matrix.os }}
-          path: |
-            build/reports/
-          if-no-files-found: ignore
+      - name: Verify version automation
+        run: node --test .github/scripts/*.test.cjs
+      - name: Check Linux ARM32 compiler under emulation
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user
+          compiler=build/generated/shaderc-resources/valthorne/shaderc/linux/arm32/shaderc
+          chmod +x "$compiler"
+          qemu-arm -cpu cortex-a7 "$compiler" --version
+          qemu-arm -cpu cortex-a7 "$compiler" -f src/main/resources/valthorne/shaders/bgfx/engine/batch.frag.sc -o "$RUNNER_TEMP/arm32-shader.bin" --type f --platform linux --profile spirv --varyingdef src/main/resources/valthorne/shaders/bgfx/engine/varying.def.sc -i build/generated/shaderc-resources/valthorne/shaderc/include

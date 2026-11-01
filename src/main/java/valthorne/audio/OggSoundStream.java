@@ -16,7 +16,8 @@ import java.nio.file.Path;
  * position and must be externally serialized; instances are not thread-safe.
  * <p>Close the stream to release the native decoder. Closing is idempotent and leaves
  * metadata accessible, but further reads and seeks fail. Memory-backed encoded data
- * is retained for the decoder's lifetime.
+ * is retained for the decoder's lifetime. Identification and comment headers are
+ * checked before native decoding, with a 16 MiB limit per metadata packet.
  *
  * @author Albert Beaupre
  */
@@ -41,11 +42,13 @@ public class OggSoundStream implements SoundStream {
             IntBuffer error = BufferUtils.createIntBuffer(1);
 
             if (data.source() instanceof SoundSource.PathSource(String path)) {
+                OggVorbisHeaders.validate(Path.of(path));
                 this.encodedData = null;
                 ByteBuffer fileNameBuffer = MemoryUtil.memUTF8(Path.of(path).toAbsolutePath().toString());
                 this.decoder = STBVorbis.stb_vorbis_open_filename(fileNameBuffer, error, null);
                 MemoryUtil.memFree(fileNameBuffer);
             } else if (data.source() instanceof SoundSource.BytesSource(byte[] bytes)) {
+                OggVorbisHeaders.validate(bytes);
                 this.encodedData = BufferUtils.createByteBuffer(bytes.length);
                 this.encodedData.put(bytes).flip();
                 this.decoder = STBVorbis.stb_vorbis_open_memory(encodedData, error, null);

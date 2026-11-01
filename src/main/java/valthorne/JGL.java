@@ -1,21 +1,20 @@
 package valthorne;
 
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 import org.lwjgl.glfw.GLFW;
 import valthorne.event.Event;
 import valthorne.event.EventHandler;
 import valthorne.event.EventPublisher;
 import valthorne.event.EventType;
-
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
+import valthorne.graphics.bgfx.BgfxGraphics;
 
 import static org.lwjgl.glfw.GLFW.glfwGetTime;
-import static org.lwjgl.glfw.GLFW.glfwInit;
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
-import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
 import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
-import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
+import static org.lwjgl.glfw.GLFW.glfwInit;
+import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
 /**
  * The {@code JGL} class forms the core of the Valthorne 2D game engine framework.
@@ -28,8 +27,9 @@ import static org.lwjgl.glfw.GLFW.glfwGetWindowAttrib;
  * <ul>
  *   <li>Framework Initialization: Initializes GLFW as a windowing system and configures
  *       systems like audio, input devices (keyboard, mouse), and window display.</li>
- *   <li>Main Application Loop: Ensures consistent updates to the game state and renders
- *       every frame, calculating delta time and frame rates for precise updates.</li>
+ *   <li>Main Application Loop: Updates game state and renders while the framebuffer has
+ *       nonzero dimensions. Input, queued tasks and updates continue while minimized;
+ *       rendering resumes after restoration. Frame rates count rendered frames.</li>
  *   <li>Event-Driven Design: Provides a centralized event bus to facilitate communication
  *       between various components by subscribing, unsubscribing, and broadcasting events.</li>
  *   <li>Resource Cleanup: At the end of the application's lifecycle, ensures proper
@@ -148,7 +148,10 @@ public class JGL {
             double lastTime = glfwGetTime();
 
             while (!Window.shouldClose()) {
+                long graphicsGeneration = BgfxGraphics.generation();
                 drainTasks();
+                if (Window.shouldClose()) break;
+                if (graphicsGeneration != BgfxGraphics.generation()) lastTime = glfwGetTime();
 
                 double now = glfwGetTime();
                 deltaTime = (float) (now - lastTime);
@@ -158,11 +161,15 @@ public class JGL {
                 Window.dispatchCloseRequest();
                 if (Window.shouldClose()) break;
 
+                BgfxGraphics.beginFrame();
                 frameApplication.update(deltaTime);
-                frameApplication.render();
+                // Updates may minimize the window, so check its drawable extent afterward.
+                if (Window.getFramebufferWidth() > 0 && Window.getFramebufferHeight() > 0) {
+                    frameApplication.render();
+                    frames++;
+                }
 
                 fpsTime += deltaTime;
-                frames++;
 
                 if (fpsTime >= 1) {
                     framesPerSecond = frames;
@@ -170,7 +177,7 @@ public class JGL {
                     frames = 0;
                 }
 
-                glfwSwapBuffers(Window.getAddress());
+                BgfxGraphics.present();
                 Mouse.resetScroll();
             }
         } catch (Throwable throwable) {

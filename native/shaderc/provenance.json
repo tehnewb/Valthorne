@@ -1,0 +1,91 @@
+{
+  "bgfxApi": 156,
+  "containerVersion": 12,
+  "compilerVersion": "1.19.156",
+  "sourceRevision": "f564ae8bf92cd2ac27d95b12408bd68be3ddf955",
+  "resources": [
+    {
+      "path": "valthorne/shaderc/windows/x64/shaderc.exe",
+      "url": "https://build.lwjgl.org/stable/windows/x64/bgfx-tools/shaderc.exe",
+      "sha256": "d5eb81c22d68283bda50791242312e3a34f3b71ca25be883b0ff924633525a7a"
+    },
+    {
+      "path": "valthorne/shaderc/windows/arm64/shaderc.exe",
+      "url": "https://build.lwjgl.org/stable/windows/arm64/bgfx-tools/shaderc.exe",
+      "sha256": "8572ee2f39bc6ff1f8daf9e32dd59372b7a8ec48f858b6104a6fd19c32333af5"
+    },
+    {
+      "path": "valthorne/shaderc/linux/x64/shaderc",
+      "url": "https://build.lwjgl.org/stable/linux/x64/bgfx-tools/shaderc",
+      "sha256": "10539b3c641f6cf3da04638e150a3d3aa1b7caa9508a843cee41614f8e91f200"
+    },
+    {
+      "path": "valthorne/shaderc/macosx/x64/shaderc",
+      "url": "https://build.lwjgl.org/stable/macosx/x64/bgfx-tools/shaderc",
+      "sha256": "83f311c5560c8aa756ede028a7dbb9157b61ae101274c119919e7e33e517c4e3"
+    },
+    {
+      "path": "valthorne/shaderc/macosx/arm64/shaderc",
+      "url": "https://build.lwjgl.org/stable/macosx/arm64/bgfx-tools/shaderc",
+      "sha256": "50a6284bfefc9f7ec8ae39e835d599e72650b1fd290ad541d5784b869d7662b3"
+    },
+    {
+      "path": "valthorne/shaderc/include/bgfx_shader.sh",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/src/bgfx_shader.sh",
+      "sha256": "5ad79a2ff5d1b1fd1f22d986f2b0b5dc49f89ffd5ce18e57966b6ab894094508"
+    },
+    {
+      "path": "valthorne/shaderc/include/bgfx_compute.sh",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/src/bgfx_compute.sh",
+      "sha256": "c2cb5d05818dc7bf9663406be480a8e52410fdca1b5ec89617f21b4eeddb315c"
+    },
+    {
+      "path": "META-INF/licenses/shaderc-glslang.txt",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/3rdparty/glslang/LICENSE.txt",
+      "sha256": "17e70c676e1521ff3e4686f04a2053d93a7e28a33be8de7ec37ab0ff72feb677"
+    },
+    {
+      "path": "META-INF/licenses/shaderc-spirv-cross.txt",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/3rdparty/spirv-cross/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "META-INF/licenses/shaderc-spirv-tools.txt",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/3rdparty/spirv-tools/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "META-INF/licenses/shaderc-spirv-headers.txt",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/3rdparty/spirv-headers/LICENSE",
+      "sha256": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613"
+    },
+    {
+      "path": "META-INF/licenses/shaderc-dawn.txt",
+      "url": "https://raw.githubusercontent.com/LWJGL-CI/bgfx/f564ae8bf92cd2ac27d95b12408bd68be3ddf955/3rdparty/dawn/LICENSE",
+      "sha256": "0493f897193af1796d5054659f45ec7d4c5af648fa67a99f01d30e55cc805abc"
+    },
+    {
+      "path": "valthorne/shaderc/linux/arm64/shaderc",
+      "archive": "prebuilt/linux-arm64.gz",
+      "sha256": "a58b96ed21c5da04621aceedfc50ca065d01a585fe4575093270b4fd043630a3"
+    },
+    {
+      "path": "valthorne/shaderc/linux/arm32/shaderc",
+      "archive": "prebuilt/linux-arm32.gz",
+      "sha256": "ded7db2657ef0c72013f1b121f668083b5055148bab0e1385f70734108564a43"
+    }
+  ],
+  "browserArtifacts": {
+    "shaderc.mjs": "49996c84d5831d4b1e7a7361b3a4708668a2c5fbea4edb3163eae839cb1d3eb0",
+    "shaderc.wasm": "4f65b2206fc303e2e2e7378985041a92c90564e4eafa247f1ea68e8c6750134e"
+  },
+  "rebuild": {
+    "emscripten": "4.0.23",
+    "zig": "0.15.2",
+    "optimization": "O1",
+    "cppStandard": "C++20",
+    "bxRevision": "f3a9adb603c5677731e7cf10622fa16e1dfe9ea5",
+    "bimgRevision": "9bfbd6493b48a15238f2d1374a718ec026524515",
+    "linuxCallstack": "Use bx unwind support when musl has no execinfo.h"
+  }
+}

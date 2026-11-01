@@ -1,13 +1,11 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 /**
  * Shared shader base for textured quad rendering with explicit attributes and uniforms.
  *
  * <p>This contract is used by immediate quad renderers such as {@code Sprite.draw()},
- * framebuffer blits, and standalone sprite effect shaders that should work on modern
- * OpenGL core profiles without relying on fixed-function state.</p>
+ * framebuffer blits, and standalone sprite effect shaders on every supported
+ * graphics backend.</p>
  *
  * @author Albert Beaupre
  * @since August 15th, 2026
@@ -37,18 +35,8 @@ public class TexturedQuadShader extends Shader {
     public static final String UNIFORM_TEXTURE = "u_texture";
 
     /**
-     * Bundled default quad vertex GLSL, loaded once.
-     */
-    private static final String DEFAULT_VERTEX_SOURCE = ValthorneFiles.readString("valthorne/shaders/core/textured-quad.vert");
-
-    /**
-     * Bundled default texture-times-color fragment GLSL, loaded once.
-     */
-    private static final String DEFAULT_FRAGMENT_SOURCE = ValthorneFiles.readString("valthorne/shaders/core/textured-quad.frag");
-
-    /**
      * Compiles the default bundled textured-quad vertex and fragment stages.
-     * Requires a current OpenGL context; drawing code supplies uniforms and textures.
+     * Requires a current graphics device; drawing code supplies uniforms and textures.
      */
     public TexturedQuadShader() {
         this(null, null);
@@ -57,7 +45,7 @@ public class TexturedQuadShader extends Shader {
     /**
      * Compiles a custom fragment stage with the default vertex contract.
      *
-     * @param fragmentSource GLSL fragment source, or null/blank for the default
+     * @param fragmentSource packaged fragment identifier, or null/blank for the default
      */
     public TexturedQuadShader(String fragmentSource) {
         this(null, fragmentSource);
@@ -68,8 +56,8 @@ public class TexturedQuadShader extends Shader {
      * null or blank arguments. Custom stages must match the drawing helper's
      * position, UV, color, sampler, and projection contract.
      *
-     * @param vertexSource custom vertex GLSL, or null/blank
-     * @param fragmentSource custom fragment GLSL, or null/blank
+     * @param vertexSource packaged vertex identifier, or null/blank
+     * @param fragmentSource packaged fragment identifier, or null/blank
      */
     public TexturedQuadShader(String vertexSource, String fragmentSource) {
         super(normalizeVertexSource(vertexSource), normalizeFragmentSource(fragmentSource));
@@ -78,19 +66,25 @@ public class TexturedQuadShader extends Shader {
     /**
      * Returns the cached bundled vertex source without another resource read.
      *
-     * @return default vertex GLSL
+     * @return default vertex stage identifier
      */
     protected static String defaultVertexSource() {
-        return DEFAULT_VERTEX_SOURCE;
+        /*
+         * Logical identifiers are shared by all packaged backend variants.
+         */
+        return "engine/quad.vert";
     }
 
     /**
      * Returns the cached bundled fragment source without another resource read.
      *
-     * @return default fragment GLSL
+     * @return default fragment stage identifier
      */
     protected static String defaultFragmentSource() {
-        return DEFAULT_FRAGMENT_SOURCE;
+        /*
+         * Resolve the compiled program family through the active graphics device.
+         */
+        return "engine/texture.frag";
     }
 
     /**
@@ -100,7 +94,10 @@ public class TexturedQuadShader extends Shader {
      * @return nonblank source passed to compilation
      */
     private static String normalizeVertexSource(String vertexSource) {
-        return vertexSource == null || vertexSource.isBlank() ? DEFAULT_VERTEX_SOURCE : vertexSource;
+        /*
+         * Keep caller-supplied stages intact while selecting backend defaults for omissions.
+         */
+        return vertexSource == null || vertexSource.isBlank() ? defaultVertexSource() : vertexSource;
     }
 
     /**
@@ -110,6 +107,9 @@ public class TexturedQuadShader extends Shader {
      * @return nonblank source passed to compilation
      */
     private static String normalizeFragmentSource(String fragmentSource) {
-        return fragmentSource == null || fragmentSource.isBlank() ? DEFAULT_FRAGMENT_SOURCE : fragmentSource;
+        /*
+         * Compiled native stage names pass through without GLSL rewriting.
+         */
+        return fragmentSource == null || fragmentSource.isBlank() ? defaultFragmentSource() : fragmentSource;
     }
 }

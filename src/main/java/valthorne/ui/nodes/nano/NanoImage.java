@@ -1,6 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import org.lwjgl.nanovg.NVGPaint;
+import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.graphics.texture.TextureData;
 import valthorne.ui.UINode;
@@ -11,7 +12,8 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * UI image node that uploads borrowed TextureData to a lazily created NanoVG
  * image and stretches it across the node's layout rectangle. The image pattern
  * uses full opacity and no rotation; aspect ratio follows the assigned width
- * and height rather than a separate fit policy.
+ * and height rather than a separate fit policy. The pattern accounts for
+ * TextureData's bottom-first rows without modifying the borrowed pixels.
  *
  * <p>Construction with a texture initializes layout dimensions from its pixel
  * dimensions. The native image is created on the first draw and recreated when
@@ -28,6 +30,7 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * @author Albert Beaupre
  */
 public class NanoImage extends UINode implements NanoNode {
+    private long imageGeneration = -1; // Device generation owning the cached NanoVG image.
 
     private TextureData texture; // Borrowed source pixels retained for lazy upload and context recreation.
     private int imageHandle = -1; // Owned NanoVG image name, positive only after successful creation.
@@ -112,7 +115,8 @@ public class NanoImage extends UINode implements NanoNode {
 
         NVGPaint paint = NVGPaint.calloc();
         try {
-            nvgImagePattern(vg, x, y, width, height, 0f, imageHandle, 1f, paint);
+            // Match bottom-first TextureData without relying on renderer image flags.
+            nvgImagePattern(vg, x, y + height, width, -height, 0f, imageHandle, 1f, paint);
             nvgBeginPath(vg);
             nvgRect(vg, x, y, width, height);
             nvgFillPaint(vg, paint);
@@ -158,20 +162,24 @@ public class NanoImage extends UINode implements NanoNode {
 
     /**
      * Reuses a positive image handle owned by the requested context, otherwise
-     * deletes the old image and uploads current RGBA pixels. Vertical flipping
-     * matches TextureData's bottom-first rows to NanoVG. Failed creation leaves
-     * a nonpositive handle and is retried by a later draw.
+     * deletes the old image and uploads current RGBA pixels unchanged. Drawing
+     * reverses the image pattern to match TextureData's bottom-first rows.
+     * Failed creation leaves a nonpositive handle and is retried by a later draw.
      *
      * @param vg the valid nonzero destination NanoVG context
      */
     private void ensureImage(long vg) {
+        if (imageGeneration != BgfxGraphics.generation()) {
+            imageHandle = -1;
+            imageContext = 0;
+            imageGeneration = BgfxGraphics.generation();
+        }
         if (imageHandle > 0 && imageContext == vg)
             return;
 
         deleteImage();
 
-        // TextureData uses the same bottom-first rows as TextureBatch.
-        imageHandle = nvgCreateImageRGBA(vg, texture.width(), texture.height(), NVG_IMAGE_FLIPY, texture.buffer());
+        imageHandle = nvgCreateImageRGBA(vg, texture.width(), texture.height(), 0, texture.buffer());
         imageContext = vg;
     }
 
@@ -181,7 +189,7 @@ public class NanoImage extends UINode implements NanoNode {
      * do nothing beyond resetting bookkeeping. Source TextureData is untouched.
      */
     private void deleteImage() {
-        if (imageHandle > 0 && imageContext != 0L)
+        if (imageGeneration == BgfxGraphics.generation() && imageHandle > 0 && imageContext != 0L)
             nvgDeleteImage(imageContext, imageHandle);
 
         imageHandle = -1;

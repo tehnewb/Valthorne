@@ -1,50 +1,47 @@
 package valthorne.graphics.texture;
 
-import org.lwjgl.BufferUtils;
-import valthorne.Window;
-import valthorne.graphics.Color;
-import valthorne.graphics.Sprite;
-import valthorne.graphics.shader.Shader;
-
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
 import java.util.Objects;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.GL_MAX_TEXTURE_IMAGE_UNITS;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL20.glGetUniformLocation;
-import static org.lwjgl.opengl.GL20.glUniform2f;
-import static org.lwjgl.opengl.GL20.glUniform1f;
-import static org.lwjgl.opengl.GL14.*;
-import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL31.glDrawArraysInstanced;
-import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
+import org.lwjgl.BufferUtils;
+import valthorne.Window;
+import valthorne.graphics.Color;
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsResource;
+import valthorne.graphics.Sprite;
+import valthorne.graphics.bgfx.BgfxBatchRenderer;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxResources;
+import valthorne.graphics.shader.Shader;
 
 /**
  * <p>
  * {@code TextureBatch} is Valthorne's instanced textured-quad renderer. It is designed
- * to batch many sprite draw operations into as few OpenGL draw calls as possible while
+ * to batch many sprite draw operations into as few GPU draw calls as possible while
  * still supporting several advanced rendering features such as color tinting, sprite
  * scaling, sprite rotation, nine-patch rendering, nested clipping, translation stacks,
  * shader overrides, and rendering into a {@link FrameBuffer}.
  * </p>
- * <p>Adaptive coverage and MSDF atlas textures use the standard sprite queue.
- * Immutable texture metadata selects distance-field sampling per texture unit,
- * so these fonts and ordinary sprites can share one draw while preserving
- * painter order. Text's physical viewport snapshot is lazy and reused until
- * the next begin or external-renderer resume; the vertex format is unchanged.</p>
+ * <p>
+ * Adaptive fonts and retained text runs use coverage/MSDF atlases within this same
+ * begin/end scope. The batch lazily creates a curve shader, groups consecutive text
+ * submissions, and flushes at sprite/text boundaries to preserve painter order.
+ * Glyphs share sprite staging storage, quad geometry and the instance VBO.
+ * An internal component owns glyph implementation state and is allocated only
+ * when text is used; callers keep one batch and the same drawing lifecycle.
+ * Text inherits translation, clipping, tint and opacity. Its dedicated curve shader
+ * uses the current window projection and physical viewport; custom sprite shaders
+ * do not affect glyphs. Flush before changing projection, viewport or external rendering
+ * state. Fonts are borrowed and must remain alive until queued text is flushed.
+ * No raster atlas or per-draw scratch allocation is used by the text path.
+ * </p>
  *
  * <p>
  * Instead of immediately sending every individual sprite to the GPU, this class stores
  * per-instance data inside an internal {@link FloatBuffer}. Once the batch is full or
  * the caller explicitly ends the batch, that instance data is uploaded to the GPU and
- * rendered with {@code glDrawArraysInstanced}. This greatly reduces driver overhead and
+ * rendered with {@code an instanced GPU submission}. This greatly reduces driver overhead and
  * improves rendering performance when drawing large numbers of textured objects.
  * </p>
  *
@@ -101,28 +98,23 @@ import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
  * @author Albert Beaupre
  * @since February 8th, 2026
  */
-public final class TextureBatch {
+public final class TextureBatch implements GraphicsResource {
+    private BgfxBatchRenderer bgfxRenderer; // Owned compact GPU instance path.
+    private int previousTargetWidth; // Saved parent target width for cropped viewport restoration.
+    private int previousTargetHeight; // Saved target orientation for a scoped bgfx framebuffer.
 
-    private final ByteBuffer instanceBytes; // Owned native staging storage for ordinary and font atlas quads.
+    private final ByteBuffer instanceBytes; // Shared native staging storage for sprite and glyph segments.
     private final FloatBuffer instanceBuffer; // Float view of shared staging storage used for sprite instances.
     private final Color color = new Color(1f, 1f, 1f, 1f); // Default batch tint used when a draw call does not provide one
     private float opacityMultiplier = 1f; // Multiplies final per-sprite alpha for temporary translucent rendering.
     private final Shader defaultShader; // Built-in shader used when no custom shader is active
     private final int maxSprites; // Maximum number of sprite instances that can be queued before a flush
     private final int maxTextureUnits; // Maximum number of texture units this batch may use
-    private final int quadVBO; // VBO containing the shared quad geometry used by all instances
-    private final int instanceVBO; // VBO containing uploaded instance data for the current flush
-    private final int vao; // Owned vertex-array name for quad and instance attributes.
+    private final int[] textViewport = new int[4]; // Cached physical viewport for adaptive glyph grid fitting.
+    private boolean textViewportValid; // Whether textViewport belongs to the current batch scope.
+    private final float[] distanceRanges = new float[64]; // Packed per-slot MSDF range or negative R8 coverage marker.
+    private final String[] distanceUniforms = new String[16]; // Stable indexed uniform names allocated only at construction.
     private final int[] vp = new int[4]; // Temporary viewport storage used when switching framebuffer targets
-    private final int[] textViewport = new int[4]; // Lazily sampled viewport shared by all adaptive labels in a batch scope.
-    private final float[] distanceRanges; // Last uploaded per-unit MSDF ranges; zero preserves ordinary texture sampling.
-    private int distanceRangeUniform; // First location in the built-in shader's contiguous vec2 range array.
-    private int textContrastUniform; // Coverage correction control in the active participating shader.
-    private boolean linearTextBlending; // Whether a linear target or hardware sRGB blending handles edge luminance.
-    private int distanceRangeProgram; // Program supplying cached range locations and values; detects shader reloads.
-    private boolean distanceFields; // Whether the active shader accepts shared distance-range uniforms.
-    private boolean textViewportValid; // Whether the viewport snapshot matches the current drawing scope.
-    private final int[] previousScissorBox = new int[4]; // Previous OpenGL scissor rectangle restored after batching
     private final float[] clipStack = new float[256]; // Stack storing nested clip rectangles as x, y, width, height groups
     private final float[] translationStack = new float[256]; // Stack storing nested translation states as x and y pairs
     private Shader customShader; // Optional user-supplied shader override
@@ -154,29 +146,27 @@ public final class TextureBatch {
     private float clipW; // Active clip rectangle width
     private float clipH; // Active clip rectangle height
 
-    private boolean scissorEnabledBeforeBegin; // Whether OpenGL scissor testing was enabled before begin() modified state
-    private long totalDrawCalls; // Cumulative nonempty draw count for sprites and atlas text.
+    private long totalDrawCalls; // Cumulative nonempty sprite draw count, combined with glyph counts by the getter.
     private boolean cullingEnabled = true; // Whether standard shader quads use viewport rejection.
-    private long totalSubmittedSprites; // Cumulative submitted and viewport-culled sprite counts.
-    private long totalCulledSprites; // Cumulative submitted and viewport-culled sprite counts.
+    private long totalSubmittedSprites; // Cumulative submitted sprite count.
+    private long totalCulledSprites; // Cumulative viewport-culled sprite count.
 
     /**
      * <p>
-     * Creates a new {@code TextureBatch} with the requested sprite capacity and an
-     * automatically detected texture unit limit clamped to sixteen.
+     * Creates a new {@code TextureBatch} with the requested sprite capacity and
+     * sixteen texture slots exposed by the packaged batch shaders.
      * </p>
      *
      * <p>
-     * This constructor is convenient for most normal usage. It queries the OpenGL
-     * context for supported texture image units and keeps the batch within a safe
-     * upper bound.
+     * The same sampler contract applies across supported bgfx backends; construction
+     * does not query implicit graphics state to choose a slot count.
      * </p>
      *
      * @param maxSprites the maximum number of sprite instances that may be queued
      *                   before the batch must flush
      */
     public TextureBatch(int maxSprites) {
-        this(maxSprites, detectTextureUnitsClamped(16));
+        this(maxSprites, 16);
     }
 
     /**
@@ -188,7 +178,7 @@ public final class TextureBatch {
      * <p>
      * This constructor allocates the CPU-side instance buffer, creates the default
      * shader, binds its expected attributes and samplers, builds the base quad vertex
-     * data, and creates the OpenGL buffer objects required for batched instanced
+     * data, and creates the GPU buffer objects required for batched instanced
      * rendering.
      * </p>
      *
@@ -212,8 +202,8 @@ public final class TextureBatch {
         }
 
         this.maxSprites = maxSprites;
+        for (int i = 0; i < distanceUniforms.length; i++) distanceUniforms[i] = "u_distanceRange[" + i + "]";
         this.maxTextureUnits = Math.min(maxTextureUnits, 16);
-        this.distanceRanges = new float[this.maxTextureUnits * 2];
 
         this.textureUnitCapacity = Math.min(4, this.maxTextureUnits);
         this.textureIDs = new int[this.textureUnitCapacity];
@@ -222,56 +212,15 @@ public final class TextureBatch {
         this.instanceBytes = BufferUtils.createByteBuffer(Math.multiplyExact(this.maxSprites, TextureBatchContract.INST_STRIDE_BYTES));
         this.instanceBuffer = instanceBytes.asFloatBuffer();
 
-        this.defaultShader = new Shader(TextureBatchContract.defaultVertexShader(), TextureBatchContract.buildDefaultFragmentShader(this.maxTextureUnits), TextureBatchContract::bindAttributes);
-        TextureBatchContract.bindSamplers(this.defaultShader, this.maxTextureUnits);
-        this.distanceRangeUniform = glGetUniformLocation(this.defaultShader.getProgramID(), "u_distanceRange[0]");
-        this.textContrastUniform = glGetUniformLocation(this.defaultShader.getProgramID(), "u_textContrast");
-        this.distanceRangeProgram = this.defaultShader.getProgramID();
-
-        this.activeShader = this.defaultShader;
-
-        FloatBuffer quad = BufferUtils.createFloatBuffer(TextureBatchContract.QUAD_VERTS * TextureBatchContract.QUAD_FLOATS_PER_VERT);
-
-        quad.put(0f)
-                .put(0f)
-                .put(0f)
-                .put(0f);
-        quad.put(1f)
-                .put(0f)
-                .put(1f)
-                .put(0f);
-        quad.put(1f)
-                .put(1f)
-                .put(1f)
-                .put(1f);
-
-        quad.put(1f)
-                .put(1f)
-                .put(1f)
-                .put(1f);
-        quad.put(0f)
-                .put(1f)
-                .put(0f)
-                .put(1f);
-        quad.put(0f)
-                .put(0f)
-                .put(0f)
-                .put(0f);
-
-        quad.flip();
-
-        quadVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, quad, GL_STATIC_DRAW);
-
-        instanceVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, (long) this.maxSprites * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
-
-        vao = glGenVertexArrays();
-        configureVertexArray();
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        bgfxRenderer = new BgfxBatchRenderer(maxSprites);
+        try {
+            defaultShader = new TextureBatchShader(this.maxTextureUnits);
+        } catch (RuntimeException | Error failure) {
+            bgfxRenderer.close();
+            throw failure;
+        }
+        activeShader = defaultShader;
+        BgfxResources.register(this);
     }
 
     /**
@@ -298,84 +247,6 @@ public final class TextureBatch {
      */
     private static float insetMax(float value, float size) {
         return size > 1f ? value + size - 0.5f : value + size;
-    }
-
-    /**
-     * <p>
-     * Detects the number of supported texture image units from the current OpenGL
-     * context and clamps the result to a caller-provided maximum.
-     * </p>
-     *
-     * <p>
-     * If the driver reports an invalid value less than or equal to zero, the method
-     * falls back to eight texture units as a conservative default.
-     * </p>
-     *
-     * @param clampTo the maximum allowed texture unit count
-     * @return the detected and clamped texture unit count
-     */
-    private static int detectTextureUnitsClamped(int clampTo) {
-        int units = glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS);
-        if (units <= 0) {
-            units = 8;
-        }
-        return Math.min(units, clampTo);
-    }
-
-    /**
-     * Associates static quad and streamed instance buffers with the batch vertex
-     * array, configuring the shared attribute layout and instance divisors. Requires
-     * the GL context and leaves array bindings at zero.
-     */
-    private void configureVertexArray() {
-        glBindVertexArray(vao);
-
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-
-        int quadStride = TextureBatchContract.QUAD_FLOATS_PER_VERT * TextureBatchContract.BYTES_PER_FLOAT;
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_LOCAL);
-        glVertexAttribPointer(TextureBatchContract.ATTR_LOCAL, 2, GL_FLOAT, false, quadStride, 0L);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_UV);
-        glVertexAttribPointer(TextureBatchContract.ATTR_UV, 2, GL_FLOAT, false, quadStride, 2L * TextureBatchContract.BYTES_PER_FLOAT);
-
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_XYWH);
-        glVertexAttribPointer(TextureBatchContract.ATTR_XYWH, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 0L);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_XYWH, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_COL);
-        glVertexAttribPointer(TextureBatchContract.ATTR_COL, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 4L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_COL, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_TEX);
-        glVertexAttribPointer(TextureBatchContract.ATTR_TEX, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 8L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_TEX, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_UVRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_UVRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 9L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_UVRECT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_ORIGIN);
-        glVertexAttribPointer(TextureBatchContract.ATTR_ORIGIN, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 13L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ORIGIN, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_ROT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_ROT, 2, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 15L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_ROT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPRECT);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPRECT, 4, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 17L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPRECT, 1);
-
-        glEnableVertexAttribArray(TextureBatchContract.ATTR_CLIPENABLED);
-        glVertexAttribPointer(TextureBatchContract.ATTR_CLIPENABLED, 1, GL_FLOAT, false, TextureBatchContract.INST_STRIDE_BYTES, 21L * TextureBatchContract.BYTES_PER_FLOAT);
-        glVertexAttribDivisor(TextureBatchContract.ATTR_CLIPENABLED, 1);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
     }
 
     /**
@@ -442,22 +313,6 @@ public final class TextureBatch {
      */
     public Shader getDefaultShader() {
         return defaultShader;
-    }
-
-    /**
-     * Reports whether the selected shader supports ordinary and MSDF sampling.
-     * @return whether adaptive text can stay in the current shader and queue
-     */
-    public boolean supportsDistanceFields() {
-        return activeShader == defaultShader || activeShader instanceof TextureBatchShader shader && shader.supportsDistanceFields();
-    }
-
-    /**
-     * Reports vertex transformations that bypass coverage grid fitting.
-     * @return whether the selected shader transforms text beyond the projection
-     */
-    public boolean transformsText() {
-        return activeShader instanceof TextureBatchShader shader && shader.transformsText();
     }
 
     /**
@@ -620,7 +475,7 @@ public final class TextureBatch {
 
     /**
      * Reports whether the batch currently has a logical clip rectangle enabled.
-     * This is batch state rather than a fresh query of GL scissor enablement.
+     * This reflects the batch's shader clip state independently of physical scissor state.
      *
      * @return whether logical clipping is active
      */
@@ -670,101 +525,9 @@ public final class TextureBatch {
      * stacks, tint, shader choice, and framebuffer ownership.
      */
     public void resumeAfterExternalDraw() {
-        if (!drawing) throw new IllegalStateException("The batch is not drawing.");
-        if (instanceCount != 0) throw new IllegalStateException("Flush before switching renderers.");
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_SCISSOR_TEST);
-        activeTextureCount = 0;
-        lastTextureID = -1;
-        lastTextureUnit = -1;
-        Arrays.fill(textureIDs, 0, textureUnitCapacity, -1);
         textViewportValid = false;
-        bindActiveShaderState();
-    }
-
-    /**
-     * Samples the active viewport once per drawing scope for adaptive text.
-     * Detects linear and sRGB targets in the same cold snapshot so font coverage
-     * correction never adds framebuffer queries to individual glyph draws.
-     * Resume after external rendering to invalidate this snapshot when another
-     * renderer changes the viewport. Projection values remain live independently.
-     */
-    private void sampleTextViewport() {
-        if (!drawing) throw new IllegalStateException("Call begin() before reading the text viewport.");
-        if (textViewportValid) return;
-        glGetIntegerv(GL_VIEWPORT, textViewport);
-        linearTextBlending = glIsEnabled(GL_FRAMEBUFFER_SRGB);
-        int framebuffer = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
-        if (framebuffer != 0) {
-            int component = glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE);
-            linearTextBlending = component == GL_FLOAT || linearTextBlending && glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING) == GL_SRGB;
-        }
-        if (distanceFields && textContrastUniform >= 0) glUniform1f(textContrastUniform, linearTextBlending ? 0 : 1);
-        textViewportValid = true;
-    }
-
-    /**
-     * Returns the batch scope's sampled physical viewport origin.
-     * @return horizontal viewport origin in pixels
-     */
-    public int getViewportX() { sampleTextViewport(); return textViewport[0]; }
-
-    /**
-     * Returns the batch scope's sampled physical viewport origin.
-     * @return vertical viewport origin in pixels
-     */
-    public int getViewportY() { sampleTextViewport(); return textViewport[1]; }
-
-    /**
-     * Returns the batch scope's sampled physical viewport width.
-     * @return viewport width in pixels
-     */
-    public int getViewportWidth() { sampleTextViewport(); return textViewport[2]; }
-
-    /**
-     * Returns the batch scope's sampled physical viewport height.
-     * @return viewport height in pixels
-     */
-    public int getViewportHeight() { sampleTextViewport(); return textViewport[3]; }
-
-    /**
-     * Aligns a logical text origin to a physical pixel for uniform axis-aligned
-     * projections. Glyph advances stay fractional; transformed text stays unsnapped.
-     * @param x logical horizontal position before batch translation
-     * @return aligned horizontal origin in the same logical coordinate system
-     */
-    public float alignTextOrigin(float x) { return alignTextCoordinate(x, false); }
-
-    /**
-     * Aligns a logical baseline using the same policy as text origins and carets.
-     * @param y logical baseline before batch translation
-     * @return aligned baseline in the same logical coordinate system
-     */
-    public float alignTextBaseline(float y) { return alignTextCoordinate(y, true); }
-
-    /**
-     * Projects, rounds and unprojects one coordinate without native scratch buffers.
-     * @param value logical coordinate before batch translation
-     * @param vertical whether to use the vertical axis
-     * @return unchanged value for general transforms, otherwise a physical-pixel alignment
-     */
-    private float alignTextCoordinate(float value, boolean vertical) {
-        if (!Float.isFinite(value)) throw new IllegalArgumentException("Text coordinate must be finite");
-        sampleTextViewport();
-        float[] matrix = Window.getProjectionMatrix();
-        if (transformsText() || matrix[1] != 0 || matrix[4] != 0 || matrix[3] != 0 || matrix[7] != 0 || matrix[15] != 1 || matrix[0] <= 0 || matrix[5] <= 0) return value;
-        float sx = matrix[0] * textViewport[2] * 0.5f;
-        float sy = matrix[5] * textViewport[3] * 0.5f;
-        if (sx <= 0 || sy <= 0 || Math.abs(sx - sy) > Math.max(sx, sy) * 0.0001f) return value;
-        float scale = vertical ? sy : sx;
-        float origin = vertical ? textViewport[1] + (matrix[13] * 0.5f + 0.5f) * textViewport[3] : textViewport[0] + (matrix[12] * 0.5f + 0.5f) * textViewport[2];
-        float translated = value + (vertical ? translationY : translationX);
-        float screen = translated * scale + origin;
-        return value + (Math.round(screen) - screen) / scale;
+        if (!drawing) throw new IllegalStateException("The batch is not drawing");
+        BgfxGraphics.configureView();
     }
 
     /**
@@ -781,7 +544,7 @@ public final class TextureBatch {
      *
      * <p>
      * The clip rectangle is stored as instance data and later interpreted by the shader.
-     * It does not directly call {@code glScissor} for every nested region.
+     * Nested regions do not change the coordinator's physical scissor state.
      * </p>
      *
      * @param x      the clip region X coordinate
@@ -898,7 +661,7 @@ public final class TextureBatch {
      *
      * <p>
      * This method initializes batch state, resets clip and translation stacks, saves
-     * and temporarily modifies relevant OpenGL state, clears instance bookkeeping, and
+     * and temporarily modifies relevant engine render state, clears instance bookkeeping, and
      * binds the currently active shader and vertex attributes. If an FBO is provided,
      * the current framebuffer and viewport are captured and restored later in
      * {@link #end()}.
@@ -916,63 +679,7 @@ public final class TextureBatch {
      *                               into a framebuffer
      */
     public void begin(FrameBuffer fbo) {
-        if (drawing) throw new IllegalStateException("Already drawing.");
-        translationDepth = 0;
-        translationX = 0f;
-        translationY = 0f;
-        drawing = true;
-        textViewportValid = false;
-
-        usingFBO = fbo != null;
-
-        if (usingFBO) {
-            previousFBO = glGetInteger(GL_FRAMEBUFFER_BINDING);
-
-            glGetIntegerv(GL_VIEWPORT, vp);
-            prevViewportX = vp[0];
-            prevViewportY = vp[1];
-            prevViewportW = vp[2];
-            prevViewportH = vp[3];
-
-            if (prevViewportW <= 0 || prevViewportH <= 0) {
-                throw new IllegalStateException("GL_VIEWPORT returned invalid size: " + prevViewportW + "x" + prevViewportH);
-            }
-
-            if (fbo.getWidth() != prevViewportW || fbo.getHeight() != prevViewportH) {
-                fbo.resize(prevViewportW, prevViewportH);
-            }
-
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo.getFrameBufferId());
-            glViewport(0, 0, fbo.getWidth(), fbo.getHeight());
-        }
-
-        clipDepth = 0;
-        clipEnabled = false;
-        clipX = 0f;
-        clipY = 0f;
-        clipW = 0f;
-        clipH = 0f;
-
-        scissorEnabledBeforeBegin = glIsEnabled(GL_SCISSOR_TEST);
-        if (scissorEnabledBeforeBegin) {
-            glGetIntegerv(GL_SCISSOR_BOX, previousScissorBox);
-            glDisable(GL_SCISSOR_TEST);
-        }
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        instanceCount = 0;
-        instanceBuffer.clear();
-
-        activeTextureCount = 0;
-        lastTextureID = -1;
-        lastTextureUnit = -1;
-
-        Arrays.fill(textureIDs, 0, textureUnitCapacity, -1);
-
-        activeShader = customShader != null ? customShader : defaultShader;
-        bindActiveShaderState();
+        beginBgfx(fbo);
     }
 
     /**
@@ -1854,11 +1561,33 @@ public final class TextureBatch {
         instanceCount++;
     }
 
+
+
+    /**
+     * Reports the parent's drawing scope to its owned rendering components.
+     *
+     * @return whether begin has established an active batch scope
+     */
+    boolean isDrawing() {
+        return drawing;
+    }
+
+    /**
+     * Borrows the current default tint for owned rendering components.
+     * The borrower must not mutate the returned color.
+     *
+     * @return live batch tint
+     */
+    Color getDefaultTint() {
+        return color;
+    }
+
+
+
     /**
      * <p>
-     * Ends the current batch, flushes any remaining queued instances, restores OpenGL
-     * state modified by {@link #begin()} and unbinds textures and shaders used by the
-     * batch.
+     * Ends the current batch, flushes any remaining queued instances, and clears its
+     * selected shader and texture-slot bookkeeping.
      * </p>
      *
      * <p>
@@ -1870,45 +1599,69 @@ public final class TextureBatch {
      * @throws IllegalStateException if the batch is not currently active
      */
     public void end() {
-        if (!drawing) throw new IllegalStateException("Call begin() before end().");
+        endBgfx();
+    }
 
-        flush();
-
-        activeShader.unbind();
-        glBindVertexArray(0);
-        drawing = false;
-
-        for (int i = 0; i < maxTextureUnits; i++) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, 0);
-        }
-        glActiveTexture(GL_TEXTURE0);
-
-        activeTextureCount = 0;
-        lastTextureID = -1;
-        lastTextureUnit = -1;
-
-        if (scissorEnabledBeforeBegin) {
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3]);
-        } else {
-            glDisable(GL_SCISSOR_TEST);
-        }
-
+    /**
+     * Establishes public batch scopes without reading implicit engine render state.
+     *
+     * @param fbo optional offscreen output
+     */
+    private void beginBgfx(FrameBuffer fbo) {
+        BgfxGraphics.device();
+        if (drawing) throw new IllegalStateException("Already drawing");
+        textViewportValid = false;
+        translationDepth = 0;
+        translationX = translationY = 0;
         clipDepth = 0;
         clipEnabled = false;
-        clipX = 0f;
-        clipY = 0f;
-        clipW = 0f;
-        clipH = 0f;
-        translationDepth = 0;
-        translationX = 0f;
-        translationY = 0f;
-
+        clipX = clipY = clipW = clipH = 0;
+        usingFBO = fbo != null;
         if (usingFBO) {
-            glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
-            glViewport(prevViewportX, prevViewportY, prevViewportW, prevViewportH);
-            usingFBO = false;
+            previousFBO = BgfxGraphics.target();
+            previousTargetHeight = BgfxGraphics.targetHeight();
+            previousTargetWidth = BgfxGraphics.targetWidth();
+            BgfxGraphics.getViewport(vp);
+            prevViewportX = vp[0];
+            prevViewportY = vp[1];
+            prevViewportW = vp[2];
+            prevViewportH = vp[3];
+            if (fbo.getWidth() != prevViewportW || fbo.getHeight() != prevViewportH)
+                fbo.resize(prevViewportW, prevViewportH);
+            BgfxGraphics.setTarget(fbo.getFrameBufferId(), fbo.getWidth(), fbo.getHeight());
+            BgfxGraphics.setViewport(0, 0, fbo.getWidth(), fbo.getHeight());
+        }
+        drawing = true;
+        instanceCount = 0;
+        instanceBuffer.clear();
+        instanceBytes.clear();
+        activeTextureCount = 0;
+        lastTextureID = lastTextureUnit = -1;
+        Arrays.fill(textureIDs, -1);
+        activeShader = customShader != null ? customShader : defaultShader;
+        activeShader.bind();
+    }
+
+    /**
+     * Flushes the public batch and restores its optional framebuffer scope.
+     */
+    private void endBgfx() {
+        if (!drawing) throw new IllegalStateException("Call begin before end");
+        try {
+            flush();
+        } finally {
+            drawing = false;
+            activeShader.unbind();
+            activeTextureCount = 0;
+            lastTextureID = lastTextureUnit = -1;
+            clipDepth = translationDepth = 0;
+            clipEnabled = false;
+            translationX = translationY = 0;
+            if (usingFBO) {
+                BgfxGraphics.setTarget(previousFBO, previousTargetWidth, previousTargetHeight);
+                BgfxGraphics.setViewport(prevViewportX, prevViewportY, prevViewportW, prevViewportH);
+                usingFBO = false;
+            }
         }
     }
 
@@ -1950,7 +1703,7 @@ public final class TextureBatch {
 
     /**
      * Returns the cumulative count of nonempty sprite and glyph draws, including
-     * glyph capacity/font flushes within a currently active text segment.
+     * atlas capacity flushes during adaptive text drawing.
      *
      * @return lifetime draw-call count
      */
@@ -1959,10 +1712,10 @@ public final class TextureBatch {
     }
 
     /**
-     * Uploads queued quad instances after applying the active projection, orphans the
-     * stream buffer, and issues one instanced draw. Clears CPU instance/texture-slot
+     * Uploads queued sprite and adaptive glyph instances into an unused range after applying the active
+     * projection, and issues one instanced draw. Clears CPU instance/texture-slot
      * bookkeeping afterward while retaining the drawing scope. Empty queues return
-     * immediately. Call within an active batch scope with its GL state intact;
+     * immediately. Call within an active batch scope with its engine render state intact;
      * this method does not establish or restore the full scope itself.
      */
     public void flush() {
@@ -1973,12 +1726,7 @@ public final class TextureBatch {
         applyActiveProjection();
         instanceBuffer.flip();
 
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, (long) maxSprites * TextureBatchContract.INST_STRIDE_BYTES, GL_STREAM_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, instanceBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glDrawArraysInstanced(GL_TRIANGLES, 0, TextureBatchContract.QUAD_VERTS, instanceCount);
+        bgfxRenderer.submit(instanceBytes, instanceCount, TextureBatchContract.INST_STRIDE_BYTES, activeShader, textureIDs, activeTextureCount, false);
         totalDrawCalls++;
 
         instanceBuffer.clear();
@@ -1992,20 +1740,19 @@ public final class TextureBatch {
 
     /**
      * <p>
-     * Releases native and OpenGL resources owned by this batch.
+     * Releases native resources owned by this batch.
      * </p>
      *
      * <p>
-     * This disposes the internally owned default shader, any lazily created curve
-     * shader and the quad and instance VBOs. Pending text is discarded; borrowed
+     * This disposes the internally owned default shader and the quad and instance
+     * buffers. Pending instances are discarded; borrowed
      * fonts remain alive. After this method is called, the batch should no longer be used.
      * </p>
      */
     public void dispose() {
+        BgfxResources.unregister(this);
         defaultShader.dispose();
-        glDeleteVertexArrays(vao);
-        glDeleteBuffers(quadVBO);
-        glDeleteBuffers(instanceVBO);
+        bgfxRenderer.close();
     }
 
     /**
@@ -2021,24 +1768,15 @@ public final class TextureBatch {
      * </p>
      */
     private void bindActiveShaderState() {
-        distanceFields = supportsDistanceFields();
-        if (distanceFields && distanceRangeProgram != activeShader.getProgramID()) {
-            distanceRangeProgram = activeShader.getProgramID();
-            distanceRangeUniform = glGetUniformLocation(distanceRangeProgram, "u_distanceRange[0]");
-            textContrastUniform = glGetUniformLocation(distanceRangeProgram, "u_textContrast");
-            int units = activeShader instanceof TextureBatchShader shader ? shader.getMaxTextureUnits() : maxTextureUnits;
-            TextureBatchContract.bindSamplers(activeShader, units);
-        }
-        // A borrowed shader may have been used by another batch since our last bind.
-        if (distanceFields) Arrays.fill(distanceRanges, Float.NaN);
         activeShader.bind();
-        if (distanceFields && textContrastUniform >= 0) glUniform1f(textContrastUniform, linearTextBlending ? 0 : 1);
         applyActiveProjection();
-        glBindVertexArray(vao);
+
     }
 
     /**
-     * Pushes the currently active engine-managed projection matrix into the active shader.
+     * Pushes the engine projection, atlas ranges and target-aware text contrast
+     * into the active shader. These values are refreshed on submission so borrowed
+     * shaders and nested target scopes cannot retain another batch's policy.
      *
      * <p>Shaders that do not declare the batch projection uniform simply ignore this update
      * because {@link Shader#setUniformMatrix4(String, float[])} is a no-op when the uniform
@@ -2046,6 +1784,9 @@ public final class TextureBatch {
      */
     private void applyActiveProjection() {
         activeShader.setUniformMatrix4(TextureBatchContract.UNIFORM_MVP, Window.getProjectionMatrix());
+        activeShader.setUniform1f("u_textContrast", BgfxGraphics.isLinearTextBlending() ? 0 : 1);
+        for (int i = 0; i < activeTextureCount; i++)
+            activeShader.setUniform4f(distanceUniforms[i], distanceRanges[i * 4], distanceRanges[i * 4 + 1], 0, 0);
     }
 
     /**
@@ -2062,7 +1803,7 @@ public final class TextureBatch {
      * can flush and retry.
      * </p>
      *
-     * @param texture texture with immutable sampling metadata
+     * @param texture texture whose managed binding and sampling mode are resolved
      * @return the texture unit index, or {@code -1} if the batch must flush first
      */
     private int getOrBindTextureUnit(Texture texture) {
@@ -2079,8 +1820,6 @@ public final class TextureBatch {
             }
         }
 
-        int shaderLimit = activeShader instanceof TextureBatchShader shader ? Math.min(maxTextureUnits, shader.getMaxTextureUnits()) : maxTextureUnits;
-        if (activeTextureCount >= shaderLimit) return -1;
         if (activeTextureCount >= textureUnitCapacity) {
             if (textureUnitCapacity >= maxTextureUnits) {
                 return -1;
@@ -2090,22 +1829,9 @@ public final class TextureBatch {
 
         int unit = activeTextureCount++;
         textureIDs[unit] = textureID;
-
-        if (distanceFields && distanceRangeUniform >= 0) {
-            float range = texture.getDistanceFieldRange();
-            float rx = range == 0 ? 0 : range / texture.getWidth();
-            float ry = range == 0 ? 0 : range / texture.getHeight();
-            int index = unit * 2;
-            if (distanceRanges[index] != rx || distanceRanges[index + 1] != ry) {
-                glUniform2f(distanceRangeUniform + unit, rx, ry);
-                distanceRanges[index] = rx;
-                distanceRanges[index + 1] = ry;
-            }
-        }
-
-        glActiveTexture(GL_TEXTURE0 + unit);
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glActiveTexture(GL_TEXTURE0);
+        float range = texture.getDistanceFieldRange();
+        distanceRanges[unit * 4] = range > 0 ? range / texture.getWidth() : range;
+        distanceRanges[unit * 4 + 1] = range > 0 ? range / texture.getHeight() : 0;
 
         lastTextureID = textureID;
         lastTextureUnit = unit;
@@ -2129,4 +1855,98 @@ public final class TextureBatch {
         Arrays.fill(textureIDs, oldCapacity, newCapacity, -1);
         textureUnitCapacity = newCapacity;
     }
+
+    /**
+     * Reports whether the selected shader decodes R8 coverage and MSDF atlases.
+     * @return whether adaptive text can stay in the current shader and queue
+     */
+    public boolean supportsDistanceFields() {
+        return activeShader == defaultShader || activeShader instanceof TextureBatchShader shader && shader.supportsDistanceFields();
+    }
+
+    /**
+     * Reports vertex transformations that bypass coverage grid fitting.
+     * @return whether the selected shader transforms text beyond the projection
+     */
+    public boolean transformsText() {
+        return activeShader instanceof TextureBatchShader shader && shader.transformsText();
+    }
+
+    /**
+     * Samples the active viewport once per drawing scope for adaptive text.
+     * Resume after external rendering to invalidate this snapshot when another
+     * renderer changes the viewport. Projection values remain live independently.
+     */
+    private void sampleTextViewport() {
+        if (!drawing) throw new IllegalStateException("Call begin() before reading the text viewport.");
+        if (textViewportValid) return;
+        BgfxGraphics.getViewport(textViewport);
+        textViewportValid = true;
+    }
+
+    /**
+     * Returns the batch scope's sampled physical viewport origin.
+     * @return horizontal viewport origin in pixels
+     */
+    public int getViewportX() { sampleTextViewport(); return textViewport[0]; }
+
+    /**
+     * Returns the batch scope's sampled physical viewport origin.
+     * @return vertical viewport origin in pixels
+     */
+    public int getViewportY() { sampleTextViewport(); return textViewport[1]; }
+
+    /**
+     * Returns the batch scope's sampled physical viewport width.
+     * @return viewport width in pixels
+     */
+    public int getViewportWidth() { sampleTextViewport(); return textViewport[2]; }
+
+    /**
+     * Returns the batch scope's sampled physical viewport height.
+     * @return viewport height in pixels
+     */
+    public int getViewportHeight() { sampleTextViewport(); return textViewport[3]; }
+
+    /**
+     * Aligns a logical text origin to a physical pixel for uniform axis-aligned
+     * projections. Glyph advances stay fractional; transformed text stays unsnapped.
+     * @param x logical horizontal position before batch translation
+     * @return aligned horizontal origin in the same logical coordinate system
+     */
+    public float alignTextOrigin(float x) { return alignTextCoordinate(x, false); }
+
+    /**
+     * Aligns a logical baseline using the same policy as text origins and carets.
+     * @param y logical baseline before batch translation
+     * @return aligned baseline in the same logical coordinate system
+     */
+    public float alignTextBaseline(float y) { return alignTextCoordinate(y, true); }
+
+    /**
+     * Projects, rounds and unprojects one coordinate without native scratch buffers.
+     * @param value logical coordinate before batch translation
+     * @param vertical whether to use the vertical axis
+     * @return unchanged value for general transforms, otherwise a physical-pixel alignment
+     */
+    private float alignTextCoordinate(float value, boolean vertical) {
+        if (!Float.isFinite(value)) throw new IllegalArgumentException("Text coordinate must be finite");
+        sampleTextViewport();
+        float[] matrix = Window.getProjectionMatrix();
+        if (transformsText() || matrix[1] != 0 || matrix[4] != 0 || matrix[3] != 0 || matrix[7] != 0 || matrix[15] != 1 || matrix[0] <= 0 || matrix[5] <= 0) return value;
+        float sx = matrix[0] * textViewport[2] * 0.5f;
+        float sy = matrix[5] * textViewport[3] * 0.5f;
+        if (sx <= 0 || sy <= 0 || Math.abs(sx - sy) > Math.max(sx, sy) * 0.0001f) return value;
+        float scale = vertical ? sy : sx;
+        float origin = vertical ? textViewport[1] + (matrix[13] * 0.5f + 0.5f) * textViewport[3] : textViewport[0] + (matrix[12] * 0.5f + 0.5f) * textViewport[2];
+        float translated = value + (vertical ? translationY : translationX);
+        float screen = translated * scale + origin;
+        return value + (Math.round(screen) - screen) / scale;
+    }
+
+    @Override
+    public void validateGraphicsReset(GraphicsBackend backend) {
+        if (drawing) throw new IllegalStateException("End texture batches before switching graphics backends");
+    }
+
 }
