@@ -11,6 +11,7 @@ export async function prepareBrowserLoaders(root, output) {
         "graphics/map/tiled/TiledObject", "graphics/map/tiled/FileSystemResolver",
         "graphics/map/ldtk/LdtkProject", "graphics/map/ldtk/LdtkResolvers", "graphics/map/ldtk/LdtkLoader", "graphics/map/tiled/TiledMapLoader",
         "asset/Assets", "graphics/font/FontData",
+        "graphics/animation/AnimationParameters", "graphics/particle/ParticleParameters",
         "ui/behavior/file/FileOperations", "ui/behavior/file/FileCopyVisitor", "ui/behavior/DirectoryBrowserModel", "graphics/map/tiled/TiledDecoding", "ui/nodes/DirectoryTree",
         "ui/nodes/nano/NanoDirectoryTree", "ui/nodes/FileChooser",
         "ui/nodes/nano/NanoFileChooser", "ui/nodes/nano/NanoFileContextMenu",
@@ -18,6 +19,16 @@ export async function prepareBrowserLoaders(root, output) {
     for (const type of types) {
         let source = (await readFile(path.join(root, "src/main/java/valthorne", type + ".java"), "utf8")).replaceAll("\r\n", "\n");
         source = source.replaceAll("javax.xml.stream.", "valthorne.browser.xml.");
+        if (type === "graphics/animation/AnimationParameters" || type === "graphics/particle/ParticleParameters") {
+            source = source.replace("import java.nio.file.Files;", "import valthorne.browser.BrowserAssets;");
+            source = source.replace("import java.nio.file.Path;\n", "");
+            source = source.replace("Files.readAllBytes(Path.of(location))", "BrowserAssets.read(location)");
+            const start = source.indexOf("        Path parent = Path.of(location).getParent();");
+            const end = source.indexOf("\n    }", start);
+            if (start < 0 || end < start) throw new Error("Review browser linked-image resolution: " + type);
+            source = source.slice(0, start) + `        String resolved = BrowserAssets.resolve(location, image);
+        return classpath ? ValthorneFiles.readBytes(resolved) : BrowserAssets.read(resolved);` + source.slice(end);
+        }
         if (type.startsWith("graphics/map/")) {
             source = source.replace("import java.nio.file.Files;", "import java.nio.file.Files;\nimport valthorne.browser.BrowserAssets;");
             source = source.replaceAll("Files.readAllBytes(", "BrowserAssets.read(");

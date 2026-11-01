@@ -29,6 +29,8 @@ def replacements = [
     'valthorne/graphics/map/ldtk/LdtkProject',
     'valthorne/graphics/map/ldtk/LdtkResolvers',
     'valthorne/asset/Assets',
+    'valthorne/graphics/animation/AnimationParameters',
+    'valthorne/graphics/particle/ParticleParameters',
     'valthorne/utility/properties/PropertySetTextIO',
     'valthorne/graphics/font/FontData',
     'valthorne/ui/behavior/file/FileOperations',
