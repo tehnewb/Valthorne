@@ -373,7 +373,16 @@ public final class AndroidRuntime {
     /**
      * Finishes the activity after the shared engine releases its resources.
      */
-    public static void close() { closing = true; activity.runOnUiThread(activity::finish); synchronized (lifecycle) { lifecycle.notifyAll(); } }
+    public static void close() {
+        ValthorneActivity owner = activity;
+        closing = true;
+        owner.runOnUiThread(() -> {
+            if (!owner.isDestroyed() && !owner.isChangingConfigurations()) owner.finish();
+        });
+        synchronized (lifecycle) {
+            lifecycle.notifyAll();
+        }
+    }
     /**
      * Releases the logical window after native renderer shutdown.
      */
