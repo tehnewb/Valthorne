@@ -126,13 +126,13 @@ public final class BgfxResources {
                 try {
                     release(snapshot);
                 } catch (RuntimeException | Error cleanupFailure) {
-                    failure.addSuppressed(cleanupFailure);
+                    if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
                 }
                 try {
                     BgfxGraphics.restart(previous);
                     restore(snapshot);
                 } catch (RuntimeException | Error rollbackFailure) {
-                    failure.addSuppressed(rollbackFailure);
+                    if (failure != rollbackFailure) failure.addSuppressed(rollbackFailure);
                     throw new GraphicsRecoveryException(failure);
                 }
                 throw new IllegalStateException("Could not switch to " + backend + "; restored " + previous, failure);
@@ -157,7 +157,7 @@ public final class BgfxResources {
                 snapshot[i].releaseGraphicsResources();
             } catch (RuntimeException | Error error) {
                 if (failure == null) failure = error;
-                else failure.addSuppressed(error);
+                else if (failure != error) failure.addSuppressed(error);
             }
         }
         if (failure != null) throw new IllegalStateException("Could not release graphics resources", failure);
