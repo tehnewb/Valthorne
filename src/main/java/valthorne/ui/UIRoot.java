@@ -315,7 +315,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      */
     public UIRoot(int inputPriority) {
         this.inputPriority = inputPriority;
-        this.nanoVGHandle = NanoVGBGFX.nvgCreate(true, BgfxGraphics.view(), 0);
+        this.nanoVGHandle = NanoVGBGFX.nvgCreate(true, 0, 0);
         if (nanoVGHandle != 0L) {
             registerDefaultNanoFont();
         }
