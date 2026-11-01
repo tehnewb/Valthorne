@@ -240,13 +240,16 @@ public final class Assets {
         try {
             ensureService().execute(() -> {
                 if (entry.future().isDone()) return;
+                Object loaded = null;
                 T value;
                 try {
                     AssetLoader loader = loaders.get(parameters.getClass());
                     if (loader == null)
                         throw new IllegalStateException("No loader for " + parameters.getClass().getName());
-                    value = assetType.cast(loader.load(parameters));
+                    loaded = loader.load(parameters);
+                    value = assetType.cast(loaded);
                 } catch (Throwable failure) {
+                    failure = appendSuppressed(failure, disposeAssetValue(loaded));
                     entry.future().completeExceptionally(failure);
                     return;
                 }
