@@ -16,6 +16,7 @@ android {
     ndkVersion = '27.2.12479018'
     defaultConfig {
         minSdk = 35
+        consumerProguardFiles 'consumer-rules.pro'
         missingDimensionStrategy 'precision', 'Sp'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
         externalNativeBuild {
