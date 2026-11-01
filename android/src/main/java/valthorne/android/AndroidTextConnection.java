@@ -13,6 +13,7 @@ import valthorne.android.internal.AndroidRuntime;
 final class AndroidTextConnection extends BaseInputConnection {
     private final AndroidSurface view; // Native view receiving hardware-equivalent key events.
     private String composing = ""; // Uncommitted IME text, cleared on commit or finish.
+    private int composingCursor = 1; // Requested cursor position relative to the deferred composition.
 
     /**
      * Creates an input connection for the current engine text focus.
@@ -23,16 +24,23 @@ final class AndroidTextConnection extends BaseInputConnection {
     @Override
     public boolean commitText(CharSequence text, int newCursorPosition) {
         composing = "";
-        AndroidRuntime.emit(11, 0, 0, 0, 0, 0, 0, text.toString());
+        AndroidRuntime.emit(13, newCursorPosition, 0, 0, 0, 0, 0, text.toString());
         return true;
     }
 
     @Override
-    public boolean setComposingText(CharSequence text, int newCursorPosition) { composing = text.toString(); return true; }
+    public boolean setComposingText(CharSequence text, int newCursorPosition) { composing = text.toString(); composingCursor = newCursorPosition; return true; }
 
     @Override
     public boolean finishComposingText() {
-        if (!composing.isEmpty()) { AndroidRuntime.emit(11, 0, 0, 0, 0, 0, 0, composing); composing = ""; }
+        if (!composing.isEmpty()) { AndroidRuntime.emit(13, composingCursor, 0, 0, 0, 0, 0, composing); composing = ""; }
+        return true;
+    }
+
+    @Override
+    public boolean setSelection(int start, int end) {
+        if (start < 0 || end < 0) return false;
+        AndroidRuntime.emit(14, start, end, 0, 0, 0, 0, null);
         return true;
     }
 

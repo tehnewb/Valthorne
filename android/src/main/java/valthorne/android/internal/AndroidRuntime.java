@@ -311,13 +311,46 @@ public final class AndroidRuntime {
             case 8 -> { if (windowClose != null) windowClose.invoke(1); }
             case 11 -> { if (character != null) { for (int i = 0; i < event.text().length();) { int code = event.text().codePointAt(i); character.invoke(1, code); i += Character.charCount(code); } } }
             case 12 -> {
-                if (textTarget != null && textTarget.isFocused() && !textTarget.isDisabled()) {
-                    TextEditModel editor = textTarget instanceof TextField field ? field.getEditor() : textTarget instanceof NanoTextField field ? field.getEditor() : textTarget instanceof NanoCodeEditor editorNode ? editorNode.getEditor() : null;
-                    if (editor != null) editor.deleteSurrounding(event.a(), event.b(), event.c() != 0);
+                TextEditModel editor = focusedEditor();
+                if (editor != null) editor.deleteSurrounding(event.a(), event.b(), event.c() != 0);
+            }
+            case 13 -> {
+                TextEditModel editor = focusedEditor();
+                if (editor != null) {
+                    int start = editor.start();
+                    boolean inserted = editor.insert(event.text());
+                    int end = inserted ? editor.caret() : editor.end();
+                    long offset = event.a() > 0 ? (long) end + event.a() - 1 : (long) start + event.a();
+                    editor.move((int) Math.clamp(offset, 0, editor.text().length()), false);
+                } else if (character != null) {
+                    for (int i = 0; i < event.text().length();) {
+                        int code = event.text().codePointAt(i);
+                        character.invoke(1, code);
+                        i += Character.charCount(code);
+                    }
+                }
+            }
+            case 14 -> {
+                TextEditModel editor = focusedEditor();
+                if (editor != null) {
+                    editor.move(event.a(), false);
+                    editor.move(event.b(), true);
                 }
             }
             default -> throw new IllegalArgumentException("Unknown Android input event " + event.kind());
         }
+    }
+
+    /**
+     * Returns the focused built-in editor on the render thread, or null for a
+     * custom input target. Native IME operations retain the editor's validation,
+     * selection and undo behavior without accessing mutable UI state on Android's UI thread.
+     *
+     * @return active editable model, or null when no supported editor owns focus
+     */
+    private static TextEditModel focusedEditor() {
+        if (textTarget == null || !textTarget.isFocused() || textTarget.isDisabled()) return null;
+        return textTarget instanceof TextField field ? field.getEditor() : textTarget instanceof NanoTextField field ? field.getEditor() : textTarget instanceof NanoCodeEditor editor ? editor.getEditor() : null;
     }
 
     /**
