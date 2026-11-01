@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -37,3 +37,15 @@ jobs:
       - name: Build desktop and browser libraries
         shell: bash
         run: bash ./gradlew assemble --stacktrace --console=plain
+      - name: Verify version automation
+        run: node --test .github/scripts/*.test.cjs
+      - name: Check Linux ARM32 compiler under emulation
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user
+          compiler=build/generated/shaderc-resources/valthorne/shaderc/linux/arm32/shaderc
+          chmod +x "$compiler"
+          qemu-arm -cpu cortex-a7 "$compiler" --version
+          qemu-arm -cpu cortex-a7 "$compiler" -f src/main/resources/valthorne/shaders/bgfx/engine/batch.frag.sc -o "$RUNNER_TEMP/arm32-shader.bin" --type f --platform linux --profile spirv --varyingdef src/main/resources/valthorne/shaders/bgfx/engine/varying.def.sc -i build/generated/shaderc-resources/valthorne/shaderc/include

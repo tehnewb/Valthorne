@@ -10,7 +10,7 @@ import valthorne.graphics.bgfx.BgfxShader;
 import static org.lwjgl.bgfx.BGFX.*;
 
 /**
- * Owns a packaged compute program on the active device. Compute is optional;
+ * Owns a packaged or source-compiled compute program on the active device. Compute is optional;
  * check {@link #isComputeSupported()} before construction. Stage identifiers
  * resolve to binaries for the selected backend. Dispatch creates an ordered pass
  * so subsequent draws see completed writes without waiting on the CPU.
@@ -34,16 +34,12 @@ public final class ComputeShader {
     private final BgfxShader program; // Owned program and retained uniform storage.
 
     /**
-     * Loads a compiled stage for the active backend.
+     * Loads a compiled stage or compiles portable bgfx compute source for the active backend.
      *
-     * @param stage packaged stage identifier without the binary suffix
+     * @param stage packaged identifier without the binary suffix or portable compute source
      */
     public ComputeShader(String stage) {
         if (!isComputeSupported()) throw new UnsupportedOperationException("The selected device does not support compute");
-        if (stage == null) throw new NullPointerException("stage");
-        if (stage.startsWith("bgfx:")) stage = stage.substring(5);
-        if (stage.isBlank() || stage.contains("..") || stage.indexOf('\n') >= 0 || stage.indexOf('\r') >= 0)
-            throw new IllegalArgumentException("A packaged compute stage identifier is required");
         program = new BgfxShader(stage);
     }
 

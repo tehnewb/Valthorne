@@ -315,6 +315,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      */
     public UIRoot(int inputPriority) {
         this.inputPriority = inputPriority;
+        // The render path selects the actual view; context creation may occur between frames.
         this.nanoVGHandle = NanoVGBGFX.nvgCreate(true, 0, 0);
         if (nanoVGHandle != 0L) {
             registerDefaultNanoFont();
@@ -1854,7 +1855,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
     @Override
     public void restoreGraphicsResources() {
         if (!nanoVGEnabled) return;
-        nanoVGHandle = NanoVGBGFX.nvgCreate(true, BgfxGraphics.view(), 0);
+        nanoVGHandle = NanoVGBGFX.nvgCreate(true, 0, 0);
         if (nanoVGHandle == 0) throw new IllegalStateException("Could not restore UI vector context");
         try {
             registerDefaultNanoFont();

@@ -44,6 +44,8 @@ jobs:
       - name: Validate publication policy and snapshot
         id: policy
         run: node .github/scripts/release-policy.cjs
+      - name: Verify automation
+        run: node --test .github/scripts/*.test.cjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

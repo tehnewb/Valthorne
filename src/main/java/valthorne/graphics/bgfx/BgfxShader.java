@@ -1,8 +1,5 @@
 package valthorne.graphics.bgfx;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -16,9 +13,9 @@ import valthorne.graphics.GraphicsResource;
 import static org.lwjgl.bgfx.BGFX.*;
 
 /**
- * Owns a packaged bgfx program and reflected uniform state. The public Shader
- * facade uses this implementation when sources identify compiled stages with a
- * {@code bgfx:} prefix. Binaries are loaded once; shaderc is never run at runtime.
+ * Owns a bgfx program and reflected uniform state. Stages may be packaged names
+ * or portable bgfx source strings. Inline stages compile once per backend family;
+ * successful bytecode remains available for recovery without recompilation.
  *
  * <p>Uniform values persist in primitive arrays and are replayed at every draw,
  * preserving immediate uniform-update semantics despite bgfx's deferred
@@ -27,8 +24,8 @@ import static org.lwjgl.bgfx.BGFX.*;
  * remains valid until close, including programs using shared shader code.</p>
  */
 public final class BgfxShader implements AutoCloseable, GraphicsResource {
-    private final String vertexName; // Logical graphics or compute stage identifier.
-    private final String fragmentName; // Fragment stage identifier, null for compute programs.
+    private final BgfxShaderStage vertexStage; // Retained graphics or compute stage recipe.
+    private final BgfxShaderStage fragmentStage; // Fragment recipe, null for compute programs.
     private boolean live; // Whether retained uniform handles belong to the current device.
 
     /**
@@ -60,15 +57,26 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
      * @param fragmentName fragment name without bgfx prefix or binary suffix
      */
     public BgfxShader(String vertexName, String fragmentName) {
+        this(vertexName, fragmentName, null);
+    }
+
+    /**
+     * Links packaged stages or compiles portable source using shared varyings.
+     *
+     * @param vertexSource packaged vertex name or portable bgfx source
+     * @param fragmentSource packaged fragment name or portable bgfx source
+     * @param varyings shared varying declarations, or null for engine defaults
+     */
+    public BgfxShader(String vertexSource, String fragmentSource, String varyings) {
         BgfxGraphics.device();
-        this.vertexName = vertexName;
-        this.fragmentName = fragmentName;
+        vertexStage = new BgfxShaderStage(vertexSource, varyings, 'v');
+        fragmentStage = new BgfxShaderStage(fragmentSource, varyings, 'f');
         live = true;
         try {
-            vertex = load(vertexName);
-            fragment = load(fragmentName);
+            vertex = load(vertexStage);
+            fragment = load(fragmentStage);
             program = bgfx_create_program(vertex, fragment, false);
-            if (program == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not link bgfx shader " + vertexName + " / " + fragmentName);
+            if (program == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not link bgfx shader " + vertexStage.name() + " / " + fragmentStage.name());
             reflect(vertex);
             reflect(fragment);
             BgfxResources.register(this);
@@ -85,11 +93,11 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
      */
     public BgfxShader(String computeName) {
         BgfxGraphics.device();
-        this.vertexName = computeName;
-        this.fragmentName = null;
+        vertexStage = new BgfxShaderStage(computeName, null, 'c');
+        fragmentStage = null;
         live = true;
         try {
-            vertex = load(computeName);
+            vertex = load(vertexStage);
             program = bgfx_create_compute_program(vertex, false);
             if (program == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not link compute shader " + computeName);
             reflect(vertex);
@@ -103,33 +111,27 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
     /**
      * Loads a bgfx shader container into native-owned upload memory.
      *
-     * @param name stage name without final binary suffix
+     * @param stage packaged or inline stage recipe
      * @return owned stage handle
      */
-    private short load(String name) {
+    private short load(BgfxShaderStage stage) {
         /*
          * Classpath containers include backend-specific bytecode and reflection.
          * Shader creation consumes a native copy independent of Java I/O storage.
          */
-        String path = "/valthorne/bgfx/" + BgfxShaderResources.directory() + "/" + name + ".bin";
-        try (InputStream stream = BgfxShader.class.getResourceAsStream(path)) {
-            if (stream == null) throw new IllegalArgumentException("Missing compiled shader: " + path);
-            byte[] bytes = stream.readAllBytes();
-            BGFXMemory memory = bgfx_alloc(bytes.length);
-            if (memory == null) throw new IllegalStateException("Could not allocate shader upload memory");
-            memory.data()
-                    .put(bytes);
-            short handle = bgfx_create_shader(memory);
-            if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Invalid compiled shader: " + path);
-            try {
-                readSamplerBindings(bytes);
-                return handle;
-            } catch (RuntimeException | Error failure) {
-                bgfx_destroy_shader(handle);
-                throw failure;
-            }
-        } catch (IOException failure) {
-            throw new UncheckedIOException("Could not load " + path, failure);
+        byte[] bytes = stage.bytes();
+        BGFXMemory memory = bgfx_alloc(bytes.length);
+        if (memory == null) throw new IllegalStateException("Could not allocate shader upload memory");
+        memory.data()
+                .put(bytes);
+        short handle = bgfx_create_shader(memory);
+        if (handle == BGFX_INVALID_HANDLE) throw new IllegalStateException("Invalid compiled shader: " + stage.name());
+        try {
+            readSamplerBindings(bytes);
+            return handle;
+        } catch (RuntimeException | Error failure) {
+            bgfx_destroy_shader(handle);
+            throw failure;
         }
     }
 
@@ -384,6 +386,8 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
         BgfxGraphics.device();
         BgfxResources.unregister(this);
         releaseGraphicsResources();
+        vertexStage.clear();
+        if (fragmentStage != null) fragmentStage.clear();
         uniformCount = 0;
         Arrays.fill(uniforms, null);
     }
@@ -407,14 +411,14 @@ public final class BgfxShader implements AutoCloseable, GraphicsResource {
         Arrays.fill(uniforms, null);
         live = true;
         try {
-            vertex = load(vertexName);
-            if (fragmentName == null) {
+            vertex = load(vertexStage);
+            if (fragmentStage == null) {
                 program = bgfx_create_compute_program(vertex, false);
             } else {
-                fragment = load(fragmentName);
+                fragment = load(fragmentStage);
                 program = bgfx_create_program(vertex, fragment, false);
             }
-            if (program == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not restore shader " + vertexName);
+            if (program == BGFX_INVALID_HANDLE) throw new IllegalStateException("Could not restore shader " + vertexStage.name());
             reflect(vertex);
             if (fragment != BGFX_INVALID_HANDLE) reflect(fragment);
             for (BgfxUniform saved : previous) {

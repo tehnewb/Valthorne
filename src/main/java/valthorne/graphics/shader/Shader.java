@@ -4,9 +4,13 @@ import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.bgfx.BgfxShader;
 
 /**
- * Owns a renderer-independent program identified by packaged vertex/fragment stage
- * names. The active graphics backend selects the corresponding compiled shader
- * containers. Uniform values remain in primitive arrays until draw submission;
+ * Owns a renderer-independent program created from packaged stage names or bgfx's
+ * portable GLSL-based source strings. Source stages compile during construction
+ * and reload, once per backend family; drawing never starts the compiler. Shared
+ * engine varyings are the default, while the three-argument constructor accepts
+ * custom varying declarations. Use vec4/mat3/mat4 uniforms and bgfx sampler macros;
+ * desktop GLSL source is not the portable shader language.
+ * Uniform values remain in primitive arrays until draw submission;
  * changing a value never changes commands already submitted. Resources belong to
  * the creating render thread and must be disposed before graphics shutdown.
  *
@@ -18,40 +22,58 @@ import valthorne.graphics.bgfx.BgfxShader;
  * shader.unbind();
  * shader.dispose();
  * }</pre>
+ *
+ * <p>For a custom texture fragment stage, supply portable source directly:</p>
+ * <pre>{@code
+ * String fragment = """
+ *         $input v_color, v_uv
+ *         #include <bgfx_shader.sh>
+ *         SAMPLER2D(u_texture, 0);
+ *         uniform vec4 u_tint;
+ *         void main() {
+ *             gl_FragColor = texture2D(u_texture, v_uv) * v_color * u_tint;
+ *         }
+ *         """;
+ * Shader shader = new Shader("engine/quad.vert", fragment);
+ * shader.setUniform4f("u_tint", 1, 0.5f, 0.25f, 1);
+ * }</pre>
+ *
+ * <p>Source can include the packaged {@code bgfx_shader.sh} and
+ * {@code bgfx_compute.sh} headers. Other shared code must be included in the
+ * supplied string. Varying declarations follow bgfx's one-declaration-per-line
+ * format. Construction, reload and a first switch to another backend may block
+ * while compiling; preload source shaders outside latency-sensitive drawing.</p>
  */
 public class Shader {
     private BgfxShader program; // Owned compiled program, or null after disposal.
-    private String vertexSource; // Packaged vertex-stage identifier.
-    private String fragmentSource; // Packaged fragment-stage identifier.
+    private String vertexSource; // Packaged vertex-stage identifier or portable source.
+    private String fragmentSource; // Packaged fragment-stage identifier or portable source.
+    private final String varyings; // Shared varying declarations, or null for engine defaults.
 
     /**
-     * Loads a program compiled for the current graphics backend.
+     * Creates a program from packaged identifiers or portable bgfx source strings.
      *
-     * @param vertexSource packaged vertex-stage name without binary suffix
-     * @param fragmentSource packaged fragment-stage name without binary suffix
+     * @param vertexSource packaged vertex-stage name or portable source
+     * @param fragmentSource packaged fragment-stage name or portable source
      */
     public Shader(String vertexSource, String fragmentSource) {
-        this.vertexSource = stage(vertexSource);
-        this.fragmentSource = stage(fragmentSource);
-        program = new BgfxShader(this.vertexSource, this.fragmentSource);
+        this(vertexSource, fragmentSource, null);
     }
 
     /**
-     * Validates and normalizes a stage resource identifier.
+     * Creates a program with explicit shared varying declarations. Null varyings
+     * select the engine's standard attributes and varyings. Compiler diagnostics
+     * propagate without publishing a partially constructed program.
      *
-     * @param source packaged stage identifier
-     * @return normalized stage name
+     * @param vertexSource packaged vertex-stage name or portable source
+     * @param fragmentSource packaged fragment-stage name or portable source
+     * @param varyings bgfx varying declarations, or null for the engine defaults
      */
-    private static String stage(String source) {
-        /*
-         * Source text is never compiled against one API at runtime; every backend
-         * consumes the same logical stage name from its own compiled directory.
-         */
-        if (source == null) throw new NullPointerException("stage");
-        if (source.startsWith("bgfx:")) source = source.substring(5);
-        if (source.isBlank() || source.indexOf('\n') >= 0 || source.indexOf('\r') >= 0 || source.contains(".."))
-            throw new IllegalArgumentException("Expected a packaged shader stage name");
-        return source;
+    public Shader(String vertexSource, String fragmentSource, String varyings) {
+        program = new BgfxShader(vertexSource, fragmentSource, varyings);
+        this.vertexSource = vertexSource.startsWith("bgfx:") ? vertexSource.substring(5) : vertexSource;
+        this.fragmentSource = fragmentSource.startsWith("bgfx:") ? fragmentSource.substring(5) : fragmentSource;
+        this.varyings = varyings;
     }
 
     /**
@@ -80,7 +102,8 @@ public class Shader {
     }
 
     /**
-     * Reloads the stored stage resources, retaining the old program on failure.
+     * Reloads stored stages, recompiling inline sources and retaining the old
+     * program when compilation or linking fails.
      *
      * @return whether both replacement stages were loaded successfully
      */
@@ -89,21 +112,20 @@ public class Shader {
     }
 
     /**
-     * Atomically replaces the program with another packaged stage pair.
+     * Atomically replaces the program with packaged stages or portable sources,
+     * retaining this shader's shared varying declarations.
      *
-     * @param vertexSource replacement vertex-stage identifier
-     * @param fragmentSource replacement fragment-stage identifier
+     * @param vertexSource replacement vertex identifier or portable source
+     * @param fragmentSource replacement fragment identifier or portable source
      * @return whether replacement succeeded; failures are reported to stderr
      */
     public boolean reload(String vertexSource, String fragmentSource) {
         try {
-            String vertex = stage(vertexSource);
-            String fragment = stage(fragmentSource);
-            BgfxShader replacement = new BgfxShader(vertex, fragment);
+            BgfxShader replacement = new BgfxShader(vertexSource, fragmentSource, varyings);
             if (program != null) program.close();
             program = replacement;
-            this.vertexSource = vertex;
-            this.fragmentSource = fragment;
+            this.vertexSource = vertexSource.startsWith("bgfx:") ? vertexSource.substring(5) : vertexSource;
+            this.fragmentSource = fragmentSource.startsWith("bgfx:") ? fragmentSource.substring(5) : fragmentSource;
             return true;
         } catch (RuntimeException failure) {
             System.err.println(failure.getMessage());
@@ -189,18 +211,18 @@ public class Shader {
     }
 
     /**
-     * Returns the configured vertex-stage resource name.
+     * Returns the configured portable vertex source or normalized packaged name.
      *
-     * @return packaged vertex identifier
+     * @return original source text or packaged vertex identifier without its bgfx prefix
      */
     public String getVertexSource() {
         return vertexSource;
     }
 
     /**
-     * Returns the configured fragment-stage resource name.
+     * Returns the configured portable fragment source or normalized packaged name.
      *
-     * @return packaged fragment identifier
+     * @return original source text or packaged fragment identifier without its bgfx prefix
      */
     public String getFragmentSource() {
         return fragmentSource;

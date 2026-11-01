@@ -1,0 +1,19 @@
+{
+  "bgfxApi": 156,
+  "containerVersion": 12,
+  "compilerVersion": "1.19.156",
+  "sourceRevision": "f564ae8bf92cd2ac27d95b12408bd68be3ddf955",
+  "artifacts": {
+    "shaderc.mjs": "cff927632c064396199332c3a06cf5e0962a1e1b89957d1bc4063a2e296da796",
+    "shaderc.wasm": "76c43c1d1795753a97323415fbb8b8e7e8baef024159360f8360ae4e928c8707"
+  },
+  "rebuild": {
+    "emscripten": "4.0.23",
+    "zig": "0.15.2",
+    "optimization": "O1",
+    "cppStandard": "C++20",
+    "bxRevision": "f3a9adb603c5677731e7cf10622fa16e1dfe9ea5",
+    "bimgRevision": "9bfbd6493b48a15238f2d1374a718ec026524515",
+    "linuxCallstack": "Use bx unwind support when musl has no execinfo.h"
+  }
+}

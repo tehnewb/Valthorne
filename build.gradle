@@ -103,14 +103,15 @@ java {
     withSourcesJar()
 }
 
-// Keep private local sources and resources outside the public library build.
-sourceSets {
-    main {
-        java.exclude 'valthorne/threed/**', 'valthorne/ui/engine/**'
-        resources.exclude 'ui/icons/**', 'ui/scene-selection.png',
-                'valthorne/filament/**', 'valthorne/shaders/model3d/**',
-                'valthorne/shaders/pathtrace/**', 'META-INF/licenses/*filament*'
-    }
+// Inline portable shaders require the pinned compiler on the consuming host.
+def prepareShaderCompiler = tasks.register('prepareShaderCompiler', Exec) {
+    commandLine 'node', file('native/shaderc/prepare.mjs')
+    inputs.files(fileTree('native/shaderc'))
+    outputs.dir(layout.buildDirectory.dir('generated/shaderc-resources'))
+}
+tasks.named('processResources') {
+    dependsOn prepareShaderCompiler
+    from(prepareShaderCompiler)
 }
 
 mavenPublishing {

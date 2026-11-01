@@ -511,6 +511,17 @@ public final class NanoVG {
     }
 
     /**
+     * Enables or disables edge antialiasing for subsequent shapes in this context.
+     * @param context drawing context
+     * @param enabled whether shape edges use antialiasing
+     */
+    public static void nvgShapeAntiAlias(long context, boolean enabled) {
+        BrowserNative.word(0, (int) context);
+        BrowserNative.word(1, enabled ? 1 : 0);
+        BrowserNative.call(NVG_SHAPE_ANTI_ALIAS);
+    }
+
+    /**
      * Executes the NanoVG GlobalAlpha operation.
      * @param context native drawing value
      * @param v0 native drawing value

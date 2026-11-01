@@ -3,8 +3,8 @@ package valthorne.graphics.texture;
 import valthorne.graphics.shader.Shader;
 
 /**
- * Owns a compiled sprite-batch program with stable sampler routing. Stage names
- * resolve to the selected backend's packaged binaries. Custom stages must follow
+ * Owns a sprite-batch program with stable sampler routing. Stages may be packaged
+ * identifiers or portable bgfx source strings. Custom stages must follow
  * the packed sprite instance contract; null or blank names select the defaults.
  * Construction initializes sampler routing once, with no per-draw name allocation.
  *
@@ -14,7 +14,7 @@ import valthorne.graphics.shader.Shader;
  * }</pre>
  */
 public class TextureBatchShader extends Shader {
-    private final boolean distanceFields; // Whether the compiled fragment stage accepts adaptive MSDF ranges.
+    private boolean distanceFields; // Whether the current fragment stage accepts adaptive MSDF ranges.
     private final int maxTextureUnits; // Number of sampled texture slots exposed by this program.
 
     /**
@@ -30,21 +30,34 @@ public class TextureBatchShader extends Shader {
      * Loads a custom fragment stage with the default sprite vertex contract.
      *
      * @param maxTextureUnits sampled texture slot count from one through sixteen
-     * @param fragmentStage packaged fragment identifier, or null for the default
+     * @param fragmentStage packaged fragment identifier or portable source, or null for the default
      */
     public TextureBatchShader(int maxTextureUnits, String fragmentStage) {
         this(maxTextureUnits, null, fragmentStage);
     }
 
     /**
-     * Loads complete compiled stages and assigns their sampler slots.
+     * Loads packaged stages or compiles portable sources and assigns sampler slots.
      *
      * @param maxTextureUnits sampled texture slot count from one through sixteen
-     * @param vertexStage packaged vertex identifier, or null for the default
-     * @param fragmentStage packaged fragment identifier, or null for the default
+     * @param vertexStage packaged vertex identifier or portable source, or null for the default
+     * @param fragmentStage packaged fragment identifier or portable source, or null for the default
      */
     public TextureBatchShader(int maxTextureUnits, String vertexStage, String fragmentStage) {
-        super(selectVertex(maxTextureUnits, vertexStage), selectFragment(fragmentStage));
+        this(maxTextureUnits, vertexStage, fragmentStage, null);
+    }
+
+    /**
+     * Compiles portable stages with custom varying declarations or loads packaged
+     * stage identifiers. Null stage overrides select the standard batch stages.
+     *
+     * @param maxTextureUnits sampled texture slot count from one through sixteen
+     * @param vertexStage packaged vertex identifier or portable source
+     * @param fragmentStage packaged fragment identifier or portable source
+     * @param varyings shared varying declarations, or null for engine defaults
+     */
+    public TextureBatchShader(int maxTextureUnits, String vertexStage, String fragmentStage, String varyings) {
+        super(selectVertex(maxTextureUnits, vertexStage), selectFragment(fragmentStage), varyings);
         this.maxTextureUnits = maxTextureUnits;
         distanceFields = bgfx().hasUniform("u_distanceRange");
         TextureBatchContract.bindSamplers(this, maxTextureUnits);
@@ -91,6 +104,14 @@ public class TextureBatchShader extends Shader {
      * @return whether coverage/MSDF textures can use this shader
      */
     public boolean supportsDistanceFields() { return distanceFields; }
+
+    @Override
+    public boolean reload(String vertexSource, String fragmentSource) {
+        if (!super.reload(vertexSource, fragmentSource)) return false;
+        distanceFields = bgfx().hasUniform("u_distanceRange");
+        TextureBatchContract.bindSamplers(this, maxTextureUnits);
+        return true;
+    }
 
     /**
      * Reports additional vertex transforms that require scalable text rendering.

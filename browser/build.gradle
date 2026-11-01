@@ -52,6 +52,7 @@ def replacements = [
     'valthorne/graphics/bgfx/BgfxDesktopWindow', 'valthorne/graphics/bgfx/BgfxCallbacks',
     'valthorne/graphics/bgfx/BgfxPlatform', 'valthorne/graphics/bgfx/BgfxWindowsSurface',
     'valthorne/graphics/bgfx/BgfxNativeLibrary',
+    'valthorne/graphics/bgfx/BgfxShaderCompiler',
     'valthorne/graphics/bgfx/BgfxMipmaps',
     'valthorne/graphics/bgfx/BgfxGraphics', 'valthorne/graphics/bgfx/BgfxBatchRenderer', 'valthorne/graphics/bgfx/BgfxMeshRenderer',
     'valthorne/graphics/bgfx/BgfxMesh', 'valthorne/graphics/bgfx/BgfxVertexBuffer',
@@ -72,6 +73,8 @@ def browserEngineApi = tasks.register('browserEngineApi', Jar) {
     replacements.each { type -> exclude "${type}.class", "${type}\$*.class" }
     exclude 'META-INF/MANIFEST.MF'
     exclude 'windows/**/org/lwjgl/bgfx/valthorne-bgfx.dll'
+    exclude 'valthorne/shaderc/**'
+    exclude 'META-INF/valthorne-shaderc.json'
     exclude 'META-INF/windows/**/org/lwjgl/bgfx/valthorne-bgfx.dll.*', 'META-INF/valthorne-bgfx.json'
 }
 

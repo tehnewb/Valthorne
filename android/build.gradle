@@ -90,6 +90,8 @@ dependencies {
     api "com.alibaba.fastjson2:fastjson2:${rootProject.fastjson2Version}.android5"
 }
 android.sourceSets.main.resources.srcDir(rootProject.file('src/main/resources'))
+android.sourceSets.main.resources.srcDir(rootProject.layout.buildDirectory.dir('generated/shaderc-resources').get().asFile)
+android.sourceSets.main.resources.excludes += ['valthorne/shaderc/windows/**', 'valthorne/shaderc/linux/**', 'valthorne/shaderc/macosx/**']
 tasks.configureEach {
     if (name.startsWith('compile') && name.endsWith('JavaWithJavac')) dependsOn prepareAndroidPlatform
     if (name.startsWith('configureCMake')) dependsOn prepareAndroidPlatform

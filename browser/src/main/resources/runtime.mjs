@@ -4,6 +4,7 @@ import { BrowserPhysics } from "./physics.mjs";
 import createBgfx from "./native/bgfx.mjs";
 import { BrowserYoga } from "./yoga.mjs";
 import { BrowserAudio } from "./audio-backend.mjs";
+import { BrowserShaders } from "./source-shaders.mjs";
 
 let launching = false;
 
@@ -76,6 +77,7 @@ export class BrowserHost {
         this.files = new BrowserFiles();
         this.yoga = new BrowserYoga();
         this.physics = new BrowserPhysics();
+        this.shaders = new BrowserShaders();
         this.audioBackend = new BrowserAudio(this);
         this.assets = new Map();
         this.fontOwners = new FinalizationRegistry((pointer) => native._valthorne_font_free(pointer));
@@ -541,6 +543,7 @@ export class BrowserHost {
 
     /** Releases host-owned memory after the Java application has finished all sessions. */
     async dispose() {
+        this.shaders.close();
         this.files.close();
         this.close();
         try {

@@ -75,7 +75,7 @@ for (const file of files) {
         source = source.replaceAll('Rejects compute operations unavailable in the WebGL 2 specification.', 'Executes native Android compute work after device capability validation.').replaceAll('     * @throws UnsupportedOperationException because WebGL 2 has no compute pipeline\n', '');
     }
     const relative = path.relative(path.join(root, "browser/src/main/java"), file);
-    if (relative.endsWith('NanoVG.java')) {
+    if (relative.endsWith('NanoVG.java') && !source.includes('void nvgShapeAntiAlias(')) {
         const end = source.lastIndexOf('}');
         source = source.slice(0, end) + `    /**
      * Enables or disables native shape edge antialiasing.
