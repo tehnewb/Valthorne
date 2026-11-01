@@ -48,7 +48,7 @@ const nanoDirectory = path.join(generated, "nanovg");
 mkdirSync(nanoDirectory, { recursive: true });
 for (const file of ["nanovg_bgfx.cpp", "nanovg_bgfx.h", "nanovg.h"])
     copyFileSync(path.join(sources, "bgfx/examples/common/nanovg", file), path.join(nanoDirectory, file));
-run("git", ["apply", "--unidiff-zero", "--directory=build/bgfx-native/generated/nanovg", path.join(directory, "nanovg-lwjgl.patch")]);
+run("git", ["apply", "--ignore-space-change", "--unidiff-zero", "--directory=build/bgfx-native/generated/nanovg", path.join(directory, "nanovg-lwjgl.patch")]);
 let renderer = readFileSync(path.join(sources, "bgfx/src/renderer_d3d12.cpp"), "utf8");
 const old = "uint32_t idx = (m_backBufferColorIdx-1) % m_scd.bufferCount;";
 const start = renderer.indexOf("void requestScreenShot(");
