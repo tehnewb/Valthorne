@@ -555,11 +555,6 @@ public final class BrowserOperation {
     public static final int ADAPTIVE_FONT_SCRIPT = 122;
 
     /**
-     * Sets edge antialiasing for subsequent NanoVG shapes.
-     */
-    public static final int NVG_SHAPE_ANTI_ALIAS = 123;
-
-    /**
      * Prevents constructing protocol constant holders.
      */
     private BrowserOperation() {

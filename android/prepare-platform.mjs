@@ -75,6 +75,20 @@ for (const file of files) {
         source = source.replaceAll('Rejects compute operations unavailable in the WebGL 2 specification.', 'Executes native Android compute work after device capability validation.').replaceAll('     * @throws UnsupportedOperationException because WebGL 2 has no compute pipeline\n', '');
     }
     const relative = path.relative(path.join(root, "browser/src/main/java"), file);
+    if (relative.endsWith('NanoVG.java')) {
+        const end = source.lastIndexOf('}');
+        source = source.slice(0, end) + `    /**
+     * Enables or disables native shape edge antialiasing.
+     * @param context drawing context
+     * @param enabled whether shape edges use antialiasing
+     */
+    public static void nvgShapeAntiAlias(long context, boolean enabled) {
+        AndroidNative.word(0, (int) context);
+        AndroidNative.word(1, enabled ? 1 : 0);
+        AndroidNative.call(308);
+    }
+` + source.slice(end);
+    }
     write(path.join(javaOutput, relative), source);
 }
 
@@ -182,7 +196,7 @@ cpp = cpp.replace('reinterpret_cast<bgfx::VertexLayout*>(address)', 'static_cast
     .replace('reinterpret_cast<stbtt_vertex*>(w[1])', 'static_cast<stbtt_vertex*>(pointer(w[1], true))')
     .replace('nvgDelete(context(w[0]))', 'nvgDelete(static_cast<NVGcontext*>(pointer(w[0], true)))');
 cpp = cpp.replace(/reinterpret_cast<uintptr_t>\(([^;\n]+)\)/g, 'storePointer($1)');
-cpp = cpp.replace('    switch (operation) {', '    switch (operation) {\n' + compute.map((entry, index) => `    case ${300 + index}: ${entry[3]}`).join('\n'));
+cpp = cpp.replace('    switch (operation) {', '    switch (operation) {\n    case 308: nvgShapeAntiAlias(context(w[0]), w[1]); return 0;\n' + compute.map((entry, index) => `    case ${300 + index}: ${entry[3]}`).join('\n'));
 cpp = cpp.replace('const auto* caps = bgfx::getCaps();', 'const auto* caps = bgfx::getCaps(); w[8] = caps->limits.maxComputeBindings;');
 cpp = cpp.replace('storePointer(uniformInfo.name)', 'storePointer(uniformInfo.name, true)').replace('storePointer(stbi_failure_reason())', 'storePointer(stbi_failure_reason(), true)');
 write(path.join(cppOutput, "runtime.cpp"), cpp);

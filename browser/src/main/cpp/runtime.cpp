@@ -263,7 +263,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t valthorne_command(uint32_t operation, uint32_t* w,
     case NVG_SCISSOR: nvgScissor(context(w[0]), f[0], f[1], f[2], f[3]); return 0;
     case NVG_INTERSECT_SCISSOR: nvgIntersectScissor(context(w[0]), f[0], f[1], f[2], f[3]); return 0;
     case NVG_STROKE_WIDTH: nvgStrokeWidth(context(w[0]), f[0]); return 0;
-    case NVG_SHAPE_ANTI_ALIAS: nvgShapeAntiAlias(context(w[0]), w[1]); return 0;
     case NVG_GLOBAL_ALPHA: nvgGlobalAlpha(context(w[0]), f[0]); return 0;
     case NVG_FONT_SIZE: nvgFontSize(context(w[0]), f[0]); return 0;
     case NVG_BEGIN_FRAME: nvgBeginFrame(context(w[0]), f[0], f[1], f[2]); return 0;
