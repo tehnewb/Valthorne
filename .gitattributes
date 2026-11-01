@@ -7,12 +7,10 @@
 *.md text eol=lf
 *.yml text eol=lf
 *.sh text eol=lf
+*.mjs text eol=lf
 gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
 *.filamat binary
 *.ktx binary
 *.ttf binary
-# Preserve upstream license texts and recorded benchmark output verbatim.
-portable/web/public/licenses/** -text -whitespace
-docs/benchmarks/**/*.json -whitespace
