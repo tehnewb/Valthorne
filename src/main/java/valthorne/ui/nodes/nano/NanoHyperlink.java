@@ -283,7 +283,7 @@ public class NanoHyperlink extends UINode implements NanoNode {
     }
 
     /**
-     * Refreshes styling and measures text using the root's NanoVG context when available. Without a context, estimates width from UTF-16 length times font size times 0.56 and uses font size as height. Automatic dimensions become nonnegative measured dimensions plus twice their padding, then inherited layout is applied. Explicit dimensions remain unchanged.
+     * Refreshes styling and measures text using the root's NanoVG context when available. Without a context, estimates width from UTF-16 length times font size times 0.56 and uses font size as height. After inherited layout, unconstrained automatic axes receive nonnegative measured dimensions plus twice their padding. Opposing absolute insets, explicit dimensions, and automatic sizing intent are preserved.
      */
     @Override
     protected void applyLayout() {
@@ -304,15 +304,8 @@ public class NanoHyperlink extends UINode implements NanoNode {
             measuredTextHeight = fontSize;
         }
 
-        if (getLayout().getWidth().isAuto()) {
-            getLayout().width(Math.max(0f, measuredTextWidth + paddingX * 2f));
-        }
-
-        if (getLayout().getHeight().isAuto()) {
-            getLayout().height(Math.max(0f, measuredTextHeight + paddingY * 2f));
-        }
-
         super.applyLayout();
+        applyIntrinsicSize(Math.max(0f, measuredTextWidth + paddingX * 2f), Math.max(0f, measuredTextHeight + paddingY * 2f));
     }
 
     /**

@@ -455,7 +455,7 @@ public class NanoSlider extends UINode implements NanoNode {
     }
 
     /**
-     * Changes orientation, supplies default dimensions only for axes still auto,
+     * Changes orientation, retains automatic sizing intent,
      * and marks layout dirty. Existing fixed dimensions and numeric value are retained.
      *
      * @param vertical true for bottom-to-top increase
@@ -463,13 +463,6 @@ public class NanoSlider extends UINode implements NanoNode {
      */
     public NanoSlider vertical(boolean vertical) {
         this.vertical = vertical;
-        if (vertical) {
-            if (getLayout().getWidth().isAuto()) getLayout().width(Math.max(trackHeight, thumbSize));
-            if (getLayout().getHeight().isAuto()) getLayout().height(160);
-        } else {
-            if (getLayout().getWidth().isAuto()) getLayout().width(160);
-            if (getLayout().getHeight().isAuto()) getLayout().height(Math.max(trackHeight, thumbSize));
-        }
         markLayoutDirty();
         return this;
     }
@@ -652,7 +645,8 @@ public class NanoSlider extends UINode implements NanoNode {
 
     /**
      * Applies resolved state colors and nonnegative track/thumb sizes, then supplies
-     * auto cross-axis dimensions and vertical default length before base layout.
+     * intrinsic dimensions on unconstrained automatic axes after base layout.
+     * Opposing absolute insets and automatic sizing intent are preserved.
      * The action remains dynamically resolved at notification time.
      */
     @Override
@@ -692,11 +686,8 @@ public class NanoSlider extends UINode implements NanoNode {
         if (resolvedThumbSize != null) thumbSize = Math.max(0f, resolvedThumbSize);
         if (resolvedTrackCornerRadius != null) trackCornerRadius = Math.max(0f, resolvedTrackCornerRadius);
         if (resolvedThumbCornerRadius != null) thumbCornerRadius = Math.max(0f, resolvedThumbCornerRadius);
-        if (vertical) {
-            if (getLayout().getWidth().isAuto()) getLayout().width(Math.max(trackHeight, thumbSize));
-            if (getLayout().getHeight().isAuto()) getLayout().height(160);
-        } else {if (getLayout().getHeight().isAuto()) getLayout().height(Math.max(trackHeight, thumbSize));}
         super.applyLayout();
+        applyIntrinsicSize(vertical ? Math.max(trackHeight, thumbSize) : 160f, vertical ? 160f : Math.max(trackHeight, thumbSize));
     }
 
     /**

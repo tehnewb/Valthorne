@@ -748,8 +748,9 @@ public class NanoTextField extends UINode implements NanoNode {
 
     /**
      * Applies non-null theme paint/font settings and measures content/placeholder
-     * when a style exists. Replaces only dimensions still auto, then delegates layout
-     * and scrolls the caret into view. Styled measurement requires root attachment;
+     * when a style exists. Applies base layout and supplies intrinsic sizes only on
+     * unconstrained automatic axes, then scrolls the caret into view. Opposing
+     * absolute insets and the application's auto sizing intent are retained. Styled measurement requires root attachment;
      * caret padding and scissor expansion are retained without nonnegative clamping.
      */
     @Override
@@ -823,18 +824,11 @@ public class NanoTextField extends UINode implements NanoNode {
         float measuredWidth = Math.max(measureTextWidth(measured), measureTextWidth(fallback)) + padding * 2f;
         float measuredHeight = NanoText.measureTextHeight(this, (getRoot() == null ? 0L : getRoot().getNanoVGHandle()), fontName, fontSize) + padding * 2f;
 
-        if (getLayout().getWidth().isAuto())
-            getLayout()
-                .width(measuredWidth);
-
-        if (getLayout().getHeight().isAuto()) {
-            Float controlHeight = style.get(UITokens.CONTROL_HEIGHT);
-            if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
-            getLayout()
-                    .height(measuredHeight);
-        }
+        Float controlHeight = style.get(UITokens.CONTROL_HEIGHT);
+        if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
 
         super.applyLayout();
+        applyIntrinsicSize(measuredWidth, measuredHeight);
         updateScroll();
     }
 
