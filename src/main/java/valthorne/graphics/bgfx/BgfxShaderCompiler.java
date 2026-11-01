@@ -61,9 +61,10 @@ final class BgfxShaderCompiler {
                     case "spirv" -> "spirv";
                     case "dx11" -> "s_5_0";
                     case "essl" -> "300_es";
+                    case "metal" -> "metal";
                     default -> throw new UnsupportedOperationException("No source compiler profile for " + family);
                 };
-                String platform = family.equals("essl") ? "asm.js" : switch (Platform.get()) {
+                String platform = family.equals("metal") ? "osx" : family.equals("essl") ? "asm.js" : switch (Platform.get()) {
                     case WINDOWS -> "windows";
                     case MACOSX -> "osx";
                     default -> "linux";

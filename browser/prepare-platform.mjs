@@ -63,6 +63,7 @@ for (const name of [
     "JGL",
     "PlatformTools",
     "JGLConfiguration",
+    "graphics/GraphicsBackend",
     "Window",
     "Keyboard",
     "Mouse",
@@ -169,14 +170,12 @@ for (const name of [
     }` +
             source.slice(end + 1);
     }
-    if (name === "JGLConfiguration")
+    if (name === "graphics/GraphicsBackend")
         source = replace(
             source,
-            "GraphicsBackend graphicsBackend = GraphicsBackend.OPENGL",
-            "GraphicsBackend graphicsBackend = GraphicsBackend.WEBGL",
+            'return System.getProperty("os.name", "").startsWith("Mac") ? METAL : OPENGL;',
+            "return WEBGL;",
         );
-    if (name === "graphics/bgfx/BgfxGraphics")
-        source = source.replaceAll("GraphicsBackend.OPENGL", "GraphicsBackend.WEBGL");
     if (name === "JGL") {
         source = source.replace(
             "import valthorne.graphics.bgfx.BgfxGraphics;",

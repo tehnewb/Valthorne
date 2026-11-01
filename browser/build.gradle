@@ -41,7 +41,7 @@ def replacements = [
     'valthorne/ui/nodes/nano/NanoFileContextMenu',
     'valthorne/io/file/NativeFileDialog',
 
-    'valthorne/JGL', 'valthorne/JGLConfiguration', 'valthorne/Window', 'valthorne/Keyboard', 'valthorne/Mouse',
+    'valthorne/JGL', 'valthorne/JGLConfiguration', 'valthorne/graphics/GraphicsBackend', 'valthorne/Window', 'valthorne/Keyboard', 'valthorne/Mouse',
     'valthorne/graphics/shader/ComputeBuffer', 'valthorne/Audio', 'valthorne/AudioRuntime', 'valthorne/PlatformTools',
     'valthorne/audio/SoundData', 'valthorne/audio/SoundPlayer', 'valthorne/audio/WaveSoundDecoder', 'valthorne/audio/OggSoundDecoder', 'valthorne/audio/Mp3SoundDecoder',
     'valthorne/graphics/font/adaptive/FontHinting', 'valthorne/graphics/font/adaptive/AdaptiveNativeFace', 'valthorne/graphics/font/adaptive/OpenTypeContainer',

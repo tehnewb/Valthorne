@@ -36,6 +36,8 @@ final class BgfxPlatform {
         if (backend == null) throw new NullPointerException("backend");
         if (backend == GraphicsBackend.WEBGL)
             throw new UnsupportedOperationException("WebGL requires the browser platform runtime; a desktop JVM cannot create a browser canvas");
+        if (backend == GraphicsBackend.METAL && Platform.get() != Platform.MACOSX)
+            throw new UnsupportedOperationException("Metal requires macOS");
         if ((backend == GraphicsBackend.DIRECTX || backend == GraphicsBackend.DIRECTX12) && Platform.get() != Platform.WINDOWS)
             throw new UnsupportedOperationException("DirectX requires Windows");
     }

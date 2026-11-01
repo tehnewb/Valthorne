@@ -7,6 +7,7 @@ import static org.lwjgl.bgfx.BGFX.*;
  * choices never silently fall back to a different API. Feature availability is
  * reported separately by GraphicsCapabilities. WEBGL identifies the browser
  * shader target; the desktop JVM launcher cannot initialize that target.
+ * Default configurations select Metal on macOS and OpenGL on Windows and Linux.
  */
 public enum GraphicsBackend {
     /**
@@ -33,7 +34,11 @@ public enum GraphicsBackend {
      * Browser WebGL 2 through the browser runtime's bgfx WebAssembly device.
      * Launch browser exports with this backend; desktop launchers use native APIs.
      */
-    WEBGL(BGFX_RENDERER_TYPE_OPENGLES, "essl");
+    WEBGL(BGFX_RENDERER_TYPE_OPENGLES, "essl"),
+    /**
+     * Native Metal on macOS with packaged Metal Shading Language stages.
+     */
+    METAL(BGFX_RENDERER_TYPE_METAL, "metal");
 
     private final int rendererType; // Native bgfx renderer identifier.
     private final String shaderDirectory; // Packaged shader container family.
@@ -47,6 +52,21 @@ public enum GraphicsBackend {
     GraphicsBackend(int rendererType, String shaderDirectory) {
         this.rendererType = rendererType;
         this.shaderDirectory = shaderDirectory;
+    }
+
+    /**
+     * Selects the platform runtime's default API without initializing graphics.
+     * Desktop macOS uses Metal; Windows and Linux retain OpenGL. Browser and
+     * Android artifacts supply WebGL and OpenGL ES defaults respectively.
+     *
+     * @return default rendering API for this platform artifact
+     */
+    public static GraphicsBackend defaultBackend() {
+        /*
+         * The operating system name needs no native library initialization,
+         * allowing configurations to be constructed before creating a window.
+         */
+        return System.getProperty("os.name", "").startsWith("Mac") ? METAL : OPENGL;
     }
 
     /**

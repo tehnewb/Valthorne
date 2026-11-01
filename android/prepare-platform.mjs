@@ -121,10 +121,12 @@ for (const name of ["BgfxGraphics", "BgfxBatchRenderer", "BgfxMeshRenderer", "Bg
     write(path.join(javaOutput, "valthorne/graphics/bgfx", name + ".java"), source);
 }
 
-for (const name of ["JGL", "JGLConfiguration", "Window", "Keyboard", "Mouse", "PlatformTools", "graphics/font/FontData", "graphics/font/adaptive/FontHinting", "graphics/texture/TextureData"]) {
+for (const name of ["JGL", "JGLConfiguration", "graphics/GraphicsBackend", "Window", "Keyboard", "Mouse", "PlatformTools", "graphics/font/FontData", "graphics/font/adaptive/FontHinting", "graphics/texture/TextureData"]) {
     let source = rename(readFileSync(path.join(root, "browser/build/generated/platform/valthorne", name + ".java"), "utf8"));
     if (name === "JGL") source = source.replaceAll("java.util.ArrayDeque", "java.util.concurrent.LinkedBlockingDeque").replaceAll("ArrayDeque<Runnable>", "LinkedBlockingDeque<Runnable>").replaceAll("new ArrayDeque<>()", "new LinkedBlockingDeque<>()");
     source = source.replaceAll("GraphicsBackend.WEBGL", "GraphicsBackend.OPENGLES");
+    if (name === "graphics/GraphicsBackend")
+        source = source.replace("return WEBGL;", "return OPENGLES;");
     write(path.join(javaOutput, "valthorne", name + ".java"), source);
 }
 

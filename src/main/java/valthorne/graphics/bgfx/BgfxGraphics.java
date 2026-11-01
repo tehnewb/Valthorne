@@ -171,7 +171,7 @@ public final class BgfxGraphics {
         /*
          * Preserve the attachment API's original single-sample default.
          */
-        initialize(window, vsync, 0, GraphicsBackend.OPENGL);
+        initialize(window, vsync, 0, GraphicsBackend.defaultBackend());
     }
 
     /**
@@ -185,7 +185,7 @@ public final class BgfxGraphics {
         /*
          * Existing attachment callers select the portable desktop default.
          */
-        initialize(window, vsync, samples, GraphicsBackend.OPENGL);
+        initialize(window, vsync, samples, GraphicsBackend.defaultBackend());
     }
 
     /**

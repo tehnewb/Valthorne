@@ -53,7 +53,7 @@ public final class BgfxDesktopWindow implements AutoCloseable {
      * @param vsync whether presentation waits for vertical synchronization
      */
     public BgfxDesktopWindow(long handle, boolean vsync) {
-        this(handle, vsync, 0, GraphicsBackend.OPENGL);
+        this(handle, vsync, 0, GraphicsBackend.defaultBackend());
     }
 
     /**
@@ -65,7 +65,7 @@ public final class BgfxDesktopWindow implements AutoCloseable {
      * @param samples requested multisample count, zero through sixteen
      */
     public BgfxDesktopWindow(long handle, boolean vsync, int samples) {
-        this(handle, vsync, samples, GraphicsBackend.OPENGL);
+        this(handle, vsync, samples, GraphicsBackend.defaultBackend());
     }
 
     /**

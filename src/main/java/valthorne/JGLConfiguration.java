@@ -29,7 +29,7 @@ import static org.lwjgl.glfw.GLFW.*;
  */
 public final class JGLConfiguration {
 
-    private GraphicsBackend graphicsBackend = GraphicsBackend.OPENGL; // Rendering API selected before window creation.
+    private GraphicsBackend graphicsBackend = GraphicsBackend.defaultBackend(); // Platform rendering API selected before window creation.
 
     private final Map<Integer, Integer> extraHints = new LinkedHashMap<>(); // Extra raw GLFW integer hints applied after the standard hints
     private String title = "Valthorne"; // Title text used for the created window

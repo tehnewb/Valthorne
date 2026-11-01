@@ -43,7 +43,7 @@ final class BgfxShaderStage {
         this.text = text;
         this.varyings = varyings;
         this.type = type;
-        compiled = source ? new byte[4][] : null;
+        compiled = source ? new byte[5][] : null;
     }
 
     /**
@@ -77,6 +77,7 @@ final class BgfxShaderStage {
                 case "spirv" -> 1;
                 case "dx11" -> 2;
                 case "essl" -> 3;
+                case "metal" -> 4;
                 default -> throw new UnsupportedOperationException("No source compiler profile for " + family);
             };
             byte[] bytes = compiled[index];
