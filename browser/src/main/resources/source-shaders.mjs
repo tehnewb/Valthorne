@@ -3,6 +3,7 @@ export class BrowserShaders {
     constructor() {
         this.loading = null;
         this.compiler = null;
+        this.importRetry = 0;
         this.messages = [];
         this.messageLength = 0;
         this.closed = false;
@@ -12,7 +13,15 @@ export class BrowserShaders {
         if (this.closed) throw new Error("Shader compiler session is closed");
         if (!this.loading) {
             this.loading = (async () => {
-                const { default: createCompiler } = await import("./native/shaderc.mjs");
+                // Failed module imports remain cached in Firefox and WebKit.
+                const moduleUrl = this.importRetry === 0 ? "./native/shaderc.mjs" : "./native/shaderc.mjs?retry=" + this.importRetry;
+                let createCompiler;
+                try {
+                    ({ default: createCompiler } = await import(moduleUrl));
+                } catch (error) {
+                    this.importRetry++;
+                    throw error;
+                }
                 const message = (text) => {
                     const remaining = 65536 - this.messageLength;
                     if (remaining > 0) {
