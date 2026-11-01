@@ -74,7 +74,13 @@ public final class GameMemory {
             if (entry.value() == value) throw new IllegalArgumentException("Resource is already owned by this store");
         }
         entries.add(new GameMemoryEntry<>(value, disposer));
-        resources.put(key, value);
+        try {
+            resources.put(key, value);
+        } catch (RuntimeException | Error failure) {
+            entries.remove(entries.size() - 1);
+            resources.remove(key);
+            throw failure;
+        }
         return value;
     }
 
