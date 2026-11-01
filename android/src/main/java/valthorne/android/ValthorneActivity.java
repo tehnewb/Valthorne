@@ -9,7 +9,6 @@ import android.view.Display;
 import android.view.Display.Mode;
 import android.window.OnBackInvokedDispatcher;
 import android.widget.FrameLayout;
-import java.util.concurrent.TimeUnit;
 import valthorne.Application;
 import valthorne.JGL;
 import valthorne.JGLConfiguration;
@@ -68,12 +67,13 @@ public abstract class ValthorneActivity extends Activity {
     /**
      * Serializes activity recreation with the previous application's shutdown
      * without blocking Android's UI thread or rebinding a still-running JGL loop.
+     * Application disposal may take longer than a fixed timeout; only this daemon
+     * handoff waits, and destroyed replacement activities never initialize a host.
      * @param previous previous application owner thread
      */
     private void awaitPreviousHost(Thread previous) {
         try {
-            previous.join(TimeUnit.SECONDS.toMillis(5));
-            if (previous.isAlive()) throw new IllegalStateException("Previous Valthorne application did not shut down");
+            previous.join();
             runOnUiThread(() -> { if (!isDestroyed()) initializeHost(); });
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();

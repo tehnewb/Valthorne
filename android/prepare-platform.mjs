@@ -123,7 +123,12 @@ for (const name of ["BgfxGraphics", "BgfxBatchRenderer", "BgfxMeshRenderer", "Bg
 
 for (const name of ["JGL", "JGLConfiguration", "graphics/GraphicsBackend", "Window", "Keyboard", "Mouse", "PlatformTools", "graphics/font/FontData", "graphics/font/adaptive/FontHinting", "graphics/texture/TextureData"]) {
     let source = rename(readFileSync(path.join(root, "browser/build/generated/platform/valthorne", name + ".java"), "utf8"));
-    if (name === "JGL") source = source.replaceAll("java.util.ArrayDeque", "java.util.concurrent.LinkedBlockingDeque").replaceAll("ArrayDeque<Runnable>", "LinkedBlockingDeque<Runnable>").replaceAll("new ArrayDeque<>()", "new LinkedBlockingDeque<>()");
+    if (name === "JGL") {
+        source = source.replaceAll("java.util.ArrayDeque", "java.util.concurrent.LinkedBlockingDeque").replaceAll("ArrayDeque<Runnable>", "LinkedBlockingDeque<Runnable>").replaceAll("new ArrayDeque<>()", "new LinkedBlockingDeque<>()");
+        const cleanup = '            Throwable cleanupFailure = null;';
+        if (!source.includes(cleanup)) throw new Error('Review Android presentation shutdown hook');
+        source = source.replace(cleanup, cleanup + '\n            try { AndroidRuntime.prepareShutdown(); }\n            catch (Throwable shutdownFailure) { cleanupFailure = shutdownFailure; }');
+    }
     source = source.replaceAll("GraphicsBackend.WEBGL", "GraphicsBackend.OPENGLES");
     if (name === "graphics/GraphicsBackend")
         source = source.replace("return WEBGL;", "return OPENGLES;");

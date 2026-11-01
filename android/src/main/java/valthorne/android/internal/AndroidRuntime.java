@@ -81,6 +81,11 @@ public final class AndroidRuntime {
      * Whether the render thread has reached a safe surface-loss boundary.
      */
     private static boolean surfaceAcknowledged;
+
+    /**
+     * Whether final presentation has stopped before application disposal.
+     */
+    private static boolean shuttingDown;
     /**
      * Baseline logical height taken from the application's window configuration.
      */
@@ -168,6 +173,7 @@ public final class AndroidRuntime {
             paused = false;
             recover = false;
             surfaceAcknowledged = false;
+            shuttingDown = false;
             pausedNanos = pauseStart = 0;
             cursorX = cursorY = 0;
             windowFocus = null;
@@ -215,7 +221,7 @@ public final class AndroidRuntime {
         synchronized (lifecycle) {
             surface = null;
             recover = device != null;
-            surfaceAcknowledged = device == null;
+            surfaceAcknowledged = device == null || (shuttingDown && surfaceAcknowledged);
             lifecycle.notifyAll();
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
             while (!surfaceAcknowledged && device != null) {
@@ -224,6 +230,27 @@ public final class AndroidRuntime {
                 try { TimeUnit.NANOSECONDS.timedWait(lifecycle, remaining); }
                 catch (InterruptedException failure) { Thread.currentThread().interrupt(); throw new IllegalStateException(failure); }
             }
+        }
+    }
+
+    /**
+     * Drains the last presenting frame on the render owner before application
+     * disposal. Surface destruction may then finish without waiting for slow
+     * resource cleanup or native shutdown; neither may submit another game frame.
+     * Native window ownership remains with the device until its ordinary close.
+     */
+    public static void prepareShutdown() {
+        AndroidNativeDevice current;
+        synchronized (lifecycle) {
+            if (shuttingDown) return;
+            shuttingDown = true;
+            current = device;
+            surfaceAcknowledged = current == null;
+        }
+        if (current != null) current.quiesce();
+        synchronized (lifecycle) {
+            surfaceAcknowledged = true;
+            lifecycle.notifyAll();
         }
     }
 
