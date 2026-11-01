@@ -54,6 +54,22 @@ def prepareAndroidPlatform = tasks.register('prepareAndroidPlatform', Exec) {
 }
 android.sourceSets.main.java.srcDir(layout.buildDirectory.dir('generated/platform/java').get().asFile)
 
+// Include shared API sources while keeping Android replacements authoritative.
+tasks.withType(Jar).matching { it.name == 'sourceReleaseJar' }.configureEach {
+    dependsOn prepareAndroidPlatform
+    inputs.file(layout.buildDirectory.file('generated/platform/classes.json'))
+    inputs.files(fileTree('src/main/java'))
+    def replaced = [] as Set
+    doFirst { replaced.addAll(new groovy.json.JsonSlurper().parse(layout.buildDirectory.file('generated/platform/classes.json').get().asFile)) }
+    from(rootProject.sourceSets.main.allJava) {
+        exclude { element ->
+            if (!element.path.endsWith('.java')) return false
+            def type = element.path.substring(0, element.path.length() - 5)
+            replaced.contains(type) || file('src/main/java/' + type + '.java').exists()
+        }
+    }
+}
+
 def androidEngineApi = tasks.register('androidEngineApi', Jar) {
     dependsOn rootProject.tasks.named('jar'), prepareAndroidPlatform
     inputs.file(layout.buildDirectory.file('generated/platform/classes.json'))
