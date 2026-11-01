@@ -41,8 +41,12 @@ for (const [name, file] of [["freetype", "freetype/docs/FTL.TXT"], ["harfbuzz", 
     writeFileSync(path.join(licenses, name + ".txt"), readFileSync(path.join(root, file)));
 writeFileSync(path.join(licenses, "openal-soft.txt"), readFileSync(path.join(root, "openal/COPYING")));
 writeFileSync(path.join(licenses, "openal-soft-source.txt"), "OpenAL Soft is dynamically linked and unmodified.\nCorresponding source: https://github.com/kcat/openal-soft/tree/" + revisions.openal[1] + "\nAndroid build integration: android/src/main/cpp/CMakeLists.txt in the Valthorne source distribution.\n");
-const stb = readFileSync(path.join(root, "bimg/3rdparty/stb/stb_image_resize2.h"), "utf8");
-const licenseStart = stb.lastIndexOf("ALTERNATIVE A - MIT License");
-if (licenseStart < 0) throw new Error("Review STB resize licensing before updating Android dependencies");
-writeFileSync(path.join(licenses, "stb-image-resize.txt"), stb.slice(licenseStart, stb.lastIndexOf("*/")).trim() + "\n");
+for (const [name, file] of [["stb-image-resize", "bimg/3rdparty/stb/stb_image_resize2.h"], ["stb-image", "bimg/3rdparty/stb/stb_image.h"], ["stb-truetype", "bgfx/3rdparty/stb/stb_truetype.h"]]) {
+    const source = readFileSync(path.join(root, file), "utf8");
+    const start = source.lastIndexOf("ALTERNATIVE A - MIT License");
+    if (start < 0) throw new Error("Review STB licensing before updating Android dependencies: " + name);
+    writeFileSync(path.join(licenses, name + ".txt"), source.slice(start, source.lastIndexOf("*/")).trim() + "\n");
+}
+const nano = readFileSync(path.join(root, "bgfx/examples/common/nanovg/nanovg.cpp"), "utf8");
+writeFileSync(path.join(licenses, "nanovg.txt"), nano.slice(0, nano.indexOf("#include")).trim() + "\n");
 writeFileSync(path.join(root, "valthorne-android-sources.json"), JSON.stringify(revisions, null, 2) + "\n");
