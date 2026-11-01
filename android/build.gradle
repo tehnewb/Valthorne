@@ -96,6 +96,7 @@ tasks.configureEach {
     if (name.startsWith('compile') && name.endsWith('JavaWithJavac')) dependsOn prepareAndroidPlatform
     if (name.startsWith('configureCMake')) dependsOn prepareAndroidPlatform
     if (name.startsWith('source') && name.endsWith('Jar')) dependsOn prepareAndroidPlatform
+    if (name.startsWith('process') && name.endsWith('JavaRes')) dependsOn rootProject.tasks.named('prepareShaderCompiler')
 }
 
 def prepareAndroidNative = tasks.register('prepareAndroidNative', Exec) {
