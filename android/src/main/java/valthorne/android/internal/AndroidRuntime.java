@@ -22,6 +22,7 @@ import valthorne.graphics.GraphicsBackend;
 import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.bgfx.BgfxResources;
 import valthorne.ui.UINode;
+import valthorne.ui.behavior.TextEditModel;
 import valthorne.ui.nodes.TextField;
 import valthorne.ui.nodes.nano.NanoTextField;
 import valthorne.ui.nodes.nano.NanoCodeEditor;
@@ -44,6 +45,10 @@ public final class AndroidRuntime {
      * Pending copied platform events; render callbacks drain these in order.
      */
     private static final ArrayBlockingQueue<AndroidInputEvent> events = new ArrayBlockingQueue<>(1024);
+    /**
+     * Current input-method target, confined to the render thread.
+     */
+    private static UINode textTarget;
     /**
      * Current Android activity, installed before entering JGL.
      */
@@ -177,6 +182,7 @@ public final class AndroidRuntime {
             scroll = null;
             drop = null;
             events.clear();
+            textTarget = null;
         }
     }
 
@@ -246,11 +252,17 @@ public final class AndroidRuntime {
      * Drains copied events and restores graphics after a surface replacement.
      */
     public static void poll() {
-        boolean restore;
         for (;;) {
             AndroidNativeDevice pending;
             synchronized (lifecycle) {
-                if (closing || (surface != null && !paused)) break;
+                if (closing) break;
+                if (surface != null && !paused) {
+                    if (recover) {
+                        BgfxResources.recoverDevice();
+                        recover = false;
+                    }
+                    break;
+                }
                 pending = surfaceAcknowledged ? null : device;
                 if (pending == null) {
                     surfaceAcknowledged = true;
@@ -271,11 +283,6 @@ public final class AndroidRuntime {
                 lifecycle.notifyAll();
             }
         }
-        synchronized (lifecycle) {
-            restore = recover && !closing;
-            recover = false;
-        }
-        if (restore) BgfxResources.recoverDevice();
         AndroidInputEvent event;
         while ((event = events.poll()) != null) dispatch(event);
     }
@@ -303,6 +310,12 @@ public final class AndroidRuntime {
             case 6 -> { if (windowSize != null) windowSize.invoke(1, width(), height()); if (framebufferSize != null) framebufferSize.invoke(1, pixelsWide, pixelsHigh); }
             case 8 -> { if (windowClose != null) windowClose.invoke(1); }
             case 11 -> { if (character != null) { for (int i = 0; i < event.text().length();) { int code = event.text().codePointAt(i); character.invoke(1, code); i += Character.charCount(code); } } }
+            case 12 -> {
+                if (textTarget != null && textTarget.isFocused() && !textTarget.isDisabled()) {
+                    TextEditModel editor = textTarget instanceof TextField field ? field.getEditor() : textTarget instanceof NanoTextField field ? field.getEditor() : textTarget instanceof NanoCodeEditor editorNode ? editorNode.getEditor() : null;
+                    if (editor != null) editor.deleteSurrounding(event.a(), event.b(), event.c() != 0);
+                }
+            }
             default -> throw new IllegalArgumentException("Unknown Android input event " + event.kind());
         }
     }
@@ -499,6 +512,7 @@ public final class AndroidRuntime {
      * Selects the software keyboard for the focused engine text control.
      */
     public static void textFocus(UINode node) {
+        textTarget = node;
         boolean enabled = node instanceof TextField || node instanceof NanoTextField || node instanceof NanoCodeEditor;
         boolean masked = node instanceof TextField field && field.isMasking() || node instanceof NanoTextField nanoField && nanoField.isMasking();
         activity.runOnUiThread(() -> activity.surfaceView().textFocus(enabled, masked));

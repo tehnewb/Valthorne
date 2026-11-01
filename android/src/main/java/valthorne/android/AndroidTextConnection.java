@@ -38,13 +38,17 @@ final class AndroidTextConnection extends BaseInputConnection {
 
     @Override
     public boolean deleteSurroundingText(int beforeLength, int afterLength) {
-        for (int i = 0; i < beforeLength; i++) stroke(KeyEvent.KEYCODE_DEL);
-        for (int i = 0; i < afterLength; i++) stroke(KeyEvent.KEYCODE_FORWARD_DEL);
+        if (beforeLength < 0 || afterLength < 0) return false;
+        AndroidRuntime.emit(12, beforeLength, afterLength, 0, 0, 0, 0, null);
         return true;
     }
 
     @Override
-    public boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) { return deleteSurroundingText(beforeLength, afterLength); }
+    public boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) {
+        if (beforeLength < 0 || afterLength < 0) return false;
+        AndroidRuntime.emit(12, beforeLength, afterLength, 1, 0, 0, 0, null);
+        return true;
+    }
 
     @Override
     public boolean sendKeyEvent(KeyEvent event) { return view.dispatchKey(event); }

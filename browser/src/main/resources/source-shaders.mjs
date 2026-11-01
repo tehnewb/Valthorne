@@ -46,6 +46,7 @@ export class BrowserShaders {
         if (type !== "v" && type !== "f") throw new Error("WebGL 2 does not support compute shaders");
         this.messages.length = 0;
         this.messageLength = 0;
+        const stack = compiler.stackSave();
         try {
             compiler.FS.writeFile("/source.sc", source);
             compiler.FS.writeFile("/varying.def.sc", varyings);
@@ -54,6 +55,7 @@ export class BrowserShaders {
             if (status !== 0) throw new Error(this.messages.join("\n"));
             return compiler.FS.readFile("/output.bin");
         } finally {
+            compiler.stackRestore(stack);
             for (const name of ["/source.sc", "/varying.def.sc", "/output.bin"])
                 if (compiler.FS.analyzePath(name).exists) compiler.FS.unlink(name);
             this.messages.length = 0;

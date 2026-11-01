@@ -21,9 +21,9 @@ file(READ "${SOURCES}/bx/src/amalgamated.cpp" BX_SOURCE)
 string(REPLACE "#include \"" "#include \"${SOURCES}/bx/src/" BX_SOURCE "${BX_SOURCE}")
 string(REPLACE "${SOURCES}/bx/src/debug.cpp" "${CMAKE_CURRENT_BINARY_DIR}/generated/debug.cpp" BX_SOURCE "${BX_SOURCE}")
 file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/compiler_bx.cpp" CONTENT "${BX_SOURCE}" @ONLY)
-if(ANDROID)
+if(ANDROID OR EMSCRIPTEN)
   # shaderc consumes its source and replaces it after preprocessing. Keep both
-  # allocations owned on every return path when embedding it in a long-lived JVM.
+  # allocations owned on every return path in a long-lived application session.
   file(READ "${BGFX}/tools/shaderc/shaderc.cpp" SHADERC_SOURCE)
   set(COMPILE_DECL "bool compileShader(const char* _varying, const char* _comment, char* _shader, uint32_t _shaderLen, const Options& _options, bx::WriterI* _shaderWriter, bx::WriterI* _messageWriter)\n\t{")
   string(FIND "${SHADERC_SOURCE}" "${COMPILE_DECL}" COMPILE_START)
@@ -42,7 +42,6 @@ set(COMPILER_FILES ${SHADERC_FILES} ${GLSLANG_FILES} ${SPIRV_FILES} ${CROSS_FILE
 if(ANDROID)
   add_library(shaderc SHARED ${COMPILER_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/../../android/src/main/cpp/native_shaderc.cpp")
   set_target_properties(shaderc PROPERTIES OUTPUT_NAME valthorne_shaderc CXX_VISIBILITY_PRESET hidden C_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
-  target_include_directories(shaderc PRIVATE "${BGFX}/tools/shaderc")
   target_link_libraries(shaderc PRIVATE android log)
   target_link_options(shaderc PRIVATE "-Wl,-z,max-page-size=16384")
 else()
@@ -53,6 +52,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/compiler_bx.cpp" APPEND PROPERTY COMPILE_OPTIONS -D_LARGEFILE64_SOURCE=1 -include sys/prctl.h)
 endif()
 target_include_directories(shaderc PRIVATE
+  "${BGFX}/tools/shaderc"
   "${SOURCES}/bimg/include" "${BGFX}/include" "${BGFX}/src" "${BGFX}/3rdparty" "${SOURCES}/bx/include" "${SOURCES}/bx/3rdparty"
   "${GLSLANG}" "${GLSLANG}/glslang/Public" "${GLSLANG}/glslang/Include"
   "${SPIRV}" "${SPIRV}/include" "${SPIRV}/include/generated" "${SPIRV}/source"
@@ -66,6 +66,6 @@ if(EMSCRIPTEN)
     -D__EMSCRIPTEN_MAJOR__=__EMSCRIPTEN_major__ -D__EMSCRIPTEN_MINOR__=__EMSCRIPTEN_minor__ -D__EMSCRIPTEN_TINY__=__EMSCRIPTEN_tiny__)
   target_link_options(shaderc PRIVATE -O2 -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createShaderCompiler
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sSTACK_SIZE=1048576 -sINVOKE_RUN=0 -sEXIT_RUNTIME=0
-    -sENVIRONMENT=web,node "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']")
+    -sENVIRONMENT=web,node "-sEXPORTED_RUNTIME_METHODS=['FS','callMain','stackSave','stackRestore']")
   set_target_properties(shaderc PROPERTIES SUFFIX ".mjs")
 endif()

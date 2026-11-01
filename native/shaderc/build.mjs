@@ -61,7 +61,10 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 if (target === "browser") {
     const output = path.join(root, "browser/src/main/resources/native");
-    for (const file of ["shaderc.mjs", "shaderc.wasm"]) copyFileSync(path.join(build, file), path.join(output, file));
+    for (const file of ["shaderc.mjs", "shaderc.wasm"]) {
+        const bytes = readFileSync(path.join(build, file));
+        writeFileSync(path.join(output, file), file.endsWith(".mjs") ? bytes.toString("utf8").replaceAll("\r\n", "\n") : bytes);
+    }
     mkdirSync(path.join(output, "shaderc-include"), { recursive: true });
     for (const header of ["bgfx_shader.sh", "bgfx_compute.sh"])
         copyFileSync(path.join(sources, "bgfx/src", header), path.join(output, "shaderc-include", header));
