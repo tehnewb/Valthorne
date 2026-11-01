@@ -26,7 +26,7 @@ import valthorne.graphics.bgfx.BgfxShader;
  * <p>For a custom texture fragment stage, supply portable source directly:</p>
  * <pre>{@code
  * String fragment = """
- *         $input v_color, v_uv
+ *         $input v_color, v_uv, v_glyph, v_band, v_world, v_clip, v_params
  *         #include <bgfx_shader.sh>
  *         SAMPLER2D(u_texture, 0);
  *         uniform vec4 u_tint;
@@ -37,6 +37,10 @@ import valthorne.graphics.bgfx.BgfxShader;
  * Shader shader = new Shader("engine/quad.vert", fragment);
  * shader.setUniform4f("u_tint", 1, 0.5f, 0.25f, 1);
  * }</pre>
+ *
+ * <p>When pairing source with an engine vertex stage, retain the complete
+ * {@code $input} list shown above, including unused varyings. bgfx matches the
+ * declared vertex outputs and fragment inputs when linking.</p>
  *
  * <p>Source can include the packaged {@code bgfx_shader.sh} and
  * {@code bgfx_compute.sh} headers. Other shared code must be included in the

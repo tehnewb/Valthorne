@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <exception>
 #include <limits>
+#include <memory>
 #include <string>
 #include <stdexcept>
 #include <vector>
@@ -32,10 +33,11 @@ namespace {
 
 extern "C" JNIEXPORT jbyteArray JNICALL Java_valthorne_graphics_bgfx_BgfxShaderCompiler_compileNative(JNIEnv* env, jclass, jbyteArray input, jbyteArray varyingInput, jchar type, jstring profile, jstring directory) {
     try {
-        auto source = bytes(env, input, 16384);
+        const auto length = uint32_t(env->GetArrayLength(input));
+        auto source = std::make_unique<char[]>(size_t(length) + 16384);
+        env->GetByteArrayRegion(input, 0, jsize(length), reinterpret_cast<jbyte*>(source.get()));
         auto varyings = bytes(env, varyingInput, 1);
         if (env->ExceptionCheck()) return nullptr;
-        const auto length = uint32_t(env->GetArrayLength(input));
         source[length] = '\n';
         bgfx::Options options;
         options.shaderType = char(type);
@@ -53,7 +55,8 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_valthorne_graphics_bgfx_BgfxShaderC
         bx::MemoryBlock block(&allocator);
         bx::MemoryWriter output(&block);
         Diagnostics diagnostics;
-        if (!bgfx::compileShader(varyings.data(), "", source.data(), length, options, &output, &diagnostics)) {
+        // The embedded adapter owns source immediately, including failure paths.
+        if (!bgfx::compileShader(varyings.data(), "", source.release(), length, options, &output, &diagnostics)) {
             env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), diagnostics.text.empty() ? "Could not compile inline shader" : diagnostics.text.c_str());
             return nullptr;
         }
