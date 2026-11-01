@@ -18,6 +18,10 @@ public enum GraphicsBackend {
      */
     OPENGL(BGFX_RENDERER_TYPE_OPENGL, "glsl"),
     /**
+     * Native OpenGL ES 3 on Android through the Android platform runtime.
+     */
+    OPENGLES(BGFX_RENDERER_TYPE_OPENGLES, "essl"),
+    /**
      * DirectX through Direct3D 11 on Windows.
      */
     DIRECTX(BGFX_RENDERER_TYPE_DIRECT3D11, "dx11"),

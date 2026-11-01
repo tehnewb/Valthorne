@@ -1,6 +1,7 @@
 # Build tools and generated output (at any project depth)
 .gradle/
 .gradle-local/
+.cxx/
 build/
 out/
 bin/

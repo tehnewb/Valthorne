@@ -190,7 +190,10 @@ public final class BgfxRenderTarget implements AutoCloseable, GraphicsResource {
             short depth = BGFX_INVALID_HANDLE;
             try {
                 color = bgfx_create_texture_2d(width, height, false, 1, format, flags, null, 0);
-                depth = bgfx_create_texture_2d(width, height, false, 1, BGFX_TEXTURE_FORMAT_D24S8, BGFX_TEXTURE_RT_WRITE_ONLY, null, 0);
+                int depthFormat = bgfx_is_texture_valid(0, false, 1, BGFX_TEXTURE_FORMAT_D24S8, BGFX_TEXTURE_RT_WRITE_ONLY) ? BGFX_TEXTURE_FORMAT_D24S8 : BGFX_TEXTURE_FORMAT_D32FS8;
+                if (!bgfx_is_texture_valid(0, false, 1, depthFormat, BGFX_TEXTURE_RT_WRITE_ONLY))
+                    throw new UnsupportedOperationException("The device cannot allocate a depth/stencil attachment");
+                depth = bgfx_create_texture_2d(width, height, false, 1, depthFormat, BGFX_TEXTURE_RT_WRITE_ONLY, null, 0);
                 if (color == BGFX_INVALID_HANDLE || depth == BGFX_INVALID_HANDLE)
                     throw new IllegalStateException("Could not allocate render-target attachments");
                 framebuffer = bgfx_create_frame_buffer_from_handles(new short[]{color, depth}, true);

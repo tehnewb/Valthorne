@@ -1,0 +1,139 @@
+plugins {
+    id 'com.android.library' version '9.1.0'
+    id 'maven-publish'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories { google(); mavenCentral() }
+
+def nativeSources = providers.gradleProperty('androidNativeSources').orElse(rootProject.layout.buildDirectory.dir('android-native-sources').map { it.asFile.absolutePath })
+
+android {
+    namespace = 'valthorne.android'
+    compileSdk = 36
+    ndkVersion = '27.2.12479018'
+    defaultConfig {
+        minSdk = 35
+        missingDimensionStrategy 'precision', 'Sp'
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
+        externalNativeBuild {
+            cmake {
+                arguments '-DVALTHORNE_NATIVE_SOURCES=' + nativeSources.get().replace('\\', '/'), '-DANDROID_STL=c++_static', '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                cppFlags '-std=c++20'
+            }
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path = file('src/main/cpp/CMakeLists.txt')
+            version = '3.22.1'
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
+    }
+    publishing {
+        singleVariant('release') { withSourcesJar() }
+    }
+}
+
+def prepareAndroidPlatform = tasks.register('prepareAndroidPlatform', Exec) {
+    dependsOn ':browser:preparePlatform'
+    inputs.file('prepare-platform.mjs')
+    inputs.file('prepare-audio.mjs')
+    inputs.dir(rootProject.file('browser/src/main/java'))
+    inputs.dir(rootProject.file('browser/src/main/cpp'))
+    inputs.dir(rootProject.file('browser/build/generated/platform'))
+    inputs.dir(rootProject.file('src/main/java'))
+    outputs.dir(layout.buildDirectory.dir('generated/platform'))
+    commandLine 'node', 'prepare-platform.mjs'
+}
+android.sourceSets.main.java.srcDir(layout.buildDirectory.dir('generated/platform/java').get().asFile)
+
+def androidEngineApi = tasks.register('androidEngineApi', Jar) {
+    dependsOn rootProject.tasks.named('jar'), prepareAndroidPlatform
+    inputs.file(layout.buildDirectory.file('generated/platform/classes.json'))
+    inputs.files(fileTree('src/main/java'))
+    archiveFileName = 'valthorne-android-api.jar'
+    from { zipTree(rootProject.tasks.named('jar').get().archiveFile) }
+    include '**/*.class'
+    def replaced = [] as Set
+    doFirst { replaced.addAll(new groovy.json.JsonSlurper().parse(layout.buildDirectory.file('generated/platform/classes.json').get().asFile)) }
+    exclude { element ->
+        if (!element.path.endsWith('.class')) return false
+        def type = element.path.substring(0, element.path.length() - 6).split('\\$')[0]
+        replaced.contains(type) || file('src/main/java/' + type + '.java').exists()
+    }
+}
+configurations { androidJoltBindings }
+
+def androidJoltApi = tasks.register('androidJoltApi', Jar) {
+    archiveFileName = 'valthorne-android-jolt-api.jar'
+    from { configurations.androidJoltBindings.collect { zipTree(it) } }
+    include '**/*.class'
+}
+
+dependencies {
+    compileOnly project(':')
+    api files(androidEngineApi)
+    api 'org.joml:joml:1.10.9'
+    api 'org.joml:joml-primitives:1.10.0'
+    api 'net.onedaybeard.artemis:artemis-odb:2.3.0'
+    // The Android release AAR contains native libraries but omits Java bindings.
+    // The unclassified desktop artifact supplies the shared platform-neutral JNI API.
+    androidJoltBindings('com.github.stephengold:jolt-jni-Windows64:6.0.0') { transitive = false }
+    api files(androidJoltApi)
+    runtimeOnly 'com.github.stephengold:jolt-jni-Android:6.0.0:SpRelease@aar'
+    api "com.alibaba.fastjson2:fastjson2:${rootProject.fastjson2Version}.android5"
+}
+android.sourceSets.main.resources.srcDir(rootProject.file('src/main/resources'))
+tasks.configureEach {
+    if (name.startsWith('compile') && name.endsWith('JavaWithJavac')) dependsOn prepareAndroidPlatform
+    if (name.startsWith('configureCMake')) dependsOn prepareAndroidPlatform
+    if (name.startsWith('source') && name.endsWith('Jar')) dependsOn prepareAndroidPlatform
+}
+
+def prepareAndroidNative = tasks.register('prepareAndroidNative', Exec) {
+    inputs.file('prepare-native.mjs')
+    outputs.file(nativeSources.map { file(it + '/valthorne-android-sources.json') })
+    outputs.upToDateWhen { false }
+    commandLine 'node', 'prepare-native.mjs', nativeSources.get()
+}
+
+def nativeLicenses = tasks.register('nativeLicenses', Sync) {
+    dependsOn prepareAndroidNative
+    from(nativeSources.map { file(it + '/valthorne-android-licenses') }) { into 'licenses' }
+    into layout.buildDirectory.dir('generated/native-assets')
+}
+android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/native-assets').get().asFile)
+tasks.named('preBuild') { dependsOn nativeLicenses }
+
+tasks.configureEach {
+    if (name.startsWith('configureCMake')) dependsOn prepareAndroidNative
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            androidRelease(MavenPublication) {
+                from components.release
+                artifactId = 'Valthorne-android'
+                pom {
+                    name = 'Valthorne Android'
+                    description = 'Native Android runtime for Valthorne applications'
+                    url = 'https://github.com/tehnewb/Valthorne'
+                    licenses {
+                        license {
+                            name = 'The Apache License, Version 2.0'
+                            url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                    scm { url = 'https://github.com/tehnewb/Valthorne' }
+                }
+            }
+        }
+    }
+}

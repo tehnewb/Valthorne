@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        google()
         gradlePluginPortal()
         mavenCentral()
     }
@@ -7,3 +8,7 @@ pluginManagement {
 
 rootProject.name = "Valthorne"
 include 'browser'
+if (providers.gradleProperty('androidTarget').map { it.toBoolean() }.getOrElse(false)) {
+    include 'android-platform'
+    project(':android-platform').projectDir = file('android')
+}
