@@ -20,6 +20,9 @@ import java.util.Random;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
@@ -500,6 +503,11 @@ public final class ParticleSystem {
      *
      * <p>This performs one upload to the VBO and one {@code glDrawArraysInstanced(GL_TRIANGLES)} call.
      * If render throttling is enabled, this may skip drawing until enough time has elapsed.</p>
+     *
+     * <p>Samples the particle image on texture unit zero, restoring that unit's previous
+     * 2D texture binding and the caller's active texture unit after drawing. Other
+     * texture units are untouched. Culling is restored; program, vertex-array and
+     * array-buffer bindings are left at zero. Blend and viewport state are unchanged.</p>
      */
     public void draw() {
         if (activeCount <= 0) return;
@@ -751,17 +759,22 @@ public final class ParticleSystem {
         shader.setUniform4f("u_uvRect", u0, v0, u1, v1);
         shader.setUniform2f("u_pixelScale", 2f * sizeScaleX / Math.max(1, renderViewport.get(2)), 2f * sizeScaleY / Math.max(1, renderViewport.get(3)));
         shader.setUniform1f("u_discSoftness", discSoftness);
-        glBindTexture(GL_TEXTURE_2D, texture.getTextureID());
-        glBindVertexArray(vao);
+        int activeTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+        glActiveTexture(GL_TEXTURE0);
+        int previousTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         boolean culling = glIsEnabled(GL_CULL_FACE);
-        glDisable(GL_CULL_FACE);
         try {
+            glBindTexture(GL_TEXTURE_2D, texture.getTextureID());
+            glBindVertexArray(vao);
+            glDisable(GL_CULL_FACE);
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, toDraw);
         } finally {
             if (culling) glEnable(GL_CULL_FACE);
+            glBindVertexArray(0);
+            glBindTexture(GL_TEXTURE_2D, previousTexture);
+            glActiveTexture(activeTexture);
+            shader.unbind();
         }
-        glBindVertexArray(0);
-        shader.unbind();
     }
 
     /**
