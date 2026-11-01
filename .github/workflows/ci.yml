@@ -28,6 +28,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # Temurin has no Windows ARM64 JDK 25; build with x64 Java there.
+          # Native ARM64 Node still validates the packaged ARM64 compiler.
+          architecture: ${{ matrix.os == 'windows-11-arm' && 'x64' || '' }}
       - uses: gradle/actions/setup-gradle@v4
       - name: Check wrapper integrity
         uses: gradle/actions/wrapper-validation@v4
