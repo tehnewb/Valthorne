@@ -698,10 +698,15 @@ public final class ParticleSystem {
         shader.setUniform4f("u_uvRect", u0, v0, u1, v1);
         shader.setUniform2f("u_pixelScale", 2f * sizeScaleX / Math.max(1, renderViewport[2]), 2f * sizeScaleY / Math.max(1, renderViewport[3]));
         shader.setUniform1f("u_discSoftness", discSoftness);
-        BgfxGraphics.bindTexture(0, texture.getTextureID());
-        batchBytes.position(0).limit(toDraw * STRIDE_BYTES);
-        bgfxRenderer.submit(batchBytes, toDraw, STRIDE_BYTES, shader, BgfxGraphics.textures(), 1, false);
-        shader.unbind();
+        int previousTexture = BgfxGraphics.textures()[0];
+        try {
+            BgfxGraphics.bindTexture(0, texture.getTextureID());
+            batchBytes.position(0).limit(toDraw * STRIDE_BYTES);
+            bgfxRenderer.submit(batchBytes, toDraw, STRIDE_BYTES, shader, BgfxGraphics.textures(), 1, false);
+        } finally {
+            BgfxGraphics.bindTexture(0, previousTexture);
+            shader.unbind();
+        }
     }
 
     /**

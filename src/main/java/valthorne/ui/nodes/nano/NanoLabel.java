@@ -8,7 +8,6 @@ import valthorne.graphics.Color;
 import valthorne.graphics.texture.TextureBatch;
 import valthorne.ui.NanoUtility;
 import valthorne.ui.UINode;
-import org.lwjgl.util.yoga.Yoga;
 import valthorne.ui.UIRoot;
 import valthorne.ui.enums.Alignment;
 import valthorne.ui.theme.ResolvedStyle;
@@ -693,7 +692,8 @@ public class NanoLabel extends UINode implements NanoNode {
      * all lines. Without a root NanoVG handle, estimates width as half font size
      * per UTF-16 unit and line height as font size. Applies measured automatic
      * dimensions directly to Yoga after base layout, preserving the application's
-     * auto or explicit specification. Font and color resources are borrowed.
+     * auto or explicit specification and allowing opposing absolute insets to stretch.
+     * Font and color resources are borrowed.
      */
     @Override
     protected void applyLayout() {
@@ -746,8 +746,7 @@ public class NanoLabel extends UINode implements NanoNode {
         }
 
         super.applyLayout();
-        if (getLayout().getWidth().isAuto()) Yoga.YGNodeStyleSetWidth(getYogaMemoryAddress(), measuredWidth);
-        if (getLayout().getHeight().isAuto()) Yoga.YGNodeStyleSetHeight(getYogaMemoryAddress(), measuredHeight);
+        applyIntrinsicSize(measuredWidth, measuredHeight);
     }
 
     /**

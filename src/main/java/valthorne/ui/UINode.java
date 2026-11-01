@@ -10,6 +10,7 @@ import valthorne.graphics.texture.TextureBatch;
 import org.joml.Vector2f;
 import valthorne.math.geometry.Rectangle;
 import valthorne.ui.nodes.Tooltip;
+import valthorne.ui.enums.PositionType;
 import valthorne.ui.theme.*;
 import valthorne.viewport.Viewport;
 import java.util.Objects;
@@ -1725,6 +1726,7 @@ public abstract class UINode implements Dimensional {
         UIConstants.applyLayout(yogaMemoryAddress, layout);
         ResolvedStyle style = getStyle();
         if (style != null && layout.getMinHeight().isAuto() && layout.getHeight().isAuto()
+                && !(layout.getPositionType() == PositionType.ABSOLUTE && !layout.getTop().isAuto() && !layout.getBottom().isAuto())
                 && (this instanceof Button || this instanceof TextField
                 || this instanceof NanoButton || this instanceof NanoTextField
                 || this instanceof NanoComboBox || this instanceof NumberSpinner || this instanceof NanoNumberSpinner
@@ -1732,6 +1734,23 @@ public abstract class UINode implements Dimensional {
             Float height = style.get(UITokens.CONTROL_HEIGHT);
             if (height != null) Yoga.YGNodeStyleSetMinHeight(yogaMemoryAddress, height);
         }
+    }
+
+    /**
+     * Supplies measured dimensions after applying the application's layout, without
+     * replacing its automatic sizing intent. Opposing absolute insets retain Yoga's
+     * automatic dimension so the solver can stretch that axis. Explicit dimensions
+     * and Yoga's minimum and maximum constraints remain authoritative.
+     *
+     * @param width preferred unconstrained width in layout units
+     * @param height preferred unconstrained height in layout units
+     */
+    protected final void applyIntrinsicSize(float width, float height) {
+        boolean absolute = layout.getPositionType() == PositionType.ABSOLUTE;
+        if (layout.getWidth().isAuto() && !(absolute && !layout.getLeft().isAuto() && !layout.getRight().isAuto()))
+            Yoga.YGNodeStyleSetWidth(yogaMemoryAddress, width);
+        if (layout.getHeight().isAuto() && !(absolute && !layout.getTop().isAuto() && !layout.getBottom().isAuto()))
+            Yoga.YGNodeStyleSetHeight(yogaMemoryAddress, height);
     }
 
     /**

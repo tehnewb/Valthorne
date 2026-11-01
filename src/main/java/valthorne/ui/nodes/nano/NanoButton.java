@@ -674,7 +674,8 @@ public class NanoButton extends NanoContainer {
 
     /**
      * Applies non-null theme paint/font/padding values, measures text plus padding,
-     * and replaces dimensions still marked auto. Then delegates base layout.
+     * and applies base layout before supplying unconstrained automatic dimensions.
+     * Opposing absolute insets and the application's auto sizing intent are retained.
      * Local setters override resolved theme values; missing native context uses
      * approximate text metrics through the measurement helpers.
      */
@@ -764,18 +765,11 @@ public class NanoButton extends NanoContainer {
         float measuredWidth = measureTextWidth(text) + paddingX * 2f;
         float measuredHeight = measureTextHeight() + paddingY * 2f;
 
-        if (getLayout().getWidth().isAuto())
-            getLayout()
-                .width(measuredWidth);
-
-        if (getLayout().getHeight().isAuto()) {
-            Float controlHeight = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
-            if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
-            getLayout()
-                    .height(measuredHeight);
-        }
+        Float controlHeight = style == null ? null : style.get(UITokens.CONTROL_HEIGHT);
+        if (controlHeight != null) measuredHeight = Math.max(measuredHeight, controlHeight);
 
         super.applyLayout();
+        applyIntrinsicSize(measuredWidth, measuredHeight);
     }
 
     /**
