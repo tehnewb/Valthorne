@@ -13,7 +13,8 @@ import static org.lwjgl.bgfx.BGFX.bgfx_get_caps;
 import static org.lwjgl.bgfx.BGFX.BGFX_TEXTURE_FORMAT_RGBA8;
 
 /**
- * Owns a nearest-sampled RGBA8 render target with optional depth/stencil storage.
+ * Owns a nearest-sampled RGBA8 render target with optional depth/stencil storage
+ * and hardware sRGB encoding. Existing three-argument construction keeps non-sRGB storage.
  * Rendering uses the same scene, batch and shader APIs as the window. Begin/end save and restore
  * the parent target and viewport; different targets may nest in reverse order.
  * Finish active batches before changing targets. Projection and scissor state
@@ -38,6 +39,7 @@ import static org.lwjgl.bgfx.BGFX.BGFX_TEXTURE_FORMAT_RGBA8;
  */
 public final class FrameBuffer implements GraphicsResource {
     private final boolean hasDepth; // Whether the target includes depth/stencil storage.
+    private final boolean srgb; // Retained hardware color encoding across resize and recovery.
     private final FloatBuffer positions = BufferUtils.createFloatBuffer(8); // Reused destination quad positions.
     private final FloatBuffer coordinates = BufferUtils.createFloatBuffer(8); // Reused backend-corrected texture coordinates.
     private final int[] viewport = new int[4]; // Saved parent viewport in bottom-left physical pixels.
@@ -57,8 +59,23 @@ public final class FrameBuffer implements GraphicsResource {
      * @param hasDepth whether depth/stencil storage is required
      */
     public FrameBuffer(int width, int height, boolean hasDepth) {
+        this(width, height, hasDepth, false);
+    }
+
+    /**
+     * Allocates an RGBA8 attachment with optional hardware sRGB encoding. Draw
+     * linear shader colors into an sRGB target; attachment sampling decodes them
+     * automatically. Unsupported sRGB targets fail rather than silently falling back.
+     *
+     * @param width positive pixel width within device limits
+     * @param height positive pixel height within device limits
+     * @param hasDepth whether depth/stencil storage is required
+     * @param srgb whether encoding and blending use hardware sRGB conversion
+     */
+    public FrameBuffer(int width, int height, boolean hasDepth, boolean srgb) {
         this.hasDepth = hasDepth;
-        target = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth, BGFX_TEXTURE_FORMAT_RGBA8, TextureFilter.NEAREST);
+        this.srgb = srgb;
+        target = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth, BGFX_TEXTURE_FORMAT_RGBA8, TextureFilter.NEAREST, srgb);
         this.width = width;
         this.height = height;
         BgfxResources.register(this);
@@ -118,7 +135,7 @@ public final class FrameBuffer implements GraphicsResource {
         requireOpen();
         if (drawing) throw new IllegalStateException("End capture before resizing the framebuffer");
         if (this.width == width && this.height == height) return;
-        BgfxRenderTarget replacement = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth, BGFX_TEXTURE_FORMAT_RGBA8, TextureFilter.NEAREST);
+        BgfxRenderTarget replacement = new BgfxRenderTarget(BgfxGraphics.device(), width, height, hasDepth, BGFX_TEXTURE_FORMAT_RGBA8, TextureFilter.NEAREST, srgb);
         target.close();
         target = replacement;
         this.width = width;

@@ -41,6 +41,10 @@ public final class BgfxGraphics {
      */
     private static int[] samplerFlags;
     /**
+     * Linear or hardware-sRGB blending policy indexed by owned framebuffer handle.
+     */
+    private static boolean[] linearTargets;
+    /**
      * Bottom-left physical viewport rectangle shared by the public drawing APIs.
      */
     private static final int[] viewport = new int[4];
@@ -149,6 +153,7 @@ public final class BgfxGraphics {
         frameActive = false;
         device.replaceBackend(backend);
         samplerFlags = new int[bgfx_get_caps().limits().maxTextures()];
+        linearTargets = new boolean[16];
         Arrays.fill(samplerFlags, -1);
         for (int i = 0; i < textures.length; i++)
             if (textures[i] < 65536) textures[i] = Short.toUnsignedInt(BGFX_INVALID_HANDLE);
@@ -199,6 +204,7 @@ public final class BgfxGraphics {
         device = new BgfxDesktopWindow(window, vsync, samples, backend);
         generation++;
         samplerFlags = new int[bgfx_get_caps().limits().maxTextures()];
+        linearTargets = new boolean[16];
         Arrays.fill(samplerFlags, -1);
         Arrays.fill(textures, Short.toUnsignedInt(BGFX_INVALID_HANDLE));
         textureUnit = 0;
@@ -665,6 +671,35 @@ public final class BgfxGraphics {
     }
 
     /**
+     * Reports whether the active target already blends text in linear light.
+     * Owned floating-point and sRGB attachments disable the approximation used
+     * for normalized non-sRGB targets. The window backbuffer uses non-sRGB reset
+     * flags. This lookup performs no native queries or per-glyph work.
+     *
+     * @return whether perceptual coverage correction must be disabled
+     */
+    public static boolean isLinearTextBlending() {
+        device();
+        int index = Short.toUnsignedInt(target);
+        return index < linearTargets.length && linearTargets[index];
+    }
+
+    /**
+     * Records an owned attachment's blending policy on allocation or release.
+     *
+     * @param framebuffer valid owned framebuffer handle
+     * @param linear whether blending is floating-point or hardware-sRGB
+     */
+    static void setLinearTarget(short framebuffer, boolean linear) {
+        int index = Short.toUnsignedInt(framebuffer);
+        if (index >= linearTargets.length) {
+            if (!linear) return;
+            linearTargets = Arrays.copyOf(linearTargets, Math.max(index + 1, linearTargets.length * 2));
+        }
+        linearTargets[index] = linear;
+    }
+
+    /**
      * Selects a render target; callers must flush pending batches before switching.
      *
      * @param framebuffer unsigned handle or 65535 for the backbuffer
@@ -853,6 +888,7 @@ public final class BgfxGraphics {
             device = null;
             shader = null;
             samplerFlags = null;
+            linearTargets = null;
             BgfxResources.clear();
             frameActive = false;
             currentView = -1;

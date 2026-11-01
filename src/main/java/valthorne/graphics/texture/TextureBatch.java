@@ -1774,7 +1774,9 @@ public final class TextureBatch implements GraphicsResource {
     }
 
     /**
-     * Pushes the currently active engine-managed projection matrix into the active shader.
+     * Pushes the engine projection, atlas ranges and target-aware text contrast
+     * into the active shader. These values are refreshed on submission so borrowed
+     * shaders and nested target scopes cannot retain another batch's policy.
      *
      * <p>Shaders that do not declare the batch projection uniform simply ignore this update
      * because {@link Shader#setUniformMatrix4(String, float[])} is a no-op when the uniform
@@ -1782,6 +1784,7 @@ public final class TextureBatch implements GraphicsResource {
      */
     private void applyActiveProjection() {
         activeShader.setUniformMatrix4(TextureBatchContract.UNIFORM_MVP, Window.getProjectionMatrix());
+        activeShader.setUniform1f("u_textContrast", BgfxGraphics.isLinearTextBlending() ? 0 : 1);
         for (int i = 0; i < activeTextureCount; i++)
             activeShader.setUniform4f(distanceUniforms[i], distanceRanges[i * 4], distanceRanges[i * 4 + 1], 0, 0);
     }

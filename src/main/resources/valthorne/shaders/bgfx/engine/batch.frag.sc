@@ -17,6 +17,7 @@ SAMPLER2D(u_tex13, 13);
 SAMPLER2D(u_tex14, 14);
 SAMPLER2D(u_tex15, 15);
 uniform vec4 u_distanceRange[16];
+uniform vec4 u_textContrast;
 void main() {
     if (v_params.y > 0.5 && (v_world.x < v_clip.x || v_world.y < v_clip.y ||
         v_world.x > v_clip.x + v_clip.z || v_world.y > v_clip.y + v_clip.w)) discard;
@@ -44,6 +45,11 @@ void main() {
         vec2 screenTexSize = vec2_splat(1.0) / max(fwidth(v_uv), vec2_splat(0.000001));
         float range = max(0.5 * dot(unitRange, screenTexSize), 1.0);
         color = vec4(1.0, 1.0, 1.0, clamp(range * (median - 0.5) + 0.5, 0.0, 1.0));
+    }
+    if (unitRange.x != 0.0) {
+        // Linear/sRGB attachments already blend coverage in linear light.
+        float foreground = dot(v_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+        color.a += u_textContrast.x * (foreground - 0.5) * color.a * (1.0 - color.a);
     }
     gl_FragColor = color * v_color;
 }
