@@ -88,6 +88,10 @@ export async function prepareBrowserLoaders(root, output) {
             const lock = source.indexOf("    private static final Object SERVICE_LOCK");
             if (lock < 0) throw new Error("Review browser asset executor ownership");
             source = source.slice(0, source.lastIndexOf("    /**", lock)) + source.slice(source.indexOf("\n", lock) + 1);
+            const cacheLock = source.indexOf("    private static final Object CACHE_LOCK");
+            if (cacheLock < 0) throw new Error("Review browser asset registration ownership");
+            source = source.slice(0, source.lastIndexOf("    /**", cacheLock)) + source.slice(source.indexOf("\n", cacheLock) + 1);
+            source = source.replaceAll("synchronized (CACHE_LOCK)", "");
             const ensure = source.indexOf("    private static BrowserExecutor ensureService() {");
             const ensureEnd = source.indexOf("\n    /**", ensure);
             if (ensure < 0 || ensureEnd < ensure) throw new Error("Review browser executor scheduling");
@@ -106,10 +110,10 @@ export async function prepareBrowserLoaders(root, output) {
             source = source.replace("Volatile owned virtual-thread executor", "Owned cooperative executor");
             source = source.replace(" * @author Albert Beaupre", " * <p>Browser loaders execute on cooperative UI coroutines. Custom resource-owning assets\n * implement AutoCloseable for cleanup; ordinary managed values need no cleanup\n * contract. Built-in assets use direct disposal calls. Arbitrary reflective dispose-method discovery is unavailable.</p>\n *\n * @author Albert Beaupre");
 
-            const start = source.indexOf("    private static Throwable disposeAssetValue(Object asset) {");
+            const start = source.indexOf("    static Throwable disposeAssetValue(Object asset) {");
             const end = source.indexOf("\n    /**", start);
             if (start < 0 || end < 0) throw new Error("Review browser asset disposal adaptation");
-            source = source.slice(0, start) + `    private static Throwable disposeAssetValue(Object asset) {
+            source = source.slice(0, start) + `    static Throwable disposeAssetValue(Object asset) {
         /*
          * Known asset resources use direct calls; custom browser resource owners
          * implement AutoCloseable. Managed values need no cleanup contract; arbitrary

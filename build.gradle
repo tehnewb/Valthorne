@@ -9,6 +9,27 @@ version = providers.gradleProperty('releaseVersion')
         .get()
 description = "A 2D game development library"
 
+def githubPackages = providers.gradleProperty('githubPackages').map { it.toBoolean() }.getOrElse(false)
+if (githubPackages && !(version.toString() ==~ /\d+\.\d+\.\d+\.\d+-dev\.[0-9a-f]{40}\.\d+\.\d+/))
+    throw new GradleException('GitHub Packages requires a development version containing the full commit SHA, run ID, and attempt.')
+if (githubPackages && providers.gradleProperty('releaseSigning').map { it.toBoolean() }.getOrElse(false))
+    throw new GradleException('Development packages must not enable release signing.')
+
+if (githubPackages) {
+    publishing {
+        repositories {
+            maven {
+                name = 'githubPackages'
+                url = uri('https://maven.pkg.github.com/tehnewb/Valthorne')
+                credentials {
+                    username = providers.environmentVariable('GITHUB_ACTOR').orNull
+                    password = providers.environmentVariable('GITHUB_TOKEN').orNull
+                }
+            }
+        }
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -93,7 +114,7 @@ sourceSets {
 }
 
 mavenPublishing {
-    publishToMavenCentral()
+    if (!githubPackages) publishToMavenCentral()
 
     if (providers.gradleProperty('releaseSigning')
             .map { it.toBoolean() }
@@ -103,7 +124,7 @@ mavenPublishing {
 
     coordinates(
             group.toString(),
-            project.name.toString(),
+            githubPackages ? 'valthorne' : project.name.toString(),
             version.toString()
     )
 

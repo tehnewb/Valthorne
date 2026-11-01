@@ -42,6 +42,13 @@ for (const [name, url, revision] of dependencies) {
 // swapchain index identifies the image just rendered. Leave flip/fence code alone.
 const generated = path.join(root, "build/bgfx-native/generated");
 mkdirSync(generated, { recursive: true });
+// Restore the NanoVG bridge included by LWJGL's shared-library build. The
+// upstream revision recorded in its native metadata predates this CI patch.
+const nanoDirectory = path.join(generated, "nanovg");
+mkdirSync(nanoDirectory, { recursive: true });
+for (const file of ["nanovg_bgfx.cpp", "nanovg_bgfx.h", "nanovg.h"])
+    copyFileSync(path.join(sources, "bgfx/examples/common/nanovg", file), path.join(nanoDirectory, file));
+run("git", ["apply", "--unidiff-zero", "--directory=build/bgfx-native/generated/nanovg", path.join(directory, "nanovg-lwjgl.patch")]);
 let renderer = readFileSync(path.join(sources, "bgfx/src/renderer_d3d12.cpp"), "utf8");
 const old = "uint32_t idx = (m_backBufferColorIdx-1) % m_scd.bufferCount;";
 const start = renderer.indexOf("void requestScreenShot(");
@@ -89,6 +96,10 @@ for (const [architecture, target, processor] of [["x64", "x86_64", "AMD64"], ["a
         "-DCMAKE_MAKE_PROGRAM=" + ninja, "-DBGFX_SOURCES=" + sources.replaceAll("\\", "/"),
         "-DBGFX_GENERATED=" + generated.replaceAll("\\", "/")], root, false, env);
     run(cmake, ["--build", output, "--parallel", "6"], root, false, env);
+    const exports = run(path.join(toolchain, "bin/llvm-readobj" + suffix), ["--coff-exports", path.join(output, "valthorne-bgfx.dll")], root, true).replaceAll("\r\n", "\n");
+    for (const name of ["nvgCreate", "nvgDelete", "nvgSetViewId", "nvgGetViewId", "nvgluCreateFramebuffer",
+        "nvgluBindFramebuffer", "nvgluDeleteFramebuffer", "nvgluSetViewFramebuffer", "nvgCreateBgfxTexture", "org_lwjgl_nanovg_setup"])
+        if (!exports.includes("Name: " + name + "\n")) throw new Error("Missing NanoVG export: " + name);
     const resource = `windows/${architecture}/org/lwjgl/bgfx/valthorne-bgfx.dll`;
     const destination = path.join(root, "src/main/resources", resource);
     mkdirSync(path.dirname(destination), { recursive: true });
@@ -107,12 +118,15 @@ for (const [name, source] of [
     ["bimg", path.join(sources, "bimg/LICENSE")], ["astc-encoder", path.join(sources, "bimg/3rdparty/astc-encoder/LICENSE.txt")],
     ["llvm-mingw", path.join(toolchain, "LICENSE.TXT")],
 ]) writeFileSync(path.join(licenses, "bgfx-windows-" + name + ".txt"), readFileSync(source, "utf8").replaceAll("\r\n", "\n").trimEnd() + "\n");
+const nanoSource = readFileSync(path.join(sources, "bgfx/examples/common/nanovg/nanovg_bgfx.cpp"), "utf8");
+writeFileSync(path.join(licenses, "bgfx-windows-nanovg.txt"), nanoSource.slice(0, nanoSource.indexOf("#define NVG_ANTIALIAS")).replaceAll("\r\n", "\n").trimEnd() + "\n");
 const provenance = JSON.stringify({
     lwjgl: "3.4.3", bgfxApi: 156, toolchain: "llvm-mingw-20261020-ucrt", clang: "23.1.4",
     toolchainArchiveSha256: "fd5462b7f5d93b2ff981fcd3f9c7e427e47f3203c64ea91c27bcc444eebd74cd",
     sources: Object.fromEntries(dependencies.map(([name, , revision]) => [name, revision])),
     patches: ["Direct3D 12 requestScreenShot reads m_backBufferColorIdx rather than the previous index",
-        "Vulkan requestScreenShot resolves the selected framebuffer before readback"], artifacts,
+        "Vulkan requestScreenShot resolves the selected framebuffer before readback",
+        "NanoVG LWJGL bridge from LWJGL-CI/bgfx commit 26d1f09896f08a1b8fc8101b0752feed3e448ff5"], artifacts,
 }, null, 2) + "\n";
 writeFileSync(path.join(directory, "provenance.json"), provenance);
 writeFileSync(path.join(root, "src/main/resources/META-INF/valthorne-bgfx.json"), provenance);

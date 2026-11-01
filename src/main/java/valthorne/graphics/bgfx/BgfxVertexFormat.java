@@ -36,9 +36,6 @@ public final class BgfxVertexFormat {
      * @param tint packed RGBA bytes
      */
     public static void vertex(ByteBuffer data, float x, float y, float z, int tint) {
-        /*
-         * A sixteen-byte vertex keeps solid shapes compact and naturally aligned.
-         */
         data.putFloat(x)
                 .putFloat(y)
                 .putFloat(z)

@@ -232,9 +232,6 @@ public final class TextureBatch implements GraphicsResource {
      * @return the adjusted float value based on the size parameter
      */
     private static float insetMin(float value, float size) {
-        /*
-         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
-         */
         return size > 1f ? value + 0.5f : value;
     }
 
@@ -249,9 +246,6 @@ public final class TextureBatch implements GraphicsResource {
      * modification for sizes greater than 1
      */
     private static float insetMax(float value, float size) {
-        /*
-         * Move the sampling edge inward using primitive arithmetic to keep filtering inside the region.
-         */
         return size > 1f ? value + size - 0.5f : value + size;
     }
 

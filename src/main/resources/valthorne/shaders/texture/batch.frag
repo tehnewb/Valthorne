@@ -9,6 +9,13 @@ in float v_clipEnabled;
 out vec4 fragColor;
 uniform vec2 u_distanceRange[${TEXTURE_UNITS}];
 
+vec4 sampleRawBatchTexture(vec2 uv) {
+    float t = v_tex;
+${ SELECTION}    return texture(u_tex0, uv);
+}
+
+${DISTANCE_SAMPLING}
+
 void main() {
     if (v_clipEnabled > 0.5) {
         if (v_world.x < v_clipRect.x || v_world.y < v_clipRect.y ||
@@ -18,15 +25,13 @@ void main() {
         }
     }
 
-    vec4 c;
-    float t = v_tex;
-${ SELECTION}    else c = texture(u_tex0, v_uv);
-    vec2 unitRange = u_distanceRange[int(t)];
+    vec4 c = sampleRawBatchTexture(v_uv);
+    vec2 unitRange = u_distanceRange[int(v_tex)];
     if (unitRange.x > 0.0) {
-        float median = max(min(c.r, c.g), min(max(c.r, c.g), c.b));
-        vec2 screenTexSize = vec2(1.0) / max(fwidth(v_uv), vec2(0.000001));
-        float range = max(0.5 * dot(unitRange, screenTexSize), 1.0);
-        float coverage = clamp(range * (median - 0.5) + 0.5, 0.0, 1.0);
+        float coverage = batchTextCoverage(batchDistanceCoverage(v_uv, c.rgb, unitRange));
         fragColor = vec4(v_col.rgb, v_col.a * coverage);
-    } else fragColor = c * v_col;
+    } else {
+        if (unitRange.x < 0.0) c.a = batchTextCoverage(c.a);
+        fragColor = c * v_col;
+    }
 }

@@ -23,13 +23,15 @@ public final class AdaptiveTextRun implements TextRun {
     float[] ys = new float[0]; // Normalized vertical positions borrowed by the font.
     AtlasGlyph[] images = new AtlasGlyph[0]; // Reused image references validated against the font's eviction version.
     long imageVersion = -1; // Font cache version supplying all image references; negative means invalid.
-    int imageRaster = -1; // Physical coverage size, or zero for MSDF, supplying cached images.
+    int imageRaster = -1; // Packed physical coverage size and hinting mode, or zero for shared MSDF images.
     String text; // Immutable source key borrowed by the font's layout cache; null before a successful rebuild.
     float size; // Logical units per em borrowed by the owning font's drawing loop.
     private float width; // Normalized maximum advance across lines.
     private float height; // Normalized line-box height.
     int count; // Used prefix of parallel glyph arrays, borrowed by the font.
     int[] clusters; // Lazy glyph-to-source offsets for styled drawing, null for ordinary layouts.
+    int[] sourceLines; // Lazy zero-based source line indices for FontStyler callbacks.
+    private int shapingLine; // Source line currently being copied from HarfBuzz.
     private float penX; // Temporary normalized horizontal shaping pen.
     private float penY; // Temporary normalized baseline position.
     private AdaptiveTextCarets carets; // Lazy single-line editing geometry, null for drawing-only layouts.
@@ -79,6 +81,7 @@ public final class AdaptiveTextRun implements TextRun {
                     if (end < 0) end = normalized.length();
                     int contentEnd = end > start && normalized.charAt(end - 1) == '\r' ? end - 1 : end;
                     penX = 0;
+                    shapingLine = lines;
                     shapeLine(normalized, start, contentEnd);
                     width = Math.max(width, penX);
                     penY -= font.lineHeight();
@@ -242,6 +245,7 @@ public final class AdaptiveTextRun implements TextRun {
         for (int i = 0; i < length; i++) {
             glyphs[count] = shaped.glyph(i);
             if (clusters != null) clusters[count] = shaped.cluster(i);
+            if (sourceLines != null) sourceLines[count] = shapingLine;
             xs[count] = penX + shaped.offsetX(i);
             ys[count] = penY + shaped.offsetY(i);
             penX += shaped.advance(i);
@@ -275,6 +279,21 @@ public final class AdaptiveTextRun implements TextRun {
         xs = Arrays.copyOf(xs, capacity);
         ys = Arrays.copyOf(ys, capacity);
         if (clusters != null) clusters = Arrays.copyOf(clusters, capacity);
+        if (sourceLines != null) sourceLines = Arrays.copyOf(sourceLines, capacity);
+    }
+
+    /**
+     * Retains source mapping on first styled draw, replaying shaping only when
+     * new metadata is needed. Plain runs allocate neither mapping array.
+     * @param lineIndices whether callbacks also need source line indices
+     */
+    void ensureStyleContext(boolean lineIndices) {
+        if (clusters != null && (!lineIndices || sourceLines != null)) return;
+        if (clusters == null) clusters = new int[glyphs.length];
+        if (lineIndices && sourceLines == null) sourceLines = new int[glyphs.length];
+        String source = text;
+        text = null;
+        rebuild(source, size);
     }
 
     @Override
@@ -298,12 +317,7 @@ public final class AdaptiveTextRun implements TextRun {
             draw(batch, x, y, colors[0]);
             return;
         }
-        if (clusters == null) {
-            clusters = new int[glyphs.length];
-            String source = text;
-            text = null;
-            rebuild(source, size);
-        }
+        ensureStyleContext(false);
         font.drawRun(batch, this, x, y, 0, null, ends, colors, count);
     }
 

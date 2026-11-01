@@ -228,9 +228,6 @@ public class NanoTabbedPane extends NanoPanel {
      * @return checks ancestry by identity without allocating a temporary path
      */
     private static boolean contains(UINode parent, UINode node) {
-        /*
-         * Walk parent identities directly, avoiding allocation of an ancestor collection.
-         */
         if (parent == null) return false;
         for (; node != null; node = node.getParent()) if (node == parent) return true;
         return false;

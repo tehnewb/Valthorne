@@ -258,9 +258,6 @@ public class TabbedPane extends Panel {
      * @return whether node belongs to parent's subtree
      */
     private static boolean contains(UINode parent, UINode node) {
-        /*
-         * Walk parent identities directly, avoiding allocation of an ancestor collection.
-         */
         if (parent == null) return false;
         for (; node != null; node = node.getParent()) if (node == parent) return true;
         return false;

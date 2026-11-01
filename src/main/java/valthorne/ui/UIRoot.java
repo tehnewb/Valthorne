@@ -421,9 +421,6 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      * @return true if ancestor occurs in the parent chain
      */
     private static boolean within(UINode node, UINode ancestor) {
-        /*
-         * Walk parent identities directly, avoiding allocation of an ancestor collection.
-         */
         for (UINode current = node; current != null; current = current.getParent())
             if (current == ancestor) return true;
         return false;
@@ -1033,7 +1030,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
         if (nanoVGHandle == 0) return null;
         TextFont current = code ? nanoCodeFont : nanoFont;
         if (current != null) return current;
-        current = AdaptiveFontData.load(SystemFonts.find(code).toString(), 20)
+        current = AdaptiveFontData.load(SystemFonts.find(code).toString())
                 .asFont();
         if (code) nanoCodeFont = current;
         else nanoFont = current;

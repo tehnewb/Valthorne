@@ -257,9 +257,6 @@ public class NanoCodeEditor extends NanoPanel {
      * @return counts display columns with tab expansion for fixed-width source layout
      */
     private static int visualLength(String line) {
-        /*
-         * Expand tabs into fixed display columns while scanning the existing line once.
-         */
         int length = 0;
         for (int i = 0; i < line.length(); i++) length += line.charAt(i) == '\t' ? 4 : 1;
         return length;
@@ -309,9 +306,6 @@ public class NanoCodeEditor extends NanoPanel {
      * @return expands tab characters into spaces for aligned source display
      */
     private static String visible(String text) {
-        /*
-         * Expand tabs only for display; source offsets remain unchanged in the editing model.
-         */
         return text.replace("\t", "    ");
     }
 

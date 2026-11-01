@@ -241,9 +241,6 @@ public abstract class UINode implements Dimensional {
      * @param point mutable point in the coordinate system preceding these transforms
      */
     private static void transformContentPoint(UIContainer container, Vector2f point) {
-        /*
-         * Apply ancestor transforms in hierarchy order using the caller-owned scratch vector.
-         */
         if (container == null) return;
         transformContentPoint(container.getParent(), point);
         float x = container.inverseRotationX(point.x(), point.y());

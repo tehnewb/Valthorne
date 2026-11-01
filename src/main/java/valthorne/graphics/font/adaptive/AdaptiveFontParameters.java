@@ -1,172 +1,113 @@
 package valthorne.graphics.font.adaptive;
 
-import valthorne.graphics.font.FontSource;
-import valthorne.graphics.font.FontSource.PathSource;
-import valthorne.graphics.font.FontSource.BytesSource;
-
 import valthorne.asset.AssetParameters;
+import valthorne.graphics.font.FontSource;
+import valthorne.graphics.font.FontSource.BytesSource;
+import valthorne.graphics.font.FontSource.PathSource;
 import valthorne.io.file.ValthorneFiles;
-import valthorne.io.file.ValthorneFileException;
 
 /**
- * Describes an encoded font source, asset name, initial logical em size, and character range.
- * Construction validates a non-null source, nonblank name, positive font size, and
- * bounded Unicode prewarm range.
- * Default factories prewarm printable ASCII; the renderer caps eager work at 256 characters.
- * <p>Only name supplies the shared asset-cache key. Use distinct names for source,
- * size, or range variants that must coexist. Path factories defer file reads,
- * byte factories copy input, and classpath factories read resources immediately.
- *
+ * Size-independent encoded font request. Only name supplies the shared cache
+ * key. Size and hinting are settings on the rendering font, so one loaded asset
+ * can create independently configured fonts. Path reads are deferred to loading;
+ * bytes are copied and classpath factories read immediately. Prewarm ranges
+ * never restrict Unicode shaping; automatic background preparation has bounded admission.
  * @param source encoded font source
  * @param name nonblank shared asset-cache key
- * @param fontSize positive initial logical em size
- * @param firstCharacterIndex first character in the prewarm range
- * @param characterCount positive number of prewarm characters
- * @author Albert Beaupre
+ * @param firstCharacterIndex first Unicode prewarm codepoint
+ * @param characterCount number of consecutive prewarm codepoints
  */
-public record AdaptiveFontParameters(FontSource source, String name, int fontSize, int firstCharacterIndex, int characterCount) implements AssetParameters {
-
+public record AdaptiveFontParameters(FontSource source, String name, int firstCharacterIndex, int characterCount) implements AssetParameters {
     /**
-     * Validates the initialization of a AdaptiveFontParameters record to ensure that all required fields
-     * are non-null, non-blank if applicable, and greater than zero when constraints are specified.
-     *
-     * @param source              the source from which the font is loaded, must not be null
-     * @param name                the name of the font, must not be null or blank
-     * @param fontSize            the size of the font, must be greater than 0
-     * @param firstCharacterIndex the index of the first character in the font
-     * @param characterCount      the number of characters in the font, must be greater than 0
-     * @throws IllegalArgumentException if source is null, name is null or blank, fontSize is less than or equal to 0, or characterCount is less than or equal to 0
+     * Validates source, cache identity and the bounded Unicode prewarm range.
+     * @param source non-null encoded source
+     * @param name nonblank shared asset-cache key
+     * @param firstCharacterIndex first Unicode prewarm codepoint
+     * @param characterCount range length, from 1 through 65536
+     * @throws IllegalArgumentException if metadata is invalid
      */
     public AdaptiveFontParameters {
         if (source == null) throw new IllegalArgumentException("source cannot be null");
         if (name == null || name.isBlank()) throw new IllegalArgumentException("name cannot be null/blank");
-        if (fontSize < 1 || fontSize > 4096) throw new IllegalArgumentException("fontSize must be between 1 and 4096");
         if (firstCharacterIndex < 0 || characterCount < 1 || characterCount > 65536 || (long) firstCharacterIndex + characterCount > 0x110000)
             throw new IllegalArgumentException("Invalid Unicode prewarm range");
     }
 
     /**
-     * Creates a new {@code AdaptiveFontParameters} instance given the path to the font file
-     * and the desired font size. This method uses default values for the first character
-     * index and character count.
-     *
-     * @param path     the file path pointing to the font resource, must not be null or blank
-     * @param fontSize the size of the font, must be greater than 0
-     * @return a new {@code AdaptiveFontParameters} instance representing the font configuration
-     * @throws IllegalArgumentException if the path is null, blank, or if fontSize is less than or equal to 0
+     * Uses the path as the cache key with printable ASCII prewarming.
+     * @param path filesystem source
+     * @return immutable loading request
      */
-    public static AdaptiveFontParameters fromPath(String path, int fontSize) {
-        /*
-         * Retain the standard asset factory contract without allocating native resources.
-         */
-        return new AdaptiveFontParameters(new PathSource(path), path, fontSize, 32, 95);
+    public static AdaptiveFontParameters fromPath(String path) {
+        return fromPath(path, path);
     }
 
     /**
-     * Creates a new {@code AdaptiveFontParameters} instance from the specified file path, font name,
-     * font size, first character index, and character count.
-     *
-     * @param path      the file path pointing to the font resource; must not be null or blank
-     * @param name      the name of the font; must not be null or blank
-     * @param fontSize  the size of the font; must be greater than 0
-     * @param firstChar the index of the first character in the font
-     * @param count     the number of characters in the font; must be greater than 0
-     * @return a new {@code AdaptiveFontParameters} instance representing the font configuration
-     * @throws IllegalArgumentException if the path is null or blank,
-     *                                  if name is null or blank,
-     *                                  if fontSize is less than or equal to 0,
-     *                                  or if count is less than or equal to 0
+     * Names a filesystem source with printable ASCII prewarming.
+     * @param path filesystem source
+     * @param name shared asset-cache key
+     * @return immutable loading request
      */
-    public static AdaptiveFontParameters fromPath(String path, String name, int fontSize, int firstChar, int count) {
-        /*
-         * Retain the standard asset factory contract without allocating native resources.
-         */
-        return new AdaptiveFontParameters(new PathSource(path), name, fontSize, firstChar, count);
+    public static AdaptiveFontParameters fromPath(String path, String name) {
+        return fromPath(path, name, 32, 95);
     }
 
     /**
-     * Creates a new {@code AdaptiveFontParameters} instance from the specified byte array, font name,
-     * and font size. This method uses default values for the first character index and character count.
-     *
-     * @param bytes    a byte array containing the font data; must not be null or empty
-     * @param name     the name of the font; must not be null or blank
-     * @param fontSize the size of the font; must be greater than 0
-     * @return a new {@code AdaptiveFontParameters} instance representing the font configuration
-     * @throws IllegalArgumentException if bytes are null or empty, if name is null or blank,
-     *                                  or if fontSize is less than or equal to 0
+     * Describes a path with an explicit Unicode prewarm range.
+     * @param path filesystem source
+     * @param name shared asset-cache key
+     * @param firstChar first Unicode prewarm codepoint
+     * @param count number of prewarm codepoints
+     * @return immutable loading request
      */
-    public static AdaptiveFontParameters fromBytes(byte[] bytes, String name, int fontSize) {
-        /*
-         * Retain the standard asset factory contract without allocating native resources.
-         */
-        return new AdaptiveFontParameters(new BytesSource(bytes), name, fontSize, 32, 95);
+    public static AdaptiveFontParameters fromPath(String path, String name, int firstChar, int count) {
+        return new AdaptiveFontParameters(new PathSource(path), name, firstChar, count);
     }
 
     /**
-     * Creates a new {@code AdaptiveFontParameters} instance from the specified byte array, font name,
-     * font size, first character index, and character count.
-     *
-     * @param bytes     a byte array containing the font data; must not be null or empty
-     * @param name      the name of the font; must not be null or blank
-     * @param fontSize  the size of the font; must be greater than 0
-     * @param firstChar the index of the first character in the font
-     * @param count     the number of characters in the font; must be greater than 0
-     * @return a new {@code AdaptiveFontParameters} instance representing the font configuration
-     * @throws IllegalArgumentException if bytes are null or empty, if name is null or blank,
-     *                                  if fontSize is less than or equal to 0, or if count is less than or equal to 0
+     * Snapshots bytes with printable ASCII prewarming.
+     * @param bytes nonempty encoded font
+     * @param name shared asset-cache key
+     * @return immutable loading request
      */
-    public static AdaptiveFontParameters fromBytes(byte[] bytes, String name, int fontSize, int firstChar, int count) {
-        /*
-         * Retain the standard asset factory contract without allocating native resources.
-         */
-        return new AdaptiveFontParameters(new BytesSource(bytes), name, fontSize, firstChar, count);
+    public static AdaptiveFontParameters fromBytes(byte[] bytes, String name) {
+        return fromBytes(bytes, name, 32, 95);
     }
 
     /**
-     * Creates a new {@code AdaptiveFontParameters} instance from a resource path on the classpath,
-     * along with the specified font name and font size. This method uses default values
-     * for the first character index and character count.
-     *
-     * @param resourcePath the path to the font resource located on the classpath; must not be null or blank
-     * @param name         the name of the font; must not be null or blank
-     * @param fontSize     the size of the font; must be greater than 0
-     * @return a new {@code AdaptiveFontParameters} instance representing the font configuration
-     * @throws IllegalArgumentException if resourcePath is null or blank, if name is null or blank,
-     *                                  or if fontSize is less than or equal to 0
-     * @throws ValthorneFileException if the classpath resource
-     *         is missing or cannot be read; resource bytes are read synchronously
+     * Snapshots bytes with an explicit Unicode prewarm range.
+     * @param bytes nonempty encoded font
+     * @param name shared asset-cache key
+     * @param firstChar first Unicode prewarm codepoint
+     * @param count number of prewarm codepoints
+     * @return immutable loading request
      */
-    public static AdaptiveFontParameters fromClasspath(String resourcePath, String name, int fontSize) {
-        /*
-         * Retain the standard asset factory contract without allocating native resources.
-         */
-        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, fontSize);
+    public static AdaptiveFontParameters fromBytes(byte[] bytes, String name, int firstChar, int count) {
+        return new AdaptiveFontParameters(new BytesSource(bytes), name, firstChar, count);
     }
 
     /**
-     * Creates a new {@code AdaptiveFontParameters} instance from the specified resource path on the
-     * classpath, font name, font size, first character index, and character count.
-     *
-     * @param resourcePath the path to the font resource located on the classpath; must not be null or blank
-     * @param name         the name of the font; must not be null or blank
-     * @param fontSize     the size of the font; must be greater than 0
-     * @param firstChar    the index of the first character in the font
-     * @param count        the number of characters in the font; must be greater than 0
-     * @return a new {@code AdaptiveFontParameters} instance representing the font configuration
-     * @throws IllegalArgumentException if resourcePath is null or blank, if name is null or blank,
-     *                                  if fontSize is less than or equal to 0, or if count is less than or equal to 0
-     * @throws ValthorneFileException if the classpath resource
-     *         is missing or cannot be read; resource bytes are read synchronously
+     * Reads classpath bytes immediately with printable ASCII prewarming.
+     * @param resourcePath resource name relative to the classpath root
+     * @param name shared asset-cache key
+     * @return immutable loading request
      */
-    public static AdaptiveFontParameters fromClasspath(String resourcePath, String name, int fontSize, int firstChar, int count) {
-        /*
-         * Retain the standard asset factory contract without allocating native resources.
-         */
-        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, fontSize, firstChar, count);
+    public static AdaptiveFontParameters fromClasspath(String resourcePath, String name) {
+        return fromClasspath(resourcePath, name, 32, 95);
+    }
+
+    /**
+     * Reads classpath bytes immediately with an explicit prewarm range.
+     * @param resourcePath resource name relative to the classpath root
+     * @param name shared asset-cache key
+     * @param firstChar first Unicode prewarm codepoint
+     * @param count number of prewarm codepoints
+     * @return immutable loading request
+     */
+    public static AdaptiveFontParameters fromClasspath(String resourcePath, String name, int firstChar, int count) {
+        return fromBytes(ValthorneFiles.readBytes(resourcePath), name, firstChar, count);
     }
 
     @Override
-    public String key() {
-        return name;
-    }
+    public String key() { return name; }
 }

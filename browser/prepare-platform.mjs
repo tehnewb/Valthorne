@@ -70,7 +70,9 @@ for (const name of [
     "graphics/font/adaptive/AdaptiveFontData",
     "graphics/font/adaptive/AdaptiveTextRun",
     "graphics/font/adaptive/AdaptiveTextCarets",
+    "graphics/font/adaptive/FontGlyphPreparation",
     "graphics/texture/TextureData",
+    "utility/properties/PropertySetTextIO",
     "graphics/bgfx/BgfxGraphics",
     "graphics/bgfx/BgfxBatchRenderer",
     "graphics/bgfx/BgfxMesh",
@@ -79,6 +81,20 @@ for (const name of [
 ]) {
     let source = await readFile(path.join(root, "src/main/java/valthorne", name + ".java"), "utf8");
     source = callbackInterfaces(source);
+    if (name === "utility/properties/PropertySetTextIO") {
+        source = replace(source, 'case "locale" -> Locale.forLanguageTag(value);',
+            'case "locale" -> throw new UnsupportedOperationException("Typed Locale properties require Locale.forLanguageTag, unavailable in this browser runtime");');
+    }
+    if (name === "graphics/font/adaptive/FontGlyphPreparation") {
+        source = source.replace("import java.util.concurrent.ExecutorService;", "import valthorne.browser.BrowserExecutor;")
+            .replace("import java.util.concurrent.Executors;", "")
+            .replace(/private static final ExecutorService WORKERS = [^\n]+;/, "private static final BrowserExecutor WORKERS = new BrowserExecutor();")
+            .replaceAll("synchronized (this)", "")
+            .replaceAll("synchronized ", "")
+            .replace("Two shared daemon workers", "Cooperative browser coroutines")
+            .replace("off-thread", "on a preparation coroutine")
+            .replace("Small shared CPU pool; daemon workers do not keep applications alive.", "Shared browser coroutine scheduler; native glyph work remains UI-thread confined.");
+    }
     if (name === "graphics/font/adaptive/AdaptiveFontData" || name === "graphics/texture/TextureData") {
         source = source.replace("import java.nio.file.Files;", "import valthorne.browser.BrowserAssets;");
         source = source.replaceAll("Files.readAllBytes(Path.of(path))", "BrowserAssets.read(path)");

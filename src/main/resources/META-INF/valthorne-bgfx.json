@@ -11,10 +11,11 @@
   },
   "patches": [
     "Direct3D 12 requestScreenShot reads m_backBufferColorIdx rather than the previous index",
-    "Vulkan requestScreenShot resolves the selected framebuffer before readback"
+    "Vulkan requestScreenShot resolves the selected framebuffer before readback",
+    "NanoVG LWJGL bridge from LWJGL-CI/bgfx commit 26d1f09896f08a1b8fc8101b0752feed3e448ff5"
   ],
   "artifacts": {
-    "windows/x64/org/lwjgl/bgfx/valthorne-bgfx.dll": "74cc0b8e912c71fc3fd99905e82da523accdf6058bca78600d72716a7c586c8e",
-    "windows/arm64/org/lwjgl/bgfx/valthorne-bgfx.dll": "b8f316bc6ba6530420b2e78c41c0dc06f2ef8f42d3a042e9d997cebf2e08d3ed"
+    "windows/x64/org/lwjgl/bgfx/valthorne-bgfx.dll": "50ba9e52f343c0136fc63c531829df4e41209fbe12f222283d8fae18dd7bdcba",
+    "windows/arm64/org/lwjgl/bgfx/valthorne-bgfx.dll": "f3a4a3df0d12687c2a0d01a0ea660f0265c900bf5fb0fead0d241403e5a07d46"
   }
 }

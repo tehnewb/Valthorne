@@ -215,10 +215,6 @@ public class Circle extends Shape {
      * @return immutable interleaved cosine/sine coordinates
      */
     private static double[] createDirections(int segments) {
-        /*
-         * Preserve double-precision rounding while moving transcendental work out
-         * of position and radius updates; default circles share one lookup table.
-         */
         double[] directions = new double[segments * 2];
         double step = (Math.PI * 2.0) / segments;
         for (int i = 0; i < segments; i++) {

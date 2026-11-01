@@ -95,7 +95,7 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
         field = new Color(light ? 0xFFFFFFFF : 0xFF111111);
         selection = new Color(light ? 0xFFB8D1E4 : 0xFF40576D);
         chrome = new Color(light ? 0xFFD6D6D6 : 0xFF181818);
-        font = AdaptiveFontData.load(SystemFonts.find(false).toString(), 20)
+        font = AdaptiveFontData.load(SystemFonts.find(false).toString())
                 .asFont();
     }
 
@@ -130,10 +130,6 @@ public final class ProfessionalTheme implements Theme, AutoCloseable {
      * @param value color reference to store
      */
     private static void color(ThemeRule rule, String name, String key, Color value) {
-        /*
-         * Resolve the existing registered key namespace so composite controls
-         * and leaf widgets can share palette references without extra wrappers.
-         */
         rule.set(StyleKey.of("nano." + name + "." + key, Color.class), value);
     }
 

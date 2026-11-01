@@ -1303,11 +1303,7 @@ Block comments use:
  */
 ```
 
-Block comments are specifically required for:
-
-- Static methods, inside the method body
-
-Block comments may also be used elsewhere for genuinely useful implementation explanations.
+Internal block comments should be used only when necessary to explain complex implementation behavior. Do not add them to straightforward methods or repeat information already clear from the code or Javadoc.
 
 One-line block comments are prohibited.
 
@@ -1488,7 +1484,7 @@ public static long secondsToNanos(long seconds) {
 }
 ```
 
-The internal block comment should explain something useful, such as:
+When necessary, an internal block comment should explain complex behavior, such as:
 
 - Algorithm choice
 - Optimization

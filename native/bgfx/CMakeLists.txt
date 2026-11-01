@@ -8,6 +8,7 @@ endif()
 file(GLOB ASTC_SOURCES "${BGFX_SOURCES}/bimg/3rdparty/astc-encoder/source/*.cpp")
 add_library(valthorne-bgfx SHARED
     "${BGFX_GENERATED}/amalgamated.cpp"
+    "${BGFX_GENERATED}/nanovg/nanovg_bgfx.cpp"
     "${BGFX_SOURCES}/bx/src/amalgamated.cpp"
     "${BGFX_SOURCES}/bimg/src/image.cpp"
     ${ASTC_SOURCES})
@@ -23,6 +24,7 @@ target_include_directories(valthorne-bgfx PRIVATE
     "${BGFX_SOURCES}/bgfx/include"
     "${BGFX_SOURCES}/bgfx/src"
     "${BGFX_SOURCES}/bgfx/3rdparty"
+    "${BGFX_SOURCES}/bgfx/examples/common/nanovg"
     "${BGFX_SOURCES}/bgfx/3rdparty/khronos"
     "${BGFX_SOURCES}/bgfx/3rdparty/directx-headers/include/directx")
 get_filename_component(COMPILER_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)

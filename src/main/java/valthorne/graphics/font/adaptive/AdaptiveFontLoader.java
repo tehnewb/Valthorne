@@ -29,11 +29,11 @@ public final class AdaptiveFontLoader implements AssetLoader<AdaptiveFontParamet
         FontSource src = parameters.source();
 
         if (src instanceof PathSource(String path)) {
-            return AdaptiveFontData.load(path, parameters.fontSize(), parameters.firstCharacterIndex(), parameters.characterCount());
+            return AdaptiveFontData.load(path, parameters.firstCharacterIndex(), parameters.characterCount());
         }
 
         if (src instanceof BytesSource(byte[] bytes)) {
-            return AdaptiveFontData.load(bytes, parameters.fontSize(), parameters.firstCharacterIndex(), parameters.characterCount());
+            return AdaptiveFontData.load(bytes, parameters.firstCharacterIndex(), parameters.characterCount());
         }
 
         throw new IllegalStateException("Unknown FontSource: " + src.getClass().getName());

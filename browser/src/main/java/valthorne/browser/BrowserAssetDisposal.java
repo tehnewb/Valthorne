@@ -1,6 +1,8 @@
 package valthorne.browser;
 
 import valthorne.graphics.font.FontData;
+import valthorne.graphics.animation.AnimationData;
+import valthorne.graphics.particle.ParticleData;
 import valthorne.graphics.map.ldtk.LdtkMap;
 import valthorne.graphics.map.ldtk.LdtkProject;
 import valthorne.graphics.map.tiled.TiledMapData;
@@ -34,6 +36,8 @@ public final class BrowserAssetDisposal {
             if (value instanceof AutoCloseable closeable) closeable.close();
             else if (value instanceof TextureData texture) texture.dispose();
             else if (value instanceof FontData font) font.dispose();
+            else if (value instanceof AnimationData animation) animation.dispose();
+            else if (value instanceof ParticleData particles) particles.dispose();
             else if (value instanceof TiledMapData map) map.dispose();
             else if (value instanceof LdtkProject project) project.dispose();
             else if (value instanceof LdtkMap map) map.dispose();
