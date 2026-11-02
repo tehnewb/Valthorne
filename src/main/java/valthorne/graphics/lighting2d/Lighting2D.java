@@ -1,18 +1,19 @@
 package valthorne.graphics.lighting2d;
 
-import org.lwjgl.BufferUtils;
-
-import valthorne.graphics.Color;
-import valthorne.graphics.shader.Shader;
-import valthorne.io.file.ValthorneFiles;
-
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Objects;
-
-import static org.lwjgl.opengl.GL33.*;
+import org.lwjgl.BufferUtils;
+import valthorne.graphics.Color;
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsCapabilities;
+import valthorne.graphics.GraphicsResource;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxResources;
+import valthorne.graphics.shader.Shader;
 
 /**
  * Batched XY-world lighting with cached polar shadows and a scaled HDR light map.
@@ -23,7 +24,7 @@ import static org.lwjgl.opengl.GL33.*;
  *
  * <p>Owns GPU resources and borrows light/occluder objects. Their revisions drive
  * cache invalidation, so use their supported mutation APIs. Resource/configuration
- * operations require the creating OpenGL thread. Capture is not nestable on one
+ * operations require the creating rendering thread. Capture is not nestable on one
  * instance; finish existing batches before capture transitions.</p>
  *
  * <pre>{@code
@@ -41,33 +42,14 @@ import static org.lwjgl.opengl.GL33.*;
  *
  * @author Albert Beaupre
  */
-public final class Lighting2D implements AutoCloseable {
-    /**
-     * Instanced light-quad vertex shader source.
-     */
-    private static final String LIGHT_VERTEX = ValthorneFiles.readString("valthorne/shaders/lighting2d/light.vert");
-    /**
-     * Attenuation and polar-shadow fragment shader source.
-     */
-    private static final String LIGHT_FRAGMENT = ValthorneFiles.readString("valthorne/shaders/lighting2d/light.frag");
-    /**
-     * Vertex-ID fullscreen triangle shader source.
-     */
-    private static final String FULLSCREEN = ValthorneFiles.readString("valthorne/shaders/lighting2d/fullscreen.vert");
-    /**
-     * Scene/light composition shader source with exposure.
-     */
-    private static final String COMPOSITE = ValthorneFiles.readString("valthorne/shaders/lighting2d/composite.frag");
-    private final Thread owner = Thread.currentThread(); // Creating OpenGL thread required for guarded operations.
+public final class Lighting2D implements AutoCloseable, GraphicsResource {
+    private long graphicsGeneration = -1; // Last device generation represented by the cached light map.
+
+    private final Thread owner = Thread.currentThread(); // Creating rendering thread required for guarded operations.
+    private final BgfxLighting2D bgfx; // Owned native lighting resources.
+    private final ByteBuffer instanceBytes; // Packed light-instance backing storage shared with the float view.
     private final int capacity; // Maximum registered light count.
     private final int resolution; // Angular shadow samples per atlas row.
-    private final int atlas; // Owned polar-shadow atlas texture.
-    private final int instances; // Owned instance attribute buffer.
-    private final int vao; // Owned instanced-light vertex array.
-    private final int sceneFbo; // Owned scene capture framebuffer.
-    private final int sceneTexture; // Owned scene color texture.
-    private final int lightFbo; // Owned HDR light framebuffer.
-    private final int lightTexture; // Owned HDR light texture.
     private final Shader lightShader; // Owned instanced light shader.
     private final Shader compositeShader; // Owned scene composition shader.
     private final ArrayList<Lighting2DEntry> lights = new ArrayList<>(); // Light registrations with atlas slots and shadow caches.
@@ -94,7 +76,7 @@ public final class Lighting2D implements AutoCloseable {
     private long shadowUploads; // Cumulative polar-shadow row uploads.
     private long mapRenders; // Cumulative light-map render passes.
     private boolean disposed; // Whether owned GPU resources were released.
-    private Lighting2DState capture; // Active capture's saved GL state, null when inactive.
+    private Lighting2DState capture; // Active capture's saved engine render state, null when inactive.
 
     /**
      * Creates capacity for 512 lights with 1024 angular samples per shadow row.
@@ -107,7 +89,7 @@ public final class Lighting2D implements AutoCloseable {
     /**
      * Validates atlas dimensions, allocates staging buffers, and creates shaders and
      * GPU resources inside a selected-state restoration scope. Requires a current
-     * OpenGL context; scene and map storage are allocated on first capture.
+     * graphics device; scene and map storage are allocated on first capture.
      *
      * @param capacity         registered-light limit, one through 4096
      * @param shadowResolution angular samples per light, 64 through 4096
@@ -116,74 +98,17 @@ public final class Lighting2D implements AutoCloseable {
     public Lighting2D(int capacity, int shadowResolution) {
         if (capacity < 1 || capacity > 4096 || shadowResolution < 64 || shadowResolution > 4096)
             throw new IllegalArgumentException("Invalid lighting capacity/resolution");
-        if (capacity > glGetInteger(GL_MAX_TEXTURE_SIZE) || shadowResolution > glGetInteger(GL_MAX_TEXTURE_SIZE))
+        if (capacity > GraphicsCapabilities.maximumTextureSize() || shadowResolution > GraphicsCapabilities.maximumTextureSize())
             throw new IllegalArgumentException("Shadow atlas exceeds device limits");
         this.capacity = capacity;
         resolution = shadowResolution;
-        instanceData = BufferUtils.createFloatBuffer(capacity * 16);
+        instanceBytes = BufferUtils.createByteBuffer(capacity * 64);
+        instanceData = instanceBytes.asFloatBuffer();
         shadowData = BufferUtils.createFloatBuffer(resolution);
-        Lighting2DState ignored = new Lighting2DState();
-        try {
-            lightShader = new Shader(LIGHT_VERTEX, LIGHT_FRAGMENT);
-            compositeShader = new Shader(FULLSCREEN, COMPOSITE);
-            atlas = glGenTextures();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, atlas);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, resolution, capacity, 0, GL_RED, GL_FLOAT, 0L);
-            parameters(GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            sceneTexture = glGenTextures();
-            lightTexture = glGenTextures();
-            sceneFbo = glGenFramebuffers();
-            lightFbo = glGenFramebuffers();
-            vao = glGenVertexArrays();
-            instances = glGenBuffers();
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, instances);
-            glBufferData(GL_ARRAY_BUFFER, (long) capacity * 16 * 4, GL_STREAM_DRAW);
-            for (int i = 0; i < 4; i++) {
-                glEnableVertexAttribArray(i);
-                glVertexAttribPointer(i, 4, GL_FLOAT, false, 64, i * 16L);
-                glVertexAttribDivisor(i, 1);
-            }
-        } finally {
-            ignored.restore();
-        }
-    }
-
-    /**
-     * Allocates RGBA texture storage with linear/clamped sampling, attaches it to
-     * its framebuffer, and checks completeness. Enclosing capture owns state restoration.
-     *
-     * @param texture owned texture identifier
-     * @param fbo     owned framebuffer identifier
-     * @param w       positive pixel width
-     * @param h       positive pixel height
-     * @param format  internal texture format
-     * @throws IllegalStateException if the framebuffer is incomplete
-     */
-    private static void allocate(int texture, int fbo, int w, int h, int format) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, GL_RGBA, GL_FLOAT, 0L);
-        parameters(GL_LINEAR);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            throw new IllegalStateException("Incomplete lighting framebuffer");
-    }
-
-    /**
-     * Sets both filters and clamp-to-edge wrapping on the bound two-dimensional
-     * texture. Atlas creation subsequently overrides S wrapping to repeat.
-     *
-     * @param filter OpenGL minification/magnification filter
-     */
-    private static void parameters(int filter) {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        lightShader = new Shader("bgfx:engine/lighting/light.vert", "bgfx:engine/lighting/light.frag");
+        compositeShader = new Shader("bgfx:engine/fullscreen.vert", "bgfx:engine/lighting/composite.frag");
+        bgfx = new BgfxLighting2D(capacity, resolution);
+        BgfxResources.register(this);
     }
 
     /**
@@ -195,7 +120,7 @@ public final class Lighting2D implements AutoCloseable {
     private void check() {
         if (disposed) throw new IllegalStateException("Lighting2D is disposed");
         if (Thread.currentThread() != owner)
-            throw new IllegalStateException("Use Lighting2D on its creating GL thread");
+            throw new IllegalStateException("Use Lighting2D on its creating rendering thread");
     }
 
     /**
@@ -233,7 +158,7 @@ public final class Lighting2D implements AutoCloseable {
                 slots.clear(lights.remove(i).slot);
                 mapFingerprint = Long.MIN_VALUE;
                 return true;
-            }
+        }
         return false;
     }
 
@@ -382,11 +307,11 @@ public final class Lighting2D implements AutoCloseable {
      */
     public int getLightTextureId() {
         check();
-        return lightTexture;
+        return bgfx.lightTexture();
     }
 
     /**
-     * Saves selected GL state, sizes capture targets, and binds/clears the scene-color
+     * Saves selected engine render state, sizes capture targets, and binds/clears the scene-color
      * framebuffer. Defines XY lighting bounds, sets a full capture viewport, disables
      * scissor/sRGB, and enables all color writes. Finish existing batches first.
      * Failure cancels capture and restores covered state; success requires end/cancel.
@@ -407,7 +332,7 @@ public final class Lighting2D implements AutoCloseable {
         PointLight2D.finite(minY);
         PointLight2D.positive(worldWidth);
         PointLight2D.positive(worldHeight);
-        if (pixelWidth < 1 || pixelHeight < 1 || pixelWidth > glGetInteger(GL_MAX_TEXTURE_SIZE) || pixelHeight > glGetInteger(GL_MAX_TEXTURE_SIZE))
+        if (pixelWidth < 1 || pixelHeight < 1 || pixelWidth > GraphicsCapabilities.maximumTextureSize() || pixelHeight > GraphicsCapabilities.maximumTextureSize())
             throw new IllegalArgumentException("Invalid viewport dimensions");
         capture = new Lighting2DState();
         try {
@@ -418,13 +343,7 @@ public final class Lighting2D implements AutoCloseable {
             this.worldWidth = worldWidth;
             this.worldHeight = worldHeight;
             resize(pixelWidth, pixelHeight);
-            glBindFramebuffer(GL_FRAMEBUFFER, sceneFbo);
-            glViewport(0, 0, width, height);
-            glDisable(GL_SCISSOR_TEST);
-            glDisable(GL_FRAMEBUFFER_SRGB);
-            glColorMask(true, true, true, true);
-            glClearColor(0, 0, 0, 0);
-            glClear(GL_COLOR_BUFFER_BIT);
+            bgfx.beginScene();
         } catch (RuntimeException | Error e) {
             cancelScene();
             throw e;
@@ -434,7 +353,7 @@ public final class Lighting2D implements AutoCloseable {
     /**
      * Finishes capture, refreshes changed lighting, and composites into the saved
      * framebuffer/viewport. Scene batches must already be finished. Capture state is
-     * cleared before rendering; covered GL state is restored in finally on success
+     * cleared before rendering; covered engine render state is restored in finally on success
      * or failure. The saved destination receives one fullscreen composition draw.
      *
      * @throws IllegalStateException if no capture is active or lifecycle/thread checks fail
@@ -445,28 +364,12 @@ public final class Lighting2D implements AutoCloseable {
         Lighting2DState saved = capture;
         capture = null;
         try {
-            glDisable(GL_SCISSOR_TEST);
-            glDisable(GL_DEPTH_TEST);
-            glDisable(GL_CULL_FACE);
-            glDisable(GL_FRAMEBUFFER_SRGB);
-            glColorMask(true, true, true, true);
-            glBindSampler(0, 0);
-            glBindSampler(1, 0);
             renderLights();
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, saved.draw);
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, saved.read);
-            glViewport(saved.viewport[0], saved.viewport[1], saved.viewport[2], saved.viewport[3]);
-            glDisable(GL_BLEND);
-            glBindVertexArray(vao);
-            compositeShader.bind();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, sceneTexture);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, lightTexture);
+            saved.restore();
             compositeShader.setUniform1i("u_scene", 0);
             compositeShader.setUniform1i("u_light", 1);
             compositeShader.setUniform1f("u_exposure", exposure);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
+            bgfx.compose(compositeShader);
         } finally {
             saved.restore();
         }
@@ -495,8 +398,7 @@ public final class Lighting2D implements AutoCloseable {
     private void resize(int w, int h) {
         int mw = Math.max(1, Math.round(w * scale)), mh = Math.max(1, Math.round(h * scale));
         if (width == w && height == h && mapWidth == mw && mapHeight == mh) return;
-        allocate(sceneTexture, sceneFbo, w, h, GL_RGBA8);
-        allocate(lightTexture, lightFbo, mw, mh, GL_RGBA16F);
+        bgfx.resize(w, h, mw, mh);
         width = w;
         height = h;
         mapWidth = mw;
@@ -508,15 +410,18 @@ public final class Lighting2D implements AutoCloseable {
      * Rebuilds the occluder index after geometry-fingerprint changes, updates visible
      * polar shadow caches, and packs instance records. Reuses equal map fingerprints;
      * otherwise clears ambient and issues at most one instanced light draw. Updates
-     * statistics and leaves GL state for capture completion to restore.
+     * statistics and leaves engine render state for capture completion to restore.
      */
     private void renderLights() {
+        if (graphicsGeneration != BgfxGraphics.generation()) {
+            mapFingerprint = Long.MIN_VALUE;
+            graphicsGeneration = BgfxGraphics.generation();
+        }
         lastDrawCalls = 0;
         visibleCount = 0;
         long fingerprint = 17;
         instanceData.clear();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, atlas);
+
         long geometry = 17;
         for (Occluder2D o : occluders) {
             o.synchronize();
@@ -531,17 +436,18 @@ public final class Lighting2D implements AutoCloseable {
             PointLight2D l = entry.light;
             if (!l.enabled || l.intensity == 0 || l.r + l.g + l.b == 0 || l.x + l.radius < minX || l.y + l.radius < minY || l.x - l.radius > minX + worldWidth || l.y - l.radius > minY + worldHeight)
                 continue;
-            boolean dirty = false;
+            boolean dirty = entry.graphicsGeneration != graphicsGeneration;
             if (entry.geometry != geometry || entry.lightRevision != l.shadowRevision) {
-                dirty = entry.shadow.update(l, l.shadows ? index.query(l, occluders) : List.of());
+                dirty |= entry.shadow.update(l, l.shadows ? index.query(l, occluders) : List.of());
                 entry.geometry = geometry;
                 entry.lightRevision = l.shadowRevision;
             }
             if (dirty && l.shadows) {
                 shadowData.clear();
                 shadowData.put(entry.shadow.data()).flip();
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, entry.slot, resolution, 1, GL_RED, GL_FLOAT, shadowData);
+                bgfx.uploadShadow(entry.slot, shadowData);
                 shadowUploads++;
+                entry.graphicsGeneration = graphicsGeneration;
             }
             fingerprint = fingerprint * 31 + System.identityHashCode(l);
             fingerprint = fingerprint * 31 + l.revision;
@@ -553,24 +459,14 @@ public final class Lighting2D implements AutoCloseable {
             visibleCount++;
         }
         if (fingerprint == mapFingerprint) return;
-        glBindFramebuffer(GL_FRAMEBUFFER, lightFbo);
-        glViewport(0, 0, mapWidth, mapHeight);
-        glClearColor(ambient.r(), ambient.g(), ambient.b(), 1);
-        glClear(GL_COLOR_BUFFER_BIT);
+        bgfx.beginLights(ambient);
         if (visibleCount > 0) {
-            glEnable(GL_BLEND);
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFunc(GL_ONE, GL_ONE);
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, instances);
-            instanceData.flip();
-            glBufferData(GL_ARRAY_BUFFER, instanceData, GL_STREAM_DRAW);
-            lightShader.bind();
             lightShader.setUniform1i("u_shadows", 0);
             lightShader.setUniform1f("u_rows", capacity);
             lightShader.setUniform1f("u_resolution", resolution);
             lightShader.setUniform4f("u_world", minX, minY, worldWidth, worldHeight);
-            glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, visibleCount);
+            instanceBytes.position(0).limit(visibleCount * 64);
+            bgfx.drawLights(instanceBytes, visibleCount, lightShader);
             lastDrawCalls = 1;
         }
         mapRenders++;
@@ -589,16 +485,16 @@ public final class Lighting2D implements AutoCloseable {
         cancelScene();
         lightShader.dispose();
         compositeShader.dispose();
-        glDeleteTextures(atlas);
-        glDeleteTextures(sceneTexture);
-        glDeleteTextures(lightTexture);
-        glDeleteFramebuffers(sceneFbo);
-        glDeleteFramebuffers(lightFbo);
-        glDeleteBuffers(instances);
-        glDeleteVertexArrays(vao);
+        bgfx.close();
         lights.clear();
         occluders.clear();
+        BgfxResources.unregister(this);
         disposed = true;
+    }
+
+    @Override
+    public void validateGraphicsReset(GraphicsBackend backend) {
+        if (capture != null) throw new IllegalStateException("End lighting capture before switching graphics backends");
     }
 
 }

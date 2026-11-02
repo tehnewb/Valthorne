@@ -1,5 +1,7 @@
 package valthorne.viewport;
 
+import valthorne.graphics.GraphicsViewport;
+import valthorne.graphics.bgfx.BgfxGraphics;
 import java.util.Arrays;
 
 import valthorne.Window;
@@ -8,12 +10,11 @@ import valthorne.graphics.DrawFunction;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL30.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.bgfx.BGFX.BGFX_INVALID_HANDLE;
 
 /**
  * Base 2D viewport abstraction responsible for mapping a logical world area into a screen-space
- * rectangle, applying the proper OpenGL viewport and engine-managed projection state,
+ * rectangle, applying the physical viewport and engine-managed projection state,
  * converting screen coordinates into world coordinates, and handling viewport-aware
  * scissor rectangles.
  *
@@ -176,14 +177,14 @@ public abstract class Viewport {
      * </p>
      */
     public void apply() {
-        boolean windowTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0;
+        boolean windowTarget = BgfxGraphics.target() == Short.toUnsignedInt(BGFX_INVALID_HANDLE);
         float scaleX = getFramebufferScaleX(windowTarget);
         float scaleY = getFramebufferScaleY(windowTarget);
         int left = Math.round(x * scaleX);
         int bottom = Math.round(y * scaleY);
         int right = Math.round((x + (float) width) * scaleX);
         int top = Math.round((y + (float) height) * scaleY);
-        glViewport(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
+        GraphicsViewport.set(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
 
         float[] matrixData;
 
@@ -234,7 +235,7 @@ public abstract class Viewport {
      * </p>
      */
     public void bind() {
-        glGetIntegerv(GL_VIEWPORT, oldViewport);
+        GraphicsViewport.get(oldViewport);
         Window.copyProjectionMatrix(oldProjectionMatrix);
         apply();
     }
@@ -248,7 +249,7 @@ public abstract class Viewport {
      */
     public void unbind() {
         Window.setProjectionMatrix(oldProjectionMatrix);
-        glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+        GraphicsViewport.set(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
     }
 
     /**
@@ -268,7 +269,7 @@ public abstract class Viewport {
             throw new NullPointerException("Draw function cannot be null");
         }
 
-        glGetIntegerv(GL_VIEWPORT, oldViewport);
+        GraphicsViewport.get(oldViewport);
         Window.copyProjectionMatrix(oldProjectionMatrix);
 
         try {
@@ -276,7 +277,7 @@ public abstract class Viewport {
             function.draw();
         } finally {
             Window.setProjectionMatrix(oldProjectionMatrix);
-            glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+            GraphicsViewport.set(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
         }
     }
 
@@ -409,7 +410,7 @@ public abstract class Viewport {
             return false;
         }
 
-        boolean windowTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) == 0;
+        boolean windowTarget = BgfxGraphics.target() == Short.toUnsignedInt(BGFX_INVALID_HANDLE);
         float scaleX = getFramebufferScaleX(windowTarget);
         float scaleY = getFramebufferScaleY(windowTarget);
         int right = Math.round((sx + (float) sw) * scaleX);
@@ -419,10 +420,9 @@ public abstract class Viewport {
         sw = right - sx;
         sh = top - sy;
         if (sw <= 0 || sh <= 0) return false;
+        boolean scissorWasEnabled = GraphicsViewport.isScissorEnabled();
 
-        boolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
-
-        glGetIntegerv(GL_SCISSOR_BOX, previousScissor);
+        GraphicsViewport.getScissor(previousScissor);
         int prevX = previousScissor[0];
         int prevY = previousScissor[1];
         int prevW = previousScissor[2];
@@ -462,8 +462,7 @@ public abstract class Viewport {
         scissorScopes[offset + 3] = prevH;
         scissorScopes[offset + 4] = scissorWasEnabled ? 1 : 0;
         scissorDepth++;
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(fx, fy, fw, fh);
+        GraphicsViewport.scissor(fx, fy, fw, fh);
         return true;
     }
 
@@ -479,9 +478,7 @@ public abstract class Viewport {
     public void endScissor() {
         if (scissorDepth == 0) throw new IllegalStateException("No active scissor scope");
         int offset = --scissorDepth * 5;
-        glScissor(scissorScopes[offset], scissorScopes[offset + 1], scissorScopes[offset + 2], scissorScopes[offset + 3]);
-        if (scissorScopes[offset + 4] != 0) glEnable(GL_SCISSOR_TEST);
-        else glDisable(GL_SCISSOR_TEST);
+        BgfxGraphics.setScissor(scissorScopes[offset], scissorScopes[offset + 1], scissorScopes[offset + 2], scissorScopes[offset + 3], scissorScopes[offset + 4] != 0);
     }
 
     /**

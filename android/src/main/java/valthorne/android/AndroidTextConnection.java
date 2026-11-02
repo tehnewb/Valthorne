@@ -1,0 +1,76 @@
+package valthorne.android;
+
+import android.view.KeyEvent;
+import android.view.inputmethod.BaseInputConnection;
+import android.view.inputmethod.EditorInfo;
+import valthorne.android.internal.AndroidRuntime;
+
+/**
+ * Delivers committed Android IME text to the engine editing model. Composition
+ * stays in this connection until committed, preventing duplicate intermediate
+ * characters. The engine retains its text, selection, validation and undo state.
+ */
+final class AndroidTextConnection extends BaseInputConnection {
+    private final AndroidSurface view; // Native view receiving hardware-equivalent key events.
+    private String composing = ""; // Uncommitted IME text, cleared on commit or finish.
+    private int composingCursor = 1; // Requested cursor position relative to the deferred composition.
+
+    /**
+     * Creates an input connection for the current engine text focus.
+     * @param view native input endpoint
+     */
+    AndroidTextConnection(AndroidSurface view) { super(view, false); this.view = view; }
+
+    @Override
+    public boolean commitText(CharSequence text, int newCursorPosition) {
+        composing = "";
+        AndroidRuntime.emit(13, newCursorPosition, 0, 0, 0, 0, 0, text.toString());
+        return true;
+    }
+
+    @Override
+    public boolean setComposingText(CharSequence text, int newCursorPosition) { composing = text.toString(); composingCursor = newCursorPosition; return true; }
+
+    @Override
+    public boolean finishComposingText() {
+        if (!composing.isEmpty()) { AndroidRuntime.emit(13, composingCursor, 0, 0, 0, 0, 0, composing); composing = ""; }
+        return true;
+    }
+
+    @Override
+    public boolean setSelection(int start, int end) {
+        if (start < 0 || end < 0) return false;
+        AndroidRuntime.emit(14, start, end, 0, 0, 0, 0, null);
+        return true;
+    }
+
+    @Override
+    public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+        if (beforeLength < 0 || afterLength < 0) return false;
+        AndroidRuntime.emit(12, beforeLength, afterLength, 0, 0, 0, 0, null);
+        return true;
+    }
+
+    @Override
+    public boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) {
+        if (beforeLength < 0 || afterLength < 0) return false;
+        AndroidRuntime.emit(12, beforeLength, afterLength, 1, 0, 0, 0, null);
+        return true;
+    }
+
+    @Override
+    public boolean sendKeyEvent(KeyEvent event) { return view.dispatchKey(event); }
+
+    @Override
+    public boolean performEditorAction(int actionCode) {
+        if (actionCode != EditorInfo.IME_ACTION_DONE && actionCode != EditorInfo.IME_ACTION_GO) return false;
+        stroke(KeyEvent.KEYCODE_ENTER);
+        return true;
+    }
+
+    /**
+     * Emits one key press and release without retaining Android event objects.
+     * @param code Android key code
+     */
+    private void stroke(int code) { view.dispatchKey(new KeyEvent(KeyEvent.ACTION_DOWN, code)); view.dispatchKey(new KeyEvent(KeyEvent.ACTION_UP, code)); }
+}

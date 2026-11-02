@@ -1,26 +1,26 @@
 package valthorne.graphics.bgfx;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Objects;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3fc;
 import org.lwjgl.bgfx.BGFXVertexLayout;
 import valthorne.Window;
 import valthorne.graphics.Color;
+import valthorne.graphics.GraphicsBackend;
+import valthorne.graphics.GraphicsResource;
+import valthorne.graphics.bgfx.BgfxResources;
 import valthorne.math.geometry.Shape;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Objects;
-
 import static org.lwjgl.bgfx.BGFX.*;
-import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
-import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Draws live 2D shapes with compact bgfx instances and ordered triangle streams.
- * Owns a graphics-thread runtime, reusable staging buffers and cached quad mesh.
- * Create on the current OpenGL context, submit between begin/end, and close on
+ * Owns reusable graphics-thread staging buffers, programs and cached quad mesh.
+ * Create on the current graphics device, submit between begin/end, and close on
  * the same thread. Generic matrix and mesh submission support specialized local
  * renderers without loading any private model or camera classes.
  *
@@ -32,21 +32,28 @@ import static org.lwjgl.opengl.GL33.*;
  * }
  * }</pre>
  */
-public class BgfxShapeRenderer implements AutoCloseable {
+public class BgfxShapeRenderer implements AutoCloseable, GraphicsResource {
+    static {
+        // Blend helpers initialize LWJGL before any renderer constructor runs.
+        BgfxNativeLibrary.configure();
+    }
+
     /**
      * Solid shapes use vertex colors and conventional source-alpha compositing.
      * Alpha channels use source-over rather than squaring the source alpha.
      */
     private static final long COLOR_STATE = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA);
 
-    protected final BgfxDevice device; // Owned single-threaded bgfx runtime.
+    protected final BgfxDevice device; // Owned shape resource set on the engine device.
     private final BgfxPolygonTessellator polygons = new BgfxPolygonTessellator(); // Reused live-boundary triangulation and stroke storage.
     private final Matrix4f transform = new Matrix4f(); // Reused ordinary window projection transform.
+    private final Matrix4f viewportMatrix = new Matrix4f(); // Reused native crop transform for negative fill viewports.
+    private final float[] viewportAdjustment = new float[4]; // Reused clip-space crop scale/offset.
     private final Matrix4f projectionMatrix = new Matrix4f(); // Reused projection conversion storage.
     private final float[] view = new float[16]; // Copied column-major view for the current batch.
     private final float[] projection = new float[16]; // Copied column-major projection for the current batch.
-    private final int[] viewport = new int[4]; // OpenGL viewport selected when begin is called.
-    private final int[] scissor = new int[4]; // OpenGL clip rectangle selected when begin is called.
+    private final int[] viewport = new int[4]; // Engine viewport selected when begin is called.
+    private final int[] scissor = new int[4]; // Engine clip rectangle selected when begin is called.
     private final int[] framebufferWidth = new int[1]; // Reused GLFW framebuffer width query destination.
     private final int[] framebufferHeight = new int[1]; // Reused GLFW framebuffer height query destination.
     private BgfxVertexBuffer vertices; // Owned sixteen-byte streamed triangle records.
@@ -68,7 +75,7 @@ public class BgfxShapeRenderer implements AutoCloseable {
     private long lastUploadedBytes; // Staging bytes uploaded during the completed batch.
 
     /**
-     * Initializes bgfx on Valthorne's current desktop OpenGL context and creates
+     * Initializes bgfx on Valthorne's current desktop graphics device and creates
      * reusable stream storage. Initial capacity is 16,384 vertices and 4,096 instances.
      *
      * @throws IllegalStateException if the context is absent or another renderer is live
@@ -79,18 +86,20 @@ public class BgfxShapeRenderer implements AutoCloseable {
         try {
             vertices = new BgfxVertexBuffer(device.layout(), 16_384);
             try (BGFXVertexLayout layout = BGFXVertexLayout.calloc()) {
-                bgfx_vertex_layout_begin(layout, BGFX_RENDERER_TYPE_OPENGL);
+                bgfx_vertex_layout_begin(layout, device.rendererType());
                 for (int i = 0; i < 5; i++)
                     bgfx_vertex_layout_add(layout, BGFX_ATTRIB_TEXCOORD0 + i, (byte) 4, BGFX_ATTRIB_TYPE_FLOAT, false, false);
                 bgfx_vertex_layout_end(layout);
                 instances = new BgfxVertexBuffer(layout, 4_096);
             }
             primitives = new BgfxPrimitives2D(device);
+            BgfxResources.register(this);
         } catch (RuntimeException | Error failure) {
             if (primitives != null) primitives.close();
             if (instances != null) instances.close();
             if (vertices != null) vertices.close();
             device.close();
+            BgfxResources.unregister(this);
             throw failure;
         }
     }
@@ -107,8 +116,6 @@ public class BgfxShapeRenderer implements AutoCloseable {
                 .get(view);
         Window.copyProjectionMatrix(projection);
     }
-
-
 
     /**
      * Begins a batch with explicit column-major matrices, allowing custom 2D/3D cameras.
@@ -135,18 +142,15 @@ public class BgfxShapeRenderer implements AutoCloseable {
     private void beginBatch(boolean depthTest) {
         device.checkOwner();
         if (drawing) throw new IllegalStateException("End or cancel the current bgfx batch first");
-        if (device.state.integer(GL_DRAW_FRAMEBUFFER_BINDING) != 0)
-            throw new UnsupportedOperationException("BgfxShapeRenderer currently draws to the window framebuffer");
-        glfwGetFramebufferSize(Window.getAddress(), framebufferWidth, framebufferHeight);
-        glGetIntegerv(GL_VIEWPORT, viewport);
-        if (framebufferWidth[0] <= 0 || framebufferHeight[0] <= 0 || framebufferWidth[0] > 65_535 || framebufferHeight[0] > 65_535 || viewport[0] < 0 || viewport[1] < 0 || viewport[2] <= 0 || viewport[3] <= 0 || (long) viewport[0] + viewport[2] > framebufferWidth[0] || (long) viewport[1] + viewport[3] > framebufferHeight[0])
-            throw new IllegalArgumentException("bgfx requires a positive viewport inside a framebuffer of at most 65535 pixels per axis");
-        clipped = glIsEnabled(GL_SCISSOR_TEST);
-        glGetIntegerv(GL_SCISSOR_BOX, scissor);
+        BgfxGraphics.getViewport(viewport);
+        BgfxGraphics.getScissor(scissor);
+        clipped = BgfxGraphics.isScissorEnabled();
+        framebufferHeight[0] = BgfxGraphics.targetHeight();
+        framebufferWidth[0] = BgfxGraphics.device().width();
         vertices.clear();
         instances.clear();
         primitives.instances().clear();
-        compactCircles = device.state.integer(GL_SAMPLES) == 0;
+        compactCircles = BgfxGraphics.target() != Short.toUnsignedInt(BGFX_INVALID_HANDLE) || !BgfxGraphics.device().isMultisampled();
         Arrays.fill(commandMeshes, 0, commands, null);
         commands = 0;
         depth = depthTest;
@@ -197,22 +201,6 @@ public class BgfxShapeRenderer implements AutoCloseable {
         BgfxVertexFormat.vertex(bytes, b.x(), b.y(), b.z(), tint);
         BgfxVertexFormat.vertex(bytes, c.x(), c.y(), c.z(), tint);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     /**
      * Copies one finite transform and color into contiguous instance staging.
@@ -342,8 +330,8 @@ public class BgfxShapeRenderer implements AutoCloseable {
 
     /**
      * Uploads and executes the batch immediately, preserving the window's pixels
-     * and covered OpenGL state. Does not present or wait for GPU completion.
-     * Queued shape draws finish in order before later OpenGL calls on this context.
+     * and the engine render state. Does not present or wait for GPU completion.
+     * Queued shape draws execute in order before later engine passes.
      */
     public void end() {
         requireDrawing();
@@ -354,21 +342,15 @@ public class BgfxShapeRenderer implements AutoCloseable {
         lastUploadedBytes = 0;
         drawing = false;
         if (commands == 0 || (clipped && (scissor[2] <= 0 || scissor[3] <= 0))) return;
-        device.state.capture();
+        BgfxGraphics.invalidateView();
+        int pass = BgfxGraphics.view();
         try {
-            device.resize(framebufferWidth[0], framebufferHeight[0]);
-            bgfx_set_view_rect(0, viewport[0], framebufferHeight[0] - viewport[1] - viewport[3], viewport[2], viewport[3]);
-            if (clipped) {
-                int left = Math.max(0, scissor[0]);
-                int bottom = Math.max(0, scissor[1]);
-                int right = Math.min(framebufferWidth[0], scissor[0] + scissor[2]);
-                int top = Math.min(framebufferHeight[0], scissor[1] + scissor[3]);
-                if (right <= left || top <= bottom) return;
-                bgfx_set_view_scissor(0, left, framebufferHeight[0] - top, right - left, top - bottom);
-            } else {
-                bgfx_set_view_scissor(0, 0, 0, 0, 0);
-            }
+
             projectionMatrix.set(projection);
+            BgfxGraphics.viewportAdjustment(viewportAdjustment);
+            viewportMatrix.translation(viewportAdjustment[2], viewportAdjustment[3], 0)
+                    .scale(viewportAdjustment[0], viewportAdjustment[1], 1)
+                    .mul(projectionMatrix, projectionMatrix);
             if (!device.homogeneousDepth()) {
                 projectionMatrix.m02((projectionMatrix.m02() + projectionMatrix.m03()) * .5f);
                 projectionMatrix.m12((projectionMatrix.m12() + projectionMatrix.m13()) * .5f);
@@ -376,7 +358,7 @@ public class BgfxShapeRenderer implements AutoCloseable {
                 projectionMatrix.m32((projectionMatrix.m32() + projectionMatrix.m33()) * .5f);
             }
             projectionMatrix.get(projection);
-            bgfx_set_view_transform(0, view, projection);
+            bgfx_set_view_transform(pass, view, projection);
             vertices.upload();
             instances.upload();
             primitives.instances().upload();
@@ -395,12 +377,11 @@ public class BgfxShapeRenderer implements AutoCloseable {
                     lastTriangles += (long) mesh.vertices() / 3 * count;
                 }
                 bgfx_set_state(commandStates[i], 0);
-                bgfx_submit(0, primitive ? device.primitiveProgram() : device.program(mesh != null), 0, BGFX_DISCARD_ALL);
+                bgfx_submit(pass, primitive ? device.primitiveProgram() : device.program(mesh != null), 0, BGFX_DISCARD_ALL);
             }
-            device.execute();
             lastDrawCalls = commands;
         } finally {
-            device.state.restore();
+            BgfxGraphics.invalidateView();
         }
     }
 
@@ -481,10 +462,6 @@ public class BgfxShapeRenderer implements AutoCloseable {
         if (!drawing) throw new IllegalStateException("Call begin before submitting bgfx shapes");
     }
 
-
-
-
-
     @Override
     public void close() {
         if (closed) return;
@@ -496,4 +473,10 @@ public class BgfxShapeRenderer implements AutoCloseable {
         device.close();
         closed = true;
     }
+
+    @Override
+    public void validateGraphicsReset(GraphicsBackend backend) {
+        if (drawing) throw new IllegalStateException("End shape batches before switching graphics backends");
+    }
+
 }

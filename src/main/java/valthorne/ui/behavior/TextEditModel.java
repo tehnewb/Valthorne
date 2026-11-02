@@ -8,7 +8,8 @@ import java.util.regex.Pattern;
 
 /**
  * Single-line editing independent of fonts, rendering, and native input.
- * Indices are UTF-16 offsets snapped to extended grapheme boundaries. Maximum length
+ * Indices are UTF-16 offsets normally snapped to extended grapheme boundaries;
+ * native surrounding deletion preserves selection endpoints across joined graphemes. Maximum length
  * is measured in Unicode code points, while movement and deletion preserve graphemes.
  * Validation reports acceptability but does not veto edits. Changes are synchronous
  * and unsynchronized; use the model on the owning UI thread.
@@ -114,7 +115,7 @@ public final class TextEditModel {
     public String text() {return text;}
 
     /**
-     * Returns the active selection end as a UTF-16 offset on a grapheme boundary.
+     * Returns the active selection end as a UTF-16 offset.
      *
      * @return current caret offset
      */
@@ -360,6 +361,47 @@ public final class TextEditModel {
      * A collapsed selection is a no-op.
      */
     public void deleteSelection() {if (hasSelection()) insert("");}
+
+    /**
+     * Deletes text around the selection without deleting the selection itself.
+     * Native input methods count UTF-16 units or code points rather than graphemes.
+     * Bounds are clamped and expanded only when needed to preserve surrogate pairs.
+     * The selected text and selection direction survive as UTF-16 endpoints, even
+     * when deletion joins adjacent graphemes; ordinary navigation snaps them again.
+     * A successful edit creates one undo state and notifies listeners once.
+     *
+     * @param beforeLength nonnegative number of units preceding the selection
+     * @param afterLength nonnegative number of units following the selection
+     * @param codePoints whether lengths count Unicode code points instead of UTF-16 units
+     * @return whether text changed
+     */
+    public boolean deleteSurrounding(int beforeLength, int afterLength, boolean codePoints) {
+        if (beforeLength < 0 || afterLength < 0) return false;
+        int start = start();
+        int end = end();
+        int from = start;
+        int to = end;
+        if (codePoints) {
+            for (int i = 0; i < beforeLength && from > 0; i++) from -= Character.charCount(text.codePointBefore(from));
+            for (int i = 0; i < afterLength && to < text.length(); i++) to += Character.charCount(text.codePointAt(to));
+        } else {
+            from = Math.max(0, start - beforeLength);
+            to = (int) Math.min(text.length(), (long) end + afterLength);
+        }
+        if (from > 0 && from < text.length() && Character.isLowSurrogate(text.charAt(from)) && Character.isHighSurrogate(text.charAt(from - 1))) from--;
+        if (to < text.length() && to > 0 && Character.isHighSurrogate(text.charAt(to - 1)) && Character.isLowSurrogate(text.charAt(to))) to++;
+        if (from == start && to == end) return false;
+        undo.addLast(new TextEditState(text, anchor, caret));
+        if (undo.size() > 100) undo.removeFirst();
+        redo.clear();
+        text = text.substring(0, from) + text.substring(start, end) + text.substring(to);
+        int removedBefore = start - from;
+        anchor -= removedBefore;
+        caret -= removedBefore;
+        rebuild();
+        notifyListeners();
+        return true;
+    }
 
     /**
      * Sets anchor to zero and caret to the text end, then notifies listeners even if

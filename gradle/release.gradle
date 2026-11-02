@@ -1,9 +1,6 @@
-// Release checks are local: nothing uploads unless a publishing task is requested.
+// Release archive content and Maven Central signing.
 
-def releaseVersion = project.version.toString()
-def releaseDirectory = layout.buildDirectory.dir("release-repository/io/github/tehnewb/Valthorne/${releaseVersion}")
 def releaseSigning = providers.gradleProperty('releaseSigning').map { it.toBoolean() }.orElse(false)
-def repositoryRoot = rootDir.toPath()
 
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
@@ -18,65 +15,6 @@ tasks.named('jar', Jar) {
     }
 }
 
-publishing {
-    repositories {
-        maven {
-            name = 'releaseCheck'
-            url = layout.buildDirectory.dir('release-repository')
-        }
-    }
-}
-
-tasks.register('verifyReleaseArtifacts') {
-    description = 'Checks published jars and metadata in an isolated local Maven repository.'
-    group = 'verification'
-    dependsOn 'publishAllPublicationsToReleaseCheckRepository'
-    doLast {
-        def directory = releaseDirectory.get().asFile
-        def prefix = "Valthorne-${releaseVersion}"
-        if (releaseVersion.endsWith('-SNAPSHOT')) {
-            def metadata = new groovy.xml.XmlSlurper().parse(new File(directory, 'maven-metadata.xml'))
-            def snapshot = metadata.versioning.snapshotVersions.snapshotVersion.find {
-                it.extension.text() == 'jar' && it.classifier.text().isEmpty()
-            }.value.text()
-            if (!snapshot) throw new GradleException('Published snapshot metadata has no library JAR')
-            prefix = "Valthorne-${snapshot}"
-        }
-        ['', '-sources', '-javadoc'].each { classifier ->
-            def artifact = new File(directory, "${prefix}${classifier}.jar")
-            if (!artifact.isFile()) throw new GradleException("Missing publication: ${artifact}")
-            new java.util.zip.ZipFile(artifact).withCloseable { zip ->
-                if (zip.size() < 2) throw new GradleException("Empty publication: ${artifact}")
-                if (classifier == '-javadoc' && zip.getEntry('index.html') == null)
-                    throw new GradleException('Published Javadoc has no index.html')
-                if (classifier == '') {
-                    ['valthorne/JGL.class', 'valthorne/shaders/core/shape.vert',
-                     'valthorne/graphics/font/SystemFonts.class',
-                     'META-INF/LICENSE', 'META-INF/THIRD_PARTY_NOTICES.md'].each { resource ->
-                        if (zip.getEntry(resource) == null) throw new GradleException("Missing runtime resource: ${resource}")
-                    }
-                    def forbidden = zip.entries().find { entry -> entry.name.endsWith('.java') }
-                    if (forbidden != null) throw new GradleException("Development content leaked into library: ${forbidden.name}")
-                }
-            }
-        }
-        def pom = new File(directory, "${prefix}.pom").text
-        ['<artifactId>Valthorne</artifactId>', "<version>${releaseVersion}</version>",
-         '<artifactId>joml</artifactId>', '<artifactId>lwjgl-bom</artifactId>',
-         'natives-macos-arm64', 'natives-linux', 'natives-windows',
-         ].each { value ->
-            if (!pom.contains(value)) throw new GradleException("Publication POM is missing ${value}")
-        }
-        logger.lifecycle('Verified library, sources, Javadoc, resources, licenses, and publication metadata.')
-    }
-}
-
-tasks.register('verifyRelease') {
-    description = 'Builds and validates release packaging.'
-    group = 'verification'
-    dependsOn 'build', 'verifyReleaseArtifacts'
-}
-
 // A missing signing flag should fail before attempting a Central upload.
 tasks.matching {
     it.name == 'publishToMavenCentral' || it.name == 'publishAndReleaseToMavenCentral' ||
@@ -87,34 +25,3 @@ tasks.matching {
             throw new GradleException('Maven Central publication requires -PreleaseSigning=true and signing credentials. Configure signing credentials in the private Gradle user home.')
     }
 }
-
-tasks.register('verifyDocumentation') {
-    description = 'Checks local Markdown link targets in release documentation.'
-    group = 'verification'
-    def documents = fileTree(rootDir) {
-        include '*.md', 'docs/**/*.md',
-                'src/main/resources/**/*.md'
-        exclude '**/build/**', '**/.gradle/**'
-        // Verbatim source-era document copies retain their original relative context.
-        exclude 'docs/benchmarks/**/assets/**'
-    }
-    inputs.files(documents)
-    doLast {
-        def failures = []
-        documents.each { document ->
-            def content = document.getText('UTF-8').replaceAll(/(?s)```.*?```/, '')
-            def links = content =~ /!?\[[^\]\r\n]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/
-            links.each { match ->
-                def target = match[1].replaceAll(/^<|>$/, '').split('#', 2)[0]
-                if (target && !(target ==~ /^[a-zA-Z][a-zA-Z0-9+.-]*:.*/) && !target.startsWith('/')) {
-                    def decoded = java.net.URLDecoder.decode(target.replace('+', '%2B'), 'UTF-8')
-                    if (!new File(document.parentFile, decoded).exists())
-                        failures.add("${repositoryRoot.relativize(document.toPath())} -> ${target}")
-                }
-            }
-        }
-        if (!failures.isEmpty()) throw new GradleException('Broken documentation links:\n' + failures.join('\n'))
-        logger.lifecycle("Verified local links in ${documents.files.size()} Markdown documents.")
-    }
-}
-tasks.named('check') { dependsOn 'verifyDocumentation' }

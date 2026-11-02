@@ -1,53 +1,53 @@
 package valthorne.graphics;
 
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GLCapabilities;
+import org.lwjgl.bgfx.BGFXCaps;
+import valthorne.graphics.bgfx.BgfxGraphics;
 
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.bgfx.BGFX.*;
 
 /**
- * Immutable snapshot of the current desktop OpenGL context. This is a feature
- * report, not a GPU performance rating. Capture on the thread with that context
- * current; recapture after replacing it. OpenGL ES is not a desktop GL context.
+ * Immutable feature report from the active graphics device. Renderer names never
+ * substitute for feature checks: browser/raster devices may omit compute or HDR
+ * attachments while retaining the same scene, sprite, text and UI drawing APIs.
  *
- * @param vendor      driver vendor
- * @param renderer    driver renderer description
- * @param version     actual driver version (GLFW requests minimum versions)
- * @param raster      whether the built-in GLSL 330 raster path is supported
- * @param compute     whether compute, storage buffers and image operations are available
+ * @param vendor device vendor identifier
+ * @param renderer selected API renderer name
+ * @param version rendering runtime identity
+ * @param raster whether the engine's raster pipeline is supported
+ * @param compute whether compute dispatch and writable resources are available
  */
 public record GraphicsCapabilities(String vendor, String renderer, String version, boolean raster, boolean compute) {
     /**
-     * Captures capabilities without parsing driver strings or probing GL_EXTENSIONS.
-     * The calling thread must have a current desktop OpenGL context.
+     * Returns the active device's maximum texture extent without a report allocation.
      *
-     * @return immutable snapshot of driver identity and supported engine paths
-     * @throws IllegalStateException if no OpenGL capabilities are associated with the thread
+     * @return maximum pixels per texture axis
+     */
+    public static int maximumTextureSize() {
+        /*
+         * Native limits are authoritative across all renderer implementations.
+         */
+        BgfxGraphics.device();
+        return bgfx_get_caps().limits().maxTextureSize();
+    }
+
+    /**
+     * Captures capabilities on the render thread after graphics initialization.
+     *
+     * @return immutable active-device feature report
      */
     public static GraphicsCapabilities current() {
-        GLCapabilities gl = GL.getCapabilities();
-        return new GraphicsCapabilities(glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION), gl.OpenGL33, supportsCompute(gl));
+        /*
+         * The renderer owns API detection; no API-specific context table is queried.
+         */
+        BgfxGraphics.device();
+        BGFXCaps caps = bgfx_get_caps();
+        return new GraphicsCapabilities(Integer.toString(Short.toUnsignedInt(caps.vendorId())), bgfx_get_renderer_name(caps.rendererType()), "bgfx", (caps.supported() & BGFX_CAPS_INSTANCING) != 0, (caps.supported() & BGFX_CAPS_COMPUTE) != 0);
     }
 
     /**
-     * Checks the operations used by ComputeShader; custom GLSL must also fit the context.
-     *
-     * @param gl non-null LWJGL capability table for the context being assessed
-     * @return {@code true} when compute shaders, storage buffers, and image operations exist
-     * @throws NullPointerException if {@code gl} is null
-     */
-    public static boolean supportsCompute(GLCapabilities gl) {
-        return gl.OpenGL43 || (gl.GL_ARB_compute_shader && gl.GL_ARB_shader_storage_buffer_object && (gl.OpenGL42 || gl.GL_ARB_shader_image_load_store));
-    }
-
-    /**
-     * Rejects contexts below the bundled desktop shaders' baseline before allocation.
-     * This method has no side effects when raster rendering is supported.
-     *
-     * @throws UnsupportedOperationException if OpenGL 3.3 raster support is unavailable
+     * Rejects devices lacking the instance-based engine raster contract.
      */
     public void requireRaster() {
-        if (!raster)
-            throw new UnsupportedOperationException("Valthorne's desktop renderer requires OpenGL 3.3 / GLSL 330. Detected: " + version + ". OpenGL ES requires a separate backend and is not supported yet.");
+        if (!raster) throw new UnsupportedOperationException("The selected device does not support the engine raster contract: " + renderer);
     }
 }

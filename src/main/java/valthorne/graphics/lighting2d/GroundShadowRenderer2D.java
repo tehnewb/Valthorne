@@ -1,17 +1,19 @@
 package valthorne.graphics.lighting2d;
 
 import valthorne.Window;
-import valthorne.graphics.OpenGLStateSnapshot;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxBatchRenderer;
+import valthorne.graphics.bgfx.BgfxRenderState;
 import valthorne.graphics.shader.Shader;
-import valthorne.io.file.ValthorneFiles;
+import java.nio.ByteBuffer;
 import valthorne.graphics.texture.Texture;
 import valthorne.graphics.texture.TextureBatch;
 
 import java.nio.FloatBuffer;
 import java.util.List;
 
-import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryUtil.memAllocFloat;
+import static org.lwjgl.bgfx.BGFX.*;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
@@ -21,13 +23,13 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * Multiple lights need a separate receiver/visibility pipeline; do not stack one overlay
  * per light. TextureBatch translation/custom clipping is not applied: pass world sprites
  * and the active Window projection, with normal framebuffer viewport/scissor settings.
- * Resources and draw calls belong to the creating GL thread.
+ * Resources and draw calls belong to the creating graphics thread.
  *
  * <p>Consecutive cards sharing a texture are submitted as ordered instances,
  * including interleaved contact shadows. A texture change or 1024 queued quads
  * flushes the batch without sorting painter order. The five-tap alpha filter,
  * projection and blend equations are unchanged. Streaming storage is allocated
- * once (104 KiB CPU staging, at most 104 KiB per GPU upload); queueing a card
+ * once (104 KiB CPU staging, 112 KiB per padded GPU upload); queueing a card
  * allocates no Java objects. The existing pass-state snapshot is taken once per
  * draw invocation, not once per caster.</p>
  */
@@ -45,10 +47,11 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
      */
     private static final int INSTANCE_BYTES = INSTANCE_FLOATS * Float.BYTES;
     private final Shader shader; // Owned shader for this rendering pass.
-    private final int vao; // Owned vertex array describing pass geometry.
-    private final int vbo; // Owned streaming vertex buffer.
+    private final BgfxBatchRenderer renderer; // Ordered, frame-safe native instance storage.
+    private final BgfxRenderState state = new BgfxRenderState(); // Reused external pass snapshot.
+    private final ByteBuffer vertexBytes; // Owned packed source records for native uploads.
     private final FloatBuffer vertices; // Owned packed instance storage, released explicitly on close.
-    private boolean closed; // Whether the owned GL resources were released.
+    private boolean closed; // Whether the owned graphics resources were released.
     private int drawCalls; // Draw count in the latest shadow pass.
     private int shadowCount; // Projected/contact quads rendered in the latest pass.
     private int instanceCount; // Complete quads currently queued in the streaming buffer.
@@ -56,43 +59,22 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     private final PointLight2D blended = new PointLight2D(); // Reusable virtual source blended from nearby lights.
 
     /**
-     * Creates the shader and streaming quad resources on the current GL context,
+     * Creates the shader and streaming quad resources on the current graphics device,
      * restoring the caller's selected bindings afterward. Close on the same
      * graphics thread after the final pass.
      */
     public GroundShadowRenderer2D() {
-        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
-        Shader createdShader = null;
-        int createdVao = 0;
-        int createdVbo = 0;
-        FloatBuffer createdVertices = null;
+        shader = new Shader("engine/lighting/ground-shadow.vert", "engine/lighting/ground-shadow.frag");
+        BgfxBatchRenderer created = null;
         try {
-            createdShader = new Shader(ValthorneFiles.readString("valthorne/shaders/lighting2d/ground-shadow.vert"), ValthorneFiles.readString("valthorne/shaders/lighting2d/ground-shadow.frag"));
-            createdVao = glGenVertexArrays();
-            createdVbo = glGenBuffers();
-            createdVertices = memAllocFloat(BATCH_CAPACITY * INSTANCE_FLOATS);
-            glBindVertexArray(createdVao);
-            glBindBuffer(GL_ARRAY_BUFFER, createdVbo);
-            glBufferData(GL_ARRAY_BUFFER, (long) BATCH_CAPACITY * INSTANCE_BYTES, GL_STREAM_DRAW);
-            for (int attribute = 0; attribute < 10; attribute++) {
-                int components = attribute < 4 ? 3 : attribute < 8 ? 2 : attribute == 8 ? 4 : 2;
-                int offset = attribute < 4 ? attribute * 5 : attribute < 8 ? (attribute - 4) * 5 + 3 : attribute == 8 ? 20 : 24;
-                glEnableVertexAttribArray(attribute);
-                glVertexAttribPointer(attribute, components, GL_FLOAT, false, INSTANCE_BYTES, (long) offset * Float.BYTES);
-                glVertexAttribDivisor(attribute, 1);
-            }
-            shader = createdShader;
-            vao = createdVao;
-            vbo = createdVbo;
-            vertices = createdVertices;
+            created = new BgfxBatchRenderer(BATCH_CAPACITY, 112);
+            vertexBytes = memAlloc(BATCH_CAPACITY * INSTANCE_BYTES);
+            vertices = vertexBytes.asFloatBuffer();
+            renderer = created;
         } catch (RuntimeException | Error failure) {
-            if (createdVertices != null) memFree(createdVertices);
-            if (createdVbo != 0) glDeleteBuffers(createdVbo);
-            if (createdVao != 0) glDeleteVertexArrays(createdVao);
-            if (createdShader != null) createdShader.dispose();
+            if (created != null) created.close();
+            shader.dispose();
             throw failure;
-        } finally {
-            state.restore();
         }
     }
 
@@ -143,23 +125,13 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (!light.enabled || !light.shadows || light.elevation <= 0 || light.intensity <= 0 || light.r + light.g + light.b <= 0)
             return;
         sceneBatch.flush();
-        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+        state.store();
         try {
-            glDisable(GL_DEPTH_TEST);
-            glDepthMask(false);
-            glDisable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
-            glActiveTexture(GL_TEXTURE2);
-            glBindSampler(2, 0);
             shader.bind();
             shader.setUniform1i("u_texture", 2);
             shader.setUniform1i("u_volume", fills == null ? 0 : 1);
             shader.setUniformMatrix4("u_projection", Window.getProjectionMatrix());
             shader.setUniform1f("u_softness", Math.min(2, light.sourceRadius * .15f));
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
             for (int n = 0; n < casters.size(); n++) {
                 SpriteGroundShadow2D caster = casters.get(n);
                 if (!caster.enabled || caster.height <= 0 || caster.opacity <= 0 || caster.sprite.getColor().a() <= 0)
@@ -260,7 +232,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     }
 
     /**
-     * Uploads and draws one ordered texture run. Orphaning avoids overwriting
+     * Uploads and draws one ordered texture run. Frame-owned native ranges avoid overwriting
      * storage still consumed by an earlier submission; the native staging buffer
      * is retained and immediately reused after the upload returns. Only the used
      * prefix is uploaded, so short texture runs do not allocate full-size GPU batches.
@@ -268,9 +240,9 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
     private void flush() {
         if (instanceCount == 0) return;
         vertices.flip();
-        glBufferData(GL_ARRAY_BUFFER, vertices, GL_STREAM_DRAW);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, instanceCount);
+        BgfxGraphics.bindTexture(2, texture);
+        vertexBytes.position(0).limit(instanceCount * INSTANCE_BYTES);
+        renderer.submit(vertexBytes, instanceCount, INSTANCE_BYTES, shader, BgfxGraphics.textures(), 3, BGFX_STATE_WRITE_RGB | BGFX_STATE_MSAA | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
         drawCalls++;
         instanceCount = 0;
         vertices.clear();
@@ -296,8 +268,7 @@ public final class GroundShadowRenderer2D implements AutoCloseable {
         if (closed) return;
         closed = true;
         shader.dispose();
-        glDeleteBuffers(vbo);
-        glDeleteVertexArrays(vao);
-        memFree(vertices);
+        renderer.close();
+        memFree(vertexBytes);
     }
 }

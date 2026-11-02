@@ -1,0 +1,238 @@
+diff --git a/nanovg_bgfx.cpp b/nanovg_bgfx.cpp
+--- a/nanovg_bgfx.cpp
++++ b/nanovg_bgfx.cpp
+@@ -29,0 +30 @@
++#include <bgfx/c99/bgfx.h>
+@@ -34,0 +36,9 @@
++
++typedef void* (*reallocPROC) (void *ptr, size_t size);
++typedef void  (*freePROC)    (void *ptr);
++
++static reallocPROC org_lwjgl_realloc;
++static freePROC    org_lwjgl_free;
++
++#define NVG_REALLOC(p,sz)  org_lwjgl_realloc(p,sz)
++#define NVG_FREE(p)        org_lwjgl_free(p)
+@@ -194 +204 @@
+-				gl->textures = (struct GLNVGtexture*)bx::realloc(gl->allocator, gl->textures, sizeof(struct GLNVGtexture)*gl->ctextures);
++				gl->textures = (struct GLNVGtexture*)NVG_REALLOC(gl->textures, sizeof(struct GLNVGtexture)*gl->ctextures);
+@@ -426,0 +437,23 @@
++
++    static void nvgTransformIdentity(float* t)
++    {
++        t[0] = 1.0f; t[1] = 0.0f;
++        t[2] = 0.0f; t[3] = 1.0f;
++        t[4] = 0.0f; t[5] = 0.0f;
++    }
++	static int nvgTransformInverse(float* inv, const float* t)
++    {
++    	double invdet, det = (double)t[0] * t[3] - (double)t[2] * t[1];
++    	if (det > -1e-6 && det < 1e-6) {
++    		nvgTransformIdentity(inv);
++    		return 0;
++    	}
++    	invdet = 1.0 / det;
++    	inv[0] = (float)(t[3] * invdet);
++    	inv[2] = (float)(-t[2] * invdet);
++    	inv[4] = (float)(((double)t[2] * t[5] - (double)t[3] * t[4]) * invdet);
++    	inv[1] = (float)(-t[1] * invdet);
++    	inv[3] = (float)(t[0] * invdet);
++    	inv[5] = (float)(((double)t[1] * t[4] - (double)t[0] * t[5]) * invdet);
++    	return 1;
++    }
+@@ -839 +872 @@
+-			gl->calls = (struct GLNVGcall*)bx::realloc(gl->allocator, gl->calls, sizeof(struct GLNVGcall) * gl->ccalls);
++			gl->calls = (struct GLNVGcall*)NVG_REALLOC(gl->calls, sizeof(struct GLNVGcall) * gl->ccalls);
+@@ -852 +885 @@
+-			paths = (GLNVGpath*)bx::realloc(gl->allocator, gl->paths, sizeof(GLNVGpath) * cpaths);
++			paths = (GLNVGpath*)NVG_REALLOC(gl->paths, sizeof(GLNVGpath) * cpaths);
+@@ -873 +906 @@
+-			verts = (NVGvertex*)bx::realloc(gl->allocator, gl->verts, sizeof(NVGvertex) * cverts);
++			verts = (NVGvertex*)NVG_REALLOC(gl->verts, sizeof(NVGvertex) * cverts);
+@@ -889 +922 @@
+-			gl->uniforms = (unsigned char*)bx::realloc(gl->allocator, gl->uniforms, gl->cuniforms * structSize);
++			gl->uniforms = (unsigned char*)NVG_REALLOC(gl->uniforms, gl->cuniforms * structSize);
+@@ -1100,5 +1133,5 @@
+-		bx::free(gl->allocator, gl->uniforms);
+-		bx::free(gl->allocator, gl->verts);
+-		bx::free(gl->allocator, gl->paths);
+-		bx::free(gl->allocator, gl->calls);
+-		bx::free(gl->allocator, gl->textures);
++		NVG_FREE(gl->uniforms);
++		NVG_FREE(gl->verts);
++		NVG_FREE(gl->paths);
++		NVG_FREE(gl->calls);
++		NVG_FREE(gl->textures);
+@@ -1110 +1143,23 @@
+-NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId, bx::AllocatorI* _allocator)
++typedef NVGcontext* (*nvgCreateInternalPROC) (NVGparams*);
++typedef NVGparams*  (*nvgInternalParamsPROC) (NVGcontext*);
++typedef void        (*nvgDeleteInternalPROC) (NVGcontext*);
++
++static nvgCreateInternalPROC org_lwjgl_nvgCreateInternal;
++static nvgInternalParamsPROC org_lwjgl_nvgInternalParams;
++static nvgDeleteInternalPROC org_lwjgl_nvgDeleteInternal;
++
++BGFX_C_API void org_lwjgl_nanovg_setup(
++    reallocPROC realloc,
++    freePROC    free,
++    nvgCreateInternalPROC nvgCreateInternal,
++    nvgInternalParamsPROC nvgInternalParams,
++    nvgDeleteInternalPROC nvgDeleteInternal
++) {
++    org_lwjgl_realloc = realloc;
++    org_lwjgl_free    = free;
++    org_lwjgl_nvgCreateInternal = nvgCreateInternal;
++    org_lwjgl_nvgInternalParams = nvgInternalParams;
++    org_lwjgl_nvgDeleteInternal = nvgDeleteInternal;
++}
++
++BGFX_C_API NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId, bx::AllocatorI* _allocator)
+@@ -1147 +1202 @@
+-	ctx = nvgCreateInternal(&params);
++	ctx = org_lwjgl_nvgCreateInternal(&params);
+@@ -1156 +1211 @@
+-		nvgDeleteInternal(ctx);
++		org_lwjgl_nvgDeleteInternal(ctx);
+@@ -1166 +1221 @@
+-void nvgDelete(NVGcontext* _ctx)
++BGFX_C_API void nvgDelete(NVGcontext* _ctx)
+@@ -1168 +1223 @@
+-	nvgDeleteInternal(_ctx);
++	org_lwjgl_nvgDeleteInternal(_ctx);
+@@ -1171 +1226 @@
+-void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId)
++BGFX_C_API void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId)
+@@ -1173 +1228 @@
+-	struct NVGparams* params = nvgInternalParams(_ctx);
++	struct NVGparams* params = org_lwjgl_nvgInternalParams(_ctx);
+@@ -1178 +1233 @@
+-uint16_t nvgGetViewId(struct NVGcontext* _ctx)
++BGFX_C_API uint16_t nvgGetViewId(struct NVGcontext* _ctx)
+@@ -1180 +1235 @@
+-	struct NVGparams* params = nvgInternalParams(_ctx);
++	struct NVGparams* params = org_lwjgl_nvgInternalParams(_ctx);
+@@ -1187 +1242 @@
+-	GLNVGcontext* gl = (GLNVGcontext*)nvgInternalParams(_ctx)->userPtr;
++	GLNVGcontext* gl = (GLNVGcontext*)org_lwjgl_nvgInternalParams(_ctx)->userPtr;
+@@ -1204 +1259 @@
+-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags)
++BGFX_C_API NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags)
+@@ -1227 +1282 @@
+-	struct NVGparams* params = nvgInternalParams(_ctx);
++	struct NVGparams* params = org_lwjgl_nvgInternalParams(_ctx);
+@@ -1251,56 +1306 @@
+-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* ctx, int32_t imageFlags, bgfx::ViewId viewId)
+-{
+-	NVGLUframebuffer* framebuffer = nvgluCreateFramebuffer(ctx, imageFlags);
+-
+-	if (framebuffer != NULL)
+-	{
+-		nvgluSetViewFramebuffer(viewId, framebuffer);
+-	}
+-
+-	return framebuffer;
+-}
+-
+-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _imageFlags)
+-{
+-	BX_UNUSED(_imageFlags);
+-	bgfx::TextureHandle textures[] =
+-	{
+-		bgfx::createTexture2D(bgfx::BackbufferRatio::Equal, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_RT),
+-		bgfx::createTexture2D(bgfx::BackbufferRatio::Equal, false, 1, bgfx::TextureFormat::D24S8, BGFX_TEXTURE_RT | BGFX_TEXTURE_RT_WRITE_ONLY)
+-	};
+-	bgfx::FrameBufferHandle fbh = bgfx::createFrameBuffer(
+-		  BX_COUNTOF(textures)
+-		, textures
+-		, true
+-		);
+-
+-	if (!bgfx::isValid(fbh) )
+-	{
+-		return NULL;
+-	}
+-
+-	struct NVGparams* params = nvgInternalParams(_ctx);
+-	struct GLNVGcontext* gl = (struct GLNVGcontext*)params->userPtr;
+-	struct GLNVGtexture* tex = glnvg__allocTexture(gl);
+-
+-	if (NULL == tex)
+-	{
+-		bgfx::destroy(fbh);
+-		return NULL;
+-	}
+-
+-	tex->width  = 0;
+-	tex->height = 0;
+-	tex->type   = NVG_TEXTURE_RGBA;
+-	tex->flags  = _imageFlags | NVG_IMAGE_PREMULTIPLIED;
+-	tex->id     = bgfx::getTexture(fbh);
+-
+-	NVGLUframebuffer* framebuffer = BX_NEW(gl->allocator, NVGLUframebuffer);
+-	framebuffer->ctx    = _ctx;
+-	framebuffer->image  = tex->id.idx;
+-	framebuffer->handle = fbh;
+-
+-	return framebuffer;
+-}
+-
+-void nvgluBindFramebuffer(NVGLUframebuffer* _framebuffer)
++BGFX_C_API void nvgluBindFramebuffer(NVGLUframebuffer* _framebuffer)
+@@ -1322 +1322 @@
+-void nvgluDeleteFramebuffer(NVGLUframebuffer* _framebuffer)
++BGFX_C_API void nvgluDeleteFramebuffer(NVGLUframebuffer* _framebuffer)
+@@ -1334 +1334 @@
+-	struct NVGparams* params = nvgInternalParams(_framebuffer->ctx);
++	struct NVGparams* params = org_lwjgl_nvgInternalParams(_framebuffer->ctx);
+@@ -1340 +1340 @@
+-void nvgluSetViewFramebuffer(bgfx::ViewId _viewId, NVGLUframebuffer* _framebuffer)
++BGFX_C_API void nvgluSetViewFramebuffer(bgfx::ViewId _viewId, NVGLUframebuffer* _framebuffer)
+@@ -1347,6 +1347,6 @@
+-int nvgCreateBgfxTexture(struct NVGcontext *_ctx,
+-                         bgfx::TextureHandle _id,
+-                         int _width,
+-                         int _height,
+-                         int _flags) {
+-    struct NVGparams *params = nvgInternalParams(_ctx);
++BGFX_C_API int nvgCreateBgfxTexture(struct NVGcontext *_ctx,
++                                    bgfx::TextureHandle _id,
++                                    int _width,
++                                    int _height,
++                                    int _flags) {
++    struct NVGparams *params = org_lwjgl_nvgInternalParams(_ctx);
+diff --git a/nanovg_bgfx.h b/nanovg_bgfx.h
+--- a/nanovg_bgfx.h
++++ b/nanovg_bgfx.h
+@@ -9,0 +10 @@
++#include <bgfx/c99/bgfx.h>
+@@ -29 +30 @@
+-NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId, bx::AllocatorI* _allocator);
++BGFX_C_API NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId, bx::AllocatorI* _allocator);
+@@ -35 +36 @@
+-void nvgDelete(NVGcontext* _ctx);
++BGFX_C_API void nvgDelete(NVGcontext* _ctx);
+@@ -38 +39 @@
+-void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId);
++BGFX_C_API void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId);
+@@ -41 +42 @@
+-uint16_t nvgGetViewId(struct NVGcontext* _ctx);
++BGFX_C_API uint16_t nvgGetViewId(struct NVGcontext* _ctx);
+@@ -67 +68 @@
+-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags);
++BGFX_C_API NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _width, int32_t _height, int32_t _imageFlags);
+@@ -70 +71 @@
+-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _imageFlags, bgfx::ViewId _viewId);
++BGFX_C_API void nvgluBindFramebuffer(NVGLUframebuffer* _framebuffer);
+@@ -73 +74 @@
+-NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* _ctx, int32_t _imageFlags);
++BGFX_C_API void nvgluDeleteFramebuffer(NVGLUframebuffer* _framebuffer);
+@@ -76 +77 @@
+-void nvgluBindFramebuffer(NVGLUframebuffer* _framebuffer);
++BGFX_C_API void nvgluSetViewFramebuffer(bgfx::ViewId _viewId, NVGLUframebuffer* _framebuffer);
+@@ -79,4 +80 @@
+-void nvgluDeleteFramebuffer(NVGLUframebuffer* _framebuffer);
+-
+-///
+-void nvgluSetViewFramebuffer(bgfx::ViewId _viewId, NVGLUframebuffer* _framebuffer);
++BGFX_C_API int nvgCreateBgfxTexture(NVGcontext * _ctx, bgfx::TextureHandle _id, int _width, int _height, int _flags);

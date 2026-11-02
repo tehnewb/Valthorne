@@ -6,6 +6,7 @@ import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.nio.file.Files;
 
 /**
  * Reusable native file-dialog settings backed by LWJGL TinyFileDialogs.
@@ -109,6 +110,13 @@ public final class NativeFileDialog {
         PointerBuffer patterns = null;
         ByteBuffer[] encoded = filterPatterns.length == 0 ? null : new ByteBuffer[filterPatterns.length];
         try {
+            String initialPath = defaultPath;
+            if (initialPath != null) {
+                Path path = Path.of(initialPath);
+                String separator = path.getFileSystem().getSeparator();
+                // TinyFileDialogs distinguishes directory-only paths by their trailing separator.
+                if (Files.isDirectory(path) && !initialPath.endsWith(separator)) initialPath += separator;
+            }
             if (encoded != null) {
                 patterns = MemoryUtil.memAllocPointer(encoded.length);
                 for (int i = 0; i < encoded.length; i++) {
@@ -117,8 +125,8 @@ public final class NativeFileDialog {
                 }
             }
             String selected = save
-                    ? TinyFileDialogs.tinyfd_saveFileDialog(title, defaultPath, patterns, filterDescription)
-                    : TinyFileDialogs.tinyfd_openFileDialog(title, defaultPath, patterns, filterDescription, false);
+                    ? TinyFileDialogs.tinyfd_saveFileDialog(title, initialPath, patterns, filterDescription)
+                    : TinyFileDialogs.tinyfd_openFileDialog(title, initialPath, patterns, filterDescription, false);
             return selected == null ? null : Path.of(selected);
         } finally {
             if (encoded != null) {

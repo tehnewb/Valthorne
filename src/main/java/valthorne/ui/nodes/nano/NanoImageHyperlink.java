@@ -1,6 +1,7 @@
 package valthorne.ui.nodes.nano;
 
 import org.lwjgl.nanovg.NVGPaint;
+import valthorne.graphics.bgfx.BgfxGraphics;
 import valthorne.graphics.texture.TextureData;
 
 import static org.lwjgl.nanovg.NanoVG.*;
@@ -12,7 +13,8 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * used to draw the node. Moving the node to another context deletes the previous
  * image handle and creates a replacement. Destroying the node releases both the
  * NanoVG image and its CPU-side texture data, so callers must not share ownership
- * of that data after construction.</p>
+ * of that data after construction. The image pattern accounts for TextureData's
+ * bottom-first rows without modifying the source pixels.</p>
  *
  * <p>For example:</p>
  * <pre>{@code
@@ -22,6 +24,8 @@ import static org.lwjgl.nanovg.NanoVG.*;
  * }</pre>
  */
 public class NanoImageHyperlink extends NanoHyperlink {
+    private long imageGeneration = -1; // Device generation owning the cached NanoVG image.
+
     private TextureData texture; // Owned CPU-side pixels used for lazy uploads.
     private int imageHandle = -1; // Current NanoVG image handle, or -1 when absent.
     private long imageContext; // NanoVG context that owns the current image handle.
@@ -84,7 +88,8 @@ public class NanoImageHyperlink extends NanoHyperlink {
         float opacity = isEnabled() ? (isPressed() ? .72f : 1f) : .45f;
         NVGPaint paint = NVGPaint.calloc();
         try {
-            nvgImagePattern(vg, x, y, width, height, 0, imageHandle, opacity, paint);
+            // Match bottom-first TextureData without relying on renderer image flags.
+            nvgImagePattern(vg, x, y + height, width, -height, 0, imageHandle, opacity, paint);
             nvgBeginPath(vg);
             nvgRect(vg, x, y, width, height);
             nvgFillPaint(vg, paint);
@@ -112,9 +117,14 @@ public class NanoImageHyperlink extends NanoHyperlink {
      * @param vg nonzero NanoVG context receiving the image
      */
     private void ensureImage(long vg) {
+        if (imageGeneration != BgfxGraphics.generation()) {
+            imageHandle = -1;
+            imageContext = 0;
+            imageGeneration = BgfxGraphics.generation();
+        }
         if (imageHandle > 0 && imageContext == vg) return;
         deleteImage();
-        imageHandle = nvgCreateImageRGBA(vg, texture.width(), texture.height(), NVG_IMAGE_FLIPY, texture.buffer());
+        imageHandle = nvgCreateImageRGBA(vg, texture.width(), texture.height(), 0, texture.buffer());
         imageContext = vg;
     }
 
@@ -123,7 +133,7 @@ public class NanoImageHyperlink extends NanoHyperlink {
      * Repeated calls are safe no-ops after the first deletion.
      */
     private void deleteImage() {
-        if (imageHandle > 0 && imageContext != 0L) nvgDeleteImage(imageContext, imageHandle);
+        if (imageGeneration == BgfxGraphics.generation() && imageHandle > 0 && imageContext != 0L) nvgDeleteImage(imageContext, imageHandle);
         imageHandle = -1;
         imageContext = 0L;
     }

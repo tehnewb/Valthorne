@@ -19,9 +19,10 @@ import java.util.Objects;
 
 /**
  * World-owned deformable XY mesh solved by Jolt's native soft-body solver.
- * Construction triangulates a supported convex shape as a perimeter/center fan
- * with edge constraints; there is no enclosed 3D volume or pressure simulation.
- * Eight constraint iterations and compliance 0.00001 are used initially.
+ * Construction triangulates a supported convex shape with balanced edge constraints
+ * and a retained center vertex; there is no enclosed volume or pressure simulation.
+ * Convex perimeters accept 3 to 128 samples, bounding mesh construction work.
+ * Eight constraint iterations and compliance 0.001 are used initially.
  * Smaller compliance is stiffer; zero requests inextensible edges.
  *
  * <p>The original shape's live perimeter vectors receive interpolated pixels.
@@ -62,9 +63,9 @@ import java.util.Objects;
  */
 public final class SoftBody2D implements AutoCloseable {
     /**
-     * Initial inverse edge stiffness, allowing small elastic stretch under load.
+     * Initial inverse edge stiffness, allowing controlled elastic deformation at ordinary masses.
      */
-    private static final float DEFAULT_COMPLIANCE = 0.00001f;
+    private static final float DEFAULT_COMPLIANCE = 0.001f;
     /**
      * Initial native XPBD constraint iterations per soft update.
      */
@@ -112,6 +113,8 @@ public final class SoftBody2D implements AutoCloseable {
         originY = world.worldY(snapshot.centerY);
         boundary = shape.points();
         int count = boundary.length;
+        if (count < 3 || count > PhysicsSoftTopology2D.MAX_VERTICES)
+            throw new IllegalArgumentException("Soft bodies require 3 to 128 perimeter vertices");
         current = new float[(count + 1) * 2];
         previous = new float[current.length];
         pinned = new boolean[count + 1];
@@ -135,21 +138,17 @@ public final class SoftBody2D implements AutoCloseable {
             current[count * 2 + 1] = (float) (centerY / count);
             vertex.setPosition(current[count * 2] - originX, current[count * 2 + 1] - originY, 0);
             shared.addVertex(vertex);
-            for (int i = 0; i < count; i++) {
-                int next = (i + 1) % count;
-                float dx = current[next * 2] - current[i * 2];
-                float dy = current[next * 2 + 1] - current[i * 2 + 1];
-                double area = (double) dx * (current[count * 2 + 1] - current[i * 2 + 1]) - (double) dy * (current[count * 2] - current[i * 2]);
-                if (area == 0) throw new IllegalArgumentException("Soft mesh contains a degenerate triangle");
-                edge.setVertex(0, i)
-                        .setVertex(1, next)
+            PhysicsSoftTopology2D topology = new PhysicsSoftTopology2D(current);
+            for (int i = 0; i < topology.edges.length; i += 2) {
+                edge.setVertex(0, topology.edges[i])
+                        .setVertex(1, topology.edges[i + 1])
                         .setCompliance(DEFAULT_COMPLIANCE);
                 shared.addEdgeConstraint(edge);
-                edge.setVertex(1, count);
-                shared.addEdgeConstraint(edge);
-                face.setVertex(0, count);
-                face.setVertex(1, i);
-                face.setVertex(2, next);
+            }
+            for (int i = 0; i < topology.triangles.length; i += 3) {
+                face.setVertex(0, topology.triangles[i]);
+                face.setVertex(1, topology.triangles[i + 1]);
+                face.setVertex(2, topology.triangles[i + 2]);
                 shared.addFace(face);
             }
             shared.calculateEdgeLengths();
@@ -284,6 +283,8 @@ public final class SoftBody2D implements AutoCloseable {
 
     /**
      * Sets edge compliance; zero is stiffest and larger values permit stretching.
+     * Very stiff meshes still require mass and timestep tuning;
+     * greater stiffness can amplify numerical energy instead of settling.
      * @param compliance finite nonnegative native compliance in inverse stiffness units
      * @return this body
      */

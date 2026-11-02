@@ -42,7 +42,7 @@ final class BgfxPrimitives2D implements AutoCloseable {
     BgfxPrimitives2D(BgfxDevice device) {
         this.device = device;
         try (BGFXVertexLayout layout = BGFXVertexLayout.calloc()) {
-            bgfx_vertex_layout_begin(layout, BGFX_RENDERER_TYPE_OPENGL);
+            bgfx_vertex_layout_begin(layout, device.rendererType());
             bgfx_vertex_layout_add(layout, BGFX_ATTRIB_TEXCOORD0, (byte) 4, BGFX_ATTRIB_TYPE_FLOAT, false, false);
             bgfx_vertex_layout_add(layout, BGFX_ATTRIB_TEXCOORD1, (byte) 4, BGFX_ATTRIB_TYPE_FLOAT, false, false);
             bgfx_vertex_layout_end(layout);

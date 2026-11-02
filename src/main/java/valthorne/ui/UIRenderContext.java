@@ -1,5 +1,7 @@
 package valthorne.ui;
 
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.Window;
 import valthorne.graphics.font.TextFont;
 import valthorne.graphics.font.TextRun;
 import valthorne.graphics.texture.TextureBatch;
@@ -109,8 +111,10 @@ public final class UIRenderContext {
         var viewport = root.getViewport();
         var camera = viewport == null ? null : viewport.getCamera();
         zoom = camera == null ? 1f : camera.getZoom();
-        cameraX = camera == null ? 0f : viewport.getWorldWidth() * 0.5f - camera.getCenter().x() * zoom;
-        cameraY = camera == null ? 0f : height * 0.5f - (height - camera.getCenter().y()) * zoom;
+        float offsetX = BgfxGraphics.isActive() ? BgfxGraphics.nanoOffsetX(viewport == null ? root.getWidth() : viewport.getWorldWidth()) : 0;
+        float offsetY = BgfxGraphics.isActive() ? BgfxGraphics.nanoOffsetY(height) : 0;
+        cameraX = (camera == null ? 0f : viewport.getWorldWidth() * 0.5f - camera.getCenter().x() * zoom) + offsetX;
+        cameraY = (camera == null ? 0f : height * 0.5f - (height - camera.getCenter().y()) * zoom) + offsetY;
     }
 
     /**
@@ -575,6 +579,7 @@ public final class UIRenderContext {
         backendSwitches++;
         if (nano) {
             batch.flush();
+            if (BgfxGraphics.isActive()) BgfxGraphics.selectNano(vg);
         } else {
             nvgEndFrame(vg);
             nanoFlushes++;

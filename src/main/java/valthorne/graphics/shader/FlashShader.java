@@ -1,13 +1,11 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 /**
  * Time-based flash shader.
  *
  * <h2>What this shader does</h2>
  * <ul>
- *     <li>Samples {@code u_texture} at {@code v_uv} and tints by {@code gl_Color}.</li>
+ *     <li>Samples {@code u_texture} at {@code v_uv} and tints by {@code vertex tint}.</li>
  *     <li>Linearly mixes the sampled RGB toward {@code u_flashColor.rgb} by {@code u_amount}.</li>
  *     <li>Preserves original alpha (flash affects color only).</li>
  * </ul>
@@ -48,15 +46,10 @@ import valthorne.io.file.ValthorneFiles;
 public class FlashShader extends TexturedQuadShader {
 
     /**
-     * Fragment source loaded from the packaged flash effect shader resource.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/flash.frag");
-
-    /**
-     * Creates a new {@code FlashShader} using the built-in GLSL sources.
+     * Creates a new {@code FlashShader} using the packaged compiled stages.
      */
     public FlashShader() {
-        super(FRAG_SRC);
+        super("engine/effects/flash.frag");
     }
 
     /**
