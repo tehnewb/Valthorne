@@ -1,8 +1,11 @@
 package valthorne.compression;
 
-import java.nio.ByteBuffer;
-import java.util.zip.Deflater;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 /**
  * The Deflate class implements the CompressionStrategy interface and provides methods
@@ -10,15 +13,23 @@ import java.util.zip.Inflater;
  * <p>
  * Deflate is a widely used lossless data compression algorithm supported by
  * various file formats and protocols, including ZIP files and HTTP compression. This class
- * uses the java.util.zip.Deflater and java.util.zip.Inflater classes to perform compression
- * and decompression, respectively.
+ * uses owned zlib streams to perform compression and decompression. Standard
+ * stream buffering handles empty, small, and incompressible inputs without
+ * manual capacity calculations. Every call releases its native codec state,
+ * including failure paths; decompression rejects truncated or malformed input.
  *
  * @author Albert Beaupre
- * @see Deflater
- * @see Inflater
+ * @see DeflaterOutputStream
+ * @see InflaterInputStream
  * @since May 10th, 2025
  */
 public class Deflate implements CompressionStrategy {
+
+    /**
+     * Creates a stateless zlib codec; individual calls own their stream resources.
+     */
+    public Deflate() {
+    }
 
     /**
      * Compresses the given byte array using the Deflate compression algorithm.
@@ -29,33 +40,14 @@ public class Deflate implements CompressionStrategy {
      */
     @Override
     public byte[] compress(byte[] data) {
-        Deflater deflater = new Deflater();
-        deflater.setInput(data);
-        deflater.finish();
-
-        // Allocate a ByteBuffer with an initial capacity of half the input data length.
-        ByteBuffer compressedBuffer = ByteBuffer.allocate(data.length / 2);
-
-        byte[] buffer = new byte[1024];
-        while (!deflater.finished()) {
-            int compressedBytes = deflater.deflate(buffer);
-
-            // Ensure there is enough space in the ByteBuffer
-            if (compressedBuffer.remaining() < compressedBytes) {
-                ByteBuffer newBuffer = ByteBuffer.allocate(compressedBuffer.capacity() * 2);
-                compressedBuffer.flip();
-                newBuffer.put(compressedBuffer);
-                compressedBuffer = newBuffer;
-            }
-
-            compressedBuffer.put(buffer, 0, compressedBytes);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (DeflaterOutputStream stream = new DeflaterOutputStream(output)) {
+            stream.write(data);
+            stream.finish();
+            return output.toByteArray();
+        } catch (IOException failure) {
+            throw new RuntimeException("Failed to compress using Deflate algorithm", failure);
         }
-        deflater.end();
-
-        compressedBuffer.flip();
-        byte[] compressedData = new byte[compressedBuffer.remaining()];
-        compressedBuffer.get(compressedData);
-        return compressedData;
     }
 
     /**
@@ -67,35 +59,12 @@ public class Deflate implements CompressionStrategy {
      */
     @Override
     public byte[] decompress(byte[] data) {
-        Inflater inflater = new Inflater();
-        inflater.setInput(data);
-
-        try {
-            // Allocate a ByteBuffer with an initial capacity of twice the input data length.
-            ByteBuffer decompressedBuffer = ByteBuffer.allocate(data.length * 2);
-
-            byte[] buffer = new byte[1024];
-            while (!inflater.finished()) {
-                int decompressedBytes = inflater.inflate(buffer);
-
-                // Ensure there is enough space in the ByteBuffer
-                if (decompressedBuffer.remaining() < decompressedBytes) {
-                    ByteBuffer newBuffer = ByteBuffer.allocate(decompressedBuffer.capacity() * 2);
-                    decompressedBuffer.flip();
-                    newBuffer.put(decompressedBuffer);
-                    decompressedBuffer = newBuffer;
-                }
-
-                decompressedBuffer.put(buffer, 0, decompressedBytes);
-            }
-            inflater.end();
-
-            decompressedBuffer.flip();
-            byte[] decompressedData = new byte[decompressedBuffer.remaining()];
-            decompressedBuffer.get(decompressedData);
-            return decompressedData;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to decompress using Deflate algorithm", e);
+        try (Inflater inflater = new Inflater(); InflaterInputStream stream = new InflaterInputStream(new ByteArrayInputStream(data), inflater)) {
+            byte[] decoded = stream.readAllBytes();
+            if (!inflater.finished()) throw new IOException("Incomplete zlib stream or unsupported preset dictionary");
+            return decoded;
+        } catch (IOException failure) {
+            throw new RuntimeException("Failed to decompress using Deflate algorithm", failure);
         }
     }
 }

@@ -69,20 +69,10 @@ public class XZStrategy implements CompressionStrategy {
      */
     @Override
     public byte[] decompress(byte[] data) {
-        try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            XZCompressorInputStream xz = new XZCompressorInputStream(bais);
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int n;
-
-            while ((n = xz.read(buffer)) != -1)
-                out.write(buffer, 0, n);
-
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException("XZ decompression failed", e);
+        try (XZCompressorInputStream xz = new XZCompressorInputStream(new ByteArrayInputStream(data))) {
+            return xz.readAllBytes();
+        } catch (IOException failure) {
+            throw new RuntimeException("XZ decompression failed", failure);
         }
     }
 }

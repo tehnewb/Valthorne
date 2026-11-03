@@ -64,20 +64,10 @@ public class BZIP2Strategy implements CompressionStrategy {
      */
     @Override
     public byte[] decompress(byte[] data) {
-        try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            BZip2CompressorInputStream bzip = new BZip2CompressorInputStream(bais);
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int n;
-
-            while ((n = bzip.read(buffer)) != -1)
-                out.write(buffer, 0, n);
-
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException("BZIP2 decompression failed", e);
+        try (BZip2CompressorInputStream bzip = new BZip2CompressorInputStream(new ByteArrayInputStream(data))) {
+            return bzip.readAllBytes();
+        } catch (IOException failure) {
+            throw new RuntimeException("BZIP2 decompression failed", failure);
         }
     }
 }

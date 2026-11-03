@@ -46,6 +46,8 @@ import valthorne.viewport.Viewport;
  * Subclasses should place their custom cleanup in {@link #dispose()}, then call
  * {@link #disposeScene()} at the end of that method. The infrastructure disposal method
  * intentionally does <b>not</b> call {@link #dispose()} again. This avoids recursive disposal bugs.
+ * The scene controller invokes the subclass hook once before releasing shared resources,
+ * and ensures infrastructure cleanup even when that hook throws or omits the helper call.
  * </p>
  *
  * <h2>Rendering behavior</h2>
@@ -73,7 +75,7 @@ import valthorne.viewport.Viewport;
  *     }
  *
  *     @Override
- *     public void render(TextureBatch batch) {
+ *     public void draw(TextureBatch batch) {
  *
  *     }
  *
@@ -106,6 +108,7 @@ public abstract class Scene {
     private SceneMouseScrollListener mouseScrollListener; // The registered mouse scroll listener that forwards wheel events into this scene.
     private boolean initialized; // Whether the shared scene infrastructure has already been initialized.
     private boolean infrastructureDisposed; // Whether the shared scene infrastructure has already been disposed.
+    private boolean disposalStarted; // Prevents controller shutdown from reentering or repeating subclass cleanup.
 
 
     /**
@@ -127,6 +130,7 @@ public abstract class Scene {
         if (initialized)
             return;
 
+        disposalStarted = false;
         this.batch = new TextureBatch(4096, 16);
         this.ui = new UIRoot();
         this.viewport = new ScreenViewport(Window.getWidth(), Window.getHeight());
@@ -247,6 +251,30 @@ public abstract class Scene {
     public abstract void dispose();
 
     /**
+     * Shuts down one controller-owned scene lifetime. Calls subclass cleanup once,
+     * then releases shared infrastructure even when the subclass throws or omits
+     * its documented call to {@link #disposeScene()}. Reentrant shutdown is ignored.
+     *
+     * @throws RuntimeException if cleanup fails; secondary failures are suppressed
+     * @throws Error if cleanup fails with an error
+     */
+    final void closeScene() {
+        if (disposalStarted) return;
+        disposalStarted = true;
+        try {
+            dispose();
+        } catch (RuntimeException | Error failure) {
+            try {
+                disposeScene();
+            } catch (RuntimeException | Error cleanup) {
+                if (cleanup != failure) failure.addSuppressed(cleanup);
+            }
+            throw failure;
+        }
+        disposeScene();
+    }
+
+    /**
      * Disposes the shared infrastructure created by {@link #initializeFields()}.
      *
      * <p>
@@ -304,7 +332,6 @@ public abstract class Scene {
         camera = null;
         initialized = false;
         infrastructureDisposed = true;
-        dispose();
     }
 
     /**

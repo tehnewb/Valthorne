@@ -32,7 +32,8 @@ public record ZIP(String entryName) implements CompressionStrategy {
 
     /**
      * Compresses the given byte array using the ZIP compression format.
-     * The data is stored as a single ZIP entry named "data".
+     * The entry uses this codec's configured name, and the central directory is
+     * finalized before the result is returned.
      *
      * @param data The input data to be compressed.
      * @return The compressed data as a byte array in ZIP format.
@@ -47,6 +48,7 @@ public record ZIP(String entryName) implements CompressionStrategy {
             zipOut.putNextEntry(entry);
             zipOut.write(data);
             zipOut.closeEntry();
+            zipOut.finish();
 
             return byteOut.toByteArray();
         } catch (IOException e) {
@@ -56,7 +58,7 @@ public record ZIP(String entryName) implements CompressionStrategy {
 
     /**
      * Decompresses the given ZIP-compressed byte array and returns the first entry's content.
-     * Assumes the ZIP archive contains a single entry named "data".
+     * The first entry must match this codec's configured entry name.
      *
      * @param data The compressed data in ZIP format.
      * @return The decompressed data as a byte array.
@@ -65,21 +67,13 @@ public record ZIP(String entryName) implements CompressionStrategy {
     @Override
     public byte[] decompress(byte[] data) {
         try (ByteArrayInputStream byteIn = new ByteArrayInputStream(data);
-             ZipInputStream zipIn = new ZipInputStream(byteIn);
-             ByteArrayOutputStream byteOut = new ByteArrayOutputStream()) {
+             ZipInputStream zipIn = new ZipInputStream(byteIn)) {
 
             ZipEntry entry = zipIn.getNextEntry();
             if (entry == null || !entryName.equals(entry.getName()))
                 throw new RuntimeException("ZIP entry not found or invalid");
 
-            byte[] buffer = new byte[1024];
-            int len;
-            while ((len = zipIn.read(buffer)) != -1) {
-                byteOut.write(buffer, 0, len);
-            }
-
-            zipIn.closeEntry();
-            return byteOut.toByteArray();
+            return zipIn.readAllBytes();
         } catch (IOException e) {
             throw new RuntimeException("Failed to decompress using ZIP algorithm", e);
         }

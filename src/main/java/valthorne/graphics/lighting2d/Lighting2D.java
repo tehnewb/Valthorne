@@ -163,6 +163,10 @@ public final class Lighting2D implements AutoCloseable {
      * @throws IllegalStateException if the framebuffer is incomplete
      */
     private static void allocate(int texture, int fbo, int w, int h, int format) {
+        /*
+         * Attach newly allocated storage before checking completeness; the caller
+         * owns restoration of the temporary framebuffer and texture bindings.
+         */
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, GL_RGBA, GL_FLOAT, 0L);
@@ -180,6 +184,10 @@ public final class Lighting2D implements AutoCloseable {
      * @param filter OpenGL minification/magnification filter
      */
     private static void parameters(int filter) {
+        /*
+         * Both offscreen color targets clamp at their edges; the shadow atlas
+         * overrides horizontal wrapping after applying these shared defaults.
+         */
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -210,7 +218,8 @@ public final class Lighting2D implements AutoCloseable {
     public Lighting2D addLight(PointLight2D light) {
         check();
         Objects.requireNonNull(light);
-        if (lights.stream().anyMatch(e -> e.light == light)) return this;
+        for (int i = 0; i < lights.size(); i++)
+            if (lights.get(i).light == light) return this;
         if (lights.size() == capacity) throw new IllegalStateException("Light capacity reached");
         int slot = slots.nextClearBit(0);
         slots.set(slot);
