@@ -4,7 +4,7 @@ package valthorne.audio;
  * <p>
  * {@code AudioFormat} enumerates the audio container or codec types currently recognized
  * by Valthorne's sound loading pipeline. Each enum constant stores the signature bytes
- * used for format detection, whether special MP3 frame-sync fallback logic should be
+ * used for format detection, whether validated MPEG audio frame-header fallback logic should be
  * applied, and the {@link SoundDecoder} responsible for decoding that format when
  * decoding is supported.
  * </p>
@@ -41,7 +41,7 @@ public enum AudioFormat {
      */
     OGG(new OggSoundDecoder(), new byte[][]{{'O', 'g', 'g', 'S'}}),
     /**
-     * MP3 identification using ID3 signatures and frame-sync fallback, with a built-in decoder.
+     * MP3 identification using ID3 signatures and validated MPEG audio headers, with a built-in decoder.
      */
     MP3(new Mp3SoundDecoder(), new byte[][]{{'I', 'D', '3'}}, true),
     /**
@@ -107,6 +107,10 @@ public enum AudioFormat {
      * @return the detected audio format, or {@link #UNKNOWN} when no match is found
      */
     public static AudioFormat detect(byte[] data) {
+        /*
+         * Preserve explicit signature matching; the MPEG fallback excludes reserved
+         * header fields so ADTS reaches its own recognized, unsupported format.
+         */
         if (data == null || data.length == 0)
             return UNKNOWN;
 
@@ -120,6 +124,8 @@ public enum AudioFormat {
 
     /**
      * Returns whether the supplied bytes match this format's signature rules.
+     * The MPEG fallback requires a complete four-byte header with non-reserved
+     * version, layer, bitrate and sample-rate fields; it does not validate frame payloads.
      *
      * @param data the bytes to test
      * @return {@code true} when the bytes match this format
@@ -140,10 +146,13 @@ public enum AudioFormat {
                 return true;
         }
 
-        if (needsMp3Fallback && data.length > 2) {
+        if (needsMp3Fallback && data.length >= 4) {
             int b0 = data[0] & 0xFF;
             int b1 = data[1] & 0xFF;
-            return b0 == 0xFF && (b1 & 0xE0) == 0xE0;
+            int b2 = data[2] & 0xFF;
+            // Reject reserved version/layer values, including the zero layer bits in AAC ADTS.
+            // Free-format bitrate (index zero) remains valid; index fifteen is reserved.
+            return b0 == 0xFF && (b1 & 0xE0) == 0xE0 && (b1 & 0x18) != 0x08 && (b1 & 0x06) != 0 && (b2 & 0xF0) != 0xF0 && (b2 & 0x0C) != 0x0C;
         }
 
         return false;
