@@ -20,6 +20,9 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * physical pixels per em uses grayscale FreeType coverage with configurable
  * {@link FontHinting}; larger, rotated,
  * perspective or anisotropically scaled text uses linear MSDF atlases.
+ * Coverage quads retain their raster's native physical pixel dimensions and
+ * bearings at fractional logical sizes and display scales. Shaped advances and
+ * measurements remain fractional and independent of raster selection.
  * Size is not part of the encoded asset. {@link #setSize(float)} changes the
  * default for size-free drawing and measurement, initially 16 logical units per
  * em. Explicit-size calls and retained layouts keep independent sizes. Change
@@ -667,6 +670,8 @@ public final class AdaptiveFont implements TextFont {
         float pixelOffsetY = batch.getTranslationY() * pixelScaleY + pixelOriginY;
         float inversePixelScaleX = raster == 0 ? 0 : 1 / pixelScaleX;
         float inversePixelScaleY = raster == 0 ? 0 : 1 / pixelScaleY;
+        float imageScaleX = raster == 0 ? size : raster * inversePixelScaleX;
+        float imageScaleY = raster == 0 ? size : raster * inversePixelScaleY;
         Shader previous = batch.getShader();
         boolean override = !batch.supportsDistanceFields();
         try {
@@ -700,13 +705,17 @@ public final class AdaptiveFont implements TextFont {
                 float drawX = x + localX;
                 float drawY = y + localY;
                 if (raster != 0) {
+                    localX = xs[i] * size + glyph.left() * imageScaleX;
+                    localY = ys[i] * size + glyph.bottom() * imageScaleY;
+                    drawX = x + localX;
+                    drawY = y + localY;
                     // Hinted images already contain pixel coverage. Fractional glyph origins
                     // filter that coverage a second time and blur even fully covered stems.
                     drawX = (Math.round(drawX * pixelScaleX + pixelOffsetX) - pixelOffsetX) * inversePixelScaleX;
                     drawY = (Math.round(drawY * pixelScaleY + pixelOffsetY) - pixelOffsetY) * inversePixelScaleY;
                 }
-                float width = glyph.width() * size;
-                float height = glyph.height() * size;
+                float width = glyph.width() * imageScaleX;
+                float height = glyph.height() * imageScaleY;
                 if (callback != null) {
                     int character = run.clusters[i];
                     glyphStyle.reset();
