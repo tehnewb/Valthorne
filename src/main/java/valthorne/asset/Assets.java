@@ -24,7 +24,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -147,9 +146,9 @@ public final class Assets {
      */
     private static final AtomicInteger completedCount = new AtomicInteger(0);
     /**
-     * Concurrent set of assets queued for prepared loading.
+     * Prepared parameters and the type each batch load should request.
      */
-    private static final Set<AssetParameters> prepared = ConcurrentHashMap.newKeySet();
+    private static final ConcurrentMap<AssetParameters, Class<?>> prepared = new ConcurrentHashMap<>();
     /**
      * Atomic count used as the prepared-loading progress denominator.
      */
@@ -556,10 +555,27 @@ public final class Assets {
      * @throws NullPointerException If {@code params} is null.
      */
     public static void prepare(AssetParameters params) {
-        Objects.requireNonNull(params);
+        prepare(params, Object.class);
+    }
 
-        if (prepared.add(params))
-            preparedCount.incrementAndGet();
+    /**
+     * Queues an asset with the same output type selection as {@link #loadAsync(AssetParameters, Class)}.
+     * For example, prepare texture parameters with {@code Texture.class} to construct the
+     * texture on the render thread and cache it under the parameters' key.
+     *
+     * @param params asset parameters
+     * @param assetType requested data or finished resource type
+     * @throws IllegalArgumentException if the same parameters are queued with another type
+     */
+    public static void prepare(AssetParameters params, Class<?> assetType) {
+        Objects.requireNonNull(params);
+        Objects.requireNonNull(assetType);
+        synchronized (CACHE_LOCK) {
+            Class<?> previous = prepared.putIfAbsent(params, assetType);
+            if (previous == null) preparedCount.incrementAndGet();
+            else if (previous != assetType)
+                throw new IllegalArgumentException("Asset already prepared as " + previous.getName() + ": " + params.key());
+        }
     }
 
     /**
@@ -588,11 +604,11 @@ public final class Assets {
     public static CompletableFuture<Void> load() {
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
 
-        for (AssetParameters parameters : prepared) {
-            if (!prepared.remove(parameters))
-                continue;
+        for (AssetParameters parameters : prepared.keySet()) {
+            Class<?> assetType = prepared.remove(parameters);
+            if (assetType == null) continue;
 
-            CompletableFuture<?> future = loadAsync(parameters, Object.class)
+            CompletableFuture<?> future = loadAsync(parameters, assetType)
                     .whenComplete((_, ex) -> {
                         if (ex != null) {
                             ex.printStackTrace();
