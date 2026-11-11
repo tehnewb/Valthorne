@@ -1,5 +1,6 @@
 package valthorne.asset;
 
+import valthorne.JGL;
 import valthorne.audio.SoundLoader;
 import valthorne.audio.SoundParameters;
 import valthorne.graphics.animation.AnimationLoader;
@@ -26,6 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -73,8 +75,13 @@ import java.util.function.Consumer;
  *
  * <h2>Caching and deduplication</h2>
  * <p>
- * Both workflows deduplicate by the parameter key. If the same key is requested multiple times,
- * callers will share the same {@link CompletableFuture} instance from {@link #cache}.
+ * Both workflows deduplicate compatible requests by the parameter key.
+ * Request a loader's finished type to decode and construct in one operation:
+ * </p>
+ * <pre>{@code
+ * Assets.loadAsync(TextureParameters.fromClasspath("ui/logo.png", "logo"), Texture.class);
+ * }</pre>
+ * <p>
  * Already constructed resources can be registered with {@link #put(String, Object, Consumer)}:
  * </p>
  * <pre>{@code
@@ -92,9 +99,11 @@ import java.util.function.Consumer;
  *
  * <h2>Threading model</h2>
  * <p>
- * All loading work runs on {@link #service}. Loaders are looked up by the runtime class of the parameter
+ * Decoding runs on {@link #service}. Loaders are looked up by the runtime class of the parameter
  * instance (e.g. {@code TextureParameters.class}). The cache stores futures so callers can join or compose
- * without blocking the render thread.
+ * without blocking the render thread. {@link ConstructingAssetLoader} finalizes
+ * finished resources on the active render loop. Do not join a pending construction
+ * from that loop. Unload finished resources on their owner thread before graphics shutdown.
  * Cache registration/removal is coordinated briefly; retrieval does not acquire
  * that lock. Cleanup callbacks execute on the caller of unload/clear, so satisfy
  * each resource's thread/context requirements. Coordinate cleanup with consumers
@@ -213,7 +222,9 @@ public final class Assets {
     /**
      * Asynchronously loads an asset of the specified type using the provided asset parameters.
      * This method first checks if the requested asset is already being loaded or cached. If so,
-     * it returns the cached future. Otherwise, it initiates a new asynchronous load operation.
+     * compatible callers share the cached result. A request for a loader's finished
+     * type completes after construction on the render loop. Data requests only
+     * run the decoding stage. Use distinct keys to retain both results.
      *
      * @param <P>        The type of the asset parameters, which must extend {@link AssetParameters}.
      * @param <T>        The type of the asset to be loaded.
@@ -225,16 +236,28 @@ public final class Assets {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <P extends AssetParameters, T> CompletableFuture<T> loadAsync(P parameters, Class<T> assetType) {
+        /*
+         * Reserve the final output before decoding so concurrent callers share
+         * one decode and, when requested, one graphics allocation.
+         */
         Objects.requireNonNull(parameters);
         Objects.requireNonNull(assetType);
 
         final String key = parameters.key();
 
+        AssetLoader loader = loaders.get(parameters.getClass());
+        ConstructingAssetLoader<?, Object, T> construction = null;
+        if (loader instanceof ConstructingAssetLoader<?, ?, ?> candidate && candidate.assetType() == assetType)
+            construction = (ConstructingAssetLoader<?, Object, T>) candidate;
+        ConstructingAssetLoader<?, Object, T> selected = construction;
         AssetEntry<T> entry;
         synchronized (CACHE_LOCK) {
             AssetEntry<?> existing = cache.get(key);
-            if (existing != null) return (CompletableFuture<T>) existing.future();
-            entry = new AssetEntry<>(key, new CompletableFuture<>(), null);
+            if (existing != null) {
+                if (assetType.isAssignableFrom(existing.type())) return (CompletableFuture<T>) existing.future();
+                return existing.future().thenApply(assetType::cast);
+            }
+            entry = new AssetEntry<>(key, assetType, new CompletableFuture<>(), selected == null ? null : selected::dispose);
             register(entry);
         }
         try {
@@ -243,10 +266,13 @@ public final class Assets {
                 Object loaded = null;
                 T value;
                 try {
-                    AssetLoader loader = loaders.get(parameters.getClass());
                     if (loader == null)
                         throw new IllegalStateException("No loader for " + parameters.getClass().getName());
                     loaded = loader.load(parameters);
+                    if (selected != null) {
+                        constructAsync(entry.future(), selected, loaded);
+                        return;
+                    }
                     value = assetType.cast(loaded);
                 } catch (Throwable failure) {
                     failure = appendSuppressed(failure, disposeAssetValue(loaded));
@@ -262,6 +288,66 @@ public final class Assets {
             entry.future().completeExceptionally(failure);
         }
         return entry.future();
+    }
+
+    /**
+     * Passes ownership of decoded data to queued construction. Cancellation
+     * releases data only if the render task has yet to claim it.
+     *
+     * @param future cached result of the complete load
+     * @param loader loader owning the construction and disposal policy
+     * @param data decoded input owned by this request
+     * @param <T> finished asset type
+     */
+    private static <T> void constructAsync(CompletableFuture<T> future, ConstructingAssetLoader<?, Object, T> loader, Object data) {
+        /*
+         * One claim transfers ownership. A successful resource retains its
+         * input, while a cancelled or failed construction releases it once.
+         */
+        AtomicReference<Object> pending = new AtomicReference<>(Objects.requireNonNull(data, "decoded data"));
+        future.whenComplete((value, failure) -> {
+            Throwable cleanup = disposeAssetValue(pending.getAndSet(null));
+            if (failure != null) appendSuppressed(failure, cleanup);
+            else if (cleanup != null) rethrowUnchecked(cleanup);
+        });
+        try {
+            JGL.submitRenderTask(() -> {
+                Object input = pending.getAndSet(null);
+                if (input == null) return;
+                T asset;
+                try {
+                    asset = Objects.requireNonNull(loader.construct(input), "constructed asset");
+                } catch (Throwable failure) {
+                    failConstruction(future, appendSuppressed(failure, disposeAssetValue(input)));
+                    return;
+                }
+                if (!future.complete(asset)) {
+                    try {
+                        loader.dispose(asset);
+                    } catch (Throwable failure) {
+                        failConstruction(future, failure);
+                    }
+                }
+            }).whenComplete((ignored, failure) -> {
+                if (failure instanceof CancellationException) future.completeExceptionally(failure);
+                else if (failure != null) failConstruction(future, failure);
+            });
+        } catch (Throwable failure) {
+            failConstruction(future, failure);
+        }
+    }
+
+    /**
+     * Completes a failed construction or reports an error after cancellation.
+     *
+     * @param future cached resource request
+     * @param failure construction, scheduling or cleanup failure
+     */
+    private static void failConstruction(CompletableFuture<?> future, Throwable failure) {
+        /*
+         * An already completed future cannot carry a late disposal error.
+         */
+        if (!future.completeExceptionally(failure)) failure.printStackTrace();
     }
 
     /**
@@ -290,7 +376,7 @@ public final class Assets {
                 if (registrationOrder.get(i).completedValue() == value)
                     throw new IllegalArgumentException("Resource is already cached");
             }
-            register(new AssetEntry<>(key, CompletableFuture.completedFuture(value), disposer));
+            register(new AssetEntry<>(key, value.getClass(), CompletableFuture.completedFuture(value), disposer));
         }
         return value;
     }
@@ -310,6 +396,21 @@ public final class Assets {
             cache.remove(entry.key(), entry);
             throw failure;
         }
+    }
+
+    /**
+     * Checks whether a named asset is available without waiting. For a constructed
+     * resource, the result becomes true after its render-thread construction.
+     *
+     * @param key cache name to check
+     * @return true when the cache holds a successfully loaded value
+     */
+    public static boolean isLoaded(String key) {
+        /*
+         * Pending, failed and cancelled futures cannot provide a usable asset.
+         */
+        AssetEntry<?> entry = cache.get(key);
+        return entry != null && entry.completedValue() != null;
     }
 
     /**

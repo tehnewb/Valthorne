@@ -1,6 +1,9 @@
 package valthorne;
 
+import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingDeque;
 import org.lwjgl.glfw.GLFW;
 import valthorne.event.Event;
@@ -70,7 +73,7 @@ public class JGL {
     private static short framesPerSecond;
 
     /**
-     * Application-loop continuation flag.
+     * Application-loop continuation flag guarded by the task queue monitor.
      */
     private static boolean running;
 
@@ -108,11 +111,10 @@ public class JGL {
         if (application == null) throw new NullPointerException("Application cannot be null");
         if (config == null) throw new NullPointerException("JGLConfiguration cannot be null");
 
-        if (running) {
-            throw new IllegalStateException("JGL is already running");
+        synchronized (tasks) {
+            if (running) throw new IllegalStateException("JGL is already running");
+            running = true;
         }
-
-        running = true;
 
         boolean glfwInitialized = false;
         boolean applicationInitialized = false;
@@ -220,6 +222,28 @@ public class JGL {
             throw new NullPointerException("A null task cannot be executed.");
         WindowContext context = WindowContext.current();
         tasks.add(context == null ? task : new ContextTask(context, task));
+    }
+
+    /**
+     * Schedules work on the active rendering loop and reports its completion.
+     * Pending work is cancelled when the loop shuts down. Callers must release
+     * any input they still own when execution is rejected or cancelled.
+     *
+     * @param task rendering-thread work
+     * @return completion of the task, or failure when no loop is active
+     */
+    public static CompletableFuture<Void> submitRenderTask(Runnable task) {
+        /*
+         * Check the lifecycle and publish the task together so shutdown cannot
+         * discard it without completing its future.
+         */
+        Objects.requireNonNull(task, "task");
+        synchronized (tasks) {
+            if (!running) return CompletableFuture.failedFuture(new IllegalStateException("JGL is not running"));
+            CompletableFuture<Void> completion = new CompletableFuture<>();
+            tasks.add(new RenderTask(task, completion));
+            return completion;
+        }
     }
 
     /**
@@ -356,11 +380,18 @@ public class JGL {
      * flags. Does not perform native resource cleanup.
      */
     static void resetState() {
-        tasks.clear();
+        ArrayList<RenderTask> discarded = new ArrayList<>();
+        synchronized (tasks) {
+            Runnable task;
+            while ((task = tasks.poll()) != null) {
+                if (task instanceof RenderTask renderTask) discarded.add(renderTask);
+            }
+            running = false;
+        }
         events.clear();
         deltaTime = 0f;
         framesPerSecond = 0;
-        running = false;
+        for (RenderTask task : discarded) task.completion().cancel(false);
     }
 
     /**

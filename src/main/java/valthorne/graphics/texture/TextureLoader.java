@@ -1,20 +1,30 @@
 package valthorne.graphics.texture;
 
-import valthorne.asset.AssetLoader;
+import valthorne.asset.ConstructingAssetLoader;
 
 /**
  * TextureLoader is responsible for loading texture data based on given parameters. It implements
- * the {@code AssetLoader} interface and supports loading textures from both filesystem paths and
+ * the {@code ConstructingAssetLoader} interface and supports loading textures from both filesystem paths and
  * raw byte arrays.
  * <p>
  * The loading behavior is determined by the {@code TextureParameters}, which specify
  * the source of the texture and other configurations such as whether the image should
  * be flipped vertically during decoding.
- * The result is decoded pixel data; GPU texture creation is a separate operation.
+ * Decoding can run on a worker. Finished textures take ownership of the decoded
+ * pixels on the graphics thread and release them when disposed.
  *
  * @author Albert Beaupre
  */
-public class TextureLoader implements AssetLoader<TextureParameters, TextureData> {
+public class TextureLoader implements ConstructingAssetLoader<TextureParameters, TextureData, Texture> {
+
+    @Override
+    public Class<Texture> assetType() { return Texture.class; }
+
+    @Override
+    public Texture construct(TextureData data) { return new Texture(data, true); }
+
+    @Override
+    public void dispose(Texture asset) { asset.dispose(); }
 
     /**
      * Decodes the selected image source with the requested vertical orientation.
