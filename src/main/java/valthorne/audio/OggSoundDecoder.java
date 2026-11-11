@@ -18,7 +18,8 @@ import java.nio.file.Path;
  * metadata without retaining a streaming decoder. Probing accepts either a file
  * path or encoded bytes; full decoding accepts bytes and returns independent
  * buffered SoundData. Temporary native decoder and decoded-sample allocations
- * are released after use.
+ * are released after use. Identification and comment packets are validated before
+ * native decoding; either metadata packet exceeding 16 MiB is rejected.
  * <p>For long audio that should not be held fully decoded in memory, use the separate
  * OggSoundStream implementation. This decoder creates no OpenAL playback source.
  *
@@ -37,6 +38,7 @@ public class OggSoundDecoder implements SoundDecoder {
      * @throws RuntimeException if STB cannot open the encoded stream
      */
     public static SoundMetadata probe(byte[] data) {
+        OggVorbisHeaders.validate(data);
         ByteBuffer encoded = BufferUtils.createByteBuffer(data.length);
         encoded.put(data).flip();
 
@@ -72,6 +74,7 @@ public class OggSoundDecoder implements SoundDecoder {
      * @throws RuntimeException if STB cannot open the file
      */
     public static SoundMetadata probe(String path) {
+        OggVorbisHeaders.validate(Path.of(path));
         ByteBuffer fileNameBuffer = MemoryUtil.memUTF8(Path.of(path).toAbsolutePath().toString());
         IntBuffer error = BufferUtils.createIntBuffer(1);
         long decoder = STBVorbis.stb_vorbis_open_filename(fileNameBuffer, error, null);
@@ -114,6 +117,7 @@ public class OggSoundDecoder implements SoundDecoder {
      */
     @Override
     public SoundData decode(byte[] data) throws Exception {
+        OggVorbisHeaders.validate(data);
         ByteBuffer encoded = BufferUtils.createByteBuffer(data.length);
         encoded.put(data).flip();
 

@@ -1,7 +1,5 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 import valthorne.graphics.Sprite;
 
 /**
@@ -54,21 +52,16 @@ import valthorne.graphics.Sprite;
 public class GlowShader extends TexturedQuadShader {
 
     /**
-     * Fragment source loaded from the packaged glow effect shader resource.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/glow.frag");
-
-    /**
-     * Creates a new {@code GlowShader} using the built-in GLSL sources.
+     * Creates a new {@code GlowShader} using the packaged compiled stages.
      */
     public GlowShader() {
-        super(FRAG_SRC);
+        super("engine/effects/glow.frag");
     }
 
     /**
      * Binds the glow effect using the sprite's backing texture dimensions, draws
      * the sprite immediately, and unbinds the program on normal completion. Requires
-     * a current OpenGL context. The previous shader is not restored, and exceptions
+     * a current graphics device. The previous shader is not restored, and exceptions
      * can leave this program bound.
      *
      * @param sprite sprite with a valid backing texture

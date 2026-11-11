@@ -1,9 +1,0 @@
-plugins { id 'java-library' }
-repositories { mavenCentral() }
-java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
-tasks.withType(JavaCompile).configureEach { options.release = 17 }
-// Compile the original platform-independent sources, never copies or the desktop native dependency graph.
-sourceSets.main.java {
-    srcDir '../../src/main/java'
-    include 'valthorne/Application.java', 'valthorne/state/**', 'valthorne/tick/**', 'valthorne/math/MathUtils.java', 'valthorne/portable/**', 'valthorne/collections/**'
-}

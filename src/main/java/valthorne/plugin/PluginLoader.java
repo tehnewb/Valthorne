@@ -10,6 +10,8 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -26,7 +28,9 @@ import java.util.logging.Logger;
  *
  * <p>This class uses a configurable thread pool to load plugins concurrently, ensuring scalability while
  * preventing resource exhaustion. It provides detailed logging for debugging and monitoring using
- * Java's built-in {@link Logger}, and it maintains a list of successfully loaded plugins for later access.</p>
+ * Java's built-in {@link Logger}, and it maintains a list of successfully loaded plugins for later access.
+ * JAR class loaders remain open for lazy class and resource access until their final plugin is removed
+ * or this loader is shut down.</p>
  *
  * <p>Example usage:</p>
  * <pre>
@@ -59,6 +63,8 @@ public class PluginLoader {
     private final ExecutorService executor; // Executor responsible for asynchronous plugin loading.
 
     private final List<Plugin> loadedPlugins; // Thread-safe registry of successfully loaded plugins.
+    private final Map<Plugin, URLClassLoader> pluginLoaders = new IdentityHashMap<>(); // JAR owners retained until their final plugin unloads.
+    private boolean closed; // Whether shutdown has stopped accepting loaded plugins; guarded by loadedPlugins.
 
     /**
      * Constructs a {@code PluginLoader} with a specified thread pool size.
@@ -106,7 +112,8 @@ public class PluginLoader {
 
     /**
      * Loads plugins from a single JAR file asynchronously.
-     * Only classes implementing {@link Plugin} are loaded and instantiated.
+     * Only classes implementing {@link Plugin} are loaded and instantiated. Successful instances are
+     * registered with this loader, which keeps their JAR available until removal or shutdown.
      *
      * @param file The JAR file to load plugins from. Must be a valid, readable JAR file.
      * @return A {@link CompletableFuture} containing the list of loaded plugins from this JAR file.
@@ -122,12 +129,15 @@ public class PluginLoader {
     }
 
     /**
-     * Returns an unmodifiable view of the currently loaded plugins.
+     * Returns an immutable snapshot of the currently loaded plugins. Iteration
+     * needs no external synchronization while asynchronous loading continues.
      *
-     * @return A thread-safe, unmodifiable list of loaded {@link Plugin} instances.
+     * @return loaded plugins at the time of this call
      */
     public List<Plugin> getLoadedPlugins() {
-        return Collections.unmodifiableList(loadedPlugins);
+        synchronized (loadedPlugins) {
+            return List.copyOf(loadedPlugins);
+        }
     }
 
     /**
@@ -135,7 +145,8 @@ public class PluginLoader {
      * seconds for all tasks to complete.
      *
      * <p>This method should be called when the {@code PluginLoader} is no longer needed to ensure proper
-     * resource cleanup.</p>
+     * resource cleanup. Once loading stops, all remaining plugins are unloaded and their JAR class loaders
+     * are closed. Plugins must therefore finish their work before shutdown.</p>
      */
     public void shutdown() {
         if (!executor.isShutdown()) {
@@ -151,6 +162,11 @@ public class PluginLoader {
                 executor.shutdownNow();
                 Thread.currentThread().interrupt(); // Preserve interrupt status
             }
+        }
+        synchronized (loadedPlugins) {
+            closed = true;
+            while (!loadedPlugins.isEmpty())
+                removePlugin(loadedPlugins.get(loadedPlugins.size() - 1));
         }
     }
 
@@ -198,12 +214,7 @@ public class PluginLoader {
     private List<CompletableFuture<List<Plugin>>> submitLoadingTasks(File[] jarFiles) {
         List<CompletableFuture<List<Plugin>>> futures = new ArrayList<>(jarFiles.length);
         for (File file : jarFiles) {
-            futures.add(loadFromFile(file).thenApply(plugins -> {
-                synchronized (loadedPlugins) {
-                    loadedPlugins.addAll(plugins);
-                }
-                return plugins;
-            }));
+            futures.add(loadFromFile(file));
         }
         return futures;
     }
@@ -232,18 +243,57 @@ public class PluginLoader {
      */
     private List<Plugin> loadPluginsFromJar(File file) {
         List<Plugin> plugins = new ArrayList<>();
-        try (URLClassLoader classLoader = createClassLoader(file)) {
+        URLClassLoader classLoader;
+        try {
+            classLoader = createClassLoader(file);
+        } catch (IOException failure) {
+            throw new PluginLoadingException("Failed to open plugin JAR: " + file, failure);
+        }
+        boolean retained = false;
+        try {
             try (JarFile jar = new JarFile(file)) {
                 jar.stream()
                         .filter(entry -> entry.getName().endsWith(".class"))
                         .map(entry -> entry.getName().replace("/", ".").replace(".class", ""))
                         .forEach(className -> loadAndInstantiateClass(className, classLoader, file, plugins));
-                logger.log(Level.FINE, "Loaded {0} plugins from JAR: {1}", new Object[]{plugins.size(), file.getName()});
             }
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to process JAR file: " + file.getName(), e);
+            synchronized (loadedPlugins) {
+                if (closed)
+                    throw new IllegalStateException("Plugin loader was shut down while loading " + file);
+                for (Plugin plugin : plugins) {
+                    loadedPlugins.add(plugin);
+                    pluginLoaders.put(plugin, classLoader);
+                }
+                retained = !plugins.isEmpty();
+            }
+            return plugins;
+        } catch (IOException failure) {
+            throw new PluginLoadingException("Failed to read plugin JAR: " + file, failure);
+        } finally {
+            if (!retained) {
+                for (Plugin plugin : plugins) {
+                    try {
+                        plugin.unload();
+                    } catch (Exception failure) {
+                        logger.log(Level.SEVERE, "Failed to unload unregistered plugin: " + plugin.getClass().getName(), failure);
+                    }
+                }
+                closeClassLoader(classLoader);
+            }
         }
-        return plugins;
+    }
+
+    /**
+     * Releases a JAR handle after its plugins have finished using classes and resources.
+     *
+     * @param classLoader class loader whose final owner has been released
+     */
+    private void closeClassLoader(URLClassLoader classLoader) {
+        try {
+            classLoader.close();
+        } catch (IOException failure) {
+            logger.log(Level.SEVERE, "Failed to close plugin JAR class loader", failure);
+        }
     }
 
     /**
@@ -316,8 +366,8 @@ public class PluginLoader {
     /**
      * Unloads and removes a plugin instance from this loader.
      *
-     * <p>This will invoke {@code plugin.unload()} and then remove the instance
-     * from the internal {@code loadedPlugins} list. Any exception thrown by
+     * <p>This removes the instance before invoking {@code plugin.unload()},
+     * preventing duplicate removal during callbacks. The JAR is closed after its last plugin unloads. Any exception thrown by
      * {@code unload()} is logged but will not prevent the plugin from being
      * removed from the list.</p>
      *
@@ -328,26 +378,23 @@ public class PluginLoader {
     public boolean removePlugin(Plugin plugin) {
         Objects.requireNonNull(plugin, "plugin cannot be null");
 
-        // Fast check: only proceed if we actually track this plugin
-        boolean contained;
         synchronized (loadedPlugins) {
-            contained = loadedPlugins.contains(plugin);
-        }
-        if (!contained) {
-            logger.log(Level.FINE, "Attempted to remove a plugin that is not loaded: {0}", plugin.getClass().getName());
-            return false;
-        }
-
-        // Try to unload the plugin; log but continue on failure
-        try {
-            plugin.unload();
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error while unloading plugin: " + plugin.getClass().getName(), e);
-        }
-
-        // Remove from the list
-        synchronized (loadedPlugins) {
-            return loadedPlugins.remove(plugin);
+            if (!pluginLoaders.containsKey(plugin)) return false;
+            for (int i = 0; i < loadedPlugins.size(); i++) {
+                if (loadedPlugins.get(i) != plugin) continue;
+                loadedPlugins.remove(i);
+                break;
+            }
+            try {
+                plugin.unload();
+            } catch (Exception failure) {
+                logger.log(Level.SEVERE, "Error while unloading plugin: " + plugin.getClass().getName(), failure);
+            } finally {
+                URLClassLoader classLoader = pluginLoaders.remove(plugin);
+                if (classLoader != null && !pluginLoaders.containsValue(classLoader))
+                    closeClassLoader(classLoader);
+            }
+            return true;
         }
     }
 

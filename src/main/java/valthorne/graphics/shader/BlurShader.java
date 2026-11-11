@@ -1,7 +1,5 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 import valthorne.graphics.Sprite;
 
 /**
@@ -11,7 +9,7 @@ import valthorne.graphics.Sprite;
  * <ul>
  *     <li>Samples a 3x3 neighborhood around the current fragment (9 taps).</li>
  *     <li>Averages those samples to produce a soft blur.</li>
- *     <li>Multiplies the result by the incoming vertex color ({@code gl_Color}).</li>
+ *     <li>Multiplies the result by the incoming vertex color ({@code vertex tint}).</li>
  * </ul>
  *
  * <h2>How blur radius works</h2>
@@ -50,21 +48,16 @@ import valthorne.graphics.Sprite;
 public class BlurShader extends TexturedQuadShader {
 
     /**
-     * Fragment source loaded from the packaged blur effect shader resource.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/blur.frag");
-
-    /**
-     * Creates a new blur shader using the built-in GLSL sources.
+     * Creates a new blur shader using the packaged compiled stages.
      */
     public BlurShader() {
-        super(FRAG_SRC);
+        super("engine/effects/blur.frag");
     }
 
     /**
      * Binds the blur effect using the sprite's backing texture dimensions, draws
      * the sprite immediately, and unbinds the program on normal completion. Requires
-     * a current OpenGL context. The previous shader is not restored, and exceptions
+     * a current graphics device. The previous shader is not restored, and exceptions
      * can leave this program bound.
      *
      * @param sprite sprite with a valid backing texture

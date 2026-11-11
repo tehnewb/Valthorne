@@ -1,13 +1,11 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 /**
  * "Burn away" / dissolve shader built on top of {@link Shader}.
  *
  * <h2>What this shader does</h2>
  * <ul>
- *     <li>Samples the base texture at {@code v_uv} and tints it by {@code gl_Color}.</li>
+ *     <li>Samples the base texture at {@code v_uv} and tints it by {@code vertex tint}.</li>
  *     <li>Generates animated value-noise in UV space using {@code u_time}.</li>
  *     <li>Discards pixels where noise is below {@code u_threshold} (dissolve/burn-away).</li>
  *     <li>Adds a colored burn edge using {@code u_burnColor} and a small smoothstep band.</li>
@@ -54,15 +52,10 @@ import valthorne.io.file.ValthorneFiles;
 public class BurnShader extends TexturedQuadShader {
 
     /**
-     * Fragment source loaded from the packaged burn effect shader resource.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/burn.frag");
-
-    /**
-     * Creates a new burn shader using the built-in GLSL sources.
+     * Creates a new burn shader using the packaged compiled stages.
      */
     public BurnShader() {
-        super(FRAG_SRC);
+        super("engine/effects/burn.frag");
     }
 
     /**

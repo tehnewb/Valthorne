@@ -190,7 +190,7 @@ public class TexturePacker {
             blitRegionClipped(r, result);
         }
 
-        return new TextureData(result, (short) finalWidth, (short) finalHeight);
+        return new TextureData(result, finalWidth, finalHeight);
     }
 
     /**

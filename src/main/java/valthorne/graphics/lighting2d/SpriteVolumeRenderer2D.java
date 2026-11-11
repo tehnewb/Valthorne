@@ -2,14 +2,15 @@ package valthorne.graphics.lighting2d;
 
 import org.lwjgl.BufferUtils;
 import valthorne.Window;
-import valthorne.graphics.OpenGLStateSnapshot;
+import valthorne.graphics.bgfx.BgfxGraphics;
+import valthorne.graphics.bgfx.BgfxMeshRenderer;
+import valthorne.graphics.bgfx.BgfxRenderState;
+
+import static org.lwjgl.bgfx.BGFX.*;
 import valthorne.graphics.shader.Shader;
-import valthorne.io.file.ValthorneFiles;
 import valthorne.graphics.texture.TextureBatch;
 
 import java.nio.FloatBuffer;
-
-import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Stylized billboard volume shading, without generated normal textures.
@@ -18,9 +19,9 @@ import static org.lwjgl.opengl.GL33.*;
  * Honors sprite transforms/UVs, but not TextureBatch-local clipping or translation.
  */
 public final class SpriteVolumeRenderer2D implements AutoCloseable {
+    private final BgfxMeshRenderer bgfx; // Owned native mesh path.
+    private final BgfxRenderState bgfxState = new BgfxRenderState(); // Reused external drawing scope.
     private final Shader shader; // Owned shader for this rendering pass.
-    private final int vao; // Owned vertex array describing pass geometry.
-    private final int vbo; // Owned streaming vertex buffer.
     private final FloatBuffer vertices = BufferUtils.createFloatBuffer(24); // Reusable world/UV/card quad staging.
     private boolean closed; // Whether the owned GL resources were released.
     /**
@@ -33,31 +34,18 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
     private static final String[] ENERGY_NAMES = {"u_energy[0]", "u_energy[1]", "u_energy[2]", "u_energy[3]", "u_energy[4]"};
 
     /**
-     * Creates the shader and streaming quad resources on the current GL context,
+     * Creates the shader and streaming quad resources on the current graphics device,
      * restoring the caller's selected bindings afterward. Close on the same
      * graphics thread after the final pass.
      */
     public SpriteVolumeRenderer2D() {
-        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
-        try {
-            shader = new Shader(ValthorneFiles.readString("valthorne/shaders/lighting2d/sprite-volume.vert"), ValthorneFiles.readString("valthorne/shaders/lighting2d/sprite-volume.frag"));
-            vao = glGenVertexArrays();
-            vbo = glGenBuffers();
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferData(GL_ARRAY_BUFFER, 96, GL_STREAM_DRAW);
-            for (int i = 0; i < 3; i++) {
-                glEnableVertexAttribArray(i);
-                glVertexAttribPointer(i, 2, GL_FLOAT, false, 24, i * 8L);
-            }
-        } finally {
-            state.restore();
-        }
+        shader = new Shader("bgfx:engine/lighting/sprite-volume.vert", "bgfx:engine/lighting/sprite-volume.frag");
+        bgfx = new BgfxMeshRenderer(2, 2, 2);
     }
 
     /**
      * Shades one borrowed sprite card using a dominant light and up to four fills.
-     * Flushes the active batch, draws one quad, and restores selected GL state.
+     * Flushes the active batch, draws one quad, and restores selected engine render state.
      *
      * @param batch active scene batch
      * @param card borrowed sprite card and authored volume anchors
@@ -77,17 +65,10 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
         float baseX = quad.get(0) + card.anchorU * (quad.get(2) - quad.get(0)) + card.anchorV * (quad.get(6) - quad.get(0));
         float baseY = quad.get(1) + card.anchorU * (quad.get(3) - quad.get(1)) + card.anchorV * (quad.get(7) - quad.get(1));
         batch.flush();
-        OpenGLStateSnapshot state = new OpenGLStateSnapshot();
+
+        bgfxState.store();
         try {
-            glDisable(GL_DEPTH_TEST);
-            glDepthMask(false);
-            glDisable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-            glBlendEquation(GL_FUNC_ADD);
-            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-            glActiveTexture(GL_TEXTURE2);
-            glBindSampler(2, 0);
-            glBindTexture(GL_TEXTURE_2D, sprite.getTexture().getTextureID());
+            BgfxGraphics.bindTexture(2, sprite.getTexture().getTextureID());
             shader.bind();
             shader.setUniform1i("u_texture", 2);
             shader.setUniformMatrix4("u_projection", Window.getProjectionMatrix());
@@ -110,12 +91,9 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
                 vertices.put(c & 1).put(c >> 1);
             }
             vertices.flip();
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, vertices);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            bgfx.submit(vertices, shader, BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA | BGFX_STATE_PT_TRISTRIP | BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
         } finally {
-            state.restore();
+            bgfxState.restore();
         }
     }
 
@@ -135,7 +113,6 @@ public final class SpriteVolumeRenderer2D implements AutoCloseable {
         if (closed) return;
         closed = true;
         shader.dispose();
-        glDeleteBuffers(vbo);
-        glDeleteVertexArrays(vao);
+        bgfx.close();
     }
 }

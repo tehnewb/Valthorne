@@ -1,7 +1,5 @@
 package valthorne.graphics.shader;
 
-import valthorne.io.file.ValthorneFiles;
-
 import valthorne.graphics.Sprite;
 import java.nio.FloatBuffer;
 import valthorne.math.MathUtils;
@@ -11,7 +9,7 @@ import valthorne.math.MathUtils;
  * and optional horizontal ripple. Reflection and fade use the selected region,
  * preserving sprite flips. Ripple sampling is clamped inside that region;
  * displacement parameters use backing-texture pixels.
- * The shader owns its OpenGL program and requires a current context for creation,
+ * The shader owns its compiled bgfx program and requires a live device for creation,
  * drawing, and disposal.
  * <p>Applying the effect temporarily moves and resizes the sprite below its original
  * bounds, then restores those bounds after successful drawing. Failures can leave
@@ -32,17 +30,12 @@ import valthorne.math.MathUtils;
 public class ReflectionShader extends TexturedQuadShader {
 
     /**
-     * Fragment source loaded from the packaged reflection effect shader resource.
-     */
-    private static final String FRAG_SRC = ValthorneFiles.readString("valthorne/shaders/effects/reflection.frag");
-
-    /**
-     * Creates a reflection shader using built-in GLSL 120 sources.
+     * Creates a reflection shader using packaged compiled stages.
      *
-     * <p>This compiles and links the shader program immediately via {@link Shader#Shader(String, String)}.</p>
+     * <p>The renderer loads the stage compiled for the active graphics backend.</p>
      */
     public ReflectionShader() {
-        super(FRAG_SRC);
+        super("engine/effects/reflection.frag");
     }
 
     /**

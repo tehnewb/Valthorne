@@ -97,6 +97,15 @@ public class NanoCodeEditor extends NanoPanel {
         rebuildLines();
     }
 
+    /**
+     * Returns the owned editing model for native input-method integration.
+     * Mutations belong to the UI owner thread and retain normal change listeners.
+     * @return live source editing model
+     */
+    public TextEditModel getEditor() {
+        return model;
+    }
+
     @Override
     protected void applyLayout() {
         ResolvedStyle style = getStyle();
@@ -222,6 +231,7 @@ public class NanoCodeEditor extends NanoPanel {
     private void modelChanged() {
         blink = 0;
         if (!lastText.equals(model.text())) {
+            preferredColumn = -1;
             lastText = model.text();
             rebuildLines();
             changed.accept(lastText);

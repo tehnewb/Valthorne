@@ -95,14 +95,12 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: '5152FDD3'
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-          ALSOFT_DRIVERS: 'null'
         shell: bash
         run: |
           test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername"
           test -n "$ORG_GRADLE_PROJECT_mavenCentralPassword"
           test -n "$ORG_GRADLE_PROJECT_signingInMemoryKey"
-          bash ./gradlew publishAndReleaseToMavenCentral -PreleaseSigning=true \
-            -Pprototype3d=false -PeditorPrototype=false --console=plain
+          bash ./gradlew publishAndReleaseToMavenCentral -PreleaseSigning=true --console=plain
       - name: Record publication result
         env:
           RELEASE_VERSION: ${{ needs.verify.outputs.version }}

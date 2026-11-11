@@ -2,7 +2,7 @@ package valthorne.encryption;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.ChaCha20ParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 
 /**
  * The {@code ChaCha20Poly1305} class provides an implementation of the {@link EncryptionStrategy}
@@ -50,7 +50,7 @@ public record ChaCha20Poly1305(SecretKey key, byte[] nonce) implements Encryptio
     public byte[] encrypt(byte[] data) {
         try {
             Cipher cipher = Cipher.getInstance("ChaCha20-Poly1305");
-            ChaCha20ParameterSpec spec = new ChaCha20ParameterSpec(nonce, 1); // Counter starts at 1
+            IvParameterSpec spec = new IvParameterSpec(nonce);
             cipher.init(Cipher.ENCRYPT_MODE, key, spec);
             return cipher.doFinal(data);
         } catch (Exception e) {
@@ -74,7 +74,7 @@ public record ChaCha20Poly1305(SecretKey key, byte[] nonce) implements Encryptio
     public byte[] decrypt(byte[] data) {
         try {
             Cipher cipher = Cipher.getInstance("ChaCha20-Poly1305");
-            ChaCha20ParameterSpec spec = new ChaCha20ParameterSpec(nonce, 1); // Same nonce and counter
+            IvParameterSpec spec = new IvParameterSpec(nonce);
             cipher.init(Cipher.DECRYPT_MODE, key, spec);
             return cipher.doFinal(data);
         } catch (Exception e) {
