@@ -146,9 +146,14 @@ public final class Assets {
      */
     private static final AtomicInteger completedCount = new AtomicInteger(0);
     /**
-     * Prepared parameters and the type each batch load should request.
+     * Prepared requests indexed by the key they will use in the cache.
      */
-    private static final ConcurrentMap<AssetParameters, Class<?>> prepared = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<String, PreparedAsset> prepared = new ConcurrentHashMap<>();
+
+    /**
+     * Identifies the active progress counters. Guarded by CACHE_LOCK.
+     */
+    private static long progressGeneration;
     /**
      * Atomic count used as the prepared-loading progress denominator.
      */
@@ -197,12 +202,14 @@ public final class Assets {
 
     /**
      * Resets the progress tracking for asset loading operations.
-     * This method sets both the number of prepared assets and the number of completed assets to zero.
-     * It is useful for initializing or restarting the loading progress tracking.
+     * Counts any requests still queued and ignores completions from the previous batch.
      */
     public static void resetProgress() {
-        preparedCount.set(0);
-        completedCount.set(0);
+        synchronized (CACHE_LOCK) {
+            progressGeneration++;
+            preparedCount.set(prepared.size());
+            completedCount.set(0);
+        }
     }
 
     /**
@@ -548,8 +555,7 @@ public final class Assets {
 
     /**
      * Prepares the specified asset parameters for loading by marking them as prepared.
-     * This method ensures that the given parameters are only prepared once.
-     * If the parameters are already prepared, the method returns without action.
+     * The first request for a key supplies the parameters for that batch.
      *
      * @param params The asset parameters to prepare. Must not be null.
      * @throws NullPointerException If {@code params} is null.
@@ -565,16 +571,20 @@ public final class Assets {
      *
      * @param params asset parameters
      * @param assetType requested data or finished resource type
-     * @throws IllegalArgumentException if the same parameters are queued with another type
+     * @throws IllegalArgumentException if the same key is queued with another type
      */
     public static void prepare(AssetParameters params, Class<?> assetType) {
         Objects.requireNonNull(params);
         Objects.requireNonNull(assetType);
+        String key = Objects.requireNonNull(params.key());
         synchronized (CACHE_LOCK) {
-            Class<?> previous = prepared.putIfAbsent(params, assetType);
-            if (previous == null) preparedCount.incrementAndGet();
-            else if (previous != assetType)
-                throw new IllegalArgumentException("Asset already prepared as " + previous.getName() + ": " + params.key());
+            PreparedAsset previous = prepared.get(key);
+            if (previous == null) {
+                prepared.put(key, new PreparedAsset(params, assetType));
+                preparedCount.incrementAndGet();
+            } else if (previous.type() != assetType) {
+                throw new IllegalArgumentException("Asset already prepared as " + previous.type().getName() + ": " + key);
+            }
         }
     }
 
@@ -604,18 +614,21 @@ public final class Assets {
     public static CompletableFuture<Void> load() {
         ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
 
-        for (AssetParameters parameters : prepared.keySet()) {
-            Class<?> assetType = prepared.remove(parameters);
-            if (assetType == null) continue;
-
-            CompletableFuture<?> future = loadAsync(parameters, assetType)
+        for (String key : prepared.keySet()) {
+            long generation;
+            CompletableFuture<?> load;
+            synchronized (CACHE_LOCK) {
+                PreparedAsset request = prepared.remove(key);
+                if (request == null) continue;
+                generation = progressGeneration;
+                load = loadAsync(request.parameters(), request.type());
+            }
+            CompletableFuture<?> future = load
                     .whenComplete((_, ex) -> {
-                        if (ex != null) {
-                            ex.printStackTrace();
-                            return;
+                        synchronized (CACHE_LOCK) {
+                            if (generation == progressGeneration) completedCount.incrementAndGet();
                         }
-
-                        completedCount.incrementAndGet();
+                        if (ex != null) ex.printStackTrace();
                     });
 
             futures.add(future);
