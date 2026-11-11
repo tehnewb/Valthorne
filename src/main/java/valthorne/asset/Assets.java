@@ -255,9 +255,7 @@ public final class Assets {
             AssetEntry<?> existing = cache.get(key);
             if (existing != null) {
                 if (assetType.isAssignableFrom(existing.type())) return (CompletableFuture<T>) existing.future();
-                if (existing.type().isAssignableFrom(assetType)) return existing.future().thenApply(assetType::cast);
-                return CompletableFuture.failedFuture(new ClassCastException(
-                        "Asset " + key + " is registered as " + existing.type().getName() + ", not " + assetType.getName()));
+                return existing.future().thenApply(assetType::cast);
             }
             entry = new AssetEntry<>(key, assetType, new CompletableFuture<>(), selected == null ? null : selected::dispose);
             register(entry);
@@ -320,16 +318,31 @@ public final class Assets {
                 try {
                     asset = Objects.requireNonNull(loader.construct(input), "constructed asset");
                 } catch (Throwable failure) {
-                    future.completeExceptionally(appendSuppressed(failure, disposeAssetValue(input)));
+                    failConstruction(future, appendSuppressed(failure, disposeAssetValue(input)));
                     return;
                 }
                 if (!future.complete(asset)) loader.dispose(asset);
             }).whenComplete((ignored, failure) -> {
-                if (failure != null) future.completeExceptionally(failure);
+                if (failure != null) failConstruction(future, failure);
             });
         } catch (Throwable failure) {
-            future.completeExceptionally(failure);
+            failConstruction(future, failure);
         }
+    }
+
+    /**
+     * Completes a failed construction or reports an error after cancellation.
+     *
+     * @param future cached resource request
+     * @param failure construction, scheduling or cleanup failure
+     */
+    private static void failConstruction(CompletableFuture<?> future, Throwable failure) {
+        /*
+         * An already completed future cannot carry a late disposal error.
+         * Shutdown cancellation itself is expected and needs no report.
+         */
+        if (!future.completeExceptionally(failure) && !(failure instanceof CancellationException))
+            failure.printStackTrace();
     }
 
     /**
