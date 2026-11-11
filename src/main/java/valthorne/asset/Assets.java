@@ -25,7 +25,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -142,9 +141,9 @@ public final class Assets {
      */
     private static final ArrayList<AssetEntry<?>> registrationOrder = new ArrayList<>();
     /**
-     * Atomic completed-load progress counter.
+     * Completed-load progress counter. Guarded by CACHE_LOCK.
      */
-    private static final AtomicInteger completedCount = new AtomicInteger(0);
+    private static int completedCount;
     /**
      * Prepared requests indexed by the key they will use in the cache.
      */
@@ -155,9 +154,9 @@ public final class Assets {
      */
     private static long progressGeneration;
     /**
-     * Atomic count used as the prepared-loading progress denominator.
+     * Prepared-loading progress denominator. Guarded by CACHE_LOCK.
      */
-    private static final AtomicInteger preparedCount = new AtomicInteger(0);
+    private static int preparedCount;
     /**
      * Volatile owned virtual-thread executor, recreated after shutdown when needed.
      */
@@ -207,8 +206,8 @@ public final class Assets {
     public static void resetProgress() {
         synchronized (CACHE_LOCK) {
             progressGeneration++;
-            preparedCount.set(prepared.size());
-            completedCount.set(0);
+            preparedCount = prepared.size();
+            completedCount = 0;
         }
     }
 
@@ -221,8 +220,9 @@ public final class Assets {
      * @return the progress as a floating-point value between 0 and 1.
      */
     public static float getProgress() {
-        int total = preparedCount.get();
-        return total == 0 ? 1f : completedCount.get() / (float) total;
+        synchronized (CACHE_LOCK) {
+            return preparedCount == 0 ? 1f : completedCount / (float) preparedCount;
+        }
     }
 
     /**
@@ -550,7 +550,9 @@ public final class Assets {
      * assets matches the number of prepared assets; {@code false} otherwise.
      */
     public static boolean isFinished() {
-        return prepared.isEmpty() && completedCount.get() == preparedCount.get();
+        synchronized (CACHE_LOCK) {
+            return prepared.isEmpty() && completedCount == preparedCount;
+        }
     }
 
     /**
@@ -581,7 +583,7 @@ public final class Assets {
             PreparedAsset previous = prepared.get(key);
             if (previous == null) {
                 prepared.put(key, new PreparedAsset(params, assetType));
-                preparedCount.incrementAndGet();
+                preparedCount++;
             } else if (previous.type() != assetType) {
                 throw new IllegalArgumentException("Asset already prepared as " + previous.type().getName() + ": " + key);
             }
@@ -626,7 +628,7 @@ public final class Assets {
             CompletableFuture<?> future = load
                     .whenComplete((_, ex) -> {
                         synchronized (CACHE_LOCK) {
-                            if (generation == progressGeneration) completedCount.incrementAndGet();
+                            if (generation == progressGeneration) completedCount++;
                         }
                         if (ex != null) ex.printStackTrace();
                     });
