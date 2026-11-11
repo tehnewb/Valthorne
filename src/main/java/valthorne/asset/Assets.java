@@ -321,9 +321,16 @@ public final class Assets {
                     failConstruction(future, appendSuppressed(failure, disposeAssetValue(input)));
                     return;
                 }
-                if (!future.complete(asset)) loader.dispose(asset);
+                if (!future.complete(asset)) {
+                    try {
+                        loader.dispose(asset);
+                    } catch (Throwable failure) {
+                        failConstruction(future, failure);
+                    }
+                }
             }).whenComplete((ignored, failure) -> {
-                if (failure != null) failConstruction(future, failure);
+                if (failure instanceof CancellationException) future.completeExceptionally(failure);
+                else if (failure != null) failConstruction(future, failure);
             });
         } catch (Throwable failure) {
             failConstruction(future, failure);
@@ -339,10 +346,8 @@ public final class Assets {
     private static void failConstruction(CompletableFuture<?> future, Throwable failure) {
         /*
          * An already completed future cannot carry a late disposal error.
-         * Shutdown cancellation itself is expected and needs no report.
          */
-        if (!future.completeExceptionally(failure) && !(failure instanceof CancellationException))
-            failure.printStackTrace();
+        if (!future.completeExceptionally(failure)) failure.printStackTrace();
     }
 
     /**
