@@ -94,7 +94,7 @@ export async function prepareBrowserLoaders(root, output) {
             source = source.replaceAll("ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>()", "ArrayList<CompletableFuture<?>> futures = new ArrayList<>()");
             source = source.replaceAll("ExecutorService", "BrowserExecutor");
             source = source.replaceAll("Executors.newVirtualThreadPerTaskExecutor()", "new BrowserExecutor()");
-            source = source.replaceAll("for (AssetParameters parameters : prepared)", "for (AssetParameters parameters : new ArrayList<>(prepared))");
+            source = source.replaceAll("for (String key : prepared.keySet())", "for (String key : new ArrayList<>(prepared.keySet()))");
             source = source.replace("private static volatile BrowserExecutor service", "private static BrowserExecutor service");
             const lock = source.indexOf("    private static final Object SERVICE_LOCK");
             if (lock < 0) throw new Error("Review browser asset executor ownership");
