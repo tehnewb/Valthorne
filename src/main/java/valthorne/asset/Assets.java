@@ -381,6 +381,21 @@ public final class Assets {
     }
 
     /**
+     * Checks whether a named asset is available without waiting. For a constructed
+     * resource, the result becomes true after its render-thread construction.
+     *
+     * @param key cache name to check
+     * @return true when the cache holds a successfully loaded value
+     */
+    public static boolean isLoaded(String key) {
+        /*
+         * Pending, failed and cancelled futures cannot provide a usable asset.
+         */
+        AssetEntry<?> entry = cache.get(key);
+        return entry != null && entry.completedValue() != null;
+    }
+
+    /**
      * Retrieves a cached value associated with the given key and casts it to the specified type.
      *
      * @param <T>  The type of the object to be returned.
