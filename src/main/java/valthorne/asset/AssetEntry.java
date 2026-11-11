@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 final class AssetEntry<T> {
 
     private final String key; // Cache name used for removal from the lookup index.
+    private final Class<?> type; // Declared output type, or Object for a prepared load.
     private final CompletableFuture<T> future; // Shared pending or completed resource.
     private final Consumer<? super T> disposer; // Explicit cleanup, or null for loaded-data discovery.
 
@@ -20,11 +21,13 @@ final class AssetEntry<T> {
      * Creates an entry before publishing it in the cache.
      *
      * @param key validated cache name
+     * @param type declared output class
      * @param future shared resource future
      * @param disposer explicit cleanup, or null for automatic discovery
      */
-    AssetEntry(String key, CompletableFuture<T> future, Consumer<? super T> disposer) {
+    AssetEntry(String key, Class<?> type, CompletableFuture<T> future, Consumer<? super T> disposer) {
         this.key = key;
+        this.type = type;
         this.future = future;
         this.disposer = disposer;
     }
@@ -37,6 +40,13 @@ final class AssetEntry<T> {
     String key() {
         return key;
     }
+
+    /**
+     * Returns the declared output type for compatibility checks on duplicate requests.
+     *
+     * @return declared output class
+     */
+    Class<?> type() { return type; }
 
     /**
      * Returns the shared future used by existing asynchronous APIs.
