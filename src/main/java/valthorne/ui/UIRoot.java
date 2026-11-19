@@ -1279,7 +1279,8 @@ public class UIRoot extends UIContainer implements GraphicsResource {
 
     /**
      * Returns the lazily created animation manager advanced by this root's update.
-     * Call on the UI owner thread. Layout tweens run before layout calculation,
+     * Call on the UI owner thread. Pending layout is resolved before tweens capture
+     * start values; tween changes are then laid out before input and node updates,
      * including tweens on invisible nodes. Do not also update this manager manually.
      * Removing a subtree kills managed tweens that target its nodes, including a
      * containing Timeline. Root disposal kills all remaining managed tweens.

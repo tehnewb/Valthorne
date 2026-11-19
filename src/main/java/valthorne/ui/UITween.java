@@ -10,7 +10,8 @@ import aurelienribon.tweenengine.TweenAccessor;
  * margins and parent padding can constrain the final bounds. Layout values are
  * captured from computed geometry when the tween starts. Rotation is in degrees.
  * Opacity affects the whole subtree and is multiplied with ancestor opacity.
- * No objects are allocated by accessor updates. All access is on the UI thread.
+ * Rotation and opacity updates allocate nothing; layout updates use the existing
+ * layout setters and their immutable values. All access is on the UI thread.
  */
 public final class UITween implements TweenAccessor<UINode> {
     /**
@@ -89,6 +90,8 @@ public final class UITween implements TweenAccessor<UINode> {
 
     @Override
     public void setValues(UINode node, int property, float[] values) {
+        // A callback can detach the target after the engine's cancellation check.
+        if (!node.hasYogaNode()) return;
         switch (property) {
             case POSITION -> node.getLayout()
                     .left(values[0])

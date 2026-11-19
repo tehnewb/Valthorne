@@ -346,8 +346,11 @@ public final class UIRenderContext {
     void drawDragPreview(UINode node) {
         float previousDragOpacity = dragOpacity;
         float previousBatchOpacity = batch.getOpacityMultiplier();
-        dragOpacity *= DRAG_OPACITY;
-        batch.setOpacityMultiplier(previousBatchOpacity * DRAG_OPACITY);
+        float previewOpacity = DRAG_OPACITY;
+        for (UINode ancestor = node.getParent(); ancestor != null && ancestor != root; ancestor = ancestor.getParent())
+            previewOpacity *= ancestor.getOpacity();
+        dragOpacity *= previewOpacity;
+        batch.setOpacityMultiplier(previousBatchOpacity * previewOpacity);
         try {
             draw(node);
         } finally {
