@@ -57,14 +57,20 @@ public final class UITween implements TweenAccessor<UINode> {
          */
         if (property < POSITION || property > OPACITY) throw new IllegalArgumentException("Unknown UI tween property: " + property);
         if (!Float.isFinite(duration) || duration < 0) throw new IllegalArgumentException("Duration must be finite and nonnegative");
+        if ((property == POSITION || property == SIZE) && !node.hasYogaNode())
+            throw new IllegalStateException("Layout tweens require an attached UI node");
         return Tween.to(node, property, duration)
                 .cast(UINode.class);
     }
 
     @Override
     public int getValues(UINode node, int property, float[] values) {
-        if ((property == POSITION || property == SIZE) && !node.hasYogaNode())
-            throw new IllegalStateException("Layout tweens require an attached UI node");
+        if ((property == POSITION || property == SIZE) && !node.hasYogaNode()) {
+            // A cancelled Timeline can still initialize children after its callback.
+            values[0] = 0;
+            values[1] = 0;
+            return 2;
+        }
         switch (property) {
             case POSITION -> {
                 values[0] = node.getX();
