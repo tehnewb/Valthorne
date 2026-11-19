@@ -82,6 +82,7 @@ def browserEngineApi = tasks.register('browserEngineApi', Jar) {
 
 dependencies {
     compileOnly project(':')
+    api 'org.mini2Dx:universal-tween-engine:6.3.3'
     implementation files(browserEngineApi)
     api 'org.teavm:teavm-jso:0.16.0'
     api 'org.teavm:teavm-jso-apis:0.16.0'

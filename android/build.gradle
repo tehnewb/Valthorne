@@ -94,6 +94,7 @@ def androidJoltApi = tasks.register('androidJoltApi', Jar) {
 }
 
 dependencies {
+    api 'org.mini2Dx:universal-tween-engine:6.3.3'
     compileOnly project(':')
     api files(androidEngineApi)
     api 'org.joml:joml:1.10.9'

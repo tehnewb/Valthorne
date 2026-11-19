@@ -87,7 +87,7 @@ public final class UIRenderContext {
     private float transformX; // Accumulated rigid transform translation in world coordinates.
     private float transformY; // Accumulated rigid transform translation in world coordinates.
     private boolean nanoActive; // True while NanoVG is selected; false while texture painting is selected.
-    private float dragOpacity = 1f; // Opacity applied only while painting the lifted item.
+    private float dragOpacity = 1f; // Accumulated root, ancestor and drag-preview opacity.
     private int nodesDrawn; // Node attempts, backend transitions, and NanoVG submissions for this draw.
     private int backendSwitches; // Node attempts, backend transitions, and NanoVG submissions for this draw.
     private int nanoFlushes; // Node attempts, backend transitions, and NanoVG submissions for this draw.
@@ -107,6 +107,7 @@ public final class UIRenderContext {
         this.batch = batch;
         this.root = root;
         this.vg = vg;
+        dragOpacity = root.getOpacity();
         this.height = root.getRenderSpaceHeight();
         var viewport = root.getViewport();
         var camera = viewport == null ? null : viewport.getCamera();
@@ -345,7 +346,7 @@ public final class UIRenderContext {
     void drawDragPreview(UINode node) {
         float previousDragOpacity = dragOpacity;
         float previousBatchOpacity = batch.getOpacityMultiplier();
-        dragOpacity = DRAG_OPACITY;
+        dragOpacity *= DRAG_OPACITY;
         batch.setOpacityMultiplier(previousBatchOpacity * DRAG_OPACITY);
         try {
             draw(node);
@@ -372,6 +373,24 @@ public final class UIRenderContext {
      */
     private void drawNode(UINode node, boolean restoreBackend) {
         if (node == null || !node.isVisible() || root.skipsDragPreviewSource(node) || root.skipsExternalPresentation(node)) return;
+        float previousOpacity = dragOpacity;
+        float previousBatchOpacity = batch.getOpacityMultiplier();
+        dragOpacity *= node.getOpacity();
+        batch.setOpacityMultiplier(previousBatchOpacity * node.getOpacity());
+        try {
+            drawTransformedNode(node, restoreBackend);
+        } finally {
+            dragOpacity = previousOpacity;
+            batch.setOpacityMultiplier(previousBatchOpacity);
+        }
+    }
+
+    /**
+     * Dispatches a visible node under its inherited opacity and optional rotation.
+     * @param node visible node
+     * @param restoreBackend whether dispatch restores the previous painter
+     */
+    private void drawTransformedNode(UINode node, boolean restoreBackend) {
         if (node.getRotation() == 0) {
             drawNodeContents(node, restoreBackend);
             return;
