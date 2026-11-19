@@ -64,6 +64,7 @@ def lwjglNativeClassifiers = [
 ]
 
 dependencies {
+    api 'org.mini2Dx:universal-tween-engine:6.3.3'
     api 'net.onedaybeard.artemis:artemis-odb:2.3.0'
     api platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
 

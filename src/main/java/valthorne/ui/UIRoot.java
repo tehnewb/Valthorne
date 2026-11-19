@@ -1,5 +1,8 @@
 package valthorne.ui;
 
+import aurelienribon.tweenengine.TweenManager;
+import aurelienribon.tweenengine.Tween;
+
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
@@ -174,6 +177,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
     private UIRotationShader rotationShader; // Lazily created texture shader owned by this root for rotated UI scopes.
     private UIRenderContext renderContext; // Borrowed active mixed-backend drawing context, null outside drawing.
     private boolean disposed; // Whether root resource disposal has been requested.
+    private TweenManager tweenManager; // Lazily owned UI animation manager, updated before layout.
     boolean blockLowerInput; // Whether handled root input consumes events before lower-priority listeners.
     boolean pointerOwned; // Whether the current pointer gesture began on this root.
     private int inputPriority; // Priority of this root's keyboard, pointer, scroll, and text subscriptions.
@@ -727,6 +731,10 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      */
     @Override
     public void update(float delta) {
+        if (disposed) return;
+        if (tweenManager != null && isLayoutDirty()) layout(false);
+        if (tweenManager != null) tweenManager.update(delta);
+        if (disposed) return;
         if (pressed != null && !isNodeInteractiveNow(pressed)) cancelPointer();
         if (focused != null && !isNodeFocusableNow(focused)) setFocusTo(null);
         if (isLayoutDirty()) layout(false);
@@ -806,6 +814,8 @@ public class UIRoot extends UIContainer implements GraphicsResource {
         if (viewport != null) viewport.bind();
         try {
             batch.begin();
+            float previousOpacity = batch.getOpacityMultiplier();
+            batch.setOpacityMultiplier(previousOpacity * getOpacity());
             try {
                 if (clipToViewport) {
                     if (customViewportClip)
@@ -823,6 +833,7 @@ public class UIRoot extends UIContainer implements GraphicsResource {
                 UIRenderContext completed = renderContext;
                 renderContext = null;
                 if (clipToViewport) batch.endScissor();
+                batch.setOpacityMultiplier(previousOpacity);
                 batch.end();
                 if (completed != null) {
                     frameStats = new UIFrameStats(pendingLayoutPasses, pendingLayoutNanos, System.nanoTime() - renderStarted, completed.getNodesDrawn(), completed.getBackendSwitches(), completed.getNanoFlushes(), batch.getTotalDrawCalls() - textureCallsBefore);
@@ -973,6 +984,10 @@ public class UIRoot extends UIContainer implements GraphicsResource {
     public void dispose() {
         if (disposed) return;
         disposed = true;
+        if (tweenManager != null) {
+            tweenManager.killAll();
+            tweenManager = null;
+        }
         hideActiveTooltip();
 
         Keyboard.removeKeyListener(keyListener);
@@ -1258,7 +1273,44 @@ public class UIRoot extends UIContainer implements GraphicsResource {
      * @param node subtree about to detach
      */
     void nodeWillDetach(UINode node) {
+        cancelTweens(node);
         cancelInput(node);
+    }
+
+    /**
+     * Returns the lazily created animation manager advanced by this root's update.
+     * Call on the UI owner thread. Pending layout is resolved before tweens capture
+     * start values; tween changes are then laid out before input and node updates,
+     * including tweens on invisible nodes. Do not also update this manager manually.
+     * Removing a subtree kills managed tweens that target its nodes, including a
+     * containing Timeline. Root disposal kills all remaining managed tweens.
+     * <pre>{@code
+     * panel.tween(UITween.OPACITY, 0.3f)
+     *         .target(0f)
+     *         .start(ui.getTweenManager());
+     * }</pre>
+     * @return borrowed root-owned Universal Tween Engine manager
+     * @throws IllegalStateException if this root has been disposed
+     */
+    public TweenManager getTweenManager() {
+        if (disposed) throw new IllegalStateException("UIRoot has been disposed.");
+        if (tweenManager == null) {
+            Tween.registerAccessor(UINode.class, UITween.ACCESSOR);
+            tweenManager = new TweenManager();
+        }
+        return tweenManager;
+    }
+
+    /**
+     * Cancels animations of a subtree before its native layout nodes are freed.
+     * @param node subtree about to detach
+     */
+    private void cancelTweens(UINode node) {
+        if (tweenManager == null) return;
+        tweenManager.killTarget(node);
+        if (node instanceof UIContainer container) {
+            for (int i = 0; i < container.size(); i++) cancelTweens(container.get(i));
+        }
     }
 
     /**

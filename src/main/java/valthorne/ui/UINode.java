@@ -1,5 +1,7 @@
 package valthorne.ui;
 
+import aurelienribon.tweenengine.Tween;
+
 import valthorne.math.geometry.Dimensional;
 
 import org.lwjgl.util.yoga.Yoga;
@@ -197,6 +199,7 @@ public abstract class UINode implements Dimensional {
     private final ShortBits bits = new ShortBits(); // Compact bitset holding node interaction and state flags.
     private final Rectangle bounds = new Rectangle(); // Cached bounds built from Yoga layout results.
     private float rotation; // Counterclockwise visual angle around the laid-out center, in degrees.
+    private float opacity = 1f; // Local opacity multiplied through the rendered subtree.
     private float rotationCosine = 1; // Cached orientation cosine for allocation-free hit testing.
     private float rotationSine; // Cached orientation sine for allocation-free hit testing.
     private Tooltip tooltip; // Optional tooltip displayed for this node.
@@ -1455,6 +1458,37 @@ public abstract class UINode implements Dimensional {
      */
     public final float getRotation() {
         return rotation;
+    }
+
+    /**
+     * Returns local opacity, excluding opacity inherited from ancestors.
+     * @return opacity from zero to one
+     */
+    public final float getOpacity() {
+        return opacity;
+    }
+
+    /**
+     * Sets subtree opacity for texture and NanoVG rendering. Zero opacity keeps
+     * layout, updates and input active, allowing a fade to be reversed.
+     * @param opacity finite opacity, clamped to zero through one
+     */
+    public final void setOpacity(float opacity) {
+        if (!Float.isFinite(opacity)) throw new IllegalArgumentException("Opacity must be finite");
+        this.opacity = Math.clamp(opacity, 0f, 1f);
+    }
+
+    /**
+     * Creates an unstarted Universal Tween Engine tween for this node.
+     * Configure targets, easing, delay, repeats or callbacks before starting it
+     * with {@code start(root.getTweenManager())}, or add it to a Timeline.
+     * Use {@link UITween} constants to select the property. Times are in seconds.
+     * @param property supported UI property identifier
+     * @param duration finite nonnegative duration in seconds
+     * @return pooled tween owned by its manager after starting
+     */
+    public final Tween tween(int property, float duration) {
+        return UITween.create(this, property, duration);
     }
 
     /**
